@@ -12,4 +12,4 @@ RUN git clone https://github.com/fboulnois/pg_uuidv7.git /tmp/pg_uuidv7 \
     && make install \
     && rm -rf /tmp/pg_uuidv7
 
-RUN echo "\\c main\nCREATE EXTENSION IF NOT EXISTS pg_uuidv7;" > /docker-entrypoint-initdb.d/01-pg_uuidv7.sql
+COPY init.sql /docker-entrypoint-initdb.d/
