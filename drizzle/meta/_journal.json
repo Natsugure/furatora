@@ -8,6 +8,27 @@
       "when": 1768748874149,
       "tag": "0000_ordinary_fixer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768951598869,
+      "tag": "0001_cute_slipstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768952765360,
+      "tag": "0002_open_peter_quill",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769219442295,
+      "tag": "0003_left_gabe_jones",
+      "breakpoints": true
     }
   ]
 }

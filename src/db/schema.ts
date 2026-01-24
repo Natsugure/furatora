@@ -1,35 +1,40 @@
-import { pgTable, varchar, decimal, integer, timestamp, text, jsonb, uuid, boolean, primaryKey } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { pgTable, varchar, decimal, integer, timestamp, text, jsonb, uuid, boolean, primaryKey, unique } from 'drizzle-orm/pg-core';
+import { gt, sql } from 'drizzle-orm';
 
 export const stations = pgTable('stations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  code: varchar('code', { length: 20 }),
+  gtfsStopId: varchar('gtfs_stop_id', { length: 10 }), // GTFSのstop_id(101, 102, 2401など)
+  code: varchar('code', { length: 20 }), // 駅ナンバリング
   name: varchar('name', { length: 100 }).notNull(),
   lat: decimal('lat', { precision: 9, scale: 6 }),
   lon: decimal('lon', { precision: 9, scale: 6 }),
   wheelchairBoarding: integer('wheelchair_boarding'),
-  operators: uuid('operators').references(() => operators.id).notNull(),
+  operatorId: uuid('operators').references(() => operators.id).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (t) => [
+    unique('uniqueStopPerOperator').on(t.gtfsStopId, t.operatorId),
+]);
+
 
 export const lines = pgTable('lines', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  gtfsRouteId: varchar('gtfs_route_id', { length: 10 }), // GTFSのroute_id
   shortName: varchar('short_name', { length: 50 }),
   longName: varchar('long_name', { length: 100 }).notNull(),
   color: varchar('color', { length: 6 }),
   operators: uuid('operators').references(() => operators.id).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
-});
+}, (t) => [
+  unique('uniqueRoutePerOperator').on(t.gtfsRouteId, t.operators),
+]);
 
 export const stationLines = pgTable('station_lines', {
   stationId: uuid('station_id').references(() => stations.id).notNull(),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
-}, (table) => {
-  return {
-    pk: primaryKey({ columns: [table.stationId, table.lineId] }),
-  };
-});
+}, (t) => [
+    primaryKey({ columns: [t.stationId, t.lineId] }),
+]);
 
 export const stationAccessibility = pgTable('station_accessibility', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
@@ -60,6 +65,7 @@ export const trains = pgTable('trains', {
 
 export const operators = pgTable('operators', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  name: varchar('name', { length: 100 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull().unique('operators_name_unique'),
+  gtfsAgencyId: varchar('gtfs_agency_id', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
