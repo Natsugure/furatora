@@ -3,12 +3,12 @@ services:
     image: postgres:17
     command: '-d 1'
     build: 
-      context: .
-      dockerfile: Dockerfile
+      context: ./docker
+      dockerfile: Dockerfile.postgres
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
-      - '5433:5432'
+      - '5432:5432'
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -22,28 +22,12 @@ services:
   neon-proxy:
     image: ghcr.io/timowilhelm/local-neon-http-proxy:main
     environment:
-      - PG_CONNECTION_STRING=postgres://postgres:postgres@postgres:5432/main
+      - PG_CONNECTION_STRING=${DATABASE_URL}
     ports:
       - '4444:4444'
     depends_on:
       postgres:
         condition: service_healthy
 
-  pgadmin4:
-    image: dpage/pgadmin4:9.11.0
-    ports:
-      - 8080:80
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./config/servers.json:/pgadmin4/servers.json
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-    depends_on:
-      - postgres
-
 volumes:
   db_data:
-  pgadmin_data:

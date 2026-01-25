@@ -1,0 +1,33 @@
+{
+  "name": "@stroller-transit-app/frontend",
+  "version": "0.1.0",
+  "description": "",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "keywords": [],
+  "author": "Natsugure",
+  "packageManager": "pnpm@10.7.0",
+  "devDependencies": {
+    "@stroller-transit-app/typescript-config": "workspace:*",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.3",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@stroller-transit-app/database": "workspace:*",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
+    "next": "16.1.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
+}

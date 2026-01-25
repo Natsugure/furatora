@@ -1,0 +1,21 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "update-gtfs": "tsx src/update-gtfs.ts"
+  },
+  "dependencies": {
+    "@stroller-transit-app/database": "workspace:*",
+    "adm-zip": "^0.5.16",
+    "drizzle-orm": "^0.45.1",
+    "papaparse": "^5.5.3"
+  },
+  "devDependencies": {
+    "@stroller-transit-app/typescript-config": "workspace:*",
+    "@types/adm-zip": "^0.5.7",
+    "@types/papaparse": "^5.5.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
