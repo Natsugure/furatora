@@ -49,3 +49,6 @@ public/gtfs-data/*
 
 # VSCode config files
 .vscode/
+
+# temporary ignore
+.github
