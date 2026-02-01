@@ -1,0 +1,1 @@
+ALTER TABLE "stations" ALTER COLUMN "odpt_station_id" SET DATA TYPE varchar(100);

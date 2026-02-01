@@ -1,0 +1,1 @@
+ALTER TABLE "lines" ALTER COLUMN "odpt_railway_id" SET DATA TYPE varchar(100);

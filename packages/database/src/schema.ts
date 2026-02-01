@@ -3,34 +3,37 @@ import { sql } from 'drizzle-orm';
 
 export const stations = pgTable('stations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  gtfsStopId: varchar('gtfs_stop_id', { length: 10 }), // GTFSのstop_id(101, 102, 2401など)
-  code: varchar('code', { length: 20 }), // 駅ナンバリング
+  odptStationId: varchar('odpt_station_id', { length: 100 }), // ODPT API の owl:sameAs (例: odpt.Station:TokyoMetro.Marunouchi.Shinjuku)
+  code: varchar('code', { length: 20 }), // 駅ナンバリング (例: M08)
   name: varchar('name', { length: 100 }).notNull(),
+  nameEn: varchar('name_en', { length: 100 }),
   lat: decimal('lat', { precision: 9, scale: 6 }),
   lon: decimal('lon', { precision: 9, scale: 6 }),
-  wheelchairBoarding: integer('wheelchair_boarding'),
-  operatorId: uuid('operators').references(() => operators.id).notNull(),
+  operatorId: uuid('operator_id').references(() => operators.id).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-    unique('uniqueStopPerOperator').on(t.gtfsStopId, t.operatorId),
+    unique('uniqueStationPerOperator').on(t.odptStationId, t.operatorId),
 ]);
 
 export const lines = pgTable('lines', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  gtfsRouteId: varchar('gtfs_route_id', { length: 10 }), // GTFSのroute_id
-  shortName: varchar('short_name', { length: 50 }),
-  longName: varchar('long_name', { length: 100 }).notNull(),
-  color: varchar('color', { length: 6 }),
-  operators: uuid('operators').references(() => operators.id).notNull(),
+  odptRailwayId: varchar('odpt_railway_id', { length: 100 }), // ODPT API の owl:sameAs (例: odpt.Railway:TokyoMetro.Marunouchi)
+  lineCode: varchar('line_code', { length: 10 }), // 路線コード (例: M)
+  name: varchar('name', { length: 100 }).notNull(),
+  nameEn: varchar('name_en', { length: 100 }),
+  color: varchar('color', { length: 7 }), // カラーコード (例: #F62E36)
+  operatorId: uuid('operator_id').references(() => operators.id).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-  unique('uniqueRoutePerOperator').on(t.gtfsRouteId, t.operators),
+  unique('uniqueRailwayPerOperator').on(t.odptRailwayId, t.operatorId),
 ]);
 
 export const stationLines = pgTable('station_lines', {
   stationId: uuid('station_id').references(() => stations.id).notNull(),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
+  stationOrder: integer('station_order'), // 路線内での駅の順序 (ODPT の odpt:index)
 }, (t) => [
     primaryKey({ columns: [t.stationId, t.lineId] }),
 ]);
@@ -54,24 +57,41 @@ export const trains = pgTable('trains', {
   name: varchar('name', { length: 100 }).notNull(),
   operators: uuid('operators').references(() => operators.id).notNull(),
   lines: uuid('lines').references(() => lines.id).array().notNull(),
-  freeSpaces: jsonb('free_spaces').$type<{
-    car: number;
-    door: number;  
-  }[]>(),
+  carCount: integer('car_count').notNull(),
+  carStructure: jsonb('car_configuration').$type<CarStructure>(),
+  freeSpaces: jsonb('free_spaces').$type<FreeSpace[]>(),
+  prioritySeats: jsonb('priority_seats').$type<PrioritySeat[]>(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
+export type CarStructure = {
+  carNumber: number;
+  doorCount: number;
+};
+
+export type FreeSpace = {
+  carNumber: number;
+  nearDoor: number;
+}
+
+export type PrioritySeat = {
+  carNumber: number;
+  nearDoor: number;
+}
+
+
 export const operators = pgTable('operators', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   name: varchar('name', { length: 100 }).notNull().unique('operators_name_unique'),
-  gtfsAgencyId: varchar('gtfs_agency_id', { length: 100 }),
+  odptOperatorId: varchar('odpt_operator_id', { length: 100 }), // ODPT API の odpt:operator (例: odpt.Operator:TokyoMetro)
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export const gtfsMetadata = pgTable('gtfs_metadata', {
+export const odptMetadata = pgTable('odpt_metadata', {
   id: serial('id').primaryKey(),
   operator: varchar('operator', { length: 50 }).notNull().unique(),
-  hash: varchar('hash', { length: 64 }).notNull(),
+  railwayHash: varchar('railway_hash', { length: 64 }),
+  stationHash: varchar('station_hash', { length: 64 }),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
