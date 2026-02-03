@@ -5,19 +5,16 @@ import { OperatorList } from '@/components/OperatorList';
 import type { OperatorWithLines } from '@/types';
 
 async function fetchOperatorsWithLines(): Promise<OperatorWithLines[]> {
-  // Fetch all operators
   const operatorList = await db
     .select()
     .from(operators)
     .orderBy(asc(operators.name));
 
-  // Fetch all lines
   const lineList = await db
     .select()
     .from(lines)
-    .orderBy(asc(lines.operatorId), asc(lines.name));
+    .orderBy(asc(lines.operatorId), asc(lines.displayOrder));
 
-  // Group lines by operatorId
   return operatorList.map((op) => ({
     ...op,
     lines: lineList.filter((line) => line.operatorId === op.id),

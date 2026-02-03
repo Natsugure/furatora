@@ -7,10 +7,12 @@ export type Operator = {
 
 export type Line = {
   id: string;
+  slug: string | null;
   name: string;
   nameEn: string | null;
   lineCode: string | null;
   color: string | null;
+  displayOrder: number | null;
   operatorId: string;
 };
 

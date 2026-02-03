@@ -1,6 +1,5 @@
 services:
   postgres:
-    image: postgres:17
     command: '-d 1'
     build: 
       context: ./docker

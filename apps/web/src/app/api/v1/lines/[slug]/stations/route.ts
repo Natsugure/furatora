@@ -5,18 +5,17 @@ import { eq, asc } from 'drizzle-orm';
 import type { LineStationsApiResponse } from '@/types';
 
 type RouteParams = {
-  params: Promise<{ lineId: string }>;
+  params: Promise<{ slug: string }>;
 };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { lineId } = await params;
+  const { slug } = await params;
 
   try {
-    // Get line details first
     const lineRecord = await db
       .select()
       .from(lines)
-      .where(eq(lines.id, lineId))
+      .where(eq(lines.slug, slug))
       .limit(1);
 
     if (!lineRecord.length) {
@@ -28,7 +27,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const line = lineRecord[0];
 
-    // Get stations with stationOrder
     const stationsResult = await db
       .select({
         id: stations.id,
@@ -41,16 +39,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       })
       .from(stationLines)
       .innerJoin(stations, eq(stationLines.stationId, stations.id))
-      .where(eq(stationLines.lineId, lineId))
+      .where(eq(stationLines.lineId, line.id))
       .orderBy(asc(stationLines.stationOrder));
 
     const response: LineStationsApiResponse = {
       line: {
         id: line.id,
+        slug: line.slug,
         name: line.name,
         nameEn: line.nameEn,
         lineCode: line.lineCode,
         color: line.color,
+        displayOrder: line.displayOrder,
         operatorId: line.operatorId,
       },
       stations: stationsResult,

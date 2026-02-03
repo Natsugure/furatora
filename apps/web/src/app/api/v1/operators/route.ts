@@ -16,7 +16,7 @@ export async function GET() {
     const lineList = await db
       .select()
       .from(lines)
-      .orderBy(asc(lines.operatorId), asc(lines.name));
+      .orderBy(asc(lines.operatorId), asc(lines.displayOrder));
 
     // Group lines by operatorId
     const operatorsWithLines: OperatorWithLines[] = operatorList.map((op) => ({

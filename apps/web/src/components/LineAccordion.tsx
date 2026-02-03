@@ -8,7 +8,7 @@ type Props = {
 export function LineAccordion({ line }: Props) {
   return (
     <Link
-      href={`/lines/${line.id}/stations`}
+      href={`/lines/${line.slug}/stations`}
       className="block p-3 rounded-lg hover:bg-gray-50 border border-gray-100 transition-colors"
     >
       <div className="flex items-center gap-3">

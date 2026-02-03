@@ -43,6 +43,13 @@
       "when": 1769916104831,
       "tag": "0005_acoustic_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770122584994,
+      "tag": "0006_remarkable_silhouette",
+      "breakpoints": true
     }
   ]
 }

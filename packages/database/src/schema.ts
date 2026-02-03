@@ -19,10 +19,12 @@ export const stations = pgTable('stations', {
 export const lines = pgTable('lines', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   odptRailwayId: varchar('odpt_railway_id', { length: 100 }), // ODPT API の owl:sameAs (例: odpt.Railway:TokyoMetro.Marunouchi)
+  slug: varchar('slug', { length: 100 }).unique(), // URL用スラッグ (例: tokyometro-marunouchi)
   lineCode: varchar('line_code', { length: 10 }), // 路線コード (例: M)
   name: varchar('name', { length: 100 }).notNull(),
   nameEn: varchar('name_en', { length: 100 }),
   color: varchar('color', { length: 7 }), // カラーコード (例: #F62E36)
+  displayOrder: integer('display_order').default(0), // 表示順
   operatorId: uuid('operator_id').references(() => operators.id).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),

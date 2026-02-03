@@ -21,18 +21,6 @@ export function StationCard({ station, lineColor, isFirst, isLast }: Props) {
           <p className="text-sm text-gray-500">{station.nameEn}</p>
         )}
       </div>
-
-      {/* Terminal indicators */}
-      {isFirst && (
-        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex-shrink-0">
-          始発
-        </span>
-      )}
-      {isLast && (
-        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex-shrink-0">
-          終点
-        </span>
-      )}
     </div>
   );
 }

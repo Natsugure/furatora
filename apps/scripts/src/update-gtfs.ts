@@ -59,6 +59,37 @@ type OdptStation = {
 
 type Operator = 'TokyoMetro' | 'Toei';
 
+// 路線の表示順マッピング (odptRailwayId → displayOrder)
+const LINE_DISPLAY_ORDER: Record<string, number> = {
+  // 東京メトロ
+  'odpt.Railway:TokyoMetro.Ginza': 1,
+  'odpt.Railway:TokyoMetro.Marunouchi': 2,
+  'odpt.Railway:TokyoMetro.MarunouchiBranch': 3,
+  'odpt.Railway:TokyoMetro.Hibiya': 4,
+  'odpt.Railway:TokyoMetro.Tozai': 5,
+  'odpt.Railway:TokyoMetro.Chiyoda': 6,
+  'odpt.Railway:TokyoMetro.Yurakucho': 7,
+  'odpt.Railway:TokyoMetro.Hanzomon': 8,
+  'odpt.Railway:TokyoMetro.Namboku': 9,
+  'odpt.Railway:TokyoMetro.Fukutoshin': 10,
+  // 都営
+  'odpt.Railway:Toei.Asakusa': 11,
+  'odpt.Railway:Toei.Mita': 12,
+  'odpt.Railway:Toei.Shinjuku': 13,
+  'odpt.Railway:Toei.Oedo': 14,
+  'odpt.Railway:Toei.NipporiToneri': 15,
+  'odpt.Railway:Toei.Toden': 16,
+};
+
+// odptRailwayId からスラッグを生成
+// 例: "odpt.Railway:TokyoMetro.Marunouchi" → "tokyometro-marunouchi"
+function generateSlug(odptRailwayId: string): string {
+  return odptRailwayId
+    .replace('odpt.Railway:', '')
+    .replace(/\./g, '-')
+    .toLowerCase();
+}
+
 async function fetchOdptData<T>(endpoint: string, operator: Operator): Promise<T[]> {
   const url = `https://api.odpt.org/api/v4/${endpoint}?odpt:operator=odpt.Operator:${operator}&acl:consumerKey=${process.env.ODPT_API_KEY}`;
 
@@ -114,10 +145,12 @@ async function updateOdptData(operator: Operator) {
     const lineValues = railwayData.map((railway) => ({
       operatorId: operatorRecord.id,
       odptRailwayId: railway['owl:sameAs'],
+      slug: generateSlug(railway['owl:sameAs']),
       lineCode: railway['odpt:lineCode'] || null,
       name: railway['odpt:railwayTitle']?.ja || railway['dc:title'],
       nameEn: railway['odpt:railwayTitle']?.en || null,
       color: railway['odpt:color'] || null,
+      displayOrder: LINE_DISPLAY_ORDER[railway['owl:sameAs']] ?? 999,
     }));
 
     const BATCH_SIZE = 100;
@@ -130,10 +163,12 @@ async function updateOdptData(operator: Operator) {
         .onConflictDoUpdate({
           target: [lines.odptRailwayId, lines.operatorId],
           set: {
+            slug: sql`EXCLUDED.slug`,
             lineCode: sql`EXCLUDED.line_code`,
             name: sql`EXCLUDED.name`,
             nameEn: sql`EXCLUDED.name_en`,
             color: sql`EXCLUDED.color`,
+            displayOrder: sql`EXCLUDED.display_order`,
             updatedAt: new Date(),
           }
         });
