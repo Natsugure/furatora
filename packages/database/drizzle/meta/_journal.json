@@ -50,6 +50,13 @@
       "when": 1770122584994,
       "tag": "0006_remarkable_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770331422980,
+      "tag": "0007_heavy_nitro",
+      "breakpoints": true
     }
   ]
 }
