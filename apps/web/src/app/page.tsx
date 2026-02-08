@@ -1,6 +1,6 @@
 import { db } from '@stroller-transit-app/database/client';
 import { operators, lines } from '@stroller-transit-app/database/schema';
-import { asc } from 'drizzle-orm';
+import { asc, isNotNull } from 'drizzle-orm';
 import { OperatorList } from '@/components/OperatorList';
 import type { OperatorWithLines } from '@/types';
 
@@ -8,6 +8,7 @@ async function fetchOperatorsWithLines(): Promise<OperatorWithLines[]> {
   const operatorList = await db
     .select()
     .from(operators)
+    .where(isNotNull(operators.displayPriority))
     .orderBy(asc(operators.name));
 
   const lineList = await db

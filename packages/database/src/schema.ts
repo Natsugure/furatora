@@ -142,6 +142,7 @@ export const operators = pgTable('operators', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   name: varchar('name', { length: 100 }).notNull().unique('operators_name_unique'),
   odptOperatorId: varchar('odpt_operator_id', { length: 100 }), // ODPT API の odpt:operator (例: odpt.Operator:TokyoMetro)
+  displayPriority: integer('display_priority'), // 数字=表示順、null=非表示
   createdAt: timestamp('created_at').defaultNow(),
 });
 
