@@ -1,9 +1,10 @@
 {
-  "name": "backend",
+  "name": "scripts",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "update-gtfs": "tsx src/update-gtfs.ts"
+    "update-odpt": "tsx src/update-odpt.ts",
+    "seed": "tsx src/seed-master-data.ts"
   },
   "dependencies": {
     "@stroller-transit-app/database": "workspace:*",

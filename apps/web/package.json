@@ -5,7 +5,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm --filter scripts seed && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -23,6 +23,8 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@mantine/core": "^8.3.14",
+    "@mantine/hooks": "^8.3.14",
     "@stroller-transit-app/database": "workspace:*",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",

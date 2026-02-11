@@ -67,12 +67,12 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   }
 
   function addFreeSpace() {
-    setFreeSpaces((prev) => [...prev, { carNumber: 1, nearDoor: 1 }]);
+    setFreeSpaces((prev) => [...prev, { carNumber: 1, nearDoor: 1,  isStandard: true }]);
   }
   function removeFreeSpace(index: number) {
     setFreeSpaces((prev) => prev.filter((_, i) => i !== index));
   }
-  function updateFreeSpace(index: number, field: keyof FreeSpace, value: number) {
+  function updateFreeSpace(index: number, field: keyof FreeSpace, value: number | boolean) {
     setFreeSpaces((prev) => prev.map((fs, i) => (i === index ? { ...fs, [field]: value } : fs)));
   }
 
@@ -158,7 +158,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
           {selectedLineIds.map(id => {
             const line = allLines.find(l => l.id === id);
             return (
-              <span className="bg-blue-100 px-2 py-1 rounded">
+              <span key={line?.id} className="bg-blue-100 px-2 py-1 rounded">
                 {line?.name}
               </span>
             );
@@ -221,7 +221,13 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
               onChange={(e) => updateFreeSpace(i, 'nearDoor', Number(e.target.value))}
               className="w-20 border rounded px-2 py-1 text-sm"
             />
-            <button type="button" onClick={() => removeFreeSpace(i)} className="text-red-500 text-sm">Remove</button>
+            <span className="text-sm text-gray-500 w-16">isStandard</span>
+            <input
+              type="checkbox"
+              checked={fs.isStandard ?? false}
+              onChange={(e) => updateFreeSpace(i, 'isStandard', e.target.checked)}
+            />
+            <button type="button" onClick={() => removeFreeSpace(i)} className="ml-auto mr-2 text-red-500 text-sm">Remove</button>
           </div>
         ))}
       </div>

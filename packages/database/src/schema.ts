@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 export const stations = pgTable('stations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   odptStationId: varchar('odpt_station_id', { length: 100 }), // ODPT API の owl:sameAs (例: odpt.Station:TokyoMetro.Marunouchi.Shinjuku)
+  slug: varchar('slug', { length: 100 }).unique(), // URL用スラッグ (例: tokyo-metro-marunouchi-shinjuku)
   code: varchar('code', { length: 20 }), // 駅ナンバリング (例: M08)
   name: varchar('name', { length: 100 }).notNull(),
   nameEn: varchar('name_en', { length: 100 }),
@@ -40,16 +41,21 @@ export const stationLines = pgTable('station_lines', {
     primaryKey({ columns: [t.stationId, t.lineId] }),
 ]);
 
-export const stationAccessibility = pgTable('station_accessibility', {
+export const stationConnections = pgTable('station_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   stationId: uuid('station_id').references(() => stations.id).notNull(),
-  elevators: jsonb('elevators').$type<{
-    location: string;
-    description?: string;
-  }[]>(),
-  accessibleRoutes: jsonb('accessible_routes').$type<string[]>(),
-  notes: text('notes'),
-  verified: boolean('verified').default(false),
+
+  // DB上に存在する場合はIDを保存
+  connectedStationId: uuid('connected_station_id').references(() => stations.id),
+  connectedRailwayId: uuid('connected_railway_id').references(() => lines.id),
+
+  // 常にODPT IDを保存（後からマッチング用）
+  odptStationId: varchar('odpt_station_id', { length: 100 }),
+  odptRailwayId: varchar('odpt_railway_id', { length: 100 }),
+
+  isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
+  isStrollerAccessible: boolean('is_stroller_accessible').default(true),
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
@@ -75,6 +81,7 @@ export type CarStructure = {
 export type FreeSpace = {
   carNumber: number;
   nearDoor: number;
+  isStandard: boolean; // 全編成に装備されているか
 }
 
 export type PrioritySeat = {
@@ -99,11 +106,11 @@ export const lineDirections = pgTable('line_directions', {
 export const platforms = pgTable('platforms', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   stationId: uuid('station_id').references(() => stations.id).notNull(),
-  platformNumber: varchar('platform_number', { length: 10 }).notNull(), // 番線番号 (例: "1", "2a")
+  platformNumber: varchar('platform_number', { length: 10 }).notNull(),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
-  inboundDirectionId: uuid('inbound_direction_id').references(() => lineDirections.id), // 上り方向
-  outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id), // 下り方向
-  maxCarCount: integer('max_car_count').notNull(), // 最大両数
+  inboundDirectionId: uuid('inbound_direction_id').references(() => lineDirections.id),
+  outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id),
+  maxCarCount: integer('max_car_count').notNull(),
   carStopPositions: jsonb('car_stop_positions').$type<CarStopPosition[]>(), // 各両数の停車位置
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
@@ -111,31 +118,26 @@ export const platforms = pgTable('platforms', {
 });
 
 export type CarStopPosition = {
-  carCount: number; // 編成両数
+  carCount: number;
   frontCarPosition: number; // 先頭車両が停車する号車位置（最大両数基準）
 };
 
 export const stationFacilities = pgTable('station_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  stationId: uuid('station_id').references(() => stations.id).notNull(),
-  platformId: uuid('platform_id').references(() => platforms.id), // NULL = ホーム外（改札階など）
-  type: varchar('type', { length: 20 }).notNull(), // 'elevator' | 'escalator' | 'stairs'
-  nearCarNumber: integer('near_car_number'), // ホーム上の場合、最寄り号車番号
-  description: text('description'), // 説明 (例: "改札階〜ホーム階")
-  isAccessible: boolean('is_accessible').default(true), // ベビーカー・車椅子利用可否
+  platformId: uuid('platform_id').references(() => platforms.id).notNull(),
+  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
+  nearCarNumber: integer('near_car_number'),
+  description: text('description'),
+  isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
+  isStrollerAccessible: boolean('is_stroller_accessible').default(true),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export const facilityConnections = pgTable('facility_connections', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  facilityId: uuid('facility_id').references(() => stationFacilities.id, { onDelete: 'cascade' }).notNull(),
-  connectionType: varchar('connection_type', { length: 20 }).notNull(), // 'station' | 'same_floor'
-  connectedStationId: uuid('connected_station_id').references(() => stations.id), // connectionType='station'の場合
-  connectedFacilityId: uuid('connected_facility_id').references(() => stationFacilities.id), // connectionType='same_floor'の場合
-  description: text('description'),
-  createdAt: timestamp('created_at').defaultNow(),
+export const facilityTypes = pgTable('facility_types', {
+  code: varchar('code', { length: 20 }).primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
 });
 
 export const operators = pgTable('operators', {

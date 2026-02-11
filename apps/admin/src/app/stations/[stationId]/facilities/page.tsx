@@ -4,19 +4,13 @@ import { db } from '@stroller-transit-app/database/client';
 import {
   stations,
   stationFacilities,
-  facilityConnections,
   platforms,
   lines,
   lineDirections,
+  facilityTypes,
 } from '@stroller-transit-app/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
-
-const TYPE_LABELS: Record<string, string> = {
-  elevator: 'Elevator',
-  escalator: 'Escalator',
-  stairs: 'Stairs',
-};
 
 export default async function FacilitiesPage({
   params,
@@ -67,40 +61,25 @@ export default async function FacilitiesPage({
       : [];
   const directionMap = Object.fromEntries(directionList.map((d) => [d.id, d.displayName]));
 
-  const facilities = await db
-    .select()
-    .from(stationFacilities)
-    .where(eq(stationFacilities.stationId, stationId))
-    .orderBy(asc(stationFacilities.type), asc(stationFacilities.nearCarNumber));
+  // Get platform IDs for this station
+  const platformIds = platformList.map((p) => p.id);
 
-  // Fetch connections for all facilities
-  const connections = await Promise.all(
-    facilities.map((f) =>
-      db
-        .select()
-        .from(facilityConnections)
-        .where(eq(facilityConnections.facilityId, f.id))
-    )
-  );
-
-  // Fetch connected station names
-  const connectedStationIds = [...new Set(connections.flat().map((c) => c.connectedStationId))];
-  const connectedStations =
-    connectedStationIds.length > 0
-      ? await Promise.all(
-          connectedStationIds.map((sid) =>
-            db.select({ id: stations.id, name: stations.name }).from(stations).where(eq(stations.id, sid))
-          )
-        )
+  // Fetch facilities for these platforms
+  const facilities =
+    platformIds.length > 0
+      ? await db
+          .select()
+          .from(stationFacilities)
+          .where(inArray(stationFacilities.platformId, platformIds))
+          .orderBy(asc(stationFacilities.typeCode), asc(stationFacilities.nearCarNumber))
       : [];
-  const stationNameMap = Object.fromEntries(
-    connectedStations.flat().map((s) => [s.id, s.name])
-  );
 
-  const facilitiesWithConnections = facilities.map((f, i) => ({
-    ...f,
-    connections: connections[i],
-  }));
+  // Fetch facility types
+  const typeList = await db.select().from(facilityTypes);
+  const typeMap = Object.fromEntries(typeList.map((t) => [t.code, t.name]));
+
+  // Create platform map for display
+  const platformMap = Object.fromEntries(platformList.map((p) => [p.id, p]));
 
   return (
     <div>
@@ -191,67 +170,64 @@ export default async function FacilitiesPage({
 
       {/* Facilities Section */}
       <h3 className="text-lg font-semibold mb-3">Facilities</h3>
-      {facilitiesWithConnections.length === 0 ? (
+      {facilities.length === 0 ? (
         <p className="text-gray-500">No facilities registered yet.</p>
       ) : (
         <div className="space-y-4">
-          {facilitiesWithConnections.map((facility) => (
-            <div
-              key={facility.id}
-              className="bg-white rounded-lg shadow p-4"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">
-                      {TYPE_LABELS[facility.type] ?? facility.type}
-                    </span>
-                    {facility.nearCarNumber && (
+          {facilities.map((facility) => {
+            const platform = platformMap[facility.platformId];
+            const typeName = typeMap[facility.typeCode] ?? facility.typeCode;
+
+            return (
+              <div
+                key={facility.id}
+                className="bg-white rounded-lg shadow p-4"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium">{typeName}</span>
                       <span className="text-sm text-gray-500">
-                        (Car #{facility.nearCarNumber})
+                        (Platform {platform?.platformNumber})
                       </span>
-                    )}
-                    {facility.isAccessible === false && (
-                      <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
-                        Not accessible
-                      </span>
-                    )}
-                  </div>
-                  {facility.description && (
-                    <p className="text-sm text-gray-600">{facility.description}</p>
-                  )}
-                  {facility.notes && (
-                    <p className="text-sm text-gray-400 mt-1">{facility.notes}</p>
-                  )}
-                  {facility.connections.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-400 mb-1">Connections:</p>
-                      <ul className="text-sm text-gray-600">
-                        {facility.connections.map((conn) => (
-                          <li key={conn.id}>
-                            {stationNameMap[conn.connectedStationId] ?? conn.connectedStationId}
-                            {conn.description && ` - ${conn.description}`}
-                          </li>
-                        ))}
-                      </ul>
+                      {facility.nearCarNumber && (
+                        <span className="text-sm text-gray-500">
+                          (Car #{facility.nearCarNumber})
+                        </span>
+                      )}
+                      {(!facility.isWheelchairAccessible || !facility.isStrollerAccessible) && (
+                        <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
+                          Limited accessibility
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    href={`/stations/${stationId}/facilities/${facility.id}/edit`}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
-                  >
-                    Edit
-                  </Link>
-                  <DeleteButton
-                    endpoint={`/api/stations/${stationId}/facilities/${facility.id}`}
-                    redirectTo={`/stations/${stationId}/facilities`}
-                  />
+                    {facility.description && (
+                      <p className="text-sm text-gray-600">{facility.description}</p>
+                    )}
+                    {facility.notes && (
+                      <p className="text-sm text-gray-400 mt-1">{facility.notes}</p>
+                    )}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {!facility.isWheelchairAccessible && <span>❌ Wheelchair</span>}
+                      {!facility.isStrollerAccessible && <span className="ml-2">❌ Stroller</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/stations/${stationId}/facilities/${facility.id}/edit`}
+                      className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
+                    >
+                      Edit
+                    </Link>
+                    <DeleteButton
+                      endpoint={`/api/stations/${stationId}/facilities/${facility.id}`}
+                      redirectTo={`/stations/${stationId}/facilities`}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
