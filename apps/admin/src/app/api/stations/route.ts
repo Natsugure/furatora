@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { db } from '@stroller-transit-app/database/client';
-import { stations, stationLines, lines } from '@stroller-transit-app/database/schema';
+import { stations, stationLines, lines, stationConnections } from '@stroller-transit-app/database/schema';
 import { asc, eq } from 'drizzle-orm';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lineId = searchParams.get('lineId');
+  const connectedFromStationId = searchParams.get('connectedFrom');
+
+  if (lineId && connectedFromStationId) {
+    return NextResponse.json({ error: 'Cannot specify both lineId and connectedFrom filters.', status: 400})
+  }
 
   if (lineId) {
     const result = await db
@@ -21,6 +26,24 @@ export async function GET(request: Request) {
       .where(eq(stationLines.lineId, lineId))
       .orderBy(asc(stationLines.stationOrder));
     return NextResponse.json(result);
+  }
+
+  if (connectedFromStationId) {
+    const result = await db
+      .select({
+        id: stations.id,
+        name: stations.name,
+        code: stations.code,
+        lineId: lines.id,
+        lineName: lines.name,
+      })
+      .from(stationConnections)
+      .innerJoin(stations, eq(stationConnections.connectedStationId, stations.id))
+      .innerJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
+      .where(eq(stationConnections.stationId, connectedFromStationId))
+      .orderBy(asc(lines.name));
+
+      return NextResponse.json(result);
   }
 
   const result = await db

@@ -20,6 +20,7 @@ type PlatformData = {
   outboundDirectionId: string | null;
   maxCarCount: number;
   carStopPositions: CarStopPosition[] | null;
+  platformSide: string | null;
   notes: string;
 };
 
@@ -45,6 +46,9 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   const [carStopPositions, setCarStopPositions] = useState<CarStopPosition[]>(
     initialData?.carStopPositions ?? []
   );
+  const [platformSide, setPlatformSide] = useState<string>(
+    initialData?.platformSide ?? ''
+  );
   const [notes, setNotes] = useState(initialData?.notes ?? '');
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,14 +69,22 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   }, [lineId]);
 
   function addStopPosition() {
-    setCarStopPositions((prev) => [...prev, { carCount: 8, frontCarPosition: 1 }]);
+    setCarStopPositions((prev) => [
+      ...prev,
+      { carCount: 8, referenceCarNumber: 1, referencePlatformCell: 1, direction: 'ascending' as const },
+    ]);
   }
   function removeStopPosition(index: number) {
     setCarStopPositions((prev) => prev.filter((_, i) => i !== index));
   }
-  function updateStopPosition(index: number, field: keyof CarStopPosition, value: number) {
+  function updateStopPositionNumber(index: number, field: 'carCount' | 'referenceCarNumber' | 'referencePlatformCell', value: number) {
     setCarStopPositions((prev) =>
       prev.map((sp, i) => (i === index ? { ...sp, [field]: value } : sp))
+    );
+  }
+  function updateStopPositionDirection(index: number, value: 'ascending' | 'descending') {
+    setCarStopPositions((prev) =>
+      prev.map((sp, i) => (i === index ? { ...sp, direction: value } : sp))
     );
   }
 
@@ -87,6 +99,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
       outboundDirectionId: outboundDirectionId || null,
       maxCarCount,
       carStopPositions: carStopPositions.length > 0 ? carStopPositions : null,
+      platformSide: platformSide || null,
       notes: notes || null,
     };
 
@@ -228,37 +241,85 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           </button>
         </div>
         <p className="text-xs text-gray-500 mb-2">
-          Define where the front car stops for different train lengths (relative to max car count position)
+          編成両数ごとに停車位置を定義します。基準号車とその停車枠番号、進行方向を指定してください。
         </p>
         {carStopPositions.map((sp, i) => (
-          <div key={i} className="flex items-center gap-2 mb-2">
-            <span className="text-sm text-gray-500 w-20">Cars:</span>
-            <input
-              type="number"
-              min={1}
-              max={maxCarCount}
-              value={sp.carCount}
-              onChange={(e) => updateStopPosition(i, 'carCount', Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1 text-sm"
-            />
-            <span className="text-sm text-gray-500 w-32">Front at pos:</span>
-            <input
-              type="number"
-              min={1}
-              max={maxCarCount}
-              value={sp.frontCarPosition}
-              onChange={(e) => updateStopPosition(i, 'frontCarPosition', Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => removeStopPosition(i)}
-              className="text-red-500 text-sm"
-            >
-              Remove
-            </button>
+          <div key={i} className="border rounded p-3 mb-2 bg-gray-50">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500">編成両数:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxCarCount}
+                  value={sp.carCount}
+                  onChange={(e) => updateStopPositionNumber(i, 'carCount', Number(e.target.value))}
+                  className="w-16 border rounded px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-gray-400">両</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500">基準号車:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={sp.carCount}
+                  value={sp.referenceCarNumber}
+                  onChange={(e) => updateStopPositionNumber(i, 'referenceCarNumber', Number(e.target.value))}
+                  className="w-16 border rounded px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-gray-400">号車</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500">停車枠:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxCarCount}
+                  value={sp.referencePlatformCell}
+                  onChange={(e) => updateStopPositionNumber(i, 'referencePlatformCell', Number(e.target.value))}
+                  className="w-16 border rounded px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-gray-400">番</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500">進行方向:</span>
+                <select
+                  value={sp.direction}
+                  onChange={(e) => updateStopPositionDirection(i, e.target.value as 'ascending' | 'descending')}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  <option value="ascending">ascending (1号車→小枠番号側)</option>
+                  <option value="descending">descending (1号車→大枠番号側)</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeStopPosition(i)}
+                className="text-red-500 text-sm ml-auto"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
+      </div>
+
+      {/* Platform Side */}
+      <div>
+        <label className="block text-sm font-medium mb-1">ホーム位置 (Platform Side)</label>
+        <select
+          value={platformSide}
+          onChange={(e) => setPlatformSide(e.target.value)}
+          className="w-48 border rounded px-3 py-2"
+        >
+          <option value="">未設定（デフォルト: 下）</option>
+          <option value="bottom">bottom（列車の下側）</option>
+          <option value="top">top（列車の上側）</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          可視化で列車図の上下どちらにホーム帯を表示するか
+        </p>
       </div>
 
       {/* Notes */}

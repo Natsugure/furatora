@@ -112,6 +112,7 @@ export const platforms = pgTable('platforms', {
   outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id),
   maxCarCount: integer('max_car_count').notNull(),
   carStopPositions: jsonb('car_stop_positions').$type<CarStopPosition[]>(), // 各両数の停車位置
+  platformSide: varchar('platform_side', { length: 10 }), // 'top' | 'bottom' — ホームが列車の上下どちらか
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
@@ -119,21 +120,36 @@ export const platforms = pgTable('platforms', {
 
 export type CarStopPosition = {
   carCount: number;
-  frontCarPosition: number; // 先頭車両が停車する号車位置（最大両数基準）
+  referenceCarNumber: number;    // 基準とする号車番号
+  referencePlatformCell: number; // その号車が停車するホーム枠番号
+  direction: 'ascending' | 'descending';
+  // ascending:  号車番号の増加方向 = ホーム枠番号の増加方向（1号車が枠番号の小さい側）
+  // descending: 号車番号の増加方向 = ホーム枠番号の減少方向（1号車が枠番号の大きい側）
 };
 
 export const stationFacilities = pgTable('station_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformId: uuid('platform_id').references(() => platforms.id).notNull(),
   typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
-  nearCarNumber: integer('near_car_number'),
-  description: text('description'),
+  nearPlatformCell: integer('near_platform_cell'),
+  exits: text('exits'),
   isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
   isStrollerAccessible: boolean('is_stroller_accessible').default(true),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
+
+// 設備↔乗換駅 多対多の中間テーブル
+export const facilityConnections = pgTable('facility_connections', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  facilityId: uuid('facility_id').references(() => stationFacilities.id, { onDelete: 'cascade' }).notNull(),
+  connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
+  exitLabel: text('exit_label'), // 出口ラベル (例: "A3出口", "改札外")
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => [
+  unique('unique_facility_connection').on(t.facilityId, t.connectedStationId),
+]);
 
 export const facilityTypes = pgTable('facility_types', {
   code: varchar('code', { length: 20 }).primaryKey(),

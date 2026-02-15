@@ -36,6 +36,7 @@ export async function POST(
       outboundDirectionId: body.outboundDirectionId || null,
       maxCarCount: body.maxCarCount,
       carStopPositions: body.carStopPositions || null,
+      platformSide: body.platformSide || null,
       notes: body.notes || null,
     })
     .returning();

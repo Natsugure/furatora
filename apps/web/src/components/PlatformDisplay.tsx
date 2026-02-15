@@ -1,4 +1,4 @@
-import type { CarStopPosition, FreeSpace } from '@stroller-transit-app/database/schema';
+import type { CarStopPosition, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
 import { TrainVisualization } from './TrainVisualization';
 
 type Platform = {
@@ -9,6 +9,7 @@ type Platform = {
   outboundDirectionId: string | null;
   maxCarCount: number;
   carStopPositions: CarStopPosition[] | null;
+  platformSide: string | null;
   notes: string | null;
 };
 
@@ -30,14 +31,17 @@ type Train = {
   name: string;
   carCount: number;
   freeSpaces: FreeSpace[] | null;
+  prioritySeats: PrioritySeat[] | null;
 };
 
-type Facility = {
+export type Facility = {
   id: string;
-  type: string;
-  nearCarNumber: number | null;
-  description: string | null;
-  isAccessible: boolean | null;
+  typeCode: string;
+  typeName: string;
+  nearPlatformCell: number | null;
+  exits: string | null;
+  isWheelchairAccessible: boolean | null;
+  isStrollerAccessible: boolean | null;
 };
 
 type Props = {
@@ -47,6 +51,15 @@ type Props = {
   outboundDirection: Direction | null;
   trains: Train[];
   facilities: Facility[];
+};
+
+const FACILITY_ICONS: Record<string, string> = {
+  elevator: '🛗',
+  escalator: '⚡',
+  stairs: '🚶',
+  ramp: '♿',
+  stairLift: '🦽',
+  sameFloor: '↔️',
 };
 
 export function PlatformDisplay({
@@ -65,12 +78,10 @@ export function PlatformDisplay({
     .filter(Boolean)
     .join(' / ');
 
-  // 設備アイコンのマッピング
-  const facilityIcons: Record<string, string> = {
-    elevator: '🛗',
-    escalator: '⚡',
-    stairs: '🚶',
-  };
+  const platformSide =
+    platform.platformSide === 'top' || platform.platformSide === 'bottom'
+      ? platform.platformSide
+      : null;
 
   return (
     <div className="border border-gray-200 rounded-lg p-6 bg-white">
@@ -95,23 +106,34 @@ export function PlatformDisplay({
         </div>
       </div>
 
-      {/* Platform facilities */}
+      {/* Platform facilities (text list) */}
       {facilities.length > 0 && (
         <div className="mb-4 p-3 bg-blue-50 rounded">
           <h4 className="text-sm font-semibold mb-2">ホーム設備</h4>
           <div className="space-y-1">
-            {facilities.map((facility) => (
-              <div key={facility.id} className="text-sm flex items-center gap-2">
-                <span className="text-lg">
-                  {facilityIcons[facility.type] || '📍'}
-                </span>
-                <span>
-                  {facility.nearCarNumber && `${facility.nearCarNumber}号車付近 - `}
-                  {facility.description || facility.type}
-                  {!facility.isAccessible && ' (ベビーカー利用不可)'}
-                </span>
-              </div>
-            ))}
+            {facilities.map((facility) => {
+              const inaccessible =
+                facility.isWheelchairAccessible === false ||
+                facility.isStrollerAccessible === false;
+              return (
+                <div key={facility.id} className="text-sm flex items-center gap-2">
+                  <span className="text-lg">
+                    {FACILITY_ICONS[facility.typeCode] || '📍'}
+                  </span>
+                  <span>
+                    {facility.nearPlatformCell && `${facility.nearPlatformCell}号車付近 - `}
+                    {facility.exits || facility.typeName}
+                    {inaccessible && (
+                      <span className="ml-1 text-xs text-amber-600">
+                        {facility.isWheelchairAccessible === false && '車椅子不可'}
+                        {facility.isWheelchairAccessible === false && facility.isStrollerAccessible === false && ' / '}
+                        {facility.isStrollerAccessible === false && 'ベビーカー不可'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -129,6 +151,8 @@ export function PlatformDisplay({
                 train={train}
                 platformMaxCarCount={platform.maxCarCount}
                 carStopPositions={platform.carStopPositions}
+                facilities={facilities}
+                platformSide={platformSide}
               />
             ))}
           </div>

@@ -35,6 +35,7 @@ export async function PUT(
       outboundDirectionId: body.outboundDirectionId || null,
       maxCarCount: body.maxCarCount,
       carStopPositions: body.carStopPositions || null,
+      platformSide: body.platformSide || null,
       notes: body.notes || null,
     })
     .where(and(eq(platforms.id, platformId), eq(platforms.stationId, stationId)))

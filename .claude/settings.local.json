@@ -5,7 +5,8 @@
       "Bash(docker compose ps:*)",
       "Bash(curl:*)",
       "Bash(npx next build:*)",
-      "Bash(pnpm --filter @stroller-transit-app/database db:generate:*)"
+      "Bash(pnpm --filter @stroller-transit-app/database db:generate:*)",
+      "Bash(pnpm --filter database db:push:*)"
     ]
   }
 }

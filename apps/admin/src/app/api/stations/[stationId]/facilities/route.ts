@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@stroller-transit-app/database/client';
-import { stationFacilities, platforms } from '@stroller-transit-app/database/schema';
+import { stationFacilities, facilityConnections, platforms } from '@stroller-transit-app/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 
 export async function GET(
@@ -26,7 +26,7 @@ export async function GET(
     .select()
     .from(stationFacilities)
     .where(inArray(stationFacilities.platformId, platformIds))
-    .orderBy(asc(stationFacilities.typeCode), asc(stationFacilities.nearCarNumber));
+    .orderBy(asc(stationFacilities.nearPlatformCell));
 
   return NextResponse.json(facilities);
 }
@@ -42,13 +42,24 @@ export async function POST(
     .values({
       platformId: body.platformId,
       typeCode: body.typeCode,
-      nearCarNumber: body.nearCarNumber || null,
-      description: body.description || null,
+      nearPlatformCell: body.nearPlatformCell || null,
+      exits: body.exits || null,
       isWheelchairAccessible: body.isWheelchairAccessible ?? true,
       isStrollerAccessible: body.isStrollerAccessible ?? true,
       notes: body.notes || null,
     })
     .returning();
+
+  // 乗換駅との接続を登録
+  if (body.connections?.length > 0) {
+    await db.insert(facilityConnections).values(
+      body.connections.map((c: { stationId: string; exitLabel: string }) => ({
+        facilityId: facility.id,
+        connectedStationId: c.stationId,
+        exitLabel: c.exitLabel || null,
+      }))
+    );
+  }
 
   return NextResponse.json(facility, { status: 201 });
 }

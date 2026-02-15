@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@stroller-transit-app/database/client';
-import { stationFacilities } from '@stroller-transit-app/database/schema';
+import { stationFacilities, facilityConnections } from '@stroller-transit-app/database/schema';
 import { eq } from 'drizzle-orm';
 
 export async function PUT(
@@ -15,8 +15,8 @@ export async function PUT(
     .set({
       platformId: body.platformId,
       typeCode: body.typeCode,
-      nearCarNumber: body.nearCarNumber || null,
-      description: body.description || null,
+      nearPlatformCell: body.nearPlatformCell || null,
+      exits: body.exits || null,
       isWheelchairAccessible: body.isWheelchairAccessible ?? true,
       isStrollerAccessible: body.isStrollerAccessible ?? true,
       notes: body.notes || null,
@@ -26,6 +26,18 @@ export async function PUT(
 
   if (!updated) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // 乗換駅接続を再登録（既存削除→再挿入）
+  await db.delete(facilityConnections).where(eq(facilityConnections.facilityId, facilityId));
+  if (body.connections?.length > 0) {
+    await db.insert(facilityConnections).values(
+      body.connections.map((c: { stationId: string; exitLabel: string }) => ({
+        facilityId: facilityId,
+        connectedStationId: c.stationId,
+        exitLabel: c.exitLabel || null,
+      }))
+    );
   }
 
   return NextResponse.json(updated);

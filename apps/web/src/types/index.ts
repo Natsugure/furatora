@@ -22,6 +22,7 @@ export type OperatorWithLines = Operator & {
 
 export type Station = {
   id: string;
+  slug: string | null;
   code: string | null;
   name: string;
   nameEn: string | null;

@@ -35,6 +35,7 @@ export default async function EditPlatformPage({
           outboundDirectionId: platform.outboundDirectionId,
           maxCarCount: platform.maxCarCount,
           carStopPositions: platform.carStopPositions,
+          platformSide: platform.platformSide ?? null,
           notes: platform.notes ?? '',
         }}
       />

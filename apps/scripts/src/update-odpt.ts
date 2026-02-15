@@ -286,32 +286,23 @@ async function updateOdptData(operator: Operator) {
       const stationId = stationIdMap.get(station['owl:sameAs']);
       if (!stationId) continue;
 
-      // 接続駅情報を処理
-      if (station['odpt:connectingStation']) {
-        for (const connectedOdptStationId of station['odpt:connectingStation']) {
-          const connectedStationId = stationIdMap.get(connectedOdptStationId);
-          connectionValues.push({
-            stationId,
-            connectedStationId: connectedStationId || null,
-            connectedRailwayId: null,
-            odptStationId: connectedOdptStationId,
-            odptRailwayId: null,
-          });
-        }
-      }
+      // connectingStation と connectingRailway は同インデックスが対応する並列配列
+      // 両方をセットで1レコードに登録する
+      const connectingStations = station['odpt:connectingStation'] || [];
+      const connectingRailways = station['odpt:connectingRailway'] || [];
+      const maxLen = Math.max(connectingStations.length, connectingRailways.length);
 
-      // 接続路線情報を処理
-      if (station['odpt:connectingRailway']) {
-        for (const connectedOdptRailwayId of station['odpt:connectingRailway']) {
-          const connectedRailwayId = lineIdMap.get(connectedOdptRailwayId);
-          connectionValues.push({
-            stationId,
-            connectedStationId: null,
-            connectedRailwayId: connectedRailwayId || null,
-            odptStationId: null,
-            odptRailwayId: connectedOdptRailwayId,
-          });
-        }
+      for (let i = 0; i < maxLen; i++) {
+        const connectedOdptStationId = connectingStations[i] ?? null;
+        const connectedOdptRailwayId = connectingRailways[i] ?? null;
+
+        connectionValues.push({
+          stationId,
+          connectedStationId: connectedOdptStationId ? (stationIdMap.get(connectedOdptStationId) ?? null) : null,
+          connectedRailwayId: connectedOdptRailwayId ? (lineIdMap.get(connectedOdptRailwayId) ?? null) : null,
+          odptStationId: connectedOdptStationId,
+          odptRailwayId: connectedOdptRailwayId,
+        });
       }
     }
 

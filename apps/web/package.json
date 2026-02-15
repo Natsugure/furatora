@@ -28,6 +28,7 @@
     "@stroller-transit-app/database": "workspace:*",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
+    "lucide-react": "^0.564.0",
     "next": "16.1.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"

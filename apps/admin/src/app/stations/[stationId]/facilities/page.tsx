@@ -11,6 +11,7 @@ import {
 } from '@stroller-transit-app/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
+import { FacilityDuplicateButton } from '@/components/FacilityDuplicateButton';
 
 export default async function FacilitiesPage({
   params,
@@ -64,22 +65,27 @@ export default async function FacilitiesPage({
   // Get platform IDs for this station
   const platformIds = platformList.map((p) => p.id);
 
-  // Fetch facilities for these platforms
+  // Fetch facilities for these platforms, sorted by nearPlatformCell within each platform
   const facilities =
     platformIds.length > 0
       ? await db
           .select()
           .from(stationFacilities)
           .where(inArray(stationFacilities.platformId, platformIds))
-          .orderBy(asc(stationFacilities.typeCode), asc(stationFacilities.nearCarNumber))
+          .orderBy(asc(stationFacilities.nearPlatformCell))
       : [];
 
   // Fetch facility types
   const typeList = await db.select().from(facilityTypes);
   const typeMap = Object.fromEntries(typeList.map((t) => [t.code, t.name]));
 
-  // Create platform map for display
-  const platformMap = Object.fromEntries(platformList.map((p) => [p.id, p]));
+  // Group facilities by platformId (platformList is already sorted by platformNumber)
+  const facilitiesByPlatform = new Map<string, typeof facilities>();
+  for (const facility of facilities) {
+    const group = facilitiesByPlatform.get(facility.platformId) ?? [];
+    group.push(facility);
+    facilitiesByPlatform.set(facility.platformId, group);
+  }
 
   return (
     <div>
@@ -168,62 +174,77 @@ export default async function FacilitiesPage({
         )}
       </div>
 
-      {/* Facilities Section */}
+      {/* Facilities Section - grouped by platform */}
       <h3 className="text-lg font-semibold mb-3">Facilities</h3>
       {facilities.length === 0 ? (
         <p className="text-gray-500">No facilities registered yet.</p>
       ) : (
-        <div className="space-y-4">
-          {facilities.map((facility) => {
-            const platform = platformMap[facility.platformId];
-            const typeName = typeMap[facility.typeCode] ?? facility.typeCode;
+        <div className="space-y-6">
+          {platformList.map((platform) => {
+            const platformFacilities = facilitiesByPlatform.get(platform.id) ?? [];
+            if (platformFacilities.length === 0) return null;
+
+            const directions = [];
+            if (platform.inboundDirectionId) directions.push(directionMap[platform.inboundDirectionId] ?? '上り');
+            if (platform.outboundDirectionId) directions.push(directionMap[platform.outboundDirectionId] ?? '下り');
+            const directionText = directions.length > 0 ? ` — ${directions.join(' / ')}` : '';
 
             return (
-              <div
-                key={facility.id}
-                className="bg-white rounded-lg shadow p-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium">{typeName}</span>
-                      <span className="text-sm text-gray-500">
-                        (Platform {platform?.platformNumber})
-                      </span>
-                      {facility.nearCarNumber && (
-                        <span className="text-sm text-gray-500">
-                          (Car #{facility.nearCarNumber})
-                        </span>
-                      )}
-                      {(!facility.isWheelchairAccessible || !facility.isStrollerAccessible) && (
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
-                          Limited accessibility
-                        </span>
-                      )}
-                    </div>
-                    {facility.description && (
-                      <p className="text-sm text-gray-600">{facility.description}</p>
-                    )}
-                    {facility.notes && (
-                      <p className="text-sm text-gray-400 mt-1">{facility.notes}</p>
-                    )}
-                    <div className="text-xs text-gray-500 mt-1">
-                      {!facility.isWheelchairAccessible && <span>❌ Wheelchair</span>}
-                      {!facility.isStrollerAccessible && <span className="ml-2">❌ Stroller</span>}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Link
-                      href={`/stations/${stationId}/facilities/${facility.id}/edit`}
-                      className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
-                    >
-                      Edit
-                    </Link>
-                    <DeleteButton
-                      endpoint={`/api/stations/${stationId}/facilities/${facility.id}`}
-                      redirectTo={`/stations/${stationId}/facilities`}
-                    />
-                  </div>
+              <div key={platform.id}>
+                <h4 className="text-sm font-semibold text-gray-600 mb-2 border-b pb-1">
+                  Platform {platform.platformNumber}{directionText}
+                </h4>
+                <div className="space-y-2">
+                  {platformFacilities.map((facility) => {
+                    const typeName = typeMap[facility.typeCode] ?? facility.typeCode;
+
+                    return (
+                      <div key={facility.id} className="bg-white rounded-lg shadow p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{typeName}</span>
+                              {facility.nearPlatformCell && (
+                                <span className="text-sm text-gray-500">
+                                  枠 #{facility.nearPlatformCell}
+                                </span>
+                              )}
+                              {(!facility.isWheelchairAccessible || !facility.isStrollerAccessible) && (
+                                <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
+                                  Limited accessibility
+                                </span>
+                              )}
+                            </div>
+                            {facility.exits && (
+                              <p className="text-sm text-gray-600">{facility.exits}</p>
+                            )}
+                            {facility.notes && (
+                              <p className="text-sm text-gray-400 mt-1">{facility.notes}</p>
+                            )}
+                            <div className="text-xs text-gray-500 mt-1">
+                              {!facility.isWheelchairAccessible && <span>❌ Wheelchair</span>}
+                              {!facility.isStrollerAccessible && <span className="ml-2">❌ Stroller</span>}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Link
+                              href={`/stations/${stationId}/facilities/${facility.id}/edit`}
+                              className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
+                            >
+                              Edit
+                            </Link>
+                            <FacilityDuplicateButton
+                              endpoint={`/api/stations/${stationId}/facilities/${facility.id}/duplicate`}
+                            />
+                            <DeleteButton
+                              endpoint={`/api/stations/${stationId}/facilities/${facility.id}`}
+                              redirectTo={`/stations/${stationId}/facilities`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

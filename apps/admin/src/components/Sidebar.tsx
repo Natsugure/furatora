@@ -8,6 +8,7 @@ const navItems = [
   { href: '/trains', label: 'Trains' },
   { href: '/stations', label: 'Stations' },
   { href: '/lines', label: 'Lines' },
+  { href: '/unresolved-connections', label: '未解決接続' },
 ];
 
 export function Sidebar() {

@@ -27,7 +27,7 @@ export function StationBadge({ code, color }: Props) {
     >
       {match ? (
         <>
-          <span className="text-xs leading-none" style={{ color: borderColor }}>
+          <span className="text-xs leading-none">
             {match[1]}
           </span>
           <span className="text-sm leading-none">{match[2]}</span>

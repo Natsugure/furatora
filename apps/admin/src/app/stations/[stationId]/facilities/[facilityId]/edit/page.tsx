@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { db } from '@stroller-transit-app/database/client';
-import { stations, stationFacilities, platforms } from '@stroller-transit-app/database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { stations, stationFacilities, facilityConnections, platforms } from '@stroller-transit-app/database/schema';
+import { eq } from 'drizzle-orm';
 import { FacilityForm } from '@/components/FacilityForm';
 
 export default async function EditFacilityPage({
@@ -32,6 +32,12 @@ export default async function EditFacilityPage({
 
   if (!facility || !platformIds.includes(facility.platformId)) notFound();
 
+  // Get existing connections
+  const connections = await db
+    .select()
+    .from(facilityConnections)
+    .where(eq(facilityConnections.facilityId, facilityId));
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-6">Edit Facility - {station.name}</h2>
@@ -42,11 +48,15 @@ export default async function EditFacilityPage({
           id: facility.id,
           platformId: facility.platformId,
           typeCode: facility.typeCode,
-          nearCarNumber: facility.nearCarNumber,
-          description: facility.description ?? '',
+          nearPlatformCell: facility.nearPlatformCell,
+          exits: facility.exits ?? '',
           isWheelchairAccessible: facility.isWheelchairAccessible ?? true,
           isStrollerAccessible: facility.isStrollerAccessible ?? true,
           notes: facility.notes ?? '',
+          connections: connections.map((c) => ({
+            stationId: c.connectedStationId,
+            exitLabel: c.exitLabel ?? '',
+          })),
         }}
       />
     </div>
