@@ -16,6 +16,7 @@ type TrainData = {
   carStructure: CarStructure | null;
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
+  limitedToPlatformIds: string[] | null;
 };
 
 type Props = {
@@ -35,6 +36,9 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [carCount, setCarCount] = useState(initialData?.carCount ?? 10);
   const [freeSpaces, setFreeSpaces] = useState<FreeSpace[]>(initialData?.freeSpaces ?? []);
   const [prioritySeats, setPrioritySeats] = useState<PrioritySeat[]>(initialData?.prioritySeats ?? []);
+  const [limitedToPlatformIdsText, setLimitedToPlatformIdsText] = useState(
+    initialData?.limitedToPlatformIds ? JSON.stringify(initialData.limitedToPlatformIds, null, 2) : ''
+  );
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -90,6 +94,17 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
     e.preventDefault();
     setSubmitting(true);
 
+    let limitedToPlatformIds: string[] | null = null;
+    if (limitedToPlatformIdsText.trim()) {
+      try {
+        limitedToPlatformIds = JSON.parse(limitedToPlatformIdsText);
+      } catch {
+        alert('走行制限ホームIDのJSON形式が不正です');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const payload = {
       name,
       operatorId,
@@ -97,6 +112,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
       carCount,
       freeSpaces: freeSpaces.length > 0 ? freeSpaces : null,
       prioritySeats: prioritySeats.length > 0 ? prioritySeats : null,
+      limitedToPlatformIds,
     };
 
     const url = isEdit ? `/api/trains/${initialData!.id}` : '/api/trains';
@@ -255,6 +271,21 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
             <button type="button" onClick={() => removePrioritySeat(i)} className="text-red-500 text-sm">Remove</button>
           </div>
         ))}
+      </div>
+
+      {/* Limited To Platform IDs */}
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          走行制限ホームID
+          <span className="ml-1 text-xs text-gray-500 font-normal">(JSON配列。区間限定運用のみ。制限なしの場合は空欄)</span>
+        </label>
+        <textarea
+          value={limitedToPlatformIdsText}
+          onChange={(e) => setLimitedToPlatformIdsText(e.target.value)}
+          placeholder={'["platform-uuid-1", "platform-uuid-2"]'}
+          rows={3}
+          className="w-full border rounded px-3 py-2 font-mono text-sm"
+        />
       </div>
 
       {/* Submit */}

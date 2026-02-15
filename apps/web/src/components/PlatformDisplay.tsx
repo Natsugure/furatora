@@ -101,9 +101,6 @@ export function PlatformDisplay({
             {line.name} {directions && `(${directions})`}
           </p>
         </div>
-        <div className="text-sm text-gray-500">
-          最大{platform.maxCarCount}両編成対応
-        </div>
       </div>
 
       {/* Platform facilities (text list) */}

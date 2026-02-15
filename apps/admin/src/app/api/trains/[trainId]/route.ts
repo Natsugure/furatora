@@ -31,6 +31,7 @@ export async function PUT(
       carStructure: body.carStructure || null,
       freeSpaces: body.freeSpaces || null,
       prioritySeats: body.prioritySeats || null,
+      limitedToPlatformIds: body.limitedToPlatformIds?.length ? body.limitedToPlatformIds : null,
     })
     .where(eq(trains.id, trainId))
     .returning();

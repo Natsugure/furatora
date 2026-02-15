@@ -69,6 +69,8 @@ export const trains = pgTable('trains', {
   carStructure: jsonb('car_configuration').$type<CarStructure>(),
   freeSpaces: jsonb('free_spaces').$type<FreeSpace[]>(),
   prioritySeats: jsonb('priority_seats').$type<PrioritySeat[]>(),
+  limitedToPlatformIds: uuid('limited_to_platform_ids').array(),
+  // null = 容量制約のみで判定, non-null = 指定ホームにのみ表示
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });

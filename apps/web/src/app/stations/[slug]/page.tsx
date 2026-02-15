@@ -149,9 +149,17 @@ export default async function StationDetailPage({ params }: Props) {
       ? directionMap[platform.outboundDirectionId] ?? null
       : null;
 
-    const platformTrains = trainList.filter((train) =>
-      train.lines?.includes(platform.lineId)
-    );
+    const platformTrains = trainList.filter((train) => {
+      // 1. 路線チェック
+      if (!train.lines?.includes(platform.lineId)) return false;
+      // 2. 容量チェック（ホーム有効長より長い編成は除外）
+      if (train.carCount > platform.maxCarCount) return false;
+      // 3. 特定ホーム制限チェック（区間限定運用など）
+      if (train.limitedToPlatformIds && train.limitedToPlatformIds.length > 0) {
+        return train.limitedToPlatformIds.includes(platform.id);
+      }
+      return true;
+    });
 
     const platformFacilities = facilities
       .filter((f) => f.platformId === platform.id)
