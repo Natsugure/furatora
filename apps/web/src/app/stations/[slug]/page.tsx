@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@stroller-transit-app/database/client';
 import {
   stations,
+  stationLines,
   platforms,
   lines,
   lineDirections,
@@ -32,6 +33,16 @@ async function fetchStationDetails(slug: string) {
 
   const station = stationRecord[0];
 
+  const line = await db 
+    .select({
+      lineId: stationLines.lineId,
+      lineCode: lines.lineCode,
+      color: lines.color,
+    })
+      .from(stationLines)
+      .innerJoin(lines, eq(stationLines.lineId, lines.id))
+      .where(eq(stationLines.stationId, station.id))
+
   const platformList = await db
     .select({
       id: platforms.id,
@@ -48,7 +59,7 @@ async function fetchStationDetails(slug: string) {
     .where(eq(platforms.stationId, station.id));
 
   if (!platformList.length) {
-    return { station, platforms: [], lines: [], directions: [], trains: [], facilities: [], facilityTypeMap: {} };
+    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], facilities: [], facilityTypeMap: {} };
   }
 
   const platformIds = platformList.map((p) => p.id);
@@ -97,6 +108,7 @@ async function fetchStationDetails(slug: string) {
   return {
     station,
     platforms: platformList,
+    line: line[0],
     lines: lineList,
     directions: directionList,
     trains: trainList,
@@ -116,6 +128,7 @@ export default async function StationDetailPage({ params }: Props) {
   const {
     station,
     platforms: platformList,
+    line: line,
     lines: lineList,
     directions,
     trains: trainList,
@@ -208,7 +221,7 @@ export default async function StationDetailPage({ params }: Props) {
       {/* Station header */}
       <div className="flex gap-2">
         {station.code && (
-          <StationBadge code={station.code} color={lineList[0].color} />
+          <StationBadge code={station.code} color={line.color ?? null} />
         )}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">{station.name}</h1>
