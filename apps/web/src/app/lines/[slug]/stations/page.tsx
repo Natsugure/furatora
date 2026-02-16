@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { db } from '@stroller-transit-app/database/client';
 import { stations, stationLines, lines } from '@stroller-transit-app/database/schema';
 import { eq, asc } from 'drizzle-orm';
@@ -67,32 +68,42 @@ export default async function StationListPage({ params }: Props) {
   const { line, stations } = data;
 
   return (
-    <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
+    <div className="max-w-3xl mx-auto px-4 py-6">
       {/* Back navigation */}
       <Link
         href="/"
-        className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded-lg px-3 py-1.5 bg-white shadow-sm transition-colors mb-5"
       >
-        ← 路線一覧に戻る
+        <ArrowLeft size={15} />
+        路線一覧に戻る
       </Link>
 
-      {/* Line header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div
-          className="w-6 h-6 rounded-full flex-shrink-0"
-          style={{ backgroundColor: line.color || '#888888' }}
-        />
-        <h1 className="text-2xl md:text-3xl font-bold">
-          {line.name}
-          {line.nameEn && (
-            <span className="text-lg font-normal text-gray-500 ml-2">
-              {line.nameEn}
-            </span>
-          )}
-        </h1>
+      {/* Line header card */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+        <div className="flex items-center gap-4">
+          <div
+            className="w-1.5 h-12 rounded-full flex-shrink-0"
+            style={{ backgroundColor: line.color || '#888888' }}
+          />
+          <div>
+            <h1
+              className="text-2xl font-bold leading-tight"
+              style={{ color: line.color || '#111827' }}
+            >
+              {line.name}
+            </h1>
+            {line.nameEn && (
+              <p className="text-sm text-gray-500 mt-0.5">{line.nameEn}</p>
+            )}
+            <p className="text-sm text-gray-400 mt-1">全{stations.length}駅</p>
+          </div>
+        </div>
       </div>
 
       {/* Station list */}
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        駅を選択
+      </h2>
       {stations.length > 0 ? (
         <div className="space-y-2">
           {stations.map((station, index) => (
@@ -110,6 +121,6 @@ export default async function StationListPage({ params }: Props) {
           <p>この路線の駅データがありません</p>
         </div>
       )}
-    </main>
+    </div>
   );
 }

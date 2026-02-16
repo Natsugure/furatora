@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { LineAccordion } from './LineAccordion';
 import type { OperatorWithLines } from '@/types';
 
@@ -8,33 +9,17 @@ type Props = {
   operators: OperatorWithLines[];
 };
 
-function ChevronIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      className={`w-5 h-5 transition-transform ${expanded ? 'rotate-180' : ''}`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M19 9l-7 7-7-7"
-      />
-    </svg>
-  );
-}
-
 export function OperatorList({ operators }: Props) {
-  const [expandedOperator, setExpandedOperator] = useState<string | null>(null);
+  const [expandedOperator, setExpandedOperator] = useState<string | null>(
+    operators.length === 1 ? operators[0].id : null
+  );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {operators.map((operator) => (
         <div
           key={operator.id}
-          className="border border-gray-200 rounded-lg overflow-hidden"
+          className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
         >
           <button
             onClick={() =>
@@ -42,20 +27,27 @@ export function OperatorList({ operators }: Props) {
                 expandedOperator === operator.id ? null : operator.id
               )
             }
-            className="w-full p-4 text-left bg-gray-50 hover:bg-gray-100 flex justify-between items-center transition-colors"
+            className="w-full px-5 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
           >
-            <span className="font-semibold text-lg">{operator.name}</span>
-            <ChevronIcon expanded={expandedOperator === operator.id} />
+            <span className="font-semibold text-base text-gray-900">
+              {operator.name}
+            </span>
+            <ChevronDown
+              size={20}
+              className={`text-gray-400 transition-transform duration-200 ${
+                expandedOperator === operator.id ? 'rotate-180' : ''
+              }`}
+            />
           </button>
 
           {expandedOperator === operator.id && (
-            <div className="p-4 space-y-2 bg-white">
+            <div className="px-4 pb-3 border-t border-gray-100">
               {operator.lines.length > 0 ? (
                 operator.lines.map((line) => (
                   <LineAccordion key={line.id} line={line} />
                 ))
               ) : (
-                <p className="text-gray-500 text-sm">路線がありません</p>
+                <p className="text-gray-500 text-sm py-3">路線がありません</p>
               )}
             </div>
           )}

@@ -1,3 +1,4 @@
+import { Accessibility } from 'lucide-react';
 import { db } from '@stroller-transit-app/database/client';
 import { operators, lines } from '@stroller-transit-app/database/schema';
 import { asc, isNotNull } from 'drizzle-orm';
@@ -26,11 +27,36 @@ export default async function Home() {
   const operatorsWithLines = await fetchOperatorsWithLines();
 
   return (
-    <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6">
-        ベビーカー対応 乗換案内
-      </h1>
+    <div className="max-w-3xl mx-auto px-4 py-6">
+      {/* Info card */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <Accessibility size={22} className="text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h2 className="text-base font-semibold mb-1">このアプリについて</h2>
+            <p className="text-sm text-gray-600">
+              ベビーカーや車いすでの移動を快適にするため、各駅のバリアフリー設備と列車内のフリースペース・優先席の位置を視覚的に表示します。
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-green-50 border border-green-100 rounded-lg p-3">
+            <p className="text-sm font-semibold text-green-800 mb-0.5">エレベーター</p>
+            <p className="text-xs text-green-600">位置と改札からの距離</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+            <p className="text-sm font-semibold text-blue-800 mb-0.5">フリースペース</p>
+            <p className="text-xs text-blue-600">車両内の位置図</p>
+          </div>
+          <div className="bg-pink-50 border border-pink-100 rounded-lg p-3">
+            <p className="text-sm font-semibold text-pink-800 mb-0.5">優先席</p>
+            <p className="text-xs text-pink-600">各車両の位置</p>
+          </div>
+        </div>
+      </div>
 
+      {/* Operator/line list */}
+      <h2 className="text-xl font-bold mb-4 text-gray-800">路線を選択してください</h2>
       {operatorsWithLines.length > 0 ? (
         <OperatorList operators={operatorsWithLines} />
       ) : (
@@ -39,6 +65,6 @@ export default async function Home() {
           <p className="text-sm mt-2">データを取得してください</p>
         </div>
       )}
-    </main>
+    </div>
   );
 }

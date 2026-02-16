@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { Info } from 'lucide-react';
 import { db } from '@stroller-transit-app/database/client';
 import {
   stations,
@@ -33,15 +34,15 @@ async function fetchStationDetails(slug: string) {
 
   const station = stationRecord[0];
 
-  const line = await db 
+  const line = await db
     .select({
       lineId: stationLines.lineId,
       lineCode: lines.lineCode,
       color: lines.color,
     })
-      .from(stationLines)
-      .innerJoin(lines, eq(stationLines.lineId, lines.id))
-      .where(eq(stationLines.stationId, station.id))
+    .from(stationLines)
+    .innerJoin(lines, eq(stationLines.lineId, lines.id))
+    .where(eq(stationLines.stationId, station.id));
 
   const platformList = await db
     .select({
@@ -65,7 +66,6 @@ async function fetchStationDetails(slug: string) {
   const platformIds = platformList.map((p) => p.id);
   const lineIds = [...new Set(platformList.map((p) => p.lineId))];
 
-  // 路線・方向・設備タイプを並行取得
   const [lineList, directionList, facilityTypeList] = await Promise.all([
     db.select().from(lines).where(inArray(lines.id, lineIds)),
     (async () => {
@@ -83,7 +83,6 @@ async function fetchStationDetails(slug: string) {
     db.select().from(facilityTypes),
   ]);
 
-  // 列車情報を取得（trains.lines は uuid[] 型なので && 演算子でオーバーラップ確認）
   const trainList = lineIds.length > 0
     ? await db
         .select()
@@ -128,7 +127,7 @@ export default async function StationDetailPage({ params }: Props) {
   const {
     station,
     platforms: platformList,
-    line: line,
+    line,
     lines: lineList,
     directions,
     trains: trainList,
@@ -139,7 +138,6 @@ export default async function StationDetailPage({ params }: Props) {
   const lineMap = Object.fromEntries(lineList.map((l) => [l.id, l]));
   const directionMap = Object.fromEntries(directions.map((d) => [d.id, d]));
 
-  // プラットフォームごとの表示データを構築
   const buildPlatformEntry = (platform: (typeof platformList)[number]): PlatformEntry => {
     const line = lineMap[platform.lineId];
     const inboundDirection = platform.inboundDirectionId
@@ -150,11 +148,8 @@ export default async function StationDetailPage({ params }: Props) {
       : null;
 
     const platformTrains = trainList.filter((train) => {
-      // 1. 路線チェック
       if (!train.lines?.includes(platform.lineId)) return false;
-      // 2. 容量チェック（ホーム有効長より長い編成は除外）
       if (train.carCount > platform.maxCarCount) return false;
-      // 3. 特定ホーム制限チェック（区間限定運用など）
       if (train.limitedToPlatformIds && train.limitedToPlatformIds.length > 0) {
         return train.limitedToPlatformIds.includes(platform.id);
       }
@@ -178,7 +173,6 @@ export default async function StationDetailPage({ params }: Props) {
     };
   };
 
-  // 方向別タブを構築
   const directionToEntries = new Map<string, PlatformEntry[]>();
 
   for (const platform of platformList) {
@@ -198,12 +192,10 @@ export default async function StationDetailPage({ params }: Props) {
     }
   }
 
-  // 方向が設定されていないプラットフォーム
   const noDirectionPlatforms = platformList.filter(
     (p) => !p.inboundDirectionId && !p.outboundDirectionId
   );
 
-  // タブ配列を構築
   const tabs: DirectionTab[] = [
     ...[...directionToEntries.entries()].map(([dirId, entries]) => ({
       directionId: dirId,
@@ -222,32 +214,56 @@ export default async function StationDetailPage({ params }: Props) {
   ];
 
   return (
-    <main className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="max-w-3xl mx-auto px-4 py-6">
       {/* Back navigation */}
       <BackButton />
 
-      {/* Station header */}
-      <div className="flex gap-2">
-        {station.code && (
-          <StationBadge code={station.code} color={line.color ?? null} />
-        )}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">{station.name}</h1>
-          {station.nameEn && (
-            <p className="text-xl text-gray-600">{station.nameEn}</p>
+      {/* Station header card */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
+        <div className="flex items-center gap-4">
+          {station.code && (
+            <StationBadge code={station.code} color={line?.color ?? null} />
           )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{station.name}</h1>
+            {station.nameEn && (
+              <p className="text-gray-500 text-sm mt-0.5">{station.nameEn}</p>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Notes */}
+      {station.notes && (
+        <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 whitespace-pre-wrap">
+          {station.notes}
+        </div>
+      )}
 
       {/* Platform list */}
       {platformList.length > 0 ? (
         <div>
-          <h2 className="text-2xl font-bold mb-4">のりかえ出口・列車設備案内</h2>
+          {/* Info alert */}
+          <div className="mb-5 bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex gap-2.5">
+              <Info size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-900 mb-1">ご利用案内</p>
+                <p className="text-sm text-blue-700">
+                  各ホームのバリアフリー設備と列車のフリースペース・優先席の位置を確認できます。
+                  エレベーターの位置を参考に、乗車位置を事前に確認することで、スムーズな移動が可能です。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            ホーム情報
+          </h2>
           {tabs.length > 1 ? (
             <PlatformTabs tabs={tabs} />
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {platformList.map((platform) => {
                 const entry = buildPlatformEntry(platform);
                 return (
@@ -266,10 +282,10 @@ export default async function StationDetailPage({ params }: Props) {
           )}
         </div>
       ) : (
-        <div className="text-center text-gray-500 py-12">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center text-gray-500">
           <p>この駅のプラットフォーム情報がありません</p>
         </div>
       )}
-    </main>
+    </div>
   );
 }

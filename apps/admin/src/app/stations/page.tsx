@@ -68,6 +68,7 @@ export default async function StationsPage() {
                       <th className="px-3 py-2">Name</th>
                       <th className="px-3 py-2">Name (EN)</th>
                       <th className="px-3 py-2">Facilities</th>
+                      <th className="px-3 py-2">Edit</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -83,6 +84,14 @@ export default async function StationsPage() {
                             className="text-blue-600 hover:underline"
                           >
                             Manage
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Link
+                            href={`/stations/${stn.id}/edit`}
+                            className="text-gray-500 hover:underline"
+                          >
+                            Edit
                           </Link>
                         </td>
                       </tr>

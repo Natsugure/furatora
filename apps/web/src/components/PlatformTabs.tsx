@@ -61,25 +61,27 @@ export function PlatformTabs({ tabs }: Props) {
 
   return (
     <div>
-      {/* タブヘッダー */}
-      <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-        {tabs.map((tab, i) => (
-          <button
-            key={tab.directionId ?? 'all'}
-            onClick={() => setActiveIndex(i)}
-            className={`px-5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              i === activeIndex
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-            }`}
-          >
-            {tab.directionName}
-          </button>
-        ))}
+      {/* Tab header */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+        <div className="flex overflow-x-auto">
+          {tabs.map((tab, i) => (
+            <button
+              key={tab.directionId ?? 'all'}
+              onClick={() => setActiveIndex(i)}
+              className={`px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
+                i === activeIndex
+                  ? 'border-blue-500 text-blue-600 bg-blue-50/50'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              {tab.directionName}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* アクティブタブのプラットフォーム一覧 */}
-      <div className="space-y-6">
+      {/* Active tab platforms */}
+      <div className="space-y-4">
         {tabs[activeIndex]?.platforms.map((entry) => (
           <PlatformDisplay
             key={entry.platform.id}

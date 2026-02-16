@@ -131,11 +131,11 @@ export function TrainVisualization({
   );
 
   return (
-    <div className="border border-gray-300 rounded p-4 bg-gray-50">
+    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
       {/* 列車名 */}
       <div className="mb-3">
-        <h5 className="font-semibold text-gray-800">{train.name}</h5>
-        <p className="text-xs text-gray-600">{train.carCount}両編成</p>
+        <h5 className="font-semibold text-gray-900 text-sm">{train.name}</h5>
+        <p className="text-xs text-gray-500">{train.carCount}両編成</p>
       </div>
 
       {/* ホーム + 列車の可視化 */}
@@ -199,28 +199,28 @@ export function TrainVisualization({
       </div>
 
       {/* 凡例 */}
-      <div className="flex flex-wrap gap-4 text-xs text-gray-600 mt-3">
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-gray-300 border border-gray-300 rounded" />
+      <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 bg-gray-300 rounded" />
           <span>列車</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-blue-200 border border-gray-300 rounded" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 bg-blue-200 rounded" />
           <span>フリースペース</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-amber-200 border border-gray-300 rounded" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 bg-amber-200 rounded" />
           <span>優先席</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-stone-300 border border-stone-500" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 bg-stone-300" />
           <span>ホーム設備</span>
         </div>
       </div>
 
       {/* フリースペース詳細 */}
       {train.freeSpaces && train.freeSpaces.length > 0 && (
-        <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
+        <div className="mt-3 p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs">
           <strong className="text-blue-900">フリースペース詳細:</strong>
           <ul className="mt-1 space-y-0.5">
             {train.freeSpaces.map((fs, idx) => (
@@ -235,7 +235,7 @@ export function TrainVisualization({
 
       {/* 優先席詳細 */}
       {train.prioritySeats && train.prioritySeats.length > 0 && (
-        <div className="mt-2 p-2 bg-amber-50 rounded text-xs">
+        <div className="mt-2 p-2.5 bg-amber-50 border border-amber-100 rounded-lg text-xs">
           <strong className="text-amber-900">優先席:</strong>
           <ul className="mt-1 space-y-0.5">
             {train.prioritySeats.map((ps, idx) => (
