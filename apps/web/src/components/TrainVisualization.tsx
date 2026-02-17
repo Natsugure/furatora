@@ -8,6 +8,12 @@ type Train = {
   prioritySeats: PrioritySeat[] | null;
 };
 
+type FacilityConnection = {
+  stationName: string;
+  lineNames: string[];
+  exitLabel: string | null;
+};
+
 type Facility = {
   id: string;
   typeCode: string;
@@ -16,6 +22,7 @@ type Facility = {
   exits: string | null;
   isWheelchairAccessible: boolean | null;
   isStrollerAccessible: boolean | null;
+  connections: FacilityConnection[];
 };
 
 type Props = {
@@ -27,12 +34,12 @@ type Props = {
 };
 
 const FACILITY_ICONS: Record<string, string> = {
-  elevator: '🛗',
-  escalator: '⚡',
-  stairs: '🚶',
-  ramp: '♿',
-  stairLift: '🦽',
-  sameFloor: '↔️',
+  elevator: '/icons/elevator.png',
+  escalator: '/icons/escalator.png',
+  stairs: '/icons/stairs.png',
+  ramp: '/icons/wheelchair_ramp.png',
+  stairLift: '/icons/stair_lift.png',
+  sameFloor: '/icons/wheelchair.png',
 };
 
 export function TrainVisualization({
@@ -100,6 +107,33 @@ export function TrainVisualization({
       ? 'polygon(15% 0%, 100% 0%, 100% 100%, 15% 100%, 0% 50%)'
       : 'polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%)';
 
+  // 設備テキストラベル行（exits + 乗換路線名）
+  // flex-1 でセル幅に合わせて配置し、アイコン帯の上または下に表示する
+  const facilityLabelRow = (
+    <div className="flex gap-1 py-0.5">
+      {platformCells.map((cellNumber) => {
+        const cellFacilities = facilitiesByCell[cellNumber] ?? [];
+        const labels: string[] = [];
+        for (const f of cellFacilities) {
+          if (f.exits) labels.push(f.exits);
+          for (const conn of f.connections) {
+            if (conn.lineNames.length > 0) labels.push(conn.lineNames.join('・'));
+          }
+        }
+        return (
+          <div
+            key={cellNumber}
+            className="flex-1 flex flex-col items-center gap-px text-[9px] leading-tight text-gray-500"
+          >
+            {labels.map((label, i) => (
+              <span key={i} className="text-center break-all">{label}</span>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   // ホームの帯（設備アイコン付き）
   // セル区切りは表示せず、1本の帯としてレンダリング。
   // 設備アイコンはセル中央 ((cellNumber - 0.5) / platformMaxCarCount * 100%) に絶対配置。
@@ -115,15 +149,25 @@ export function TrainVisualization({
             className="absolute top-0 bottom-0 flex items-center gap-0.5 -translate-x-1/2"
             style={{ left: `${leftPercent}%` }}
           >
-            {cellFacilities.map((f, idx) => (
-              <span
-                key={idx}
-                title={f.exits || f.typeName}
-                className="text-sm leading-none"
-              >
-                {FACILITY_ICONS[f.typeCode] ?? '📍'}
-              </span>
-            ))}
+            {cellFacilities.map((f, idx) =>
+              FACILITY_ICONS[f.typeCode] ? (
+                <img
+                  key={idx}
+                  src={FACILITY_ICONS[f.typeCode]}
+                  alt={f.typeName}
+                  title={f.exits || f.typeName}
+                  className="w-6 h-6"
+                />
+              ) : (
+                <span
+                  key={idx}
+                  title={f.exits || f.typeName}
+                  className="text-sm leading-none"
+                >
+                  📍
+                </span>
+              )
+            )}
           </div>
         );
       })}
@@ -141,7 +185,12 @@ export function TrainVisualization({
       {/* ホーム + 列車の可視化 */}
       <div className="mb-2">
         {/* ホーム帯 — 上側 */}
-        {effectivePlatformSide === 'top' && platformStrip}
+        {effectivePlatformSide === 'top' && (
+          <>
+            {facilityLabelRow}
+            {platformStrip}
+          </>
+        )}
 
         {/* 列車の車両列 */}
         <div className="flex items-center gap-1 my-1">
@@ -195,7 +244,12 @@ export function TrainVisualization({
         </div>
 
         {/* ホーム帯 — 下側 */}
-        {effectivePlatformSide === 'bottom' && platformStrip}
+        {effectivePlatformSide === 'bottom' && (
+          <>
+            {platformStrip}
+            {facilityLabelRow}
+          </>
+        )}
       </div>
 
       {/* 凡例 */}

@@ -9,7 +9,7 @@ import './globals.css';
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
 export const metadata: Metadata = {
-  title: 'バリアフリー駅・列車案内',
+  title: 'ベビフリ乗換 | バリアフリー駅・列車案内',
   description: '各駅のホーム設備と列車内フリースペース情報',
 };
 
@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body className={`${geist.variable} antialiased flex flex-col min-h-screen bg-gradient-to-br from-blue-50 to-blue-100`}>
+      <body className={`${geist.variable} antialiased flex flex-col min-h-screen`}>
         <Providers>
           {/* Header */}
           <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
@@ -32,10 +32,10 @@ export default function RootLayout({
                 </div>
                 <div>
                   <p className="font-bold text-lg leading-tight text-gray-900">
-                    バリアフリー駅・列車案内
+                    ベビフリ乗換
                   </p>
                   <p className="text-xs text-gray-500">
-                    各駅のホーム設備と列車内フリースペース情報
+                    各駅のバリアフリールートと列車内フリースペース情報
                   </p>
                 </div>
               </Link>

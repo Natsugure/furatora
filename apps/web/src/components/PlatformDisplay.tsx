@@ -34,6 +34,12 @@ type Train = {
   prioritySeats: PrioritySeat[] | null;
 };
 
+export type FacilityConnection = {
+  stationName: string;
+  lineNames: string[];
+  exitLabel: string | null;
+};
+
 export type Facility = {
   id: string;
   typeCode: string;
@@ -42,6 +48,7 @@ export type Facility = {
   exits: string | null;
   isWheelchairAccessible: boolean | null;
   isStrollerAccessible: boolean | null;
+  connections: FacilityConnection[];
 };
 
 type Props = {
@@ -134,9 +141,6 @@ export function PlatformDisplay({
                     >
                       <span>{FACILITY_ICONS[facility.typeCode] || '📍'}</span>
                       <span>
-                        {facility.nearPlatformCell
-                          ? `${facility.nearPlatformCell}番枠付近 — `
-                          : ''}
                         {facility.exits || facility.typeName}
                       </span>
                       {!accessible && (
