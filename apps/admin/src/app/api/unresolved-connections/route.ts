@@ -36,6 +36,9 @@ export async function GET() {
       JOIN stations s ON sc.station_id = s.id
       WHERE sc.connected_railway_id IS NULL
         AND sc.odpt_railway_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM lines l WHERE l.odpt_railway_id = sc.odpt_railway_id
+        )
       GROUP BY sc.odpt_railway_id
       ORDER BY sc.odpt_railway_id
     `),
@@ -49,6 +52,9 @@ export async function GET() {
       JOIN stations s ON sc.station_id = s.id
       WHERE sc.connected_station_id IS NULL
         AND sc.odpt_station_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM stations st WHERE st.odpt_station_id = sc.odpt_station_id
+        )
       GROUP BY sc.odpt_station_id
       ORDER BY sc.odpt_station_id
     `),

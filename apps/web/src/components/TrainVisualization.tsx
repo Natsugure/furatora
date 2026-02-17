@@ -101,11 +101,17 @@ export function TrainVisualization({
   const direction = stopPosition?.direction ?? 'ascending';
   const effectivePlatformSide = platformSide ?? 'bottom';
 
-  // 先頭車両(1号車)のclip-path: ascending=左向き台形, descending=右向き台形
+  // 先頭車両(1号車)のclip-path（横レイアウト）: ascending=左向き台形, descending=右向き台形
   const leadingCarClipPath =
     direction === 'ascending'
       ? 'polygon(15% 0%, 100% 0%, 100% 100%, 15% 100%, 0% 50%)'
       : 'polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%)';
+
+  // 先頭車両(1号車)のclip-path（縦レイアウト）: ascending=上向き, descending=下向き
+  const verticalLeadingCarClipPath =
+    direction === 'ascending'
+      ? 'polygon(0% 20%, 50% 0%, 100% 20%, 100% 100%, 0% 100%)'
+      : 'polygon(0% 0%, 100% 0%, 100% 80%, 50% 100%, 0% 80%)';
 
   // 設備テキストラベル行（exits + 乗換路線名）
   // flex-1 でセル幅に合わせて配置し、アイコン帯の上または下に表示する
@@ -184,72 +190,133 @@ export function TrainVisualization({
 
       {/* ホーム + 列車の可視化 */}
       <div className="mb-2">
-        {/* ホーム帯 — 上側 */}
-        {effectivePlatformSide === 'top' && (
-          <>
-            {facilityLabelRow}
-            {platformStrip}
-          </>
-        )}
-
-        {/* 列車の車両列 */}
-        <div className="flex items-center gap-1 my-1">
+        {/* 縦レイアウト（モバイル: md未満）
+            platformSide top → ホーム帯が左、ラベルが右
+            platformSide bottom → ホーム帯が右、ラベルが左 */}
+        <div className="md:hidden flex flex-col gap-0.5">
           {platformCells.map((cellNumber) => {
             const isTrainCar = carPositions.includes(cellNumber);
-            // 表示用号車番号: 常に左から1,2,...,N
             const displayCarNumber = isTrainCar ? occupiedCells.indexOf(cellNumber) + 1 : null;
-            // 実際の号車番号: フリースペース・優先席の判定に使用
             const physicalCarNumber = isTrainCar ? carPositions.indexOf(cellNumber) + 1 : null;
-            const hasFreeSpace = physicalCarNumber
-              ? freeSpacePositions.has(physicalCarNumber)
-              : false;
-            const hasPrioritySeat = physicalCarNumber
-              ? prioritySeatPositions.has(physicalCarNumber)
-              : false;
-            // 先頭車両: carPositions[0] が物理的な1号車の停車枠
+            const hasFreeSpace = physicalCarNumber ? freeSpacePositions.has(physicalCarNumber) : false;
+            const hasPrioritySeat = physicalCarNumber ? prioritySeatPositions.has(physicalCarNumber) : false;
             const isLeadingCar = isTrainCar && cellNumber === carPositions[0];
-
             const bgColor = isTrainCar
-              ? hasFreeSpace
-                ? '#bfdbfe' // blue-200
-                : hasPrioritySeat
-                  ? '#fde68a' // amber-200
-                  : '#d1d5db' // gray-300
-              : '#f9fafb'; // gray-50
+              ? hasFreeSpace ? '#bfdbfe' : hasPrioritySeat ? '#fde68a' : '#d1d5db'
+              : '#f9fafb';
+            const cellFacilities = facilitiesByCell[cellNumber] ?? [];
+            const labels: string[] = [];
+            for (const f of cellFacilities) {
+              if (f.exits) labels.push(f.exits);
+              for (const conn of f.connections) {
+                if (conn.lineNames.length > 0) labels.push(conn.lineNames.join('・'));
+              }
+            }
 
-            return (
+            // 縦レイアウト: 横1:縦3 = w-12(48px) × h-36(144px)
+            const carCell = (
               <div
-                key={cellNumber}
-                className="relative flex-1 h-12 border border-gray-300 flex items-center justify-center text-xs font-mono"
+                className="w-12 flex-shrink-0 h-36 border border-gray-300 flex items-center justify-center font-mono"
                 style={{
                   backgroundColor: bgColor,
-                  clipPath: isLeadingCar && isTrainCar ? leadingCarClipPath : undefined,
-                  borderRadius: isLeadingCar && isTrainCar ? 0 : undefined,
+                  clipPath: isLeadingCar ? verticalLeadingCarClipPath : undefined,
+                  borderRadius: isLeadingCar ? 0 : undefined,
                 }}
               >
                 {isTrainCar && displayCarNumber && (
                   <div className="text-center">
-                    <div className="font-bold">{displayCarNumber}</div>
-                    {hasFreeSpace && (
-                      <div className="text-[10px] text-blue-700">🚼</div>
-                    )}
-                    {!hasFreeSpace && hasPrioritySeat && (
-                      <div className="text-[10px] text-amber-700">🪑</div>
-                    )}
+                    <div className="font-bold text-base">{displayCarNumber}</div>
+                    {hasFreeSpace && <div className="text-xs text-blue-700">🚼</div>}
+                    {!hasFreeSpace && hasPrioritySeat && <div className="text-xs text-amber-700">🪑</div>}
                   </div>
+                )}
+              </div>
+            );
+
+            // ホーム帯: 横幅を2倍（w-16 = 64px）
+            const stripCell = (
+              <div className="w-16 flex-shrink-0 h-36 bg-stone-200 flex flex-col items-center justify-center gap-1">
+                {cellFacilities.map((f, idx) =>
+                  FACILITY_ICONS[f.typeCode] ? (
+                    <img key={idx} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={f.exits || f.typeName} className="w-7 h-7" />
+                  ) : (
+                    <span key={idx} className="text-base leading-none">📍</span>
+                  )
+                )}
+              </div>
+            );
+
+            // ラベル: flex-1で残り幅を使いきり、余白・折り返しつきで多く表示
+            const labelCell = (
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 text-xs leading-snug text-gray-600 px-2 py-1">
+                {labels.map((label, i) => (
+                  <span key={i} className="break-words">{label}</span>
+                ))}
+              </div>
+            );
+
+            return (
+              <div key={cellNumber} className="flex items-stretch gap-0.5">
+                {effectivePlatformSide === 'top' ? (
+                  <>{labelCell}{stripCell}{carCell}</>
+                ) : (
+                  <>{carCell}{stripCell}{labelCell}</>
                 )}
               </div>
             );
           })}
         </div>
 
-        {/* ホーム帯 — 下側 */}
-        {effectivePlatformSide === 'bottom' && (
-          <>
-            {platformStrip}
-            {facilityLabelRow}
-          </>
-        )}
+        {/* 横レイアウト（デスクトップ: md以上） */}
+        <div className="hidden md:block">
+          {effectivePlatformSide === 'top' && (
+            <>
+              {facilityLabelRow}
+              {platformStrip}
+            </>
+          )}
+
+          <div className="flex items-center gap-1 my-1">
+            {platformCells.map((cellNumber) => {
+              const isTrainCar = carPositions.includes(cellNumber);
+              const displayCarNumber = isTrainCar ? occupiedCells.indexOf(cellNumber) + 1 : null;
+              const physicalCarNumber = isTrainCar ? carPositions.indexOf(cellNumber) + 1 : null;
+              const hasFreeSpace = physicalCarNumber ? freeSpacePositions.has(physicalCarNumber) : false;
+              const hasPrioritySeat = physicalCarNumber ? prioritySeatPositions.has(physicalCarNumber) : false;
+              const isLeadingCar = isTrainCar && cellNumber === carPositions[0];
+              const bgColor = isTrainCar
+                ? hasFreeSpace ? '#bfdbfe' : hasPrioritySeat ? '#fde68a' : '#d1d5db'
+                : '#f9fafb';
+
+              return (
+                <div
+                  key={cellNumber}
+                  className="relative flex-1 h-12 border border-gray-300 flex items-center justify-center text-xs font-mono"
+                  style={{
+                    backgroundColor: bgColor,
+                    clipPath: isLeadingCar && isTrainCar ? leadingCarClipPath : undefined,
+                    borderRadius: isLeadingCar && isTrainCar ? 0 : undefined,
+                  }}
+                >
+                  {isTrainCar && displayCarNumber && (
+                    <div className="text-center">
+                      <div className="font-bold">{displayCarNumber}</div>
+                      {hasFreeSpace && <div className="text-[10px] text-blue-700">🚼</div>}
+                      {!hasFreeSpace && hasPrioritySeat && <div className="text-[10px] text-amber-700">🪑</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {effectivePlatformSide === 'bottom' && (
+            <>
+              {platformStrip}
+              {facilityLabelRow}
+            </>
+          )}
+        </div>
       </div>
 
       {/* 凡例 */}

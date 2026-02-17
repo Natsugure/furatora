@@ -274,6 +274,17 @@ async function updateOdptData(operator: Operator) {
     console.log(`${operator}: Registered ${stationLineValues.length} station-line relations`);
 
     // 4. 駅の乗り換え情報を登録
+    // 全オペレーターの路線・駅マップ（クロスオペレーター乗換のFK解決に使用）
+    const allLineRecords = await tx
+      .select({ id: lines.id, odptRailwayId: lines.odptRailwayId })
+      .from(lines);
+    const allLineIdMap = new Map(allLineRecords.map(l => [l.odptRailwayId, l.id]));
+
+    const allStationRecords = await tx
+      .select({ id: stations.id, odptStationId: stations.odptStationId })
+      .from(stations);
+    const allStationIdMap = new Map(allStationRecords.map(s => [s.odptStationId, s.id]));
+
     const connectionValues: {
       stationId: string;
       connectedStationId: string | null;
@@ -298,8 +309,8 @@ async function updateOdptData(operator: Operator) {
 
         connectionValues.push({
           stationId,
-          connectedStationId: connectedOdptStationId ? (stationIdMap.get(connectedOdptStationId) ?? null) : null,
-          connectedRailwayId: connectedOdptRailwayId ? (lineIdMap.get(connectedOdptRailwayId) ?? null) : null,
+          connectedStationId: connectedOdptStationId ? (allStationIdMap.get(connectedOdptStationId) ?? null) : null,
+          connectedRailwayId: connectedOdptRailwayId ? (allLineIdMap.get(connectedOdptRailwayId) ?? null) : null,
           odptStationId: connectedOdptStationId,
           odptRailwayId: connectedOdptRailwayId,
         });
