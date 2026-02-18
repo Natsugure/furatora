@@ -4,7 +4,8 @@
   "private": true,
   "exports": {
     "./client": "./src/client.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./enums": "./src/enums.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

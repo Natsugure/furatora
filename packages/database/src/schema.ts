@@ -1,4 +1,5 @@
 import { pgTable, varchar, decimal, integer, timestamp, text, jsonb, uuid, boolean, primaryKey, unique, serial } from 'drizzle-orm/pg-core';
+import type { StrollerDifficulty, WheelchairDifficulty, DirectionType, PlatformSide } from './enums';
 import { sql } from 'drizzle-orm';
 
 export const stations = pgTable('stations', {
@@ -54,8 +55,11 @@ export const stationConnections = pgTable('station_connections', {
   odptStationId: varchar('odpt_station_id', { length: 100 }),
   odptRailwayId: varchar('odpt_railway_id', { length: 100 }),
 
-  isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
-  isStrollerAccessible: boolean('is_stroller_accessible').default(true),
+  strollerDifficulty: varchar('stroller_difficulty', { length: 20 }).$type<StrollerDifficulty>(),
+  wheelchairDifficulty: varchar('wheelchair_difficulty', { length: 20 }).$type<WheelchairDifficulty>(),
+
+  notesAboutStroller: text('notes_about_stroller'),
+  notesAboutWheelchair: text('notes_about_wheelchair'),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
@@ -67,7 +71,7 @@ export const trains = pgTable('trains', {
   operators: uuid('operators').references(() => operators.id).notNull(),
   lines: uuid('lines').references(() => lines.id).array().notNull(),
   carCount: integer('car_count').notNull(),
-  carStructure: jsonb('car_configuration').$type<CarStructure>(),
+  carStructure: jsonb('car_structure').$type<CarStructure>(),
   freeSpaces: jsonb('free_spaces').$type<FreeSpace[]>(),
   prioritySeats: jsonb('priority_seats').$type<PrioritySeat[]>(),
   limitedToPlatformIds: uuid('limited_to_platform_ids').array(),
@@ -96,7 +100,7 @@ export type PrioritySeat = {
 export const lineDirections = pgTable('line_directions', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
-  directionType: varchar('direction_type', { length: 20 }).notNull(), // 'inbound' | 'outbound'
+  directionType: varchar('direction_type', { length: 20 }).notNull().$type<DirectionType>(),
   representativeStationId: uuid('representative_station_id').references(() => stations.id).notNull(),
   displayName: varchar('display_name', { length: 100 }).notNull(), // "渋谷方面"
   displayNameEn: varchar('display_name_en', { length: 100 }), // "For Shibuya"
@@ -115,7 +119,7 @@ export const platforms = pgTable('platforms', {
   outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id),
   maxCarCount: integer('max_car_count').notNull(),
   carStopPositions: jsonb('car_stop_positions').$type<CarStopPosition[]>(), // 各両数の停車位置
-  platformSide: varchar('platform_side', { length: 10 }), // 'top' | 'bottom' — ホームが列車の上下どちらか
+  platformSide: varchar('platform_side', { length: 10 }).$type<PlatformSide>(), // ホームが列車の上下どちらか
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
