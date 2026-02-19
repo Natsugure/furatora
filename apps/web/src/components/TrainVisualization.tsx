@@ -1,9 +1,10 @@
-import type { CarStopPosition, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
+import type { CarStopPosition, FreeSpace, PrioritySeat, CarStructure } from '@stroller-transit-app/database/schema';
 
 type Train = {
   id: string;
   name: string;
   carCount: number;
+  carStructure: CarStructure | null; // 実際は CarStructure[] として保存される
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
 };
@@ -42,6 +43,152 @@ const FACILITY_ICONS: Record<string, string> = {
   sameFloor: '/icons/wheelchair.png',
 };
 
+// ドアバンド: 横レイアウト用（垂直ストライプ）
+function HorizontalDoorBands({
+  stdFreeDoors,
+  nonStdFreeDoors,
+  stdPrioDoors,
+  nonStdPrioDoors,
+  doorCount,
+}: {
+  stdFreeDoors: Set<number>;
+  nonStdFreeDoors: Set<number>;
+  stdPrioDoors: Set<number>;
+  nonStdPrioDoors: Set<number>;
+  doorCount: number;
+}) {
+  return (
+    <>
+      {Array.from({ length: doorCount }, (_, d) => {
+        const doorNum = d + 1;
+        const hasStdFree = stdFreeDoors.has(doorNum);
+        const hasNonStdFree = nonStdFreeDoors.has(doorNum);
+        const hasStdPrio = stdPrioDoors.has(doorNum);
+        const hasNonStdPrio = nonStdPrioDoors.has(doorNum);
+        const hasFree = hasStdFree || hasNonStdFree;
+        const hasPrio = hasStdPrio || hasNonStdPrio;
+        if (!hasFree && !hasPrio) return null;
+        const split = hasFree && hasPrio;
+        const freeBg = hasStdFree ? '#42A5F5' : '#BBDEFB';
+        const freeLabel = hasStdFree ? 'F' : '(F)';
+        const freeTextColor = hasStdFree ? 'white' : '#1565C0';
+        const freeFontSize = split ? (hasStdFree ? 7 : 5) : (hasStdFree ? 8 : 6);
+        const prioBg = hasStdPrio ? '#FFA726' : '#FFE0B2';
+        const prioLabel = hasStdPrio ? '優' : '(優)';
+        const prioTextColor = hasStdPrio ? 'white' : '#E65100';
+        const prioFontSize = split ? (hasStdPrio ? 7 : 5) : (hasStdPrio ? 8 : 6);
+        const leftPct = (d / doorCount) * 100;
+        const widthPct = (1 / doorCount) * 100;
+        return (
+          <div
+            key={doorNum}
+            className="absolute top-0 bottom-0"
+            style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+          >
+            {split ? (
+              <>
+                <div
+                  className="absolute left-0 right-0 top-0 bottom-1/2 flex items-center justify-center"
+                  style={{ backgroundColor: freeBg }}
+                >
+                  <span className="font-bold leading-none" style={{ fontSize: freeFontSize, color: freeTextColor }}>{freeLabel}</span>
+                </div>
+                <div
+                  className="absolute left-0 right-0 top-1/2 bottom-0 flex items-center justify-center"
+                  style={{ backgroundColor: prioBg }}
+                >
+                  <span className="font-bold leading-none" style={{ fontSize: prioFontSize, color: prioTextColor }}>{prioLabel}</span>
+                </div>
+              </>
+            ) : hasFree ? (
+              <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: freeBg }}>
+                <span className="font-bold leading-none" style={{ fontSize: freeFontSize, color: freeTextColor }}>{freeLabel}</span>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: prioBg }}>
+                <span className="font-bold leading-none" style={{ fontSize: prioFontSize, color: prioTextColor }}>{prioLabel}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ドアバンド: 縦レイアウト用（水平ストライプ）
+function VerticalDoorBands({
+  stdFreeDoors,
+  nonStdFreeDoors,
+  stdPrioDoors,
+  nonStdPrioDoors,
+  doorCount,
+}: {
+  stdFreeDoors: Set<number>;
+  nonStdFreeDoors: Set<number>;
+  stdPrioDoors: Set<number>;
+  nonStdPrioDoors: Set<number>;
+  doorCount: number;
+}) {
+  return (
+    <>
+      {Array.from({ length: doorCount }, (_, d) => {
+        const doorNum = d + 1;
+        const hasStdFree = stdFreeDoors.has(doorNum);
+        const hasNonStdFree = nonStdFreeDoors.has(doorNum);
+        const hasStdPrio = stdPrioDoors.has(doorNum);
+        const hasNonStdPrio = nonStdPrioDoors.has(doorNum);
+        const hasFree = hasStdFree || hasNonStdFree;
+        const hasPrio = hasStdPrio || hasNonStdPrio;
+        if (!hasFree && !hasPrio) return null;
+        const split = hasFree && hasPrio;
+        const freeBg = hasStdFree ? '#42A5F5' : '#BBDEFB';
+        const freeLabel = hasStdFree ? 'F' : '(F)';
+        const freeTextColor = hasStdFree ? 'white' : '#1565C0';
+        const freeFontSize = split ? (hasStdFree ? 7 : 5) : (hasStdFree ? 8 : 6);
+        const prioBg = hasStdPrio ? '#FFA726' : '#FFE0B2';
+        const prioLabel = hasStdPrio ? '優' : '(優)';
+        const prioTextColor = hasStdPrio ? 'white' : '#E65100';
+        const prioFontSize = split ? (hasStdPrio ? 7 : 5) : (hasStdPrio ? 8 : 6);
+        const topPct = (d / doorCount) * 100;
+        const heightPct = (1 / doorCount) * 100;
+        return (
+          <div
+            key={doorNum}
+            className="absolute left-0 right-0"
+            style={{ top: `${topPct}%`, height: `${heightPct}%` }}
+          >
+            {split ? (
+              <>
+                <div
+                  className="absolute top-0 bottom-0 left-0 right-1/2 flex items-center justify-center"
+                  style={{ backgroundColor: freeBg }}
+                >
+                  <span className="font-bold leading-none" style={{ fontSize: freeFontSize, color: freeTextColor }}>{freeLabel}</span>
+                </div>
+                <div
+                  className="absolute top-0 bottom-0 left-1/2 right-0 flex items-center justify-center"
+                  style={{ backgroundColor: prioBg }}
+                >
+                  <span className="font-bold leading-none" style={{ fontSize: prioFontSize, color: prioTextColor }}>{prioLabel}</span>
+                </div>
+              </>
+            ) : hasFree ? (
+              <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: freeBg }}>
+                <span className="font-bold leading-none" style={{ fontSize: freeFontSize, color: freeTextColor }}>{freeLabel}</span>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: prioBg }}>
+                <span className="font-bold leading-none" style={{ fontSize: prioFontSize, color: prioTextColor }}>{prioLabel}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export function TrainVisualization({
   train,
   platformMaxCarCount,
@@ -55,35 +202,54 @@ export function TrainVisualization({
   );
 
   // 列車の各車両の位置を計算（platformMaxCarCount基準）
-  // carPositions[i] = 号車番号(i+1)が停車するホーム枠番号
   const carPositions = Array.from({ length: train.carCount }, (_, i) => {
-    if (!stopPosition) {
-      return i + 1;
-    }
+    if (!stopPosition) return i + 1;
     const { referenceCarNumber, referencePlatformCell, direction } = stopPosition;
     const carNumber = i + 1;
-    if (direction === 'ascending') {
-      return referencePlatformCell + (carNumber - referenceCarNumber);
-    } else {
-      return referencePlatformCell - (carNumber - referenceCarNumber);
-    }
+    return direction === 'ascending'
+      ? referencePlatformCell + (carNumber - referenceCarNumber)
+      : referencePlatformCell - (carNumber - referenceCarNumber);
   });
 
-  // フリースペースの位置をセット化（標準装備のみ）
-  const freeSpacePositions = new Set(
-    train.freeSpaces?.filter((fs) => fs.isStandard).map((fs) => fs.carNumber) || []
-  );
+  // carStructure から号車ごとのドア数マップを構築
+  const carStructureArray = Array.isArray(train.carStructure)
+    ? (train.carStructure as { carNumber: number; doorCount: number }[])
+    : [];
+  const doorCountByCarNumber = new Map(carStructureArray.map((cs) => [cs.carNumber, cs.doorCount]));
+  const getDoorCount = (carNum: number) => doorCountByCarNumber.get(carNum) ?? 4;
 
-  // 優先席の位置をセット化
-  const prioritySeatPositions = new Set(
-    train.prioritySeats?.map((ps) => ps.carNumber) || []
-  );
+  // 号車 → ドア番号セット (標準フリースペース: isStandard === true のみ)
+  const stdFreeSpaceDoorsByCarNumber = new Map<number, Set<number>>();
+  for (const fs of train.freeSpaces?.filter((f) => f.isStandard === true) ?? []) {
+    if (!stdFreeSpaceDoorsByCarNumber.has(fs.carNumber)) stdFreeSpaceDoorsByCarNumber.set(fs.carNumber, new Set());
+    stdFreeSpaceDoorsByCarNumber.get(fs.carNumber)!.add(fs.nearDoor);
+  }
+
+  // 号車 → ドア番号セット (一部編成のみのフリースペース: isStandard === false のみ)
+  const nonStdFreeSpaceDoorsByCarNumber = new Map<number, Set<number>>();
+  for (const fs of train.freeSpaces?.filter((f) => f.isStandard === false) ?? []) {
+    if (!nonStdFreeSpaceDoorsByCarNumber.has(fs.carNumber)) nonStdFreeSpaceDoorsByCarNumber.set(fs.carNumber, new Set());
+    nonStdFreeSpaceDoorsByCarNumber.get(fs.carNumber)!.add(fs.nearDoor);
+  }
+
+  // 号車 → ドア番号セット (標準優先席: isStandard === true)
+  const stdPrioSeatDoorsByCarNumber = new Map<number, Set<number>>();
+  for (const ps of train.prioritySeats?.filter((p) => p.isStandard === true) ?? []) {
+    if (!stdPrioSeatDoorsByCarNumber.has(ps.carNumber)) stdPrioSeatDoorsByCarNumber.set(ps.carNumber, new Set());
+    stdPrioSeatDoorsByCarNumber.get(ps.carNumber)!.add(ps.nearDoor);
+  }
+
+  // 号車 → ドア番号セット (一部編成のみの優先席: isStandard === false のみ)
+  const nonStdPrioSeatDoorsByCarNumber = new Map<number, Set<number>>();
+  for (const ps of train.prioritySeats?.filter((p) => p.isStandard === false) ?? []) {
+    if (!nonStdPrioSeatDoorsByCarNumber.has(ps.carNumber)) nonStdPrioSeatDoorsByCarNumber.set(ps.carNumber, new Set());
+    nonStdPrioSeatDoorsByCarNumber.get(ps.carNumber)!.add(ps.nearDoor);
+  }
 
   // ホーム全体の長さ（maxCarCount基準）
   const platformCells = Array.from({ length: platformMaxCarCount }, (_, i) => i + 1);
 
-  // ホーム枠番号 → 設備リスト のマップを構築
-  // nearPlatformCell はホーム枠番号を直接指定する
+  // ホーム枠番号 → 設備リスト のマップ
   const facilitiesByCell: Record<number, Facility[]> = {};
   for (const facility of facilities) {
     if (facility.nearPlatformCell !== null) {
@@ -101,20 +267,16 @@ export function TrainVisualization({
   const direction = stopPosition?.direction ?? 'ascending';
   const effectivePlatformSide = platformSide ?? 'bottom';
 
-  // 先頭車両(1号車)のclip-path（横レイアウト）: ascending=左向き台形, descending=右向き台形
   const leadingCarClipPath =
     direction === 'ascending'
       ? 'polygon(15% 0%, 100% 0%, 100% 100%, 15% 100%, 0% 50%)'
       : 'polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%)';
 
-  // 先頭車両(1号車)のclip-path（縦レイアウト）: ascending=上向き, descending=下向き
   const verticalLeadingCarClipPath =
     direction === 'ascending'
       ? 'polygon(0% 20%, 50% 0%, 100% 20%, 100% 100%, 0% 100%)'
       : 'polygon(0% 0%, 100% 0%, 100% 80%, 50% 100%, 0% 80%)';
 
-  // 設備テキストラベル行（exits + 乗換路線名）
-  // flex-1 でセル幅に合わせて配置し、アイコン帯の上または下に表示する
   const facilityLabelRow = (
     <div className="flex gap-1 py-0.5">
       {platformCells.map((cellNumber) => {
@@ -140,9 +302,6 @@ export function TrainVisualization({
     </div>
   );
 
-  // ホームの帯（設備アイコン付き）
-  // セル区切りは表示せず、1本の帯としてレンダリング。
-  // 設備アイコンはセル中央 ((cellNumber - 0.5) / platformMaxCarCount * 100%) に絶対配置。
   const platformStrip = (
     <div className="relative h-15 bg-stone-200">
       {platformCells.map((cellNumber) => {
@@ -165,13 +324,7 @@ export function TrainVisualization({
                   className="w-6 h-6"
                 />
               ) : (
-                <span
-                  key={idx}
-                  title={f.exits || f.typeName}
-                  className="text-sm leading-none"
-                >
-                  📍
-                </span>
+                <span key={idx} title={f.exits || f.typeName} className="text-sm leading-none">📍</span>
               )
             )}
           </div>
@@ -190,20 +343,13 @@ export function TrainVisualization({
 
       {/* ホーム + 列車の可視化 */}
       <div className="mb-2">
-        {/* 縦レイアウト（モバイル: md未満）
-            platformSide top → ホーム帯が左、ラベルが右
-            platformSide bottom → ホーム帯が右、ラベルが左 */}
+        {/* 縦レイアウト（モバイル: md未満） */}
         <div className="md:hidden flex flex-col gap-0.5">
           {platformCells.map((cellNumber) => {
             const isTrainCar = carPositions.includes(cellNumber);
             const displayCarNumber = isTrainCar ? occupiedCells.indexOf(cellNumber) + 1 : null;
             const physicalCarNumber = isTrainCar ? carPositions.indexOf(cellNumber) + 1 : null;
-            const hasFreeSpace = physicalCarNumber ? freeSpacePositions.has(physicalCarNumber) : false;
-            const hasPrioritySeat = physicalCarNumber ? prioritySeatPositions.has(physicalCarNumber) : false;
             const isLeadingCar = isTrainCar && cellNumber === carPositions[0];
-            const bgColor = isTrainCar
-              ? hasFreeSpace ? '#bfdbfe' : hasPrioritySeat ? '#fde68a' : '#d1d5db'
-              : '#f9fafb';
             const cellFacilities = facilitiesByCell[cellNumber] ?? [];
             const labels: string[] = [];
             for (const f of cellFacilities) {
@@ -213,27 +359,40 @@ export function TrainVisualization({
               }
             }
 
-            // 縦レイアウト: 横1:縦3 = w-12(48px) × h-36(144px)
+            const stdFreeDoors = physicalCarNumber ? (stdFreeSpaceDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+            const nonStdFreeDoors = physicalCarNumber ? (nonStdFreeSpaceDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+            const stdPrioDoors = physicalCarNumber ? (stdPrioSeatDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+            const nonStdPrioDoors = physicalCarNumber ? (nonStdPrioSeatDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+            const doorCount = physicalCarNumber ? getDoorCount(physicalCarNumber) : 4;
+
             const carCell = (
               <div
-                className="w-12 flex-shrink-0 h-36 border border-gray-300 flex items-center justify-center font-mono"
+                className="w-12 flex-shrink-0 h-36 border border-gray-300 relative overflow-hidden"
                 style={{
-                  backgroundColor: bgColor,
+                  backgroundColor: isTrainCar ? '#d1d5db' : '#f9fafb',
                   clipPath: isLeadingCar ? verticalLeadingCarClipPath : undefined,
                   borderRadius: isLeadingCar ? 0 : undefined,
                 }}
               >
+                {isTrainCar && physicalCarNumber && (
+                  <VerticalDoorBands
+                    stdFreeDoors={stdFreeDoors}
+                    nonStdFreeDoors={nonStdFreeDoors}
+                    stdPrioDoors={stdPrioDoors}
+                    nonStdPrioDoors={nonStdPrioDoors}
+                    doorCount={doorCount}
+                  />
+                )}
                 {isTrainCar && displayCarNumber && (
-                  <div className="text-center">
-                    <div className="font-bold text-base">{displayCarNumber}</div>
-                    {hasFreeSpace && <div className="text-xs text-blue-700">🚼</div>}
-                    {!hasFreeSpace && hasPrioritySeat && <div className="text-xs text-amber-700">🪑</div>}
+                  <div className="absolute inset-0 flex items-end justify-center pb-1 z-10 pointer-events-none">
+                    <span className="font-bold text-sm text-gray-800 bg-white/60 px-0.5 rounded-sm leading-none">
+                      {displayCarNumber}
+                    </span>
                   </div>
                 )}
               </div>
             );
 
-            // ホーム帯: 横幅を2倍（w-16 = 64px）
             const stripCell = (
               <div className="w-16 flex-shrink-0 h-36 bg-stone-200 flex flex-col items-center justify-center gap-1">
                 {cellFacilities.map((f, idx) =>
@@ -246,7 +405,6 @@ export function TrainVisualization({
               </div>
             );
 
-            // ラベル: flex-1で残り幅を使いきり、余白・折り返しつきで多く表示
             const labelCell = (
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 text-xs leading-snug text-gray-600 px-2 py-1">
                 {labels.map((label, i) => (
@@ -281,28 +439,38 @@ export function TrainVisualization({
               const isTrainCar = carPositions.includes(cellNumber);
               const displayCarNumber = isTrainCar ? occupiedCells.indexOf(cellNumber) + 1 : null;
               const physicalCarNumber = isTrainCar ? carPositions.indexOf(cellNumber) + 1 : null;
-              const hasFreeSpace = physicalCarNumber ? freeSpacePositions.has(physicalCarNumber) : false;
-              const hasPrioritySeat = physicalCarNumber ? prioritySeatPositions.has(physicalCarNumber) : false;
               const isLeadingCar = isTrainCar && cellNumber === carPositions[0];
-              const bgColor = isTrainCar
-                ? hasFreeSpace ? '#bfdbfe' : hasPrioritySeat ? '#fde68a' : '#d1d5db'
-                : '#f9fafb';
+
+              const stdFreeDoors = physicalCarNumber ? (stdFreeSpaceDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+              const nonStdFreeDoors = physicalCarNumber ? (nonStdFreeSpaceDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+              const stdPrioDoors = physicalCarNumber ? (stdPrioSeatDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+              const nonStdPrioDoors = physicalCarNumber ? (nonStdPrioSeatDoorsByCarNumber.get(physicalCarNumber) ?? new Set<number>()) : new Set<number>();
+              const doorCount = physicalCarNumber ? getDoorCount(physicalCarNumber) : 4;
 
               return (
                 <div
                   key={cellNumber}
-                  className="relative flex-1 h-12 border border-gray-300 flex items-center justify-center text-xs font-mono"
+                  className="relative flex-1 h-12 border border-gray-300 overflow-hidden"
                   style={{
-                    backgroundColor: bgColor,
+                    backgroundColor: isTrainCar ? '#d1d5db' : '#f9fafb',
                     clipPath: isLeadingCar && isTrainCar ? leadingCarClipPath : undefined,
                     borderRadius: isLeadingCar && isTrainCar ? 0 : undefined,
                   }}
                 >
+                  {isTrainCar && physicalCarNumber && (
+                    <HorizontalDoorBands
+                      stdFreeDoors={stdFreeDoors}
+                      nonStdFreeDoors={nonStdFreeDoors}
+                      stdPrioDoors={stdPrioDoors}
+                      nonStdPrioDoors={nonStdPrioDoors}
+                      doorCount={doorCount}
+                    />
+                  )}
                   {isTrainCar && displayCarNumber && (
-                    <div className="text-center">
-                      <div className="font-bold">{displayCarNumber}</div>
-                      {hasFreeSpace && <div className="text-[10px] text-blue-700">🚼</div>}
-                      {!hasFreeSpace && hasPrioritySeat && <div className="text-[10px] text-amber-700">🪑</div>}
+                    <div className="absolute inset-0 flex items-end justify-center pb-0.5 z-10 pointer-events-none">
+                      <span className="font-bold text-xs text-gray-800 bg-white/60 px-0.5 rounded-sm leading-none">
+                        {displayCarNumber}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -322,12 +490,20 @@ export function TrainVisualization({
       {/* 凡例 */}
       <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
         <div className="flex items-center gap-1.5">
-          <div className="w-3.5 h-3.5 bg-blue-200 rounded" />
-          <span>フリースペース</span>
+          <div className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: '#42A5F5' }} />
+          <span>F = フリースペース</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3.5 h-3.5 bg-amber-200 rounded" />
-          <span>優先席</span>
+          <div className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: '#BBDEFB' }} />
+          <span>(F) = フリースペース(一部編成)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: '#FFA726' }} />
+          <span>優 = 優先席</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: '#FFE0B2' }} />
+          <span>(優) = 優先席(一部編成)</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 bg-stone-300" />

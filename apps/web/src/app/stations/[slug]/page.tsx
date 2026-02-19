@@ -13,7 +13,7 @@ import {
   facilityConnections,
   stationConnections,
 } from '@stroller-transit-app/database/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { PlatformDisplay } from '@/components/PlatformDisplay';
 import { PlatformTabs, type DirectionTab, type PlatformEntry } from '@/components/PlatformTabs';
 import { BackButton } from '@/components/BackButton';
@@ -125,14 +125,20 @@ async function fetchStationDetails(slug: string) {
   const connectedStationIds = [...new Set(connectionRows.map((r) => r.connectedStationId))];
   const stationLineNames = connectedStationIds.length > 0
     ? await db
-        .select({ stationId: stationLines.stationId, lineName: lines.name })
-        .from(stationLines)
-        .innerJoin(lines, eq(lines.id, stationLines.lineId))
-        .where(inArray(stationLines.stationId, connectedStationIds))
+        .select({ stationId: stationConnections.connectedStationId, lineName: lines.name })
+        .from(stationConnections)
+        .innerJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
+        .where(
+          and(
+            eq(stationConnections.stationId, station.id),
+            inArray(stationConnections.connectedStationId, connectedStationIds)
+          )
+        )
     : [];
 
   const linesByStation: Record<string, string[]> = {};
   for (const row of stationLineNames) {
+    if (!row.stationId) continue;
     if (!linesByStation[row.stationId]) linesByStation[row.stationId] = [];
     linesByStation[row.stationId].push(row.lineName);
   }

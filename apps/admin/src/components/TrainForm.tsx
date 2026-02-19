@@ -34,6 +34,15 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [operatorId, setOperatorId] = useState(initialData?.operatorId ?? '');
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>(initialData?.lineIds ?? []);
   const [carCount, setCarCount] = useState(initialData?.carCount ?? 10);
+
+  const initCarStructures = (): { carNumber: number; doorCount: number }[] => {
+    const cs = initialData?.carStructure;
+    if (Array.isArray(cs) && cs.length > 0) return cs as { carNumber: number; doorCount: number }[];
+    const count = initialData?.carCount ?? 10;
+    return Array.from({ length: count }, (_, i) => ({ carNumber: i + 1, doorCount: 4 }));
+  };
+  const [carStructures, setCarStructures] = useState(initCarStructures);
+
   const [freeSpaces, setFreeSpaces] = useState<FreeSpace[]>(initialData?.freeSpaces ?? []);
   const [prioritySeats, setPrioritySeats] = useState<PrioritySeat[]>(initialData?.prioritySeats ?? []);
   const [limitedToPlatformIdsText, setLimitedToPlatformIdsText] = useState(
@@ -81,12 +90,12 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   }
 
   function addPrioritySeat() {
-    setPrioritySeats((prev) => [...prev, { carNumber: 1, nearDoor: 1 }]);
+    setPrioritySeats((prev) => [...prev, { carNumber: 1, nearDoor: 1, isStandard: true }]);
   }
   function removePrioritySeat(index: number) {
     setPrioritySeats((prev) => prev.filter((_, i) => i !== index));
   }
-  function updatePrioritySeat(index: number, field: keyof PrioritySeat, value: number) {
+  function updatePrioritySeat(index: number, field: keyof PrioritySeat, value: number | boolean) {
     setPrioritySeats((prev) => prev.map((ps, i) => (i === index ? { ...ps, [field]: value } : ps)));
   }
 
@@ -110,6 +119,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
       operatorId,
       lineIds: selectedLineIds,
       carCount,
+      carStructure: carStructures.length > 0 ? carStructures : null,
       freeSpaces: freeSpaces.length > 0 ? freeSpaces : null,
       prioritySeats: prioritySeats.length > 0 ? prioritySeats : null,
       limitedToPlatformIds,
@@ -211,10 +221,44 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
           type="number"
           min={1}
           value={carCount}
-          onChange={(e) => setCarCount(Number(e.target.value))}
+          onChange={(e) => {
+            const newCount = Number(e.target.value);
+            setCarCount(newCount);
+            setCarStructures((prev) =>
+              Array.from({ length: newCount }, (_, i) => ({
+                carNumber: i + 1,
+                doorCount: prev[i]?.doorCount ?? 4,
+              }))
+            );
+          }}
           required
           className="w-32 border rounded px-3 py-2"
         />
+      </div>
+
+      {/* Car Structure */}
+      <div>
+        <label className="block text-sm font-medium mb-2">Car Structure (号車ごとのドア数)</label>
+        <div className="space-y-1">
+          {carStructures.map((cs, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-sm text-gray-500 w-14 text-right">{cs.carNumber}号車</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={cs.doorCount}
+                onChange={(e) =>
+                  setCarStructures((prev) =>
+                    prev.map((c, j) => j === i ? { ...c, doorCount: Number(e.target.value) } : c)
+                  )
+                }
+                className="w-20 border rounded px-2 py-1 text-sm"
+              />
+              <span className="text-sm text-gray-500">枚</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Free Spaces */}
@@ -240,7 +284,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
             <span className="text-sm text-gray-500 w-16">isStandard</span>
             <input
               type="checkbox"
-              checked={fs.isStandard ?? false}
+              checked={fs.isStandard}
               onChange={(e) => updateFreeSpace(i, 'isStandard', e.target.checked)}
             />
             <button type="button" onClick={() => removeFreeSpace(i)} className="ml-auto mr-2 text-red-500 text-sm">Remove</button>
@@ -268,7 +312,13 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
               onChange={(e) => updatePrioritySeat(i, 'nearDoor', Number(e.target.value))}
               className="w-20 border rounded px-2 py-1 text-sm"
             />
-            <button type="button" onClick={() => removePrioritySeat(i)} className="text-red-500 text-sm">Remove</button>
+            <span className="text-sm text-gray-500 w-16">isStandard</span>
+            <input
+              type="checkbox"
+              checked={ps.isStandard}
+              onChange={(e) => updatePrioritySeat(i, 'isStandard', e.target.checked)}
+            />
+            <button type="button" onClick={() => removePrioritySeat(i)} className="ml-auto mr-2 text-red-500 text-sm">Remove</button>
           </div>
         ))}
       </div>

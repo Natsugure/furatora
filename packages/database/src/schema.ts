@@ -94,6 +94,7 @@ export type FreeSpace = {
 export type PrioritySeat = {
   carNumber: number;
   nearDoor: number;
+  isStandard: boolean; // 全編成に装備されているか
 }
 
 
