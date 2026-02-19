@@ -322,10 +322,6 @@ export function TrainVisualization({
       {/* 凡例 */}
       <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
         <div className="flex items-center gap-1.5">
-          <div className="w-3.5 h-3.5 bg-gray-300 rounded" />
-          <span>列車</span>
-        </div>
-        <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 bg-blue-200 rounded" />
           <span>フリースペース</span>
         </div>
@@ -335,7 +331,7 @@ export function TrainVisualization({
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 bg-stone-300" />
-          <span>ホーム設備</span>
+          <span>ホーム</span>
         </div>
       </div>
 

@@ -11,12 +11,14 @@ import {
   stationFacilities,
   facilityTypes,
   facilityConnections,
+  stationConnections,
 } from '@stroller-transit-app/database/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { PlatformDisplay } from '@/components/PlatformDisplay';
 import { PlatformTabs, type DirectionTab, type PlatformEntry } from '@/components/PlatformTabs';
 import { BackButton } from '@/components/BackButton';
 import { StationBadge } from '../../../components/ui/StationBadge';
+import { TransferDifficultySection, type TransferConnection } from '@/components/TransferDifficultySection';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -61,7 +63,7 @@ async function fetchStationDetails(slug: string) {
     .where(eq(platforms.stationId, station.id));
 
   if (!platformList.length) {
-    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], facilities: [], facilityTypeMap: {}, connectionsByFacility: {} };
+    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], facilities: [], facilityTypeMap: {} as Record<string, string>, connectionsByFacility: {} as Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]>, transferConnections: [] };
   }
 
   const platformIds = platformList.map((p) => p.id);
@@ -145,6 +147,24 @@ async function fetchStationDetails(slug: string) {
     });
   }
 
+  // 乗換難易度: stationConnections から難易度が設定済みのものを取得
+  const transferConnectionRows = await db
+    .select({
+      lineName: lines.name,
+      lineColor: lines.color,
+      strollerDifficulty: stationConnections.strollerDifficulty,
+      wheelchairDifficulty: stationConnections.wheelchairDifficulty,
+      notesAboutStroller: stationConnections.notesAboutStroller,
+      notesAboutWheelchair: stationConnections.notesAboutWheelchair,
+    })
+    .from(stationConnections)
+    .innerJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
+    .where(eq(stationConnections.stationId, station.id));
+
+  const transferConnections: TransferConnection[] = transferConnectionRows.filter(
+    (r) => r.strollerDifficulty !== null || r.wheelchairDifficulty !== null
+  );
+
   return {
     station,
     platforms: platformList,
@@ -155,6 +175,7 @@ async function fetchStationDetails(slug: string) {
     facilities: facilityList,
     facilityTypeMap,
     connectionsByFacility,
+    transferConnections,
   };
 }
 
@@ -176,6 +197,7 @@ export default async function StationDetailPage({ params }: Props) {
     facilities,
     facilityTypeMap,
     connectionsByFacility,
+    transferConnections,
   } = data;
 
   const lineMap = Object.fromEntries(lineList.map((l) => [l.id, l]));
@@ -283,6 +305,9 @@ export default async function StationDetailPage({ params }: Props) {
           {station.notes}
         </div>
       )}
+
+      {/* Transfer difficulty */}
+      <TransferDifficultySection connections={transferConnections} />
 
       {/* Platform list */}
       {platformList.length > 0 ? (
