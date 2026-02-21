@@ -6,10 +6,11 @@
     "dev": "next dev --port 3001",
     "build": "pnpm --filter scripts seed && next build",
     "start": "next start --port 3001",
-    "lint": "next lint"
+    "lint": "eslint src/"
   },
   "devDependencies": {
     "@stroller-transit-app/typescript-config": "workspace:*",
+    "eslint": "^9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

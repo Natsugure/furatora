@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { db } from '@stroller-transit-app/database/client';
 import { trains, operators } from '@stroller-transit-app/database/schema';
-import { asc, eq } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 import { DuplicateButton } from '@/components/DuplicateButton';
 

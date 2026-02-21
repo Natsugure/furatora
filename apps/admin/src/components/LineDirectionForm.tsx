@@ -145,7 +145,7 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
           ))}
         </select>
         <p className="text-xs text-gray-500 mt-1">
-          The main station representing this direction (e.g., Shibuya for "Shibuya-bound")
+          The main station representing this direction (e.g., Shibuya for &quot;Shibuya-bound&quot;)
         </p>
       </div>
 

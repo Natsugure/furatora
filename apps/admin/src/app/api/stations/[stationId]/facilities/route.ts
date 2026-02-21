@@ -32,8 +32,7 @@ export async function GET(
 }
 
 export async function POST(
-  request: Request,
-  _params: { params: Promise<{ stationId: string }> }
+  request: Request
 ) {
   const body = await request.json();
 

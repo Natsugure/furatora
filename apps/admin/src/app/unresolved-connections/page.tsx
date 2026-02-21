@@ -122,18 +122,15 @@ function RailwayRow({
 }) {
   const [name, setName] = useState(railway.suggestedName);
   const [nameEn, setNameEn] = useState(railway.suggestedName);
-  const [operatorId, setOperatorId] = useState('');
-  const [lineCode, setLineCode] = useState('');
-  const [color, setColor] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  // 事業者キーが一致する事業者を初期選択
-  useEffect(() => {
+  const [operatorId, setOperatorId] = useState(() => {
     const match = operators.find((o) =>
       o.odptOperatorId?.toLowerCase().includes(railway.operatorKey.toLowerCase())
     );
-    if (match) setOperatorId(match.id);
-  }, [operators, railway.operatorKey]);
+    return match?.id ?? '';
+  });
+  const [lineCode, setLineCode] = useState('');
+  const [color, setColor] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
     if (!name.trim() || !operatorId) return;
@@ -254,17 +251,15 @@ function StationRow({
   const [name, setName] = useState(station.suggestedName);
   const [nameEn, setNameEn] = useState(station.suggestedName);
   const [code, setCode] = useState('');
-  const [operatorId, setOperatorId] = useState('');
-  const [linkStationId, setLinkStationId] = useState('');
-  const [stationFilter, setStationFilter] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
+  const [operatorId, setOperatorId] = useState(() => {
     const match = operators.find((o) =>
       o.odptOperatorId?.toLowerCase().includes(station.operatorKey.toLowerCase())
     );
-    if (match) setOperatorId(match.id);
-  }, [operators, station.operatorKey]);
+    return match?.id ?? '';
+  });
+  const [linkStationId, setLinkStationId] = useState('');
+  const [stationFilter, setStationFilter] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const filteredStations = stationFilter
     ? allStations.filter(

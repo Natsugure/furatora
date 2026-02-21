@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { CarStopPosition, FreeSpace, PrioritySeat, CarStructure } from '@stroller-transit-app/database/schema';
 
 type Train = {
@@ -316,11 +317,13 @@ export function TrainVisualization({
           >
             {cellFacilities.map((f, idx) =>
               FACILITY_ICONS[f.typeCode] ? (
-                <img
+                <Image
                   key={idx}
                   src={FACILITY_ICONS[f.typeCode]}
                   alt={f.typeName}
                   title={f.exits || f.typeName}
+                  width={24}
+                  height={24}
                   className="w-6 h-6"
                 />
               ) : (
@@ -397,7 +400,7 @@ export function TrainVisualization({
               <div className="w-16 flex-shrink-0 h-36 bg-stone-200 flex flex-col items-center justify-center gap-1">
                 {cellFacilities.map((f, idx) =>
                   FACILITY_ICONS[f.typeCode] ? (
-                    <img key={idx} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={f.exits || f.typeName} className="w-7 h-7" />
+                    <Image key={idx} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={f.exits || f.typeName} width={28} height={28} className="w-7 h-7" />
                   ) : (
                     <span key={idx} className="text-base leading-none">📍</span>
                   )

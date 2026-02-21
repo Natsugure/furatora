@@ -60,15 +60,6 @@ type Props = {
   facilities: Facility[];
 };
 
-const FACILITY_ICONS: Record<string, string> = {
-  elevator: '🛗',
-  escalator: '⚡',
-  stairs: '🚶',
-  ramp: '♿',
-  stairLift: '🦽',
-  sameFloor: '↔️',
-};
-
 export function PlatformDisplay({
   platform,
   line,

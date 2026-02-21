@@ -64,7 +64,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
         .then((r) => r.json())
         .then(setDirections);
     } else {
-      setDirections([]);
+      Promise.resolve([]).then(setDirections);
     }
   }, [lineId]);
 

@@ -56,7 +56,7 @@ export default async function LineDirectionsPage({
 
       {directions.length === 0 ? (
         <p className="text-gray-500 text-sm">
-          No directions defined yet. Click "+ New Direction" to create one.
+          No directions defined yet. Click &quot;+ New Direction&quot; to create one.
         </p>
       ) : (
         <div className="space-y-3">

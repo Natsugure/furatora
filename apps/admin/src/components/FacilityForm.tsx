@@ -13,13 +13,6 @@ type FacilityType = {
   name: string;
 };
 
-type Station = {
-  id: string;
-  name: string;
-  nameEn: string | null;
-  code: string | null;
-};
-
 type ConnectedStation = {
   id: string;
   name: string;

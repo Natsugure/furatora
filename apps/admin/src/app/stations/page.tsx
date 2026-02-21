@@ -32,8 +32,6 @@ export default async function StationsPage() {
     })
   );
 
-  const operatorMap = Object.fromEntries(operatorList.map((op) => [op.id, op]));
-
   // Group by operator
   const byOperator = operatorList.map((op) => ({
     operator: op,

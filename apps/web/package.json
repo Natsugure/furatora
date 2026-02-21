@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "pnpm --filter scripts seed && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint src/"
   },
   "keywords": [],
   "author": "Natsugure",
