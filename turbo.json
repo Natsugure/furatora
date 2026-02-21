@@ -6,7 +6,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["DATABASE_URL", "NODE_ENV"]
+      "env": ["DATABASE_URL", "NODE_ENV", "AUTH_SECRET", "AUTH_TRUST_HOST", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET"]
     },
     "dev": {
       "cache": false,
