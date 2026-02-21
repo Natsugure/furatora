@@ -26,21 +26,26 @@ type Connection = {
   exitLabel: string;
 };
 
-type FacilityData = {
-  id?: string;
-  platformId: string;
+type FacilitySelection = {
   typeCode: string;
-  nearPlatformCell: number | null;
-  exits: string;
   isWheelchairAccessible: boolean;
   isStrollerAccessible: boolean;
   notes: string;
+};
+
+type LocationData = {
+  id?: string;
+  platformId: string;
+  nearPlatformCell: number | null;
+  exits: string;
+  notes: string;
+  facilities: FacilitySelection[];
   connections?: Connection[];
 };
 
 type Props = {
   stationId: string;
-  initialData?: FacilityData;
+  initialData?: LocationData;
   isEdit?: boolean;
 };
 
@@ -49,13 +54,14 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [facilityTypes, setFacilityTypes] = useState<FacilityType[]>([]);
   const [connectedStations, setConnectedStations] = useState<ConnectedStation[]>([]);
+
   const [platformId, setPlatformId] = useState(initialData?.platformId ?? '');
-  const [typeCode, setTypeCode] = useState(initialData?.typeCode ?? '');
   const [nearPlatformCell, setNearPlatformCell] = useState<number | ''>(initialData?.nearPlatformCell ?? '');
   const [exits, setExits] = useState(initialData?.exits ?? '');
-  const [isWheelchairAccessible, setIsWheelchairAccessible] = useState(initialData?.isWheelchairAccessible ?? true);
-  const [isStrollerAccessible, setIsStrollerAccessible] = useState(initialData?.isStrollerAccessible ?? true);
   const [notes, setNotes] = useState(initialData?.notes ?? '');
+  const [selectedFacilities, setSelectedFacilities] = useState<FacilitySelection[]>(
+    initialData?.facilities ?? []
+  );
   const [connections, setConnections] = useState<Connection[]>(initialData?.connections ?? []);
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,6 +77,22 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
     });
   }, [stationId]);
 
+  function toggleFacilityType(typeCode: string) {
+    setSelectedFacilities((prev) => {
+      const exists = prev.find((f) => f.typeCode === typeCode);
+      if (exists) {
+        return prev.filter((f) => f.typeCode !== typeCode);
+      }
+      return [...prev, { typeCode, isWheelchairAccessible: true, isStrollerAccessible: true, notes: '' }];
+    });
+  }
+
+  function updateFacility(typeCode: string, field: keyof Omit<FacilitySelection, 'typeCode'>, value: boolean | string) {
+    setSelectedFacilities((prev) =>
+      prev.map((f) => (f.typeCode === typeCode ? { ...f, [field]: value } : f))
+    );
+  }
+
   function addConnection() {
     setConnections((prev) => [...prev, { stationId: '', exitLabel: '' }]);
   }
@@ -85,22 +107,24 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (selectedFacilities.length === 0) {
+      alert('設備タイプを1つ以上選択してください');
+      return;
+    }
     setSubmitting(true);
 
     const payload = {
       platformId,
-      typeCode,
       nearPlatformCell: nearPlatformCell === '' ? null : nearPlatformCell,
       exits: exits || null,
-      isWheelchairAccessible,
-      isStrollerAccessible,
       notes: notes || null,
+      facilities: selectedFacilities,
       connections: connections.filter((c) => c.stationId !== ''),
     };
 
     const url = isEdit
-      ? `/api/stations/${stationId}/facilities/${initialData!.id}`
-      : `/api/stations/${stationId}/facilities`;
+      ? `/api/stations/${stationId}/platform-locations/${initialData!.id}`
+      : `/api/stations/${stationId}/platform-locations`;
     const method = isEdit ? 'PUT' : 'POST';
 
     const res = await fetch(url, {
@@ -138,24 +162,6 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
         </select>
       </div>
 
-      {/* Facility Type */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Type</label>
-        <select
-          value={typeCode}
-          onChange={(e) => setTypeCode(e.target.value)}
-          required
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">Select type</option>
-          {facilityTypes.map((ft) => (
-            <option key={ft.code} value={ft.code}>
-              {ft.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Near Platform Cell */}
       <div>
         <label className="block text-sm font-medium mb-1">ホーム枠番号 (Near Platform Cell)</label>
@@ -167,7 +173,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
           placeholder="e.g. 3"
           className="w-32 border rounded px-3 py-2"
         />
-        <p className="text-xs text-gray-500 mt-1">設備が位置するホームの枠番号（1〜maxCarCount）</p>
+        <p className="text-xs text-gray-500 mt-1">設備が位置するホームの枠番号（1〜maxCarCount）。空欄でホーム全体。</p>
       </div>
 
       {/* Exits */}
@@ -180,28 +186,73 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
           placeholder="例: A3出口・B1出口"
           className="w-full border rounded px-3 py-2"
         />
-        <p className="text-xs text-gray-500 mt-1">この設備に繋がる出口を記載してください</p>
+        <p className="text-xs text-gray-500 mt-1">この場所に繋がる出口を記載してください</p>
       </div>
 
-      {/* Accessibility */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Accessibility</label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={isWheelchairAccessible}
-            onChange={(e) => setIsWheelchairAccessible(e.target.checked)}
-          />
-          <span className="text-sm">Wheelchair accessible</span>
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={isStrollerAccessible}
-            onChange={(e) => setIsStrollerAccessible(e.target.checked)}
-          />
-          <span className="text-sm">Stroller accessible</span>
-        </label>
+      {/* Notes (location-level) */}
+      <div>
+        <label className="block text-sm font-medium mb-1">場所メモ (Location Notes)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border rounded px-3 py-2"
+        />
+      </div>
+
+      {/* Facility Types */}
+      <div>
+        <label className="block text-sm font-medium mb-2">設備タイプ (Facility Types)</label>
+        <p className="text-xs text-gray-500 mb-3">この場所にある設備を選択してください（複数選択可）</p>
+        <div className="space-y-3">
+          {facilityTypes.map((ft) => {
+            const selected = selectedFacilities.find((f) => f.typeCode === ft.code);
+            return (
+              <div key={ft.code} className="border rounded p-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!selected}
+                    onChange={() => toggleFacilityType(ft.code)}
+                  />
+                  <span className="font-medium text-sm">{ft.name}</span>
+                </label>
+                {selected && (
+                  <div className="mt-2 ml-6 space-y-2">
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selected.isWheelchairAccessible}
+                          onChange={(e) => updateFacility(ft.code, 'isWheelchairAccessible', e.target.checked)}
+                        />
+                        Wheelchair accessible
+                      </label>
+                      <label className="flex items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selected.isStrollerAccessible}
+                          onChange={(e) => updateFacility(ft.code, 'isStrollerAccessible', e.target.checked)}
+                        />
+                        Stroller accessible
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      value={selected.notes}
+                      onChange={(e) => updateFacility(ft.code, 'notes', e.target.value)}
+                      placeholder="設備メモ（任意）"
+                      className="w-full border rounded px-2 py-1 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {selectedFacilities.length === 0 && (
+          <p className="text-sm text-red-500 mt-1">設備タイプを1つ以上選択してください</p>
+        )}
       </div>
 
       {/* Connected Stations (乗換駅) */}
@@ -217,7 +268,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
           </button>
         </div>
         <p className="text-xs text-gray-500 mb-2">
-          この設備を経由して乗り換え可能な駅と、対応する出口ラベルを指定してください
+          この場所を経由して乗り換え可能な駅と、対応する出口ラベルを指定してください
         </p>
         {connections.length === 0 && (
           <p className="text-sm text-gray-400 italic">接続なし</p>
@@ -252,17 +303,6 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
             </button>
           </div>
         ))}
-      </div>
-
-      {/* Notes */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Notes</label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="w-full border rounded px-3 py-2"
-        />
       </div>
 
       {/* Submit */}

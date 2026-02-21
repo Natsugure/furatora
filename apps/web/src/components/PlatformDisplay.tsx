@@ -1,4 +1,4 @@
-import type { CarStopPosition, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
+import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
 import { TrainVisualization } from './TrainVisualization';
 
 type Platform = {
@@ -30,6 +30,7 @@ type Train = {
   id: string;
   name: string;
   carCount: number;
+  carStructure: CarStructure | null;
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
 };
@@ -44,10 +45,15 @@ export type Facility = {
   id: string;
   typeCode: string;
   typeName: string;
-  nearPlatformCell: number | null;
-  exits: string | null;
   isWheelchairAccessible: boolean | null;
   isStrollerAccessible: boolean | null;
+};
+
+export type PlatformLocation = {
+  id: string;
+  nearPlatformCell: number | null;
+  exits: string | null;
+  facilities: Facility[];
   connections: FacilityConnection[];
 };
 
@@ -57,7 +63,7 @@ type Props = {
   inboundDirection: Direction | null;
   outboundDirection: Direction | null;
   trains: Train[];
-  facilities: Facility[];
+  locations: PlatformLocation[];
 };
 
 export function PlatformDisplay({
@@ -66,7 +72,7 @@ export function PlatformDisplay({
   inboundDirection,
   outboundDirection,
   trains,
-  facilities,
+  locations,
 }: Props) {
   const directions = [
     inboundDirection?.displayName,
@@ -123,7 +129,7 @@ export function PlatformDisplay({
                     train={train}
                     platformMaxCarCount={platform.maxCarCount}
                     carStopPositions={platform.carStopPositions}
-                    facilities={facilities}
+                    locations={locations}
                     platformSide={platformSide}
                   />
                 ))}

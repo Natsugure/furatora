@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { PlatformDisplay, type Facility } from './PlatformDisplay';
-import type { CarStopPosition, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
+import { PlatformDisplay, type PlatformLocation } from './PlatformDisplay';
+import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
 
 type PlatformData = {
   id: string;
@@ -33,6 +33,7 @@ type TrainData = {
   id: string;
   name: string;
   carCount: number;
+  carStructure: CarStructure | null;
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
 };
@@ -43,7 +44,7 @@ export type PlatformEntry = {
   inboundDirection: DirectionData;
   outboundDirection: DirectionData;
   trains: TrainData[];
-  facilities: Facility[];
+  locations: PlatformLocation[];
 };
 
 export type DirectionTab = {
@@ -90,7 +91,7 @@ export function PlatformTabs({ tabs }: Props) {
             inboundDirection={entry.inboundDirection}
             outboundDirection={entry.outboundDirection}
             trains={entry.trains}
-            facilities={entry.facilities}
+            locations={entry.locations}
           />
         ))}
       </div>

@@ -28,6 +28,7 @@ export default async function EditTrainPage({
           carStructure: train.carStructure,
           freeSpaces: train.freeSpaces,
           prioritySeats: train.prioritySeats,
+          limitedToPlatformIds: train.limitedToPlatformIds,
         }}
       />
     </div>

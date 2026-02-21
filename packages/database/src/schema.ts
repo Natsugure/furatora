@@ -135,12 +135,20 @@ export type CarStopPosition = {
   // descending: 号車番号の増加方向 = ホーム枠番号の減少方向（1号車が枠番号の大きい側）
 };
 
-export const stationFacilities = pgTable('station_facilities', {
+export const platformLocations = pgTable('platform_locations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformId: uuid('platform_id').references(() => platforms.id).notNull(),
-  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
-  nearPlatformCell: integer('near_platform_cell'),
+  nearPlatformCell: integer('near_platform_cell'), // null = ホーム全体
   exits: text('exits'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+export const stationFacilities = pgTable('station_facilities', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  platformLocationId: uuid('platform_location_id').references(() => platformLocations.id, { onDelete: 'cascade' }).notNull(),
+  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
   isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
   isStrollerAccessible: boolean('is_stroller_accessible').default(true),
   notes: text('notes'),
@@ -148,15 +156,15 @@ export const stationFacilities = pgTable('station_facilities', {
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-// 設備↔乗換駅 多対多の中間テーブル
+// 場所↔乗換駅 多対多の中間テーブル
 export const facilityConnections = pgTable('facility_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  facilityId: uuid('facility_id').references(() => stationFacilities.id, { onDelete: 'cascade' }).notNull(),
+  platformLocationId: uuid('platform_location_id').references(() => platformLocations.id, { onDelete: 'cascade' }).notNull(),
   connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
   exitLabel: text('exit_label'), // 出口ラベル (例: "A3出口", "改札外")
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => [
-  unique('unique_facility_connection').on(t.facilityId, t.connectedStationId),
+  unique('unique_facility_connection').on(t.platformLocationId, t.connectedStationId),
 ]);
 
 export const facilityTypes = pgTable('facility_types', {

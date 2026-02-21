@@ -16,7 +16,7 @@ export default async function NewFacilityPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">New Facility - {station.name}</h2>
+      <h2 className="text-xl font-bold mb-6">New Platform Location - {station.name}</h2>
       <FacilityForm stationId={stationId} />
     </div>
   );

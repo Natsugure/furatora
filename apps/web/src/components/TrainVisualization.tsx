@@ -20,10 +20,15 @@ type Facility = {
   id: string;
   typeCode: string;
   typeName: string;
-  nearPlatformCell: number | null;
-  exits: string | null;
   isWheelchairAccessible: boolean | null;
   isStrollerAccessible: boolean | null;
+};
+
+type PlatformLocation = {
+  id: string;
+  nearPlatformCell: number | null;
+  exits: string | null;
+  facilities: Facility[];
   connections: FacilityConnection[];
 };
 
@@ -31,7 +36,7 @@ type Props = {
   train: Train;
   platformMaxCarCount: number;
   carStopPositions: CarStopPosition[] | null;
-  facilities: Facility[];
+  locations: PlatformLocation[];
   platformSide: 'top' | 'bottom' | null;
 };
 
@@ -51,17 +56,19 @@ function HorizontalDoorBands({
   stdPrioDoors,
   nonStdPrioDoors,
   doorCount,
+  reversed,
 }: {
   stdFreeDoors: Set<number>;
   nonStdFreeDoors: Set<number>;
   stdPrioDoors: Set<number>;
   nonStdPrioDoors: Set<number>;
   doorCount: number;
+  reversed: boolean;
 }) {
   return (
     <>
       {Array.from({ length: doorCount }, (_, d) => {
-        const doorNum = d + 1;
+        const doorNum = reversed ? doorCount - d : d + 1;
         const hasStdFree = stdFreeDoors.has(doorNum);
         const hasNonStdFree = nonStdFreeDoors.has(doorNum);
         const hasStdPrio = stdPrioDoors.has(doorNum);
@@ -124,17 +131,19 @@ function VerticalDoorBands({
   stdPrioDoors,
   nonStdPrioDoors,
   doorCount,
+  reversed,
 }: {
   stdFreeDoors: Set<number>;
   nonStdFreeDoors: Set<number>;
   stdPrioDoors: Set<number>;
   nonStdPrioDoors: Set<number>;
   doorCount: number;
+  reversed: boolean;
 }) {
   return (
     <>
       {Array.from({ length: doorCount }, (_, d) => {
-        const doorNum = d + 1;
+        const doorNum = reversed ? doorCount - d : d + 1;
         const hasStdFree = stdFreeDoors.has(doorNum);
         const hasNonStdFree = nonStdFreeDoors.has(doorNum);
         const hasStdPrio = stdPrioDoors.has(doorNum);
@@ -194,7 +203,7 @@ export function TrainVisualization({
   train,
   platformMaxCarCount,
   carStopPositions,
-  facilities,
+  locations,
   platformSide,
 }: Props) {
   // この列車の編成に対応する停車位置情報を取得
@@ -250,14 +259,14 @@ export function TrainVisualization({
   // ホーム全体の長さ（maxCarCount基準）
   const platformCells = Array.from({ length: platformMaxCarCount }, (_, i) => i + 1);
 
-  // ホーム枠番号 → 設備リスト のマップ
-  const facilitiesByCell: Record<number, Facility[]> = {};
-  for (const facility of facilities) {
-    if (facility.nearPlatformCell !== null) {
-      const cell = facility.nearPlatformCell;
+  // ホーム枠番号 → 場所リスト のマップ
+  const locationsByCell: Record<number, PlatformLocation[]> = {};
+  for (const location of locations) {
+    if (location.nearPlatformCell !== null) {
+      const cell = location.nearPlatformCell;
       if (cell >= 1 && cell <= platformMaxCarCount) {
-        if (!facilitiesByCell[cell]) facilitiesByCell[cell] = [];
-        facilitiesByCell[cell].push(facility);
+        if (!locationsByCell[cell]) locationsByCell[cell] = [];
+        locationsByCell[cell].push(location);
       }
     }
   }
@@ -279,23 +288,23 @@ export function TrainVisualization({
       : 'polygon(0% 0%, 100% 0%, 100% 80%, 50% 100%, 0% 80%)';
 
   const facilityLabelRow = (
-    <div className="flex gap-1 py-0.5">
+    <div className="flex gap-1 py-0.5 min-h-8">
       {platformCells.map((cellNumber) => {
-        const cellFacilities = facilitiesByCell[cellNumber] ?? [];
+        const cellLocations = locationsByCell[cellNumber] ?? [];
         const labels: string[] = [];
-        for (const f of cellFacilities) {
-          if (f.exits) labels.push(f.exits);
-          for (const conn of f.connections) {
+        for (const loc of cellLocations) {
+          if (loc.exits) labels.push(loc.exits);
+          for (const conn of loc.connections) {
             if (conn.lineNames.length > 0) labels.push(conn.lineNames.join('・'));
           }
         }
         return (
           <div
             key={cellNumber}
-            className="flex-1 flex flex-col items-center gap-px text-[9px] leading-tight text-gray-500"
+            className={`flex-1 flex flex-col items-center gap-px text-[9px] leading-tight text-gray-500 ${effectivePlatformSide === 'top' ? 'justify-end' : 'justify-start'}`}
           >
             {labels.map((label, i) => (
-              <span key={i} className="text-center break-all">{label}</span>
+              <span key={i} className="break-all">{label}</span>
             ))}
           </div>
         );
@@ -306,8 +315,8 @@ export function TrainVisualization({
   const platformStrip = (
     <div className="relative h-15 bg-stone-200">
       {platformCells.map((cellNumber) => {
-        const cellFacilities = facilitiesByCell[cellNumber] ?? [];
-        if (cellFacilities.length === 0) return null;
+        const cellLocations = locationsByCell[cellNumber] ?? [];
+        if (cellLocations.length === 0) return null;
         const leftPercent = ((cellNumber - 0.5) / platformMaxCarCount) * 100;
         return (
           <div
@@ -315,19 +324,21 @@ export function TrainVisualization({
             className="absolute top-0 bottom-0 flex items-center gap-0.5 -translate-x-1/2"
             style={{ left: `${leftPercent}%` }}
           >
-            {cellFacilities.map((f, idx) =>
-              FACILITY_ICONS[f.typeCode] ? (
-                <Image
-                  key={idx}
-                  src={FACILITY_ICONS[f.typeCode]}
-                  alt={f.typeName}
-                  title={f.exits || f.typeName}
-                  width={24}
-                  height={24}
-                  className="w-6 h-6"
-                />
-              ) : (
-                <span key={idx} title={f.exits || f.typeName} className="text-sm leading-none">📍</span>
+            {cellLocations.flatMap((loc) =>
+              loc.facilities.map((f, idx) =>
+                FACILITY_ICONS[f.typeCode] ? (
+                  <Image
+                    key={`${loc.id}-${idx}`}
+                    src={FACILITY_ICONS[f.typeCode]}
+                    alt={f.typeName}
+                    title={loc.exits || f.typeName}
+                    width={24}
+                    height={24}
+                    className="w-6 h-6"
+                  />
+                ) : (
+                  <span key={`${loc.id}-${idx}`} title={loc.exits || f.typeName} className="text-sm leading-none">📍</span>
+                )
               )
             )}
           </div>
@@ -353,11 +364,11 @@ export function TrainVisualization({
             const displayCarNumber = isTrainCar ? occupiedCells.indexOf(cellNumber) + 1 : null;
             const physicalCarNumber = isTrainCar ? carPositions.indexOf(cellNumber) + 1 : null;
             const isLeadingCar = isTrainCar && cellNumber === carPositions[0];
-            const cellFacilities = facilitiesByCell[cellNumber] ?? [];
+            const cellLocations = locationsByCell[cellNumber] ?? [];
             const labels: string[] = [];
-            for (const f of cellFacilities) {
-              if (f.exits) labels.push(f.exits);
-              for (const conn of f.connections) {
+            for (const loc of cellLocations) {
+              if (loc.exits) labels.push(loc.exits);
+              for (const conn of loc.connections) {
                 if (conn.lineNames.length > 0) labels.push(conn.lineNames.join('・'));
               }
             }
@@ -384,6 +395,7 @@ export function TrainVisualization({
                     stdPrioDoors={stdPrioDoors}
                     nonStdPrioDoors={nonStdPrioDoors}
                     doorCount={doorCount}
+                    reversed={direction === 'descending'}
                   />
                 )}
                 {isTrainCar && displayCarNumber && (
@@ -398,18 +410,20 @@ export function TrainVisualization({
 
             const stripCell = (
               <div className="w-16 flex-shrink-0 h-36 bg-stone-200 flex flex-col items-center justify-center gap-1">
-                {cellFacilities.map((f, idx) =>
-                  FACILITY_ICONS[f.typeCode] ? (
-                    <Image key={idx} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={f.exits || f.typeName} width={28} height={28} className="w-7 h-7" />
-                  ) : (
-                    <span key={idx} className="text-base leading-none">📍</span>
+                {cellLocations.flatMap((loc) =>
+                  loc.facilities.map((f, idx) =>
+                    FACILITY_ICONS[f.typeCode] ? (
+                      <Image key={`${loc.id}-${idx}`} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={loc.exits || f.typeName} width={28} height={28} className="w-7 h-7" />
+                    ) : (
+                      <span key={`${loc.id}-${idx}`} className="text-base leading-none">📍</span>
+                    )
                   )
                 )}
               </div>
             );
 
             const labelCell = (
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 text-xs leading-snug text-gray-600 px-2 py-1">
+              <div className={`flex-1 min-w-0 flex flex-col justify-center gap-1.5 text-xs leading-snug text-gray-600 px-2 py-1 ${effectivePlatformSide === 'top' ? 'items-end text-right' : 'items-start'}`}>
                 {labels.map((label, i) => (
                   <span key={i} className="break-words">{label}</span>
                 ))}
@@ -467,6 +481,7 @@ export function TrainVisualization({
                       stdPrioDoors={stdPrioDoors}
                       nonStdPrioDoors={nonStdPrioDoors}
                       doorCount={doorCount}
+                      reversed={direction === 'descending'}
                     />
                   )}
                   {isTrainCar && displayCarNumber && (

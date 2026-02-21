@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@stroller-transit-app/database/client';
 import {
   stations,
+  platformLocations,
   stationFacilities,
   platforms,
   lines,
@@ -65,26 +66,45 @@ export default async function FacilitiesPage({
   // Get platform IDs for this station
   const platformIds = platformList.map((p) => p.id);
 
-  // Fetch facilities for these platforms, sorted by nearPlatformCell within each platform
-  const facilities =
+  // Fetch platform locations for these platforms
+  const locationList =
     platformIds.length > 0
       ? await db
           .select()
+          .from(platformLocations)
+          .where(inArray(platformLocations.platformId, platformIds))
+          .orderBy(asc(platformLocations.nearPlatformCell))
+      : [];
+
+  const locationIds = locationList.map((l) => l.id);
+
+  // Fetch facilities for these locations
+  const facilityList =
+    locationIds.length > 0
+      ? await db
+          .select()
           .from(stationFacilities)
-          .where(inArray(stationFacilities.platformId, platformIds))
-          .orderBy(asc(stationFacilities.nearPlatformCell))
+          .where(inArray(stationFacilities.platformLocationId, locationIds))
       : [];
 
   // Fetch facility types
   const typeList = await db.select().from(facilityTypes);
   const typeMap = Object.fromEntries(typeList.map((t) => [t.code, t.name]));
 
-  // Group facilities by platformId (platformList is already sorted by platformNumber)
-  const facilitiesByPlatform = new Map<string, typeof facilities>();
-  for (const facility of facilities) {
-    const group = facilitiesByPlatform.get(facility.platformId) ?? [];
+  // Group locations by platformId
+  const locationsByPlatform = new Map<string, typeof locationList>();
+  for (const location of locationList) {
+    const group = locationsByPlatform.get(location.platformId) ?? [];
+    group.push(location);
+    locationsByPlatform.set(location.platformId, group);
+  }
+
+  // Group facilities by platformLocationId
+  const facilitiesByLocation = new Map<string, typeof facilityList>();
+  for (const facility of facilityList) {
+    const group = facilitiesByLocation.get(facility.platformLocationId) ?? [];
     group.push(facility);
-    facilitiesByPlatform.set(facility.platformId, group);
+    facilitiesByLocation.set(facility.platformLocationId, group);
   }
 
   return (
@@ -113,7 +133,7 @@ export default async function FacilitiesPage({
             href={`/stations/${stationId}/facilities/new`}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
-            + New Facility
+            + New Location
           </Link>
         </div>
       </div>
@@ -174,15 +194,15 @@ export default async function FacilitiesPage({
         )}
       </div>
 
-      {/* Facilities Section - grouped by platform */}
-      <h3 className="text-lg font-semibold mb-3">Facilities</h3>
-      {facilities.length === 0 ? (
-        <p className="text-gray-500">No facilities registered yet.</p>
+      {/* Platform Locations Section - grouped by platform */}
+      <h3 className="text-lg font-semibold mb-3">Platform Locations</h3>
+      {locationList.length === 0 ? (
+        <p className="text-gray-500">No locations registered yet.</p>
       ) : (
         <div className="space-y-6">
           {platformList.map((platform) => {
-            const platformFacilities = facilitiesByPlatform.get(platform.id) ?? [];
-            if (platformFacilities.length === 0) return null;
+            const locations = locationsByPlatform.get(platform.id) ?? [];
+            if (locations.length === 0) return null;
 
             const directions = [];
             if (platform.inboundDirectionId) directions.push(directionMap[platform.inboundDirectionId] ?? '上り');
@@ -195,49 +215,61 @@ export default async function FacilitiesPage({
                   Platform {platform.platformNumber}{directionText}
                 </h4>
                 <div className="space-y-2">
-                  {platformFacilities.map((facility) => {
-                    const typeName = typeMap[facility.typeCode] ?? facility.typeCode;
+                  {locations.map((location) => {
+                    const locFacilities = facilitiesByLocation.get(location.id) ?? [];
+                    const hasLimitedAccessibility = locFacilities.some(
+                      (f) => !f.isWheelchairAccessible || !f.isStrollerAccessible
+                    );
 
                     return (
-                      <div key={facility.id} className="bg-white rounded-lg shadow p-4">
+                      <div key={location.id} className="bg-white rounded-lg shadow p-4">
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{typeName}</span>
-                              {facility.nearPlatformCell && (
-                                <span className="text-sm text-gray-500">
-                                  枠 #{facility.nearPlatformCell}
+                              {location.nearPlatformCell && (
+                                <span className="text-sm text-gray-500 font-medium">
+                                  枠 #{location.nearPlatformCell}
                                 </span>
                               )}
-                              {(!facility.isWheelchairAccessible || !facility.isStrollerAccessible) && (
+                              {hasLimitedAccessibility && (
                                 <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
                                   Limited accessibility
                                 </span>
                               )}
                             </div>
-                            {facility.exits && (
-                              <p className="text-sm text-gray-600">{facility.exits}</p>
+                            {location.exits && (
+                              <p className="text-sm text-gray-600 mb-1">{location.exits}</p>
                             )}
-                            {facility.notes && (
-                              <p className="text-sm text-gray-400 mt-1">{facility.notes}</p>
-                            )}
-                            <div className="text-xs text-gray-500 mt-1">
-                              {!facility.isWheelchairAccessible && <span>❌ Wheelchair</span>}
-                              {!facility.isStrollerAccessible && <span className="ml-2">❌ Stroller</span>}
+                            {/* Facility types list */}
+                            <div className="flex flex-wrap gap-1.5 mb-1">
+                              {locFacilities.map((f) => (
+                                <span
+                                  key={f.id}
+                                  className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded"
+                                >
+                                  {typeMap[f.typeCode] ?? f.typeCode}
+                                  {(!f.isWheelchairAccessible || !f.isStrollerAccessible) && (
+                                    <span className="ml-1 text-yellow-600">*</span>
+                                  )}
+                                </span>
+                              ))}
                             </div>
+                            {location.notes && (
+                              <p className="text-sm text-gray-400 mt-1">{location.notes}</p>
+                            )}
                           </div>
                           <div className="flex gap-2">
                             <Link
-                              href={`/stations/${stationId}/facilities/${facility.id}/edit`}
+                              href={`/stations/${stationId}/facilities/${location.id}/edit`}
                               className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
                             >
                               Edit
                             </Link>
                             <FacilityDuplicateButton
-                              endpoint={`/api/stations/${stationId}/facilities/${facility.id}/duplicate`}
+                              endpoint={`/api/stations/${stationId}/platform-locations/${location.id}/duplicate`}
                             />
                             <DeleteButton
-                              endpoint={`/api/stations/${stationId}/facilities/${facility.id}`}
+                              endpoint={`/api/stations/${stationId}/platform-locations/${location.id}`}
                               redirectTo={`/stations/${stationId}/facilities`}
                             />
                           </div>

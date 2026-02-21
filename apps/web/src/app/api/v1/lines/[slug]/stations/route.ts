@@ -30,6 +30,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const stationsResult = await db
       .select({
         id: stations.id,
+        slug: stations.slug,
         code: stations.code,
         name: stations.name,
         nameEn: stations.nameEn,
