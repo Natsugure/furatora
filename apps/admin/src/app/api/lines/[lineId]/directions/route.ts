@@ -2,39 +2,53 @@ import { NextResponse } from 'next/server';
 import { db } from '@railease-navi/database/client';
 import { lineDirections } from '@railease-navi/database/schema';
 import { eq, asc } from 'drizzle-orm';
+import { directionSchema } from '@/lib/validations';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ lineId: string }> }
 ) {
-  const { lineId } = await params;
-  const result = await db
-    .select()
-    .from(lineDirections)
-    .where(eq(lineDirections.lineId, lineId))
-    .orderBy(asc(lineDirections.directionType));
-  return NextResponse.json(result);
+  try {
+    const { lineId } = await params;
+    const result = await db
+      .select()
+      .from(lineDirections)
+      .where(eq(lineDirections.lineId, lineId))
+      .orderBy(asc(lineDirections.directionType));
+    return NextResponse.json(result);
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ lineId: string }> }
 ) {
-  const { lineId } = await params;
-  const body = await request.json();
+  try {
+    const { lineId } = await params;
+    const body = await request.json();
+    const parsed = directionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
+    }
+    const { directionType, representativeStationId, displayName, displayNameEn, terminalStationIds, notes } = parsed.data;
 
-  const [direction] = await db
-    .insert(lineDirections)
-    .values({
-      lineId,
-      directionType: body.directionType,
-      representativeStationId: body.representativeStationId,
-      displayName: body.displayName,
-      displayNameEn: body.displayNameEn || null,
-      terminalStationIds: body.terminalStationIds || null,
-      notes: body.notes || null,
-    })
-    .returning();
+    const [direction] = await db
+      .insert(lineDirections)
+      .values({
+        lineId,
+        directionType,
+        representativeStationId,
+        displayName,
+        displayNameEn: displayNameEn ?? null,
+        terminalStationIds: terminalStationIds ?? null,
+        notes: notes ?? null,
+      })
+      .returning();
 
-  return NextResponse.json(direction, { status: 201 });
+    return NextResponse.json(direction, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { logout } from '@/actions';
 
 const navItems = [
   { href: '/', label: 'Dashboard' },
@@ -40,6 +41,16 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <div className="p-2 border-t border-slate-600">
+        <form action={logout}>
+          <button
+            type="submit"
+            className="w-full px-3 py-2 rounded text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white text-left"
+          >
+            ログアウト
+          </button>
+        </form>
+      </div>
     </aside>
   );
 }

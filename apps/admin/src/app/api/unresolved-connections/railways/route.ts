@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@railease-navi/database/client';
 import { lines } from '@railease-navi/database/schema';
 import { sql } from 'drizzle-orm';
+import { unresolvedRailwaySchema } from '@/lib/validations';
 
 function generateLineSlug(odptRailwayId: string): string {
   return odptRailwayId
@@ -11,30 +12,38 @@ function generateLineSlug(odptRailwayId: string): string {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { odptRailwayId, name, nameEn, operatorId, lineCode, color } = body;
+  try {
+    const body = await request.json();
+    const parsed = unresolvedRailwaySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
+    }
+    const { odptRailwayId, name, nameEn, operatorId, lineCode, color } = parsed.data;
 
-  const [line] = await db
-    .insert(lines)
-    .values({
-      odptRailwayId,
-      slug: generateLineSlug(odptRailwayId),
-      name,
-      nameEn: nameEn || null,
-      operatorId,
-      lineCode: lineCode || null,
-      color: color || null,
-      displayOrder: 999,
-    })
-    .returning();
+    const [line] = await db
+      .insert(lines)
+      .values({
+        odptRailwayId,
+        slug: generateLineSlug(odptRailwayId),
+        name,
+        nameEn: nameEn ?? null,
+        operatorId,
+        lineCode: lineCode ?? null,
+        color: color ?? null,
+        displayOrder: 999,
+      })
+      .returning();
 
-  // 同じ odptRailwayId を持つ未解決の接続を一括更新
-  await db.execute(sql`
-    UPDATE station_connections
-    SET connected_railway_id = ${line.id}
-    WHERE odpt_railway_id = ${odptRailwayId}
-      AND connected_railway_id IS NULL
-  `);
+    // 同じ odptRailwayId を持つ未解決の接続を一括更新
+    await db.execute(sql`
+      UPDATE station_connections
+      SET connected_railway_id = ${line.id}
+      WHERE odpt_railway_id = ${odptRailwayId}
+        AND connected_railway_id IS NULL
+    `);
 
-  return NextResponse.json(line, { status: 201 });
+    return NextResponse.json(line, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

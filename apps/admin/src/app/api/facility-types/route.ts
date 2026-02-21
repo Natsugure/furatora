@@ -3,6 +3,10 @@ import { db } from '@railease-navi/database/client';
 import { facilityTypes } from '@railease-navi/database/schema';
 
 export async function GET() {
-  const types = await db.select().from(facilityTypes);
-  return NextResponse.json(types);
+  try {
+    const types = await db.select().from(facilityTypes);
+    return NextResponse.json(types);
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
