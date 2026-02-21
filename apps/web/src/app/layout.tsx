@@ -10,8 +10,8 @@ import './globals.css';
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
 export const metadata: Metadata = {
-  title: 'ベビフリ乗換 | バリアフリー駅・列車案内',
-  description: '各駅のホーム設備と列車内フリースペース情報',
+  title: 'RailEase Navi | バリアフリー駅・列車案内',
+  description: '首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを検索できます。他社線同士の乗り換えや、実際に列車に乗ったあとのフリースペース情報までわかりやすくご案内します。',
 };
 
 export default function RootLayout({
@@ -33,10 +33,10 @@ export default function RootLayout({
                 </div>
                 <div>
                   <p className="font-bold text-lg leading-tight text-gray-900">
-                    ベビフリ乗換
+                    RailEase Navi
                   </p>
                   <p className="text-xs text-gray-500">
-                    各駅のバリアフリールートと列車内フリースペース情報
+                    首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを表示
                   </p>
                 </div>
               </Link>
@@ -53,7 +53,7 @@ export default function RootLayout({
           <footer className="bg-white border-t border-gray-200 mt-8">
             <Container className="py-4 text-center">
               <p className="text-xs text-gray-500">
-                Copyright © ベビフリ乗換 | 車いす・ベビーカーに優しい乗換案内アプリ All Rights Reserved
+                Copyright © RailEase Navi All Rights Reserved
               </p>
             </Container>
           </footer>
