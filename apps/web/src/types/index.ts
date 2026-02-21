@@ -34,6 +34,28 @@ export type StationWithOrder = Station & {
   stationOrder: number | null;
 };
 
+export type StationInGroup = {
+  id: string;
+  slug: string | null;
+  code: string | null;
+  lineId: string | null;
+  lineName: string | null;
+  lineCode: string | null;
+  lineColor: string | null;
+  lineSlug: string | null;
+};
+
+export type StationGroup = {
+  name: string;
+  nameEn: string | null;
+  stations: StationInGroup[];
+};
+
+export type StationSearchApiResponse = {
+  stationGroups: StationGroup[];
+  total: number;
+};
+
 export type OperatorsApiResponse = {
   operators: OperatorWithLines[];
 };

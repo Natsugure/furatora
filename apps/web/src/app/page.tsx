@@ -2,7 +2,7 @@ import { Accessibility } from 'lucide-react';
 import { db } from '@stroller-transit-app/database/client';
 import { operators, lines } from '@stroller-transit-app/database/schema';
 import { asc, isNotNull } from 'drizzle-orm';
-import { OperatorList } from '@/components/OperatorList';
+import { SearchTabs } from '@/components/SearchTabs';
 import type { OperatorWithLines } from '@/types';
 
 async function fetchOperatorsWithLines(): Promise<OperatorWithLines[]> {
@@ -55,16 +55,8 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Operator/line list */}
-      <h2 className="text-xl font-bold mb-4 text-gray-800">路線を選択してください</h2>
-      {operatorsWithLines.length > 0 ? (
-        <OperatorList operators={operatorsWithLines} />
-      ) : (
-        <div className="text-center text-gray-500 py-12">
-          <p>事業者データがありません</p>
-          <p className="text-sm mt-2">データを取得してください</p>
-        </div>
-      )}
+      {/* Search tabs */}
+      <SearchTabs operators={operatorsWithLines} />
     </div>
   );
 }

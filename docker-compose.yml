@@ -1,3 +1,5 @@
+name: railease-navi
+
 services:
   postgres:
     command: '-d 1'
