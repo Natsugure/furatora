@@ -3,6 +3,7 @@ import { db } from '@stroller-transit-app/database/client';
 import { operators, lines } from '@stroller-transit-app/database/schema';
 import { asc, isNotNull } from 'drizzle-orm';
 import { SearchTabs } from '@/components/SearchTabs';
+import { Container } from '@/components/ui/Container';
 import type { OperatorWithLines } from '@/types';
 
 async function fetchOperatorsWithLines(): Promise<OperatorWithLines[]> {
@@ -27,7 +28,7 @@ export default async function Home() {
   const operatorsWithLines = await fetchOperatorsWithLines();
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <Container className="py-6">
       {/* Info card */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
         <div className="flex items-start gap-3 mb-4">
@@ -57,6 +58,6 @@ export default async function Home() {
 
       {/* Search tabs */}
       <SearchTabs operators={operatorsWithLines} />
-    </div>
+    </Container>
   );
 }

@@ -5,6 +5,7 @@ import { db } from '@stroller-transit-app/database/client';
 import { stations, stationLines, lines } from '@stroller-transit-app/database/schema';
 import { eq, asc } from 'drizzle-orm';
 import { StationCard } from '@/components/StationCard';
+import { Container } from '@/components/ui/Container';
 import type { Line, StationWithOrder } from '@/types';
 
 type Props = {
@@ -68,7 +69,7 @@ export default async function StationListPage({ params }: Props) {
   const { line, stations } = data;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <Container className="py-6">
       {/* Back navigation */}
       <Link
         href="/"
@@ -121,6 +122,6 @@ export default async function StationListPage({ params }: Props) {
           <p>この路線の駅データがありません</p>
         </div>
       )}
-    </div>
+    </Container>
   );
 }

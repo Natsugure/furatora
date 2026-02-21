@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google';
 import Link from 'next/link';
 import { Accessibility, Baby, Train } from 'lucide-react';
 import { Providers } from './providers';
+import { Container } from '@/components/ui/Container';
 import '@mantine/core/styles.css';
 import './globals.css';
 
@@ -24,7 +25,7 @@ export default function RootLayout({
         <Providers>
           {/* Header */}
           <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-            <div className="max-w-3xl mx-auto px-4 h-20 flex items-center justify-between">
+            <Container className="h-20 flex items-center justify-between">
               <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                 <div className="flex items-end gap-1 text-blue-500">
                   <Accessibility size={30} />
@@ -40,7 +41,7 @@ export default function RootLayout({
                 </div>
               </Link>
               <Train size={28} className="text-gray-300 flex-shrink-0" />
-            </div>
+            </Container>
           </header>
 
           {/* Main content */}
@@ -50,11 +51,11 @@ export default function RootLayout({
 
           {/* Footer */}
           <footer className="bg-white border-t border-gray-200 mt-8">
-            <div className="max-w-3xl mx-auto px-4 py-4 text-center">
+            <Container className="py-4 text-center">
               <p className="text-xs text-gray-500">
                 Copyright © ベビフリ乗換 | 車いす・ベビーカーに優しい乗換案内アプリ All Rights Reserved
               </p>
-            </div>
+            </Container>
           </footer>
         </Providers>
       </body>

@@ -19,6 +19,7 @@ import { PlatformDisplay } from '@/components/PlatformDisplay';
 import { PlatformTabs, type DirectionTab, type PlatformEntry } from '@/components/PlatformTabs';
 import { BackButton } from '@/components/BackButton';
 import { StationBadge } from '../../../components/ui/StationBadge';
+import { Container } from '@/components/ui/Container';
 import { TransferDifficultySection, type TransferConnection } from '@/components/TransferDifficultySection';
 
 type Props = {
@@ -309,7 +310,7 @@ export default async function StationDetailPage({ params }: Props) {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <Container className="py-6">
       {/* Back navigation */}
       <BackButton />
 
@@ -384,6 +385,6 @@ export default async function StationDetailPage({ params }: Props) {
           <p>この駅のプラットフォーム情報がありません</p>
         </div>
       )}
-    </div>
+    </Container>
   );
 }
