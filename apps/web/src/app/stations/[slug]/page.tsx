@@ -5,9 +5,11 @@ import {
   stations,
   stationLines,
   platforms,
+  platformCarStopPositions,
   lines,
   lineDirections,
   trains,
+  trainEquipments,
   platformLocations,
   stationFacilities,
   facilityTypes,
@@ -57,7 +59,6 @@ async function fetchStationDetails(slug: string) {
       inboundDirectionId: platforms.inboundDirectionId,
       outboundDirectionId: platforms.outboundDirectionId,
       maxCarCount: platforms.maxCarCount,
-      carStopPositions: platforms.carStopPositions,
       platformSide: platforms.platformSide,
       notes: platforms.notes,
     })
@@ -65,7 +66,7 @@ async function fetchStationDetails(slug: string) {
     .where(eq(platforms.stationId, station.id));
 
   if (!platformList.length) {
-    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], locations: [], facilityTypeMap: {} as Record<string, string>, connectionsByLocation: {} as Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]>, transferConnections: [] };
+    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], locations: [], facilityList: [], facilityTypeMap: {} as Record<string, string>, connectionsByLocation: {} as Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]>, transferConnections: [], equipmentsByTrainId: {} as Record<string, { freeSpaces: { carNumber: number; nearDoor: number; isStandard: boolean }[]; prioritySeats: { carNumber: number; nearDoor: number; isStandard: boolean }[] }>, carStopPositionsByPlatformId: {} as Record<string, { carCount: number; referenceCarNumber: number; referencePlatformCell: number; direction: 'ascending' | 'descending' }[]> };
   }
 
   const platformIds = platformList.map((p) => p.id);
@@ -99,6 +100,51 @@ async function fetchStationDetails(slug: string) {
           )}]::uuid[]`
         )
     : [];
+
+  const trainIds = trainList.map((t) => t.id);
+
+  const [rawEquipments, rawCarStopPositions] = await Promise.all([
+    trainIds.length > 0
+      ? db.select().from(trainEquipments).where(inArray(trainEquipments.trainId, trainIds))
+      : Promise.resolve([]),
+    platformIds.length > 0
+      ? db.select().from(platformCarStopPositions).where(inArray(platformCarStopPositions.platformId, platformIds))
+      : Promise.resolve([]),
+  ]);
+
+  const equipmentsByTrainId: Record<string, {
+    freeSpaces: { carNumber: number; nearDoor: number; isStandard: boolean }[];
+    prioritySeats: { carNumber: number; nearDoor: number; isStandard: boolean }[];
+  }> = {};
+  for (const item of rawEquipments) {
+    if (!equipmentsByTrainId[item.trainId]) {
+      equipmentsByTrainId[item.trainId] = { freeSpaces: [], prioritySeats: [] };
+    }
+    const entry = { carNumber: item.carNumber, nearDoor: item.nearDoor, isStandard: item.isStandard };
+    if (item.type === 'free_space') {
+      equipmentsByTrainId[item.trainId].freeSpaces.push(entry);
+    } else {
+      equipmentsByTrainId[item.trainId].prioritySeats.push(entry);
+    }
+  }
+
+  const carStopPositionsByPlatformId: Record<string, {
+    carCount: number;
+    referenceCarNumber: number;
+    referencePlatformCell: number;
+    direction: 'ascending' | 'descending';
+  }[]> = {};
+  for (const sp of rawCarStopPositions) {
+    if (!carStopPositionsByPlatformId[sp.platformId]) {
+      carStopPositionsByPlatformId[sp.platformId] = [];
+    }
+    carStopPositionsByPlatformId[sp.platformId].push({
+      carCount: sp.carCount,
+      referenceCarNumber: sp.referenceCarNumber,
+      referencePlatformCell: sp.referencePlatformCell,
+      direction: sp.direction,
+    });
+  }
 
   // platformLocations をプラットフォームIDで取得
   const locationList = await db
@@ -195,6 +241,8 @@ async function fetchStationDetails(slug: string) {
     facilityTypeMap,
     connectionsByLocation,
     transferConnections,
+    equipmentsByTrainId,
+    carStopPositionsByPlatformId,
   };
 }
 
@@ -218,6 +266,8 @@ export default async function StationDetailPage({ params }: Props) {
     facilityTypeMap,
     connectionsByLocation,
     transferConnections,
+    equipmentsByTrainId,
+    carStopPositionsByPlatformId,
   } = data;
 
   const lineMap = Object.fromEntries(lineList.map((l) => [l.id, l]));
@@ -232,14 +282,20 @@ export default async function StationDetailPage({ params }: Props) {
       ? directionMap[platform.outboundDirectionId] ?? null
       : null;
 
-    const platformTrains = trainList.filter((train) => {
-      if (!train.lines?.includes(platform.lineId)) return false;
-      if (train.carCount > platform.maxCarCount) return false;
-      if (train.limitedToPlatformIds && train.limitedToPlatformIds.length > 0) {
-        return train.limitedToPlatformIds.includes(platform.id);
-      }
-      return true;
-    });
+    const platformTrains = trainList
+      .filter((train) => {
+        if (!train.lines?.includes(platform.lineId)) return false;
+        if (train.carCount > platform.maxCarCount) return false;
+        if (train.limitedToPlatformIds && train.limitedToPlatformIds.length > 0) {
+          return train.limitedToPlatformIds.includes(platform.id);
+        }
+        return true;
+      })
+      .map((train) => ({
+        ...train,
+        freeSpaces: equipmentsByTrainId[train.id]?.freeSpaces ?? null,
+        prioritySeats: equipmentsByTrainId[train.id]?.prioritySeats ?? null,
+      }));
 
     const platformLocationsForPlatform = locations
       .filter((loc) => loc.platformId === platform.id)
@@ -260,7 +316,10 @@ export default async function StationDetailPage({ params }: Props) {
       }));
 
     return {
-      platform,
+      platform: {
+        ...platform,
+        carStopPositions: carStopPositionsByPlatformId[platform.id] ?? null,
+      },
       line,
       inboundDirection,
       outboundDirection,

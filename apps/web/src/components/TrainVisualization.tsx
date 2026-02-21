@@ -5,7 +5,7 @@ type Train = {
   id: string;
   name: string;
   carCount: number;
-  carStructure: CarStructure | null; // 実際は CarStructure[] として保存される
+  carStructure: CarStructure[] | null;
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
 };
@@ -222,9 +222,7 @@ export function TrainVisualization({
   });
 
   // carStructure から号車ごとのドア数マップを構築
-  const carStructureArray = Array.isArray(train.carStructure)
-    ? (train.carStructure as { carNumber: number; doorCount: number }[])
-    : [];
+  const carStructureArray = train.carStructure ?? [];
   const doorCountByCarNumber = new Map(carStructureArray.map((cs) => [cs.carNumber, cs.doorCount]));
   const getDoorCount = (carNum: number) => doorCountByCarNumber.get(carNum) ?? 4;
 

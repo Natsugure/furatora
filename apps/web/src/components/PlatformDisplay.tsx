@@ -30,7 +30,7 @@ type Train = {
   id: string;
   name: string;
   carCount: number;
-  carStructure: CarStructure | null;
+  carStructure: CarStructure[] | null;
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
 };

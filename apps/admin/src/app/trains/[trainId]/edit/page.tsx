@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db } from '@stroller-transit-app/database/client';
-import { trains } from '@stroller-transit-app/database/schema';
+import { trains, trainEquipments } from '@stroller-transit-app/database/schema';
 import { eq } from 'drizzle-orm';
 import { TrainForm } from '@/components/TrainForm';
 
@@ -14,6 +14,8 @@ export default async function EditTrainPage({
 
   if (!train) notFound();
 
+  const equipments = await db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId));
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-6">Edit Train</h2>
@@ -25,9 +27,13 @@ export default async function EditTrainPage({
           operatorId: train.operators,
           lineIds: train.lines,
           carCount: train.carCount,
-          carStructure: train.carStructure,
-          freeSpaces: train.freeSpaces,
-          prioritySeats: train.prioritySeats,
+          carStructure: train.carStructure ?? null,
+          freeSpaces: equipments
+            .filter((e) => e.type === 'free_space')
+            .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
+          prioritySeats: equipments
+            .filter((e) => e.type === 'priority_seat')
+            .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
           limitedToPlatformIds: train.limitedToPlatformIds,
         }}
       />

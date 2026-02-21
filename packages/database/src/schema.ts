@@ -71,9 +71,7 @@ export const trains = pgTable('trains', {
   operators: uuid('operators').references(() => operators.id).notNull(),
   lines: uuid('lines').references(() => lines.id).array().notNull(),
   carCount: integer('car_count').notNull(),
-  carStructure: jsonb('car_structure').$type<CarStructure>(),
-  freeSpaces: jsonb('free_spaces').$type<FreeSpace[]>(),
-  prioritySeats: jsonb('priority_seats').$type<PrioritySeat[]>(),
+  carStructure: jsonb('car_structure').$type<CarStructure[]>(),
   limitedToPlatformIds: uuid('limited_to_platform_ids').array(),
   // null = 容量制約のみで判定, non-null = 指定ホームにのみ表示
   createdAt: timestamp('created_at').defaultNow(),
@@ -97,6 +95,18 @@ export type PrioritySeat = {
   isStandard: boolean; // 全編成に装備されているか
 }
 
+export type TrainEquipmentType = 'free_space' | 'priority_seat';
+
+export const trainEquipments = pgTable('train_equipments', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 20 }).notNull().$type<TrainEquipmentType>(),
+  carNumber: integer('car_number').notNull(),
+  nearDoor: integer('near_door').notNull(),
+  isStandard: boolean('is_standard').notNull().default(true),
+}, (t) => [
+  unique('unique_train_equipment').on(t.trainId, t.type, t.carNumber, t.nearDoor),
+]);
 
 export const lineDirections = pgTable('line_directions', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
@@ -119,7 +129,6 @@ export const platforms = pgTable('platforms', {
   inboundDirectionId: uuid('inbound_direction_id').references(() => lineDirections.id),
   outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id),
   maxCarCount: integer('max_car_count').notNull(),
-  carStopPositions: jsonb('car_stop_positions').$type<CarStopPosition[]>(), // 各両数の停車位置
   platformSide: varchar('platform_side', { length: 10 }).$type<PlatformSide>(), // ホームが列車の上下どちらか
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
@@ -134,6 +143,17 @@ export type CarStopPosition = {
   // ascending:  号車番号の増加方向 = ホーム枠番号の増加方向（1号車が枠番号の小さい側）
   // descending: 号車番号の増加方向 = ホーム枠番号の減少方向（1号車が枠番号の大きい側）
 };
+
+export const platformCarStopPositions = pgTable('platform_car_stop_positions', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  platformId: uuid('platform_id').references(() => platforms.id, { onDelete: 'cascade' }).notNull(),
+  carCount: integer('car_count').notNull(),
+  referenceCarNumber: integer('reference_car_number').notNull(),
+  referencePlatformCell: integer('reference_platform_cell').notNull(),
+  direction: varchar('direction', { length: 20 }).notNull().$type<'ascending' | 'descending'>(),
+}, (t) => [
+  unique('unique_platform_car_stop').on(t.platformId, t.carCount),
+]);
 
 export const platformLocations = pgTable('platform_locations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),

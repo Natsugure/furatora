@@ -1,7 +1,23 @@
 import { NextResponse } from 'next/server';
 import { db } from '@stroller-transit-app/database/client';
-import { trains } from '@stroller-transit-app/database/schema';
+import { trains, trainEquipments } from '@stroller-transit-app/database/schema';
 import { eq } from 'drizzle-orm';
+import type { FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
+
+function shapeTrainWithEquipments(
+  train: typeof trains.$inferSelect,
+  equipments: (typeof trainEquipments.$inferSelect)[]
+) {
+  return {
+    ...train,
+    freeSpaces: equipments
+      .filter((e) => e.type === 'free_space')
+      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
+    prioritySeats: equipments
+      .filter((e) => e.type === 'priority_seat')
+      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
+  };
+}
 
 export async function GET(
   _request: Request,
@@ -12,7 +28,8 @@ export async function GET(
   if (!train) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json(train);
+  const equipments = await db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId));
+  return NextResponse.json(shapeTrainWithEquipments(train, equipments));
 }
 
 export async function PUT(
@@ -29,8 +46,6 @@ export async function PUT(
       lines: body.lineIds,
       carCount: body.carCount,
       carStructure: body.carStructure || null,
-      freeSpaces: body.freeSpaces || null,
-      prioritySeats: body.prioritySeats || null,
       limitedToPlatformIds: body.limitedToPlatformIds?.length ? body.limitedToPlatformIds : null,
     })
     .where(eq(trains.id, trainId))
@@ -38,7 +53,32 @@ export async function PUT(
   if (!updated) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json(updated);
+
+  await db.delete(trainEquipments).where(eq(trainEquipments.trainId, trainId));
+
+  const equipmentRows = [
+    ...(body.freeSpaces ?? []).map((fs: FreeSpace) => ({
+      trainId,
+      type: 'free_space' as const,
+      carNumber: fs.carNumber,
+      nearDoor: fs.nearDoor,
+      isStandard: fs.isStandard,
+    })),
+    ...(body.prioritySeats ?? []).map((ps: PrioritySeat) => ({
+      trainId,
+      type: 'priority_seat' as const,
+      carNumber: ps.carNumber,
+      nearDoor: ps.nearDoor,
+      isStandard: ps.isStandard,
+    })),
+  ];
+
+  if (equipmentRows.length > 0) {
+    await db.insert(trainEquipments).values(equipmentRows);
+  }
+
+  const equipments = await db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId));
+  return NextResponse.json(shapeTrainWithEquipments(updated, equipments));
 }
 
 export async function DELETE(

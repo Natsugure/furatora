@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@stroller-transit-app/database/client';
-import { platforms } from '@stroller-transit-app/database/schema';
+import { platforms, platformCarStopPositions } from '@stroller-transit-app/database/schema';
 import { eq, asc } from 'drizzle-orm';
+import type { CarStopPosition } from '@stroller-transit-app/database/schema';
 
 export async function GET(
   _request: Request,
@@ -35,11 +36,22 @@ export async function POST(
       inboundDirectionId: body.inboundDirectionId || null,
       outboundDirectionId: body.outboundDirectionId || null,
       maxCarCount: body.maxCarCount,
-      carStopPositions: body.carStopPositions || null,
       platformSide: body.platformSide || null,
       notes: body.notes || null,
     })
     .returning();
+
+  const stopPositionRows = (body.carStopPositions ?? []).map((sp: CarStopPosition) => ({
+    platformId: platform.id,
+    carCount: sp.carCount,
+    referenceCarNumber: sp.referenceCarNumber,
+    referencePlatformCell: sp.referencePlatformCell,
+    direction: sp.direction,
+  }));
+
+  if (stopPositionRows.length > 0) {
+    await db.insert(platformCarStopPositions).values(stopPositionRows);
+  }
 
   return NextResponse.json(platform, { status: 201 });
 }

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db } from '@stroller-transit-app/database/client';
-import { stations, platforms } from '@stroller-transit-app/database/schema';
+import { stations, platforms, platformCarStopPositions } from '@stroller-transit-app/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { PlatformForm } from '@/components/PlatformForm';
 
@@ -21,6 +21,11 @@ export default async function EditPlatformPage({
 
   if (!platform) notFound();
 
+  const stopPositions = await db
+    .select()
+    .from(platformCarStopPositions)
+    .where(eq(platformCarStopPositions.platformId, platformId));
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-6">Edit Platform - {station.name}</h2>
@@ -34,7 +39,12 @@ export default async function EditPlatformPage({
           inboundDirectionId: platform.inboundDirectionId,
           outboundDirectionId: platform.outboundDirectionId,
           maxCarCount: platform.maxCarCount,
-          carStopPositions: platform.carStopPositions,
+          carStopPositions: stopPositions.map((sp) => ({
+            carCount: sp.carCount,
+            referenceCarNumber: sp.referenceCarNumber,
+            referencePlatformCell: sp.referencePlatformCell,
+            direction: sp.direction,
+          })),
           platformSide: platform.platformSide ?? null,
           notes: platform.notes ?? '',
         }}

@@ -13,7 +13,7 @@ type TrainData = {
   operatorId: string;
   lineIds: string[];
   carCount: number;
-  carStructure: CarStructure | null;
+  carStructure: CarStructure[] | null;
   freeSpaces: FreeSpace[] | null;
   prioritySeats: PrioritySeat[] | null;
   limitedToPlatformIds: string[] | null;
@@ -37,7 +37,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
   const initCarStructures = (): { carNumber: number; doorCount: number }[] => {
     const cs = initialData?.carStructure;
-    if (Array.isArray(cs) && cs.length > 0) return cs as { carNumber: number; doorCount: number }[];
+    if (cs && cs.length > 0) return cs;
     const count = initialData?.carCount ?? 10;
     return Array.from({ length: count }, (_, i) => ({ carNumber: i + 1, doorCount: 4 }));
   };

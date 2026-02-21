@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@stroller-transit-app/database/client';
-import { platforms } from '@stroller-transit-app/database/schema';
+import { platforms, platformCarStopPositions } from '@stroller-transit-app/database/schema';
 import { eq, and } from 'drizzle-orm';
+import type { CarStopPosition } from '@stroller-transit-app/database/schema';
 
 export async function GET(
   _request: Request,
@@ -16,7 +17,21 @@ export async function GET(
   if (!platform) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json(platform);
+
+  const stopPositions = await db
+    .select()
+    .from(platformCarStopPositions)
+    .where(eq(platformCarStopPositions.platformId, platformId));
+
+  return NextResponse.json({
+    ...platform,
+    carStopPositions: stopPositions.map((sp) => ({
+      carCount: sp.carCount,
+      referenceCarNumber: sp.referenceCarNumber,
+      referencePlatformCell: sp.referencePlatformCell,
+      direction: sp.direction,
+    })),
+  });
 }
 
 export async function PUT(
@@ -34,7 +49,6 @@ export async function PUT(
       inboundDirectionId: body.inboundDirectionId || null,
       outboundDirectionId: body.outboundDirectionId || null,
       maxCarCount: body.maxCarCount,
-      carStopPositions: body.carStopPositions || null,
       platformSide: body.platformSide || null,
       notes: body.notes || null,
     })
@@ -44,7 +58,35 @@ export async function PUT(
   if (!updated) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  return NextResponse.json(updated);
+
+  await db.delete(platformCarStopPositions).where(eq(platformCarStopPositions.platformId, platformId));
+
+  const stopPositionRows = (body.carStopPositions ?? []).map((sp: CarStopPosition) => ({
+    platformId,
+    carCount: sp.carCount,
+    referenceCarNumber: sp.referenceCarNumber,
+    referencePlatformCell: sp.referencePlatformCell,
+    direction: sp.direction,
+  }));
+
+  if (stopPositionRows.length > 0) {
+    await db.insert(platformCarStopPositions).values(stopPositionRows);
+  }
+
+  const stopPositions = await db
+    .select()
+    .from(platformCarStopPositions)
+    .where(eq(platformCarStopPositions.platformId, platformId));
+
+  return NextResponse.json({
+    ...updated,
+    carStopPositions: stopPositions.map((sp) => ({
+      carCount: sp.carCount,
+      referenceCarNumber: sp.referenceCarNumber,
+      referencePlatformCell: sp.referencePlatformCell,
+      direction: sp.direction,
+    })),
+  });
 }
 
 export async function DELETE(
