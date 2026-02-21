@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
+import { db } from '@railease-navi/database/client';
 import { sql } from 'drizzle-orm';
 
 function parseOdptRailwayId(id: string) {

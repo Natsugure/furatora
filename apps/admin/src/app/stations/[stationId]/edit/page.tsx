@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { db } from '@stroller-transit-app/database/client';
-import { stations, stationConnections, lines } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { stations, stationConnections, lines } from '@railease-navi/database/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { StationNotesForm } from '@/components/StationNotesForm';
 import { ConnectionsEditSection, type ConnectionRow } from '@/components/ConnectionsEditSection';

@@ -59,7 +59,7 @@ importers:
 
   apps/admin:
     dependencies:
-      '@stroller-transit-app/database':
+      '@railease-navi/database':
         specifier: workspace:*
         version: link:../../packages/database
       drizzle-orm:
@@ -78,7 +78,7 @@ importers:
         specifier: ^4
         version: 4.1.18
     devDependencies:
-      '@stroller-transit-app/typescript-config':
+      '@railease-navi/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@tailwindcss/postcss':
@@ -102,7 +102,7 @@ importers:
 
   apps/scripts:
     dependencies:
-      '@stroller-transit-app/database':
+      '@railease-navi/database':
         specifier: workspace:*
         version: link:../../packages/database
       adm-zip:
@@ -115,7 +115,7 @@ importers:
         specifier: ^5.5.3
         version: 5.5.3
     devDependencies:
-      '@stroller-transit-app/typescript-config':
+      '@railease-navi/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@types/adm-zip':
@@ -139,7 +139,7 @@ importers:
       '@mantine/hooks':
         specifier: ^8.3.14
         version: 8.3.14(react@19.2.3)
-      '@stroller-transit-app/database':
+      '@railease-navi/database':
         specifier: workspace:*
         version: link:../../packages/database
       dotenv:
@@ -161,7 +161,7 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
     devDependencies:
-      '@stroller-transit-app/typescript-config':
+      '@railease-navi/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@tailwindcss/postcss':
@@ -198,7 +198,7 @@ importers:
         specifier: ^0.45.1
         version: 0.45.1(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(postgres@3.4.8)
     devDependencies:
-      '@stroller-transit-app/typescript-config':
+      '@railease-navi/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       drizzle-kit:

@@ -7,13 +7,13 @@
     "seed": "tsx src/seed-master-data.ts"
   },
   "dependencies": {
-    "@stroller-transit-app/database": "workspace:*",
+    "@railease-navi/database": "workspace:*",
     "adm-zip": "^0.5.16",
     "drizzle-orm": "^0.45.1",
     "papaparse": "^5.5.3"
   },
   "devDependencies": {
-    "@stroller-transit-app/typescript-config": "workspace:*",
+    "@railease-navi/typescript-config": "workspace:*",
     "@types/adm-zip": "^0.5.7",
     "@types/papaparse": "^5.5.2",
     "tsx": "^4.19.2",

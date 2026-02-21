@@ -1,5 +1,5 @@
 {
-  "name": "@stroller-transit-app/database",
+  "name": "@railease-navi/database",
   "version": "1.0.0",
   "private": true,
   "exports": {
@@ -19,7 +19,7 @@
     "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {
-    "@stroller-transit-app/typescript-config": "workspace:*",
+    "@railease-navi/typescript-config": "workspace:*",
     "drizzle-kit": "^0.31.8",
     "postgres": "^3.4.8",
     "tsx": "^4.21.0",

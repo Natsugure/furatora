@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { stationConnections } from '@stroller-transit-app/database/schema';
-import type { StrollerDifficulty, WheelchairDifficulty } from '@stroller-transit-app/database/enums';
+import { db } from '@railease-navi/database/client';
+import { stationConnections } from '@railease-navi/database/schema';
+import type { StrollerDifficulty, WheelchairDifficulty } from '@railease-navi/database/enums';
 import { eq } from 'drizzle-orm';
 
 export async function PUT(

@@ -1,5 +1,5 @@
-import { db } from '@stroller-transit-app/database/client';
-import { facilityTypes, operators } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { facilityTypes, operators } from '@railease-navi/database/schema';
 
 const FACILITY_TYPES = [
   { code: 'elevator', name: 'エレベーター' },

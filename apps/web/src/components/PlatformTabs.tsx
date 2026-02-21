@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PlatformDisplay, type PlatformLocation } from './PlatformDisplay';
-import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
+import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@railease-navi/database/schema';
 
 type PlatformData = {
   id: string;

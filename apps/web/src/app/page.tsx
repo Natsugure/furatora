@@ -1,6 +1,6 @@
 import { Accessibility } from 'lucide-react';
-import { db } from '@stroller-transit-app/database/client';
-import { operators, lines } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { operators, lines } from '@railease-navi/database/schema';
 import { asc, isNotNull } from 'drizzle-orm';
 import { SearchTabs } from '@/components/SearchTabs';
 import { Container } from '@/components/ui/Container';

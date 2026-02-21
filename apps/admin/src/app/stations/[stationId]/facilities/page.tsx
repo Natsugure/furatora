@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { db } from '@stroller-transit-app/database/client';
+import { db } from '@railease-navi/database/client';
 import {
   stations,
   platformLocations,
@@ -9,7 +9,7 @@ import {
   lines,
   lineDirections,
   facilityTypes,
-} from '@stroller-transit-app/database/schema';
+} from '@railease-navi/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 import { FacilityDuplicateButton } from '@/components/FacilityDuplicateButton';

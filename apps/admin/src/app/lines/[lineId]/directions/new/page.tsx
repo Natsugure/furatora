@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { db } from '@stroller-transit-app/database/client';
-import { lines } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { lines } from '@railease-navi/database/schema';
 import { eq } from 'drizzle-orm';
 import { LineDirectionForm } from '@/components/LineDirectionForm';
 

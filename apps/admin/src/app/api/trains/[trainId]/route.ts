@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { trains, trainEquipments } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { trains, trainEquipments } from '@railease-navi/database/schema';
 import { eq } from 'drizzle-orm';
-import type { FreeSpace, PrioritySeat } from '@stroller-transit-app/database/schema';
+import type { FreeSpace, PrioritySeat } from '@railease-navi/database/schema';
 
 function shapeTrainWithEquipments(
   train: typeof trains.$inferSelect,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { facilityTypes } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { facilityTypes } from '@railease-navi/database/schema';
 
 export async function GET() {
   const types = await db.select().from(facilityTypes);

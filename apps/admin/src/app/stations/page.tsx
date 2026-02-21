@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { db } from '@stroller-transit-app/database/client';
+import { db } from '@railease-navi/database/client';
 import {
   operators,
   lines,
   stationLines,
   stations,
-} from '@stroller-transit-app/database/schema';
+} from '@railease-navi/database/schema';
 import { asc, eq } from 'drizzle-orm';
 
 export default async function StationsPage() {

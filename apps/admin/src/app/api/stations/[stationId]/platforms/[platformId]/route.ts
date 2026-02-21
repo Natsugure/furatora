@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { platforms, platformCarStopPositions } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { platforms, platformCarStopPositions } from '@railease-navi/database/schema';
 import { eq, and } from 'drizzle-orm';
-import type { CarStopPosition } from '@stroller-transit-app/database/schema';
+import type { CarStopPosition } from '@railease-navi/database/schema';
 
 export async function GET(
   _request: Request,

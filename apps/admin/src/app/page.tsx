@@ -1,5 +1,5 @@
-import { db } from '@stroller-transit-app/database/client';
-import { operators, lines, stations, trains, stationFacilities } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { operators, lines, stations, trains, stationFacilities } from '@railease-navi/database/schema';
 import { count } from 'drizzle-orm';
 
 async function fetchCounts() {

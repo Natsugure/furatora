@@ -1,5 +1,5 @@
-import { db } from '@stroller-transit-app/database/client';
-import { stations, lines, stationLines, stationConnections, odptMetadata, operators } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { stations, lines, stationLines, stationConnections, odptMetadata, operators } from '@railease-navi/database/schema';
 import { eq, and, notInArray, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 

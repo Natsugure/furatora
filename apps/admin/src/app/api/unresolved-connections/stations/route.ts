@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { stations } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { stations } from '@railease-navi/database/schema';
 import { sql } from 'drizzle-orm';
 
 function generateStationSlug(odptStationId: string): string {

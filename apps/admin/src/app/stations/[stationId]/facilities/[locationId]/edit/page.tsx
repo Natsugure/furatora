@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
-import { db } from '@stroller-transit-app/database/client';
+import { db } from '@railease-navi/database/client';
 import {
   stations,
   platformLocations,
   stationFacilities,
   facilityConnections,
   platforms,
-} from '@stroller-transit-app/database/schema';
+} from '@railease-navi/database/schema';
 import { eq } from 'drizzle-orm';
 import { FacilityForm } from '@/components/FacilityForm';
 

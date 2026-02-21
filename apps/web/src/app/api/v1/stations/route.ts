@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { stations, stationLines, lines, operators } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { stations, stationLines, lines, operators } from '@railease-navi/database/schema';
 import { ilike, eq, isNotNull, and } from 'drizzle-orm';
 import type { StationGroup } from '@/types';
 

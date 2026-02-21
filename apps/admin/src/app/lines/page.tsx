@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { db } from '@stroller-transit-app/database/client';
-import { lines, operators } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { lines, operators } from '@railease-navi/database/schema';
 import { asc } from 'drizzle-orm';
 
 export default async function LinesPage() {

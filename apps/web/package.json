@@ -1,5 +1,5 @@
 {
-  "name": "@stroller-transit-app/frontend",
+  "name": "@railease-navi/frontend",
   "version": "0.1.0",
   "description": "",
   "main": "./dist/index.js",
@@ -13,7 +13,7 @@
   "author": "Natsugure",
   "packageManager": "pnpm@10.7.0",
   "devDependencies": {
-    "@stroller-transit-app/typescript-config": "workspace:*",
+    "@railease-navi/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -25,7 +25,7 @@
   "dependencies": {
     "@mantine/core": "^8.3.14",
     "@mantine/hooks": "^8.3.14",
-    "@stroller-transit-app/database": "workspace:*",
+    "@railease-navi/database": "workspace:*",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.564.0",

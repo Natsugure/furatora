@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { StrollerDifficulty, WheelchairDifficulty } from '@stroller-transit-app/database/enums';
+import type { StrollerDifficulty, WheelchairDifficulty } from '@railease-navi/database/enums';
 import {
   STROLLER_DIFFICULTY_META,
   WHEELCHAIR_DIFFICULTY_META,

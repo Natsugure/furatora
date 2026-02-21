@@ -1,4 +1,4 @@
-import type { StrollerDifficulty, WheelchairDifficulty } from '@stroller-transit-app/database/enums';
+import type { StrollerDifficulty, WheelchairDifficulty } from '@railease-navi/database/enums';
 
 type DifficultyMeta = {
   order: number;

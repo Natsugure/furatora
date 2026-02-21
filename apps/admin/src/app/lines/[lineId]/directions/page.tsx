@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { db } from '@stroller-transit-app/database/client';
-import { lines, lineDirections, stations } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { lines, lineDirections, stations } from '@railease-navi/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 

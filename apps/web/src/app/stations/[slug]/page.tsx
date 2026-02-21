@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Info } from 'lucide-react';
-import { db } from '@stroller-transit-app/database/client';
+import { db } from '@railease-navi/database/client';
 import {
   stations,
   stationLines,
@@ -15,7 +15,7 @@ import {
   facilityTypes,
   facilityConnections,
   stationConnections,
-} from '@stroller-transit-app/database/schema';
+} from '@railease-navi/database/schema';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { PlatformDisplay } from '@/components/PlatformDisplay';
 import { PlatformTabs, type DirectionTab, type PlatformEntry } from '@/components/PlatformTabs';

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@stroller-transit-app/database/client';
-import { platformLocations, stationFacilities, facilityConnections, platforms } from '@stroller-transit-app/database/schema';
+import { db } from '@railease-navi/database/client';
+import { platformLocations, stationFacilities, facilityConnections, platforms } from '@railease-navi/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 
 export async function GET(
