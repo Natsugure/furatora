@@ -10,7 +10,8 @@
       "Bash(pnpm lint:*)",
       "Bash(docker compose:*)",
       "Bash(find:*)",
-      "Bash(pnpm run lint:*)"
+      "Bash(pnpm run lint:*)",
+      "Bash(ls:*)"
     ]
   }
 }

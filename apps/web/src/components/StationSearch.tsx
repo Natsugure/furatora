@@ -10,6 +10,7 @@ export function StationSearch() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [groups, setGroups] = useState<StationGroup[]>([]);
   const [fetchedFor, setFetchedFor] = useState('');
+  const [hasError, setHasError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // debouncedQuery が変わった瞬間に loading=true となるよう派生させる
@@ -27,10 +28,17 @@ export function StationSearch() {
   useEffect(() => {
     if (!debouncedQuery) return;
     let cancelled = false;
+    setHasError(false);
     fetch(`/api/v1/stations?q=${encodeURIComponent(debouncedQuery)}`)
-      .then((res) => res.json() as Promise<StationSearchApiResponse>)
+      .then((res) => {
+        if (!res.ok) throw new Error('fetch failed');
+        return res.json() as Promise<StationSearchApiResponse>;
+      })
       .then((data) => {
         if (!cancelled) setGroups(data.stationGroups);
+      })
+      .catch(() => {
+        if (!cancelled) setHasError(true);
       })
       .finally(() => {
         if (!cancelled) setFetchedFor(debouncedQuery);
@@ -64,7 +72,11 @@ export function StationSearch() {
       {/* 検索結果 */}
       {showResults && (
         <div className="mt-2 space-y-2">
-          {displayedGroups.length === 0 && !loading ? (
+          {hasError ? (
+            <div className="bg-white rounded-xl border border-red-200 shadow-sm px-4 py-5 text-sm text-center text-red-500">
+              検索中にエラーが発生しました。しばらくしてから再度お試しください。
+            </div>
+          ) : displayedGroups.length === 0 && !loading ? (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-5 text-sm text-center text-gray-500">
               「{debouncedQuery}」に一致する駅が見つかりませんでした
             </div>
