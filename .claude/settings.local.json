@@ -9,7 +9,8 @@
       "Bash(pnpm --filter database db:push:*)",
       "Bash(pnpm lint:*)",
       "Bash(docker compose:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pnpm run lint:*)"
     ]
   }
 }

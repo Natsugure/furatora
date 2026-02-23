@@ -8,7 +8,7 @@ const FACILITY_TYPES = [
   { code: 'ramp', name: 'スロープ'},
   { code: 'stairLift', name: '階段昇降機' },
   { code: 'sameFloor', name: '同一階層'}
-] as const;
+];
 
 const OPERATORS = [
   {
@@ -21,7 +21,7 @@ const OPERATORS = [
     odptOperatorId: 'odpt.Operator:Toei',
     displayPriority: 2,
   },
-] as const;
+];
 
 async function main() {
   console.log('Starting master data seed...');

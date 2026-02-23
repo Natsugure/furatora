@@ -9,8 +9,13 @@ export function StationSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [groups, setGroups] = useState<StationGroup[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [fetchedFor, setFetchedFor] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // debouncedQuery が変わった瞬間に loading=true となるよう派生させる
+  const loading = debouncedQuery !== '' && fetchedFor !== debouncedQuery;
+  const displayedGroups = debouncedQuery ? groups : [];
+  const showResults = debouncedQuery.length > 0;
 
   // 入力から 300ms 後に検索クエリを確定
   useEffect(() => {
@@ -20,24 +25,18 @@ export function StationSearch() {
 
   // 確定したクエリで API を叩く
   useEffect(() => {
-    if (!debouncedQuery) {
-      setGroups([]);
-      return;
-    }
+    if (!debouncedQuery) return;
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/v1/stations?q=${encodeURIComponent(debouncedQuery)}`)
       .then((res) => res.json() as Promise<StationSearchApiResponse>)
       .then((data) => {
         if (!cancelled) setGroups(data.stationGroups);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setFetchedFor(debouncedQuery);
       });
     return () => { cancelled = true; };
   }, [debouncedQuery]);
-
-  const showResults = debouncedQuery.length > 0;
 
   return (
     <div ref={containerRef} className="relative">
@@ -65,12 +64,12 @@ export function StationSearch() {
       {/* 検索結果 */}
       {showResults && (
         <div className="mt-2 space-y-2">
-          {groups.length === 0 && !loading ? (
+          {displayedGroups.length === 0 && !loading ? (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-5 text-sm text-center text-gray-500">
               「{debouncedQuery}」に一致する駅が見つかりませんでした
             </div>
           ) : (
-            groups.map((group) => (
+            displayedGroups.map((group) => (
               <StationGroupCard key={group.name} group={group} />
             ))
           )}

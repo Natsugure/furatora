@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       stationGroups,
       total: stationGroups.length,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
