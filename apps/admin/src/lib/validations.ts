@@ -29,6 +29,7 @@ export const trainSchema = z.object({
 });
 
 export const stationUpdateSchema = z.object({
+  nameKana: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -69,6 +70,10 @@ export const platformLocationSchema = z.object({
   notes: z.string().nullable().optional(),
   facilities: z.array(facilitySchema).optional(),
   connections: z.array(connectionSchema).optional(),
+});
+
+export const lineUpdateSchema = z.object({
+  nameKana: z.string().nullable().optional(),
 });
 
 export const directionSchema = z.object({

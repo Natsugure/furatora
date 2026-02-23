@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
 import { stations, stationLines, lines, operators } from '@furatora/database/schema';
-import { ilike, eq, isNotNull, and } from 'drizzle-orm';
+import { ilike, eq, isNotNull, and, or } from 'drizzle-orm';
 import type { StationGroup } from '@/types';
 
 export async function GET(request: NextRequest) {
@@ -40,7 +40,10 @@ export async function GET(request: NextRequest) {
       ))
       .leftJoin(stationLines, eq(stationLines.stationId, stations.id))
       .leftJoin(lines, eq(lines.id, stationLines.lineId))
-      .where(ilike(stations.name, `%${query}%`))
+      .where(or(
+        ilike(stations.name, `%${query}%`),
+        ilike(stations.nameKana, `%${query}%`),
+      ))
       .limit(60);
 
     // 駅名でグループ化（Map は挿入順を保持するため表示順が安定する）

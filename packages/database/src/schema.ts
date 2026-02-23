@@ -8,6 +8,7 @@ export const stations = pgTable('stations', {
   slug: varchar('slug', { length: 100 }).unique(), // URL用スラッグ (例: tokyo-metro-marunouchi-shinjuku)
   code: varchar('code', { length: 20 }), // 駅ナンバリング (例: M08)
   name: varchar('name', { length: 100 }).notNull(),
+  nameKana: varchar('name_kana', { length: 100 }),
   nameEn: varchar('name_en', { length: 100 }),
   lat: decimal('lat', { precision: 9, scale: 6 }),
   lon: decimal('lon', { precision: 9, scale: 6 }),
@@ -25,6 +26,7 @@ export const lines = pgTable('lines', {
   slug: varchar('slug', { length: 100 }).unique(),
   lineCode: varchar('line_code', { length: 10 }), // 路線コード (例: M)
   name: varchar('name', { length: 100 }).notNull(),
+  nameKana: varchar('name_kana', { length: 100 }),
   nameEn: varchar('name_en', { length: 100 }),
   color: varchar('color', { length: 7 }), // カラーコード (例: #F62E36)
   displayOrder: integer('display_order').default(0), // 表示順

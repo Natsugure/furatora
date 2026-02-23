@@ -2,8 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { stations, stationConnections, lines } from '@furatora/database/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { StationNotesForm } from '@/components/StationNotesForm';
-import { ConnectionsEditSection, type ConnectionRow } from '@/components/ConnectionsEditSection';
+import { StationEditForm, type ConnectionRow } from '@/components/StationEditForm';
 
 type Props = {
   params: Promise<{ stationId: string }>;
@@ -16,7 +15,6 @@ export default async function StationEditPage({ params }: Props) {
     notFound();
   }
 
-  // この駅が持つ乗り換え接続を取得（接続先の駅名・路線名も結合）
   const connectionRows = await db
     .select({
       id: stationConnections.id,
@@ -32,7 +30,6 @@ export default async function StationEditPage({ params }: Props) {
     .from(stationConnections)
     .where(eq(stationConnections.stationId, stationId));
 
-  // 接続先の駅名・路線名を別途解決
   const connectedStationIds = connectionRows
     .map((c) => c.connectedStationId)
     .filter((id): id is string => id !== null);
@@ -65,23 +62,18 @@ export default async function StationEditPage({ params }: Props) {
   }));
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h2 className="text-xl font-bold mb-2">{station.name} — 編集</h2>
       {station.nameEn && (
         <p className="text-sm text-gray-500 mb-6">{station.nameEn}</p>
       )}
 
-      <section className="mb-10">
-        <h3 className="text-base font-semibold mb-3">駅備考</h3>
-        <StationNotesForm stationId={station.id} initialNotes={station.notes ?? ''} />
-      </section>
-
-      <section>
-        <h3 className="text-base font-semibold mb-3">
-          乗り換え接続 ({connections.length}件)
-        </h3>
-        <ConnectionsEditSection connections={connections} />
-      </section>
+      <StationEditForm
+        stationId={station.id}
+        initialNameKana={station.nameKana}
+        initialNotes={station.notes}
+        connections={connections}
+      />
     </div>
   );
 }

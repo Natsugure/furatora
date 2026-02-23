@@ -33,7 +33,10 @@ export async function PUT(
     }
     const [updated] = await db
       .update(stations)
-      .set({ notes: parsed.data.notes ?? null })
+      .set({
+        nameKana: parsed.data.nameKana ?? null,
+        notes: parsed.data.notes ?? null,
+      })
       .where(eq(stations.id, stationId))
       .returning();
     if (!updated) {

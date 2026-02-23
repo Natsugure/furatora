@@ -32,7 +32,13 @@ export default async function LinesPage() {
                   {operatorMap[line.operatorId] ?? '-'}
                 </td>
                 <td className="px-4 py-3 text-sm font-mono">{line.lineCode ?? '-'}</td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 flex gap-2">
+                  <Link
+                    href={`/lines/${line.id}/edit`}
+                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
+                  >
+                    Edit
+                  </Link>
                   <Link
                     href={`/lines/${line.id}/directions`}
                     className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
