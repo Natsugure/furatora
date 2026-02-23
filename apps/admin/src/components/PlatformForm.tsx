@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import type { CarStopPosition } from '@railease-navi/database/schema';
+import type { CarStopPosition } from '@furatora/database/schema';
 
 type Line = { id: string; name: string };
 type LineDirection = {

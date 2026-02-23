@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { db } from '@railease-navi/database/client';
+import { db } from '@furatora/database/client';
 import {
   operators,
   lines,
   stationLines,
   stations,
-} from '@railease-navi/database/schema';
+} from '@furatora/database/schema';
 import { asc, eq } from 'drizzle-orm';
 
 export default async function StationsPage() {

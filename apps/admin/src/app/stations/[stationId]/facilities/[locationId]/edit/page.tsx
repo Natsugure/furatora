@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
-import { db } from '@railease-navi/database/client';
+import { db } from '@furatora/database/client';
 import {
   stations,
   platformLocations,
   stationFacilities,
   facilityConnections,
   platforms,
-} from '@railease-navi/database/schema';
+} from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { FacilityForm } from '@/components/FacilityForm';
 

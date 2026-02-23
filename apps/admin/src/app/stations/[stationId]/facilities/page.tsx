@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { db } from '@railease-navi/database/client';
+import { db } from '@furatora/database/client';
 import {
   stations,
   platformLocations,
@@ -9,7 +9,7 @@ import {
   lines,
   lineDirections,
   facilityTypes,
-} from '@railease-navi/database/schema';
+} from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 import { FacilityDuplicateButton } from '@/components/FacilityDuplicateButton';

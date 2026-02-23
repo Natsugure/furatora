@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@railease-navi/database/client';
-import { stations, stationLines, lines } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { stations, stationLines, lines } from '@furatora/database/schema';
 import { eq, asc } from 'drizzle-orm';
 import type { LineStationsApiResponse } from '@/types';
 

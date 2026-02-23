@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { db } from '@railease-navi/database/client';
-import { trains, operators } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { trains, operators } from '@furatora/database/schema';
 import { asc } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 import { DuplicateButton } from '@/components/DuplicateButton';

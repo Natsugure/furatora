@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PlatformDisplay, type PlatformLocation } from './PlatformDisplay';
-import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@railease-navi/database/schema';
+import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 
 type PlatformData = {
   id: string;

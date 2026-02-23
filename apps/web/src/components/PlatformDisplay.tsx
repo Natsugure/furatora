@@ -1,4 +1,4 @@
-import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@railease-navi/database/schema';
+import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 import { TrainVisualization } from './TrainVisualization';
 
 type Platform = {

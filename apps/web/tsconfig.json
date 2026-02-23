@@ -1,5 +1,5 @@
 {
-  "extends": "@railease-navi/typescript-config/nextjs.json",
+  "extends": "@furatora/typescript-config/nextjs.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

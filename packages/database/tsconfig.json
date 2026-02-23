@@ -1,5 +1,5 @@
 {
-  "extends": "@railease-navi/typescript-config/base.json",
+  "extends": "@furatora/typescript-config/base.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src"

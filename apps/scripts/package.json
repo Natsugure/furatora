@@ -7,13 +7,13 @@
     "seed": "tsx src/seed-master-data.ts"
   },
   "dependencies": {
-    "@railease-navi/database": "workspace:*",
+    "@furatora/database": "workspace:*",
     "adm-zip": "^0.5.16",
     "drizzle-orm": "^0.45.1",
     "papaparse": "^5.5.3"
   },
   "devDependencies": {
-    "@railease-navi/typescript-config": "workspace:*",
+    "@furatora/typescript-config": "workspace:*",
     "@types/adm-zip": "^0.5.7",
     "@types/papaparse": "^5.5.2",
     "tsx": "^4.19.2",

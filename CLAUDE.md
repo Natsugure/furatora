@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## プロジェクト概要
-- railease-navi: 日本の鉄道の列車・駅でベビーカー・車いすが利用しやすい設備の位置と、乗り換え案内を提供するWebアプリ。
+- furatora: 日本の鉄道の列車・駅でベビーカー・車いすが利用しやすい設備の位置と、乗り換え案内を提供するWebアプリ。
 - 技術スタック: TurboRepo / TypeScript / React / Next.js / Mantine / TailwindCSS / DrizzleORM / PostgreSQL / Docker
 
 ## コーディング規約

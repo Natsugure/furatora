@@ -5,10 +5,11 @@
       "Bash(docker compose ps:*)",
       "Bash(curl:*)",
       "Bash(npx next build:*)",
-      "Bash(pnpm --filter @railease-navi/database db:generate:*)",
+      "Bash(pnpm --filter @furatora/database db:generate:*)",
       "Bash(pnpm --filter database db:push:*)",
       "Bash(pnpm lint:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(find:*)"
     ]
   }
 }

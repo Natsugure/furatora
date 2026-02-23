@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { StrollerDifficulty, WheelchairDifficulty } from '@railease-navi/database/enums';
+import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import { STROLLER_DIFFICULTY_META, WHEELCHAIR_DIFFICULTY_META } from '@/constants/difficulty';
 
 export type ConnectionRow = {

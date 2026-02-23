@@ -10,7 +10,7 @@ import './globals.css';
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
 export const metadata: Metadata = {
-  title: 'RailEase Navi | バリアフリー駅・列車案内',
+  title: 'ふらとら | バリアフリー駅・列車案内',
   description: '首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを検索できます。他社線同士の乗り換えや、実際に列車に乗ったあとのフリースペース情報までわかりやすくご案内します。',
 };
 
@@ -33,7 +33,7 @@ export default function RootLayout({
                 </div>
                 <div>
                   <p className="font-bold text-lg leading-tight text-gray-900">
-                    RailEase Navi
+                    ふらとら
                   </p>
                   <p className="text-xs text-gray-500">
                     首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを表示
@@ -53,7 +53,7 @@ export default function RootLayout({
           <footer className="bg-white border-t border-gray-200 mt-8">
             <Container className="py-4 text-center">
               <p className="text-xs text-gray-500">
-                Copyright © RailEase Navi All Rights Reserved
+                Copyright © ふらとら All Rights Reserved
               </p>
             </Container>
           </footer>

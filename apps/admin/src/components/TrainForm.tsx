@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import type { CarStructure, FreeSpace, PrioritySeat } from '@railease-navi/database/schema';
+import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 
 type Operator = { id: string; name: string };
 type Line = { id: string; name: string; nameEn: string ; operatorId: string };

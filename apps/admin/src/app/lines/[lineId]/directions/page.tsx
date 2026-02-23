@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { db } from '@railease-navi/database/client';
-import { lines, lineDirections, stations } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { lines, lineDirections, stations } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 

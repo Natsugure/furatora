@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@railease-navi/database/client';
-import { operators } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { operators } from '@furatora/database/schema';
 import { asc } from 'drizzle-orm';
 import { operatorSchema } from '@/lib/validations';
 

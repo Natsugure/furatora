@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { db } from '@railease-navi/database/client';
-import { stations, platforms, platformCarStopPositions } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { stations, platforms, platformCarStopPositions } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { PlatformForm } from '@/components/PlatformForm';
 

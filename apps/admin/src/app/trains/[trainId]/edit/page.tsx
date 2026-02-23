@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { db } from '@railease-navi/database/client';
-import { trains, trainEquipments } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { trains, trainEquipments } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { TrainForm } from '@/components/TrainForm';
 

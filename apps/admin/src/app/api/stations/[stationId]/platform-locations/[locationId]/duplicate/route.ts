@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@railease-navi/database/client';
-import { platformLocations, stationFacilities, facilityConnections } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { platformLocations, stationFacilities, facilityConnections } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 
 export async function POST(

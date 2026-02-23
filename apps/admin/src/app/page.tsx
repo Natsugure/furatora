@@ -1,5 +1,5 @@
-import { db } from '@railease-navi/database/client';
-import { operators, lines, stations, trains, stationFacilities } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { operators, lines, stations, trains, stationFacilities } from '@furatora/database/schema';
 import { count } from 'drizzle-orm';
 
 async function fetchCounts() {

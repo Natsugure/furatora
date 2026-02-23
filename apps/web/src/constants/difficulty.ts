@@ -1,4 +1,4 @@
-import type { StrollerDifficulty, WheelchairDifficulty } from '@railease-navi/database/enums';
+import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 
 type DifficultyMeta = {
   order: number;

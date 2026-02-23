@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { db } from '@railease-navi/database/client';
-import { stations, stationLines, lines } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { stations, stationLines, lines } from '@furatora/database/schema';
 import { eq, asc } from 'drizzle-orm';
 import { StationCard } from '@/components/StationCard';
 import { Container } from '@/components/ui/Container';

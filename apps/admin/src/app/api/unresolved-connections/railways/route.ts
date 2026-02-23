@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@railease-navi/database/client';
-import { lines } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { lines } from '@furatora/database/schema';
 import { sql } from 'drizzle-orm';
 import { unresolvedRailwaySchema } from '@/lib/validations';
 

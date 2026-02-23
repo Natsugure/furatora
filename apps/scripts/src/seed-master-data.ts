@@ -1,5 +1,5 @@
-import { db } from '@railease-navi/database/client';
-import { facilityTypes, operators } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { facilityTypes, operators } from '@furatora/database/schema';
 
 const FACILITY_TYPES = [
   { code: 'elevator', name: 'エレベーター' },

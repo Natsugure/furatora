@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@railease-navi/database/client';
-import { lineDirections } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { lineDirections } from '@furatora/database/schema';
 import { eq, asc } from 'drizzle-orm';
 import { directionSchema } from '@/lib/validations';
 

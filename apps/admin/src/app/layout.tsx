@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Admin - RailEase Navi',
+  title: 'Admin - ふらとら',
   description: 'Administration panel',
 };
 

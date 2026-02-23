@@ -1,6 +1,6 @@
 import { Accessibility } from 'lucide-react';
-import { db } from '@railease-navi/database/client';
-import { operators, lines } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { operators, lines } from '@furatora/database/schema';
 import { asc, isNotNull } from 'drizzle-orm';
 import { SearchTabs } from '@/components/SearchTabs';
 import { Container } from '@/components/ui/Container';

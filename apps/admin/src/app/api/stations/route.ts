@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@railease-navi/database/client';
-import { stations, stationLines, lines, stationConnections } from '@railease-navi/database/schema';
+import { db } from '@furatora/database/client';
+import { stations, stationLines, lines, stationConnections } from '@furatora/database/schema';
 import { asc, eq } from 'drizzle-orm';
 
 export async function GET(request: Request) {

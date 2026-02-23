@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import type { CarStopPosition, FreeSpace, PrioritySeat, CarStructure } from '@railease-navi/database/schema';
+import type { CarStopPosition, FreeSpace, PrioritySeat, CarStructure } from '@furatora/database/schema';
 
 type Train = {
   id: string;
