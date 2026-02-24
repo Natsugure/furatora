@@ -11,7 +11,8 @@
       "Bash(docker compose:*)",
       "Bash(find:*)",
       "Bash(pnpm run lint:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ]
   }
 }

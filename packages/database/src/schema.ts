@@ -1,4 +1,4 @@
-import { pgTable, varchar, decimal, integer, timestamp, text, jsonb, uuid, boolean, primaryKey, unique, serial } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, serial } from 'drizzle-orm/pg-core';
 import type { StrollerDifficulty, WheelchairDifficulty, DirectionType, PlatformSide } from './enums';
 import { sql } from 'drizzle-orm';
 
@@ -73,7 +73,6 @@ export const trains = pgTable('trains', {
   operators: uuid('operators').references(() => operators.id).notNull(),
   lines: uuid('lines').references(() => lines.id).array().notNull(),
   carCount: integer('car_count').notNull(),
-  carStructure: jsonb('car_structure').$type<CarStructure[]>(),
   limitedToPlatformIds: uuid('limited_to_platform_ids').array(),
   // null = 容量制約のみで判定, non-null = 指定ホームにのみ表示
   createdAt: timestamp('created_at').defaultNow(),
@@ -84,6 +83,15 @@ export type CarStructure = {
   carNumber: number;
   doorCount: number;
 };
+
+export const trainCarStructures = pgTable('train_car_structures', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
+  carNumber: integer('car_number').notNull(),
+  doorCount: integer('door_count').notNull(),
+}, (t) => [
+  unique('unique_train_car_structure').on(t.trainId, t.carNumber),
+]);
 
 export type FreeSpace = {
   carNumber: number;

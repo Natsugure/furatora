@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
-import { trains, trainEquipments } from '@furatora/database/schema';
+import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { TrainForm } from '@/components/TrainForm';
 
@@ -14,7 +14,10 @@ export default async function EditTrainPage({
 
   if (!train) notFound();
 
-  const equipments = await db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId));
+  const [equipments, carStructureRows] = await Promise.all([
+    db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
+    db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
+  ]);
 
   return (
     <div>
@@ -27,7 +30,9 @@ export default async function EditTrainPage({
           operatorId: train.operators,
           lineIds: train.lines,
           carCount: train.carCount,
-          carStructure: train.carStructure ?? null,
+          carStructure: carStructureRows.length > 0
+            ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount }))
+            : null,
           freeSpaces: equipments
             .filter((e) => e.type === 'free_space')
             .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),

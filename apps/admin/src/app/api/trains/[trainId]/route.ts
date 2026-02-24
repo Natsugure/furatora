@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { trains, trainEquipments } from '@furatora/database/schema';
+import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { trainSchema } from '@/lib/validations';
 
 function shapeTrainWithEquipments(
   train: typeof trains.$inferSelect,
-  equipments: (typeof trainEquipments.$inferSelect)[]
+  equipments: (typeof trainEquipments.$inferSelect)[],
+  carStructureRows: (typeof trainCarStructures.$inferSelect)[]
 ) {
   return {
     ...train,
+    carStructure: carStructureRows.length > 0
+      ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount }))
+      : null,
     freeSpaces: equipments
       .filter((e) => e.type === 'free_space')
       .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
@@ -29,8 +33,11 @@ export async function GET(
     if (!train) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    const equipments = await db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId));
-    return NextResponse.json(shapeTrainWithEquipments(train, equipments));
+    const [equipments, carStructureRows] = await Promise.all([
+      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
+      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
+    ]);
+    return NextResponse.json(shapeTrainWithEquipments(train, equipments, carStructureRows));
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -56,13 +63,19 @@ export async function PUT(
         operators: operatorId,
         lines: lineIds,
         carCount,
-        carStructure: carStructure ?? null,
         limitedToPlatformIds: limitedToPlatformIds?.length ? limitedToPlatformIds : null,
       })
       .where(eq(trains.id, trainId))
       .returning();
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    await db.delete(trainCarStructures).where(eq(trainCarStructures.trainId, trainId));
+    if (carStructure && carStructure.length > 0) {
+      await db.insert(trainCarStructures).values(
+        carStructure.map((cs) => ({ trainId, carNumber: cs.carNumber, doorCount: cs.doorCount }))
+      );
     }
 
     await db.delete(trainEquipments).where(eq(trainEquipments.trainId, trainId));
@@ -88,8 +101,11 @@ export async function PUT(
       await db.insert(trainEquipments).values(equipmentRows);
     }
 
-    const equipments = await db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId));
-    return NextResponse.json(shapeTrainWithEquipments(updated, equipments));
+    const [equipments, carStructureRows] = await Promise.all([
+      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
+      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
+    ]);
+    return NextResponse.json(shapeTrainWithEquipments(updated, equipments, carStructureRows));
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

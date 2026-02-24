@@ -10,6 +10,7 @@ import {
   lineDirections,
   trains,
   trainEquipments,
+  trainCarStructures,
   platformLocations,
   stationFacilities,
   facilityTypes,
@@ -66,7 +67,7 @@ async function fetchStationDetails(slug: string) {
     .where(eq(platforms.stationId, station.id));
 
   if (!platformList.length) {
-    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], locations: [], facilityList: [], facilityTypeMap: {} as Record<string, string>, connectionsByLocation: {} as Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]>, transferConnections: [], equipmentsByTrainId: {} as Record<string, { freeSpaces: { carNumber: number; nearDoor: number; isStandard: boolean }[]; prioritySeats: { carNumber: number; nearDoor: number; isStandard: boolean }[] }>, carStopPositionsByPlatformId: {} as Record<string, { carCount: number; referenceCarNumber: number; referencePlatformCell: number; direction: 'ascending' | 'descending' }[]> };
+    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], locations: [], facilityList: [], facilityTypeMap: {} as Record<string, string>, connectionsByLocation: {} as Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]>, transferConnections: [], equipmentsByTrainId: {} as Record<string, { freeSpaces: { carNumber: number; nearDoor: number; isStandard: boolean }[]; prioritySeats: { carNumber: number; nearDoor: number; isStandard: boolean }[] }>, carStructuresByTrainId: {} as Record<string, { carNumber: number; doorCount: number }[]>, carStopPositionsByPlatformId: {} as Record<string, { carCount: number; referenceCarNumber: number; referencePlatformCell: number; direction: 'ascending' | 'descending' }[]> };
   }
 
   const platformIds = platformList.map((p) => p.id);
@@ -103,12 +104,15 @@ async function fetchStationDetails(slug: string) {
 
   const trainIds = trainList.map((t) => t.id);
 
-  const [rawEquipments, rawCarStopPositions] = await Promise.all([
+  const [rawEquipments, rawCarStopPositions, rawCarStructures] = await Promise.all([
     trainIds.length > 0
       ? db.select().from(trainEquipments).where(inArray(trainEquipments.trainId, trainIds))
       : Promise.resolve([]),
     platformIds.length > 0
       ? db.select().from(platformCarStopPositions).where(inArray(platformCarStopPositions.platformId, platformIds))
+      : Promise.resolve([]),
+    trainIds.length > 0
+      ? db.select().from(trainCarStructures).where(inArray(trainCarStructures.trainId, trainIds))
       : Promise.resolve([]),
   ]);
 
@@ -126,6 +130,14 @@ async function fetchStationDetails(slug: string) {
     } else {
       equipmentsByTrainId[item.trainId].prioritySeats.push(entry);
     }
+  }
+
+  const carStructuresByTrainId: Record<string, { carNumber: number; doorCount: number }[]> = {};
+  for (const item of rawCarStructures) {
+    if (!carStructuresByTrainId[item.trainId]) {
+      carStructuresByTrainId[item.trainId] = [];
+    }
+    carStructuresByTrainId[item.trainId].push({ carNumber: item.carNumber, doorCount: item.doorCount });
   }
 
   const carStopPositionsByPlatformId: Record<string, {
@@ -242,6 +254,7 @@ async function fetchStationDetails(slug: string) {
     connectionsByLocation,
     transferConnections,
     equipmentsByTrainId,
+    carStructuresByTrainId,
     carStopPositionsByPlatformId,
   };
 }
@@ -267,6 +280,7 @@ export default async function StationDetailPage({ params }: Props) {
     connectionsByLocation,
     transferConnections,
     equipmentsByTrainId,
+    carStructuresByTrainId,
     carStopPositionsByPlatformId,
   } = data;
 
@@ -293,6 +307,7 @@ export default async function StationDetailPage({ params }: Props) {
       })
       .map((train) => ({
         ...train,
+        carStructure: carStructuresByTrainId[train.id] ?? null,
         freeSpaces: equipmentsByTrainId[train.id]?.freeSpaces ?? null,
         prioritySeats: equipmentsByTrainId[train.id]?.prioritySeats ?? null,
       }));

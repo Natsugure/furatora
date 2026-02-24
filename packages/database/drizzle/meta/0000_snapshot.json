@@ -1,11 +1,11 @@
 {
-  "id": "f3faaf51-5542-499a-b097-61a667a565b0",
+  "id": "2838ddd5-b22d-41bb-8bdb-e1842b051795",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.lines": {
-      "name": "lines",
+    "public.facility_connections": {
+      "name": "facility_connections",
       "schema": "",
       "columns": {
         "id": {
@@ -15,35 +15,23 @@
           "notNull": true,
           "default": "uuid_generate_v7()"
         },
-        "gtfs_route_id": {
-          "name": "gtfs_route_id",
-          "type": "varchar(10)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "short_name": {
-          "name": "short_name",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "long_name": {
-          "name": "long_name",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "color": {
-          "name": "color",
-          "type": "varchar(6)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "operators": {
-          "name": "operators",
+        "platform_location_id": {
+          "name": "platform_location_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "connected_station_id": {
+          "name": "connected_station_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exit_label": {
+          "name": "exit_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -55,12 +43,25 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "lines_operators_operators_id_fk": {
-          "name": "lines_operators_operators_id_fk",
-          "tableFrom": "lines",
-          "tableTo": "operators",
+        "facility_connections_platform_location_id_platform_locations_id_fk": {
+          "name": "facility_connections_platform_location_id_platform_locations_id_fk",
+          "tableFrom": "facility_connections",
+          "tableTo": "platform_locations",
           "columnsFrom": [
-            "operators"
+            "platform_location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "facility_connections_connected_station_id_stations_id_fk": {
+          "name": "facility_connections_connected_station_id_stations_id_fk",
+          "tableFrom": "facility_connections",
+          "tableTo": "stations",
+          "columnsFrom": [
+            "connected_station_id"
           ],
           "columnsTo": [
             "id"
@@ -71,12 +72,311 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uniqueRoutePerOperator": {
-          "name": "uniqueRoutePerOperator",
+        "unique_facility_connection": {
+          "name": "unique_facility_connection",
           "nullsNotDistinct": false,
           "columns": [
-            "gtfs_route_id",
-            "operators"
+            "platform_location_id",
+            "connected_station_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.facility_types": {
+      "name": "facility_types",
+      "schema": "",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "varchar(20)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.line_directions": {
+      "name": "line_directions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "line_id": {
+          "name": "line_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction_type": {
+          "name": "direction_type",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "representative_station_id": {
+          "name": "representative_station_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name_en": {
+          "name": "display_name_en",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terminal_station_ids": {
+          "name": "terminal_station_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "line_directions_line_id_lines_id_fk": {
+          "name": "line_directions_line_id_lines_id_fk",
+          "tableFrom": "line_directions",
+          "tableTo": "lines",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "line_directions_representative_station_id_stations_id_fk": {
+          "name": "line_directions_representative_station_id_stations_id_fk",
+          "tableFrom": "line_directions",
+          "tableTo": "stations",
+          "columnsFrom": [
+            "representative_station_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lines": {
+      "name": "lines",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "odpt_railway_id": {
+          "name": "odpt_railway_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "line_code": {
+          "name": "line_code",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_kana": {
+          "name": "name_kana",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_en": {
+          "name": "name_en",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "color": {
+          "name": "color",
+          "type": "varchar(7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "lines_operator_id_operators_id_fk": {
+          "name": "lines_operator_id_operators_id_fk",
+          "tableFrom": "lines",
+          "tableTo": "operators",
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "lines_slug_unique": {
+          "name": "lines_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        },
+        "uniqueRailwayPerOperator": {
+          "name": "uniqueRailwayPerOperator",
+          "nullsNotDistinct": false,
+          "columns": [
+            "odpt_railway_id",
+            "operator_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.odpt_metadata": {
+      "name": "odpt_metadata",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "operator": {
+          "name": "operator",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "railway_hash": {
+          "name": "railway_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "station_hash": {
+          "name": "station_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "odpt_metadata_operator_unique": {
+          "name": "odpt_metadata_operator_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "operator"
           ]
         }
       },
@@ -101,9 +401,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "gtfs_agency_id": {
-          "name": "gtfs_agency_id",
+        "odpt_operator_id": {
+          "name": "odpt_operator_id",
           "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_priority": {
+          "name": "display_priority",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -131,8 +437,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.station_accessibility": {
-      "name": "station_accessibility",
+    "public.platform_car_stop_positions": {
+      "name": "platform_car_stop_positions",
       "schema": "",
       "columns": {
         "id": {
@@ -142,21 +448,94 @@
           "notNull": true,
           "default": "uuid_generate_v7()"
         },
-        "station_id": {
-          "name": "station_id",
+        "platform_id": {
+          "name": "platform_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "elevators": {
-          "name": "elevators",
-          "type": "jsonb",
+        "car_count": {
+          "name": "car_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference_car_number": {
+          "name": "reference_car_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference_platform_cell": {
+          "name": "reference_platform_cell",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction": {
+          "name": "direction",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "platform_car_stop_positions_platform_id_platforms_id_fk": {
+          "name": "platform_car_stop_positions_platform_id_platforms_id_fk",
+          "tableFrom": "platform_car_stop_positions",
+          "tableTo": "platforms",
+          "columnsFrom": [
+            "platform_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_platform_car_stop": {
+          "name": "unique_platform_car_stop",
+          "nullsNotDistinct": false,
+          "columns": [
+            "platform_id",
+            "car_count"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_locations": {
+      "name": "platform_locations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "platform_id": {
+          "name": "platform_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "near_platform_cell": {
+          "name": "near_platform_cell",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "accessible_routes": {
-          "name": "accessible_routes",
-          "type": "jsonb",
+        "exits": {
+          "name": "exits",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -165,13 +544,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "verified": {
-          "name": "verified",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -190,15 +562,371 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "station_accessibility_station_id_stations_id_fk": {
-          "name": "station_accessibility_station_id_stations_id_fk",
-          "tableFrom": "station_accessibility",
+        "platform_locations_platform_id_platforms_id_fk": {
+          "name": "platform_locations_platform_id_platforms_id_fk",
+          "tableFrom": "platform_locations",
+          "tableTo": "platforms",
+          "columnsFrom": [
+            "platform_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platforms": {
+      "name": "platforms",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "station_id": {
+          "name": "station_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_number": {
+          "name": "platform_number",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_id": {
+          "name": "line_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inbound_direction_id": {
+          "name": "inbound_direction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outbound_direction_id": {
+          "name": "outbound_direction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_car_count": {
+          "name": "max_car_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_side": {
+          "name": "platform_side",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "platforms_station_id_stations_id_fk": {
+          "name": "platforms_station_id_stations_id_fk",
+          "tableFrom": "platforms",
           "tableTo": "stations",
           "columnsFrom": [
             "station_id"
           ],
           "columnsTo": [
             "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platforms_line_id_lines_id_fk": {
+          "name": "platforms_line_id_lines_id_fk",
+          "tableFrom": "platforms",
+          "tableTo": "lines",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platforms_inbound_direction_id_line_directions_id_fk": {
+          "name": "platforms_inbound_direction_id_line_directions_id_fk",
+          "tableFrom": "platforms",
+          "tableTo": "line_directions",
+          "columnsFrom": [
+            "inbound_direction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platforms_outbound_direction_id_line_directions_id_fk": {
+          "name": "platforms_outbound_direction_id_line_directions_id_fk",
+          "tableFrom": "platforms",
+          "tableTo": "line_directions",
+          "columnsFrom": [
+            "outbound_direction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.station_connections": {
+      "name": "station_connections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "station_id": {
+          "name": "station_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "connected_station_id": {
+          "name": "connected_station_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connected_railway_id": {
+          "name": "connected_railway_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "odpt_station_id": {
+          "name": "odpt_station_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "odpt_railway_id": {
+          "name": "odpt_railway_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stroller_difficulty": {
+          "name": "stroller_difficulty",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wheelchair_difficulty": {
+          "name": "wheelchair_difficulty",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes_about_stroller": {
+          "name": "notes_about_stroller",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes_about_wheelchair": {
+          "name": "notes_about_wheelchair",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "station_connections_station_id_stations_id_fk": {
+          "name": "station_connections_station_id_stations_id_fk",
+          "tableFrom": "station_connections",
+          "tableTo": "stations",
+          "columnsFrom": [
+            "station_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "station_connections_connected_station_id_stations_id_fk": {
+          "name": "station_connections_connected_station_id_stations_id_fk",
+          "tableFrom": "station_connections",
+          "tableTo": "stations",
+          "columnsFrom": [
+            "connected_station_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "station_connections_connected_railway_id_lines_id_fk": {
+          "name": "station_connections_connected_railway_id_lines_id_fk",
+          "tableFrom": "station_connections",
+          "tableTo": "lines",
+          "columnsFrom": [
+            "connected_railway_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.station_facilities": {
+      "name": "station_facilities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "platform_location_id": {
+          "name": "platform_location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type_code": {
+          "name": "type_code",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_wheelchair_accessible": {
+          "name": "is_wheelchair_accessible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "is_stroller_accessible": {
+          "name": "is_stroller_accessible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "station_facilities_platform_location_id_platform_locations_id_fk": {
+          "name": "station_facilities_platform_location_id_platform_locations_id_fk",
+          "tableFrom": "station_facilities",
+          "tableTo": "platform_locations",
+          "columnsFrom": [
+            "platform_location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "station_facilities_type_code_facility_types_code_fk": {
+          "name": "station_facilities_type_code_facility_types_code_fk",
+          "tableFrom": "station_facilities",
+          "tableTo": "facility_types",
+          "columnsFrom": [
+            "type_code"
+          ],
+          "columnsTo": [
+            "code"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -225,6 +953,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "station_order": {
+          "name": "station_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -281,9 +1015,15 @@
           "notNull": true,
           "default": "uuid_generate_v7()"
         },
-        "gtfs_stop_id": {
-          "name": "gtfs_stop_id",
-          "type": "varchar(10)",
+        "odpt_station_id": {
+          "name": "odpt_station_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -299,6 +1039,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "name_kana": {
+          "name": "name_kana",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name_en": {
+          "name": "name_en",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "lat": {
           "name": "lat",
           "type": "numeric(9, 6)",
@@ -311,17 +1063,17 @@
           "primaryKey": false,
           "notNull": false
         },
-        "wheelchair_boarding": {
-          "name": "wheelchair_boarding",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "operators": {
-          "name": "operators",
+        "operator_id": {
+          "name": "operator_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -340,12 +1092,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "stations_operators_operators_id_fk": {
-          "name": "stations_operators_operators_id_fk",
+        "stations_operator_id_operators_id_fk": {
+          "name": "stations_operator_id_operators_id_fk",
           "tableFrom": "stations",
           "tableTo": "operators",
           "columnsFrom": [
-            "operators"
+            "operator_id"
           ],
           "columnsTo": [
             "id"
@@ -356,12 +1108,156 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "uniqueStopPerOperator": {
-          "name": "uniqueStopPerOperator",
+        "stations_slug_unique": {
+          "name": "stations_slug_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "gtfs_stop_id",
-            "operators"
+            "slug"
+          ]
+        },
+        "uniqueStationPerOperator": {
+          "name": "uniqueStationPerOperator",
+          "nullsNotDistinct": false,
+          "columns": [
+            "odpt_station_id",
+            "operator_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.train_car_structures": {
+      "name": "train_car_structures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "train_id": {
+          "name": "train_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "car_number": {
+          "name": "car_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "door_count": {
+          "name": "door_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "train_car_structures_train_id_trains_id_fk": {
+          "name": "train_car_structures_train_id_trains_id_fk",
+          "tableFrom": "train_car_structures",
+          "tableTo": "trains",
+          "columnsFrom": [
+            "train_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_train_car_structure": {
+          "name": "unique_train_car_structure",
+          "nullsNotDistinct": false,
+          "columns": [
+            "train_id",
+            "car_number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.train_equipments": {
+      "name": "train_equipments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v7()"
+        },
+        "train_id": {
+          "name": "train_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "car_number": {
+          "name": "car_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "near_door": {
+          "name": "near_door",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_standard": {
+          "name": "is_standard",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "train_equipments_train_id_trains_id_fk": {
+          "name": "train_equipments_train_id_trains_id_fk",
+          "tableFrom": "train_equipments",
+          "tableTo": "trains",
+          "columnsFrom": [
+            "train_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_train_equipment": {
+          "name": "unique_train_equipment",
+          "nullsNotDistinct": false,
+          "columns": [
+            "train_id",
+            "type",
+            "car_number",
+            "near_door"
           ]
         }
       },
@@ -398,9 +1294,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "free_spaces": {
-          "name": "free_spaces",
-          "type": "jsonb",
+        "car_count": {
+          "name": "car_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limited_to_platform_ids": {
+          "name": "limited_to_platform_ids",
+          "type": "uuid[]",
           "primaryKey": false,
           "notNull": false
         },

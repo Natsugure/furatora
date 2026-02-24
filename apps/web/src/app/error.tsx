@@ -12,7 +12,9 @@ type Props = {
 
 export default function ErrorPage({ error, reset }: Props) {
   useEffect(() => {
-    // エラー内容はサーバーログに記録されるため、ここでは何もしない
+    // サーバーコンポーネント由来のエラーは Next.js がサーバー側で自動記録する。
+    // クライアントコンポーネント由来のエラーは現状ここでは収集していない。
+    // 将来的に Sentry 等を導入する場合はここで captureException を呼び出す。
     void error;
   }, [error]);
 
