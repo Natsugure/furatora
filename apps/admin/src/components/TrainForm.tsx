@@ -5,7 +5,9 @@ import { useState, useEffect, useRef } from 'react';
 import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 
 type Operator = { id: string; name: string };
-type Line = { id: string; name: string; nameEn: string ; operatorId: string };
+type Line = { id: string; name: string; nameEn: string; operatorId: string };
+type PickerStation = { id: string; name: string };
+type PickerPlatform = { id: string; platformNumber: number };
 
 type TrainData = {
   id?: string;
@@ -45,20 +47,38 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
   const [freeSpaces, setFreeSpaces] = useState<FreeSpace[]>(initialData?.freeSpaces ?? []);
   const [prioritySeats, setPrioritySeats] = useState<PrioritySeat[]>(initialData?.prioritySeats ?? []);
-  const [limitedToPlatformIdsText, setLimitedToPlatformIdsText] = useState(
-    initialData?.limitedToPlatformIds ? JSON.stringify(initialData.limitedToPlatformIds, null, 2) : ''
-  );
+  const [limitedToPlatformIds, setLimitedToPlatformIds] = useState<string[]>(initialData?.limitedToPlatformIds ?? []);
+  const [platformLabels, setPlatformLabels] = useState<Record<string, string>>({});
+  const [pickerLineId, setPickerLineId] = useState<string | null>(null);
+  const [pickerStationId, setPickerStationId] = useState<string | null>(null);
+  const [pickerPlatformId, setPickerPlatformId] = useState<string | null>(null);
+  const [pickerStations, setPickerStations] = useState<PickerStation[]>([]);
+  const [pickerPlatforms, setPickerPlatforms] = useState<PickerPlatform[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetch('/api/operators').then((r) => r.json()).then(setOperators);
     fetch('/api/lines').then((r) => r.json()).then(setAllLines);
+    const initialIds = initialData?.limitedToPlatformIds;
+    if (initialIds && initialIds.length > 0) {
+      fetch(`/api/platforms?ids=${initialIds.join(',')}`)
+        .then(r => r.json() as Promise<{ id: string; platformNumber: number; stationName: string; lineName: string }[]>)
+        .then(data => {
+          const labels: Record<string, string> = {};
+          for (const p of data) {
+            labels[p.id] = `${p.lineName} > ${p.stationName} > ${p.platformNumber}番ホーム`;
+          }
+          setPlatformLabels(labels);
+        });
+    }
   }, []);
 
-  const filteredLines = allLines.filter((l) => 
+  const filteredLines = allLines.filter((l) =>
     l.name.toLowerCase().includes(searchLinesText.toLowerCase()) ||
     l.nameEn?.toLowerCase().includes(searchLinesText.toLowerCase())
-  ); 
+  );
+
+  const pickerAvailableLines = allLines.filter(l => selectedLineIds.includes(l.id));
 
   const dropdownRef=useRef<HTMLDivElement>(null);
 
@@ -99,20 +119,44 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
     setPrioritySeats((prev) => prev.map((ps, i) => (i === index ? { ...ps, [field]: value } : ps)));
   }
 
+  function selectPickerLine(lineId: string) {
+    setPickerLineId(lineId);
+    setPickerStationId(null);
+    setPickerPlatformId(null);
+    setPickerStations([]);
+    setPickerPlatforms([]);
+    fetch(`/api/stations?lineId=${lineId}`)
+      .then(r => r.json() as Promise<PickerStation[]>)
+      .then(setPickerStations);
+  }
+
+  function selectPickerStation(stationId: string) {
+    setPickerStationId(stationId);
+    setPickerPlatformId(null);
+    setPickerPlatforms([]);
+    fetch(`/api/stations/${stationId}/platforms`)
+      .then(r => r.json() as Promise<PickerPlatform[]>)
+      .then(setPickerPlatforms);
+  }
+
+  function addPickerPlatform() {
+    if (!pickerPlatformId || limitedToPlatformIds.includes(pickerPlatformId)) return;
+    const platformId = pickerPlatformId;
+    const line = allLines.find(l => l.id === pickerLineId);
+    const station = pickerStations.find(s => s.id === pickerStationId);
+    const platform = pickerPlatforms.find(p => p.id === platformId);
+    const label = `${line?.name ?? ''} > ${station?.name ?? ''} > ${platform?.platformNumber ?? ''}番ホーム`;
+    setLimitedToPlatformIds(prev => [...prev, platformId]);
+    setPlatformLabels(prev => ({ ...prev, [platformId]: label }));
+  }
+
+  function removeLimitedPlatform(id: string) {
+    setLimitedToPlatformIds(prev => prev.filter(p => p !== id));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-
-    let limitedToPlatformIds: string[] | null = null;
-    if (limitedToPlatformIdsText.trim()) {
-      try {
-        limitedToPlatformIds = JSON.parse(limitedToPlatformIdsText);
-      } catch {
-        alert('走行制限ホームIDのJSON形式が不正です');
-        setSubmitting(false);
-        return;
-      }
-    }
 
     const payload = {
       name,
@@ -122,7 +166,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
       carStructure: carStructures.length > 0 ? carStructures : null,
       freeSpaces: freeSpaces.length > 0 ? freeSpaces : null,
       prioritySeats: prioritySeats.length > 0 ? prioritySeats : null,
-      limitedToPlatformIds,
+      limitedToPlatformIds: limitedToPlatformIds.length > 0 ? limitedToPlatformIds : null,
     };
 
     const url = isEdit ? `/api/trains/${initialData!.id}` : '/api/trains';
@@ -325,17 +369,90 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
       {/* Limited To Platform IDs */}
       <div>
-        <label className="block text-sm font-medium mb-1">
-          走行制限ホームID
-          <span className="ml-1 text-xs text-gray-500 font-normal">(JSON配列。区間限定運用のみ。制限なしの場合は空欄)</span>
+        <label className="block text-sm font-medium mb-2">
+          走行制限ホーム
+          <span className="ml-1 text-xs text-gray-500 font-normal">(区間限定運用のみ。制限なしの場合は空欄)</span>
         </label>
-        <textarea
-          value={limitedToPlatformIdsText}
-          onChange={(e) => setLimitedToPlatformIdsText(e.target.value)}
-          placeholder={'["platform-uuid-1", "platform-uuid-2"]'}
-          rows={3}
-          className="w-full border rounded px-3 py-2 font-mono text-sm"
-        />
+
+        {/* Column picker */}
+        {pickerAvailableLines.length > 0 ? (
+          <>
+            <div className="flex border rounded text-sm mb-2 divide-x h-48">
+              {/* Column 1: Lines */}
+              <div className="w-1/3 overflow-y-auto">
+                {pickerAvailableLines.map(line => (
+                  <button
+                    key={line.id}
+                    type="button"
+                    onClick={() => selectPickerLine(line.id)}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-gray-100 ${pickerLineId === line.id ? 'bg-blue-100 text-blue-700 font-medium' : ''}`}
+                  >
+                    {line.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Column 2: Stations */}
+              <div className="w-1/3 overflow-y-auto">
+                {pickerStations.map(station => (
+                  <button
+                    key={station.id}
+                    type="button"
+                    onClick={() => selectPickerStation(station.id)}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-gray-100 ${pickerStationId === station.id ? 'bg-blue-100 text-blue-700 font-medium' : ''}`}
+                  >
+                    {station.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Column 3: Platforms */}
+              <div className="w-1/3 overflow-y-auto">
+                {pickerPlatforms.map(platform => (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => setPickerPlatformId(platform.id)}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-gray-100 ${pickerPlatformId === platform.id ? 'bg-blue-100 text-blue-700 font-medium' : ''}`}
+                  >
+                    {platform.platformNumber}番ホーム
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={addPickerPlatform}
+              disabled={!pickerPlatformId || limitedToPlatformIds.includes(pickerPlatformId)}
+              className="mb-3 px-3 py-1.5 text-sm bg-blue-600 text-white rounded disabled:opacity-40 hover:bg-blue-700"
+            >
+              追加
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-gray-400 mb-3">路線を選択してからホームを追加してください</p>
+        )}
+
+        {/* Added platforms list */}
+        {limitedToPlatformIds.length === 0 ? (
+          <p className="text-sm text-gray-400">走行制限なし</p>
+        ) : (
+          <ul className="space-y-1">
+            {limitedToPlatformIds.map(id => (
+              <li key={id} className="flex items-center justify-between text-sm bg-gray-50 border rounded px-3 py-1.5">
+                <span>{platformLabels[id] ?? id}</span>
+                <button
+                  type="button"
+                  onClick={() => removeLimitedPlatform(id)}
+                  className="text-red-500 hover:text-red-700 text-xs ml-4 flex-shrink-0"
+                >
+                  削除
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Submit */}

@@ -28,7 +28,6 @@ export function StationSearch() {
   useEffect(() => {
     if (!debouncedQuery) return;
     let cancelled = false;
-    setHasError(false);
     fetch(`/api/v1/stations?q=${encodeURIComponent(debouncedQuery)}`)
       .then((res) => {
         if (!res.ok) throw new Error('fetch failed');
@@ -57,7 +56,7 @@ export function StationSearch() {
         <input
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setHasError(false); }}
           placeholder="駅名で検索（例：茅場町）"
           className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
         />

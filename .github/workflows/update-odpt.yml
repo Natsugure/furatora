@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Update GTFS data
+      - name: Update ODPT Data
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ODPT_API_KEY: ${{ secrets.ODPT_API_KEY }}

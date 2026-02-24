@@ -12,7 +12,8 @@
       "Bash(find:*)",
       "Bash(pnpm run lint:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git ls-files:*)"
     ]
   }
 }

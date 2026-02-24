@@ -145,8 +145,7 @@ async function updateOdptData(operator: Operator) {
     .then(rows => rows[0]);
 
   if (!operatorRecord) {
-    console.error(`${operator}: Operator record not found in database`);
-    return;
+    throw new Error(`${operator}: Operator record not found in database`);
   }
 
   await db.transaction(async (tx) => {
