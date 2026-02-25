@@ -1,0 +1,28 @@
+{
+  "name": "@furatora/database",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    "./client": "./src/client.ts",
+    "./schema": "./src/schema.ts",
+    "./enums": "./src/enums.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1"
+  },
+  "devDependencies": {
+    "@furatora/typescript-config": "workspace:*",
+    "drizzle-kit": "^0.31.8",
+    "postgres": "^3.4.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

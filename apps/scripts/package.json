@@ -1,0 +1,18 @@
+{
+  "name": "scripts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "update-odpt": "tsx src/update-odpt.ts",
+    "seed": "tsx src/seed-master-data.ts"
+  },
+  "dependencies": {
+    "@furatora/database": "workspace:*",
+    "drizzle-orm": "^0.45.1"
+  },
+  "devDependencies": {
+    "@furatora/typescript-config": "workspace:*",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
