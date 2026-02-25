@@ -6,7 +6,28 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["DATABASE_URL", "NODE_ENV", "AUTH_SECRET", "AUTH_TRUST_HOST", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET"]
+      "env": [
+        "DATABASE_URL",
+        "DATABASE_URL_UNPOOLED",
+        "NODE_ENV",
+        "AUTH_SECRET",
+        "AUTH_TRUST_HOST",
+        "AUTH_GITHUB_ID",
+        "AUTH_GITHUB_SECRET",
+        "PGHOST",
+        "PGHOST_UNPOOLED",
+        "PGUSER",
+        "PGDATABASE",
+        "PGPASSWORD",
+        "POSTGRES_URL",
+        "POSTGRES_URL_NON_POOLING",
+        "POSTGRES_USER",
+        "POSTGRES_HOST",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_DATABASE",
+        "POSTGRES_URL_NO_SSL",
+        "POSTGRES_PRISMA_URL"
+      ]
     },
     "dev": {
       "cache": false,

@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pg_uuidv7;
+--> statement-breakpoint
 CREATE TABLE "facility_connections" (
 	"id" uuid PRIMARY KEY DEFAULT uuid_generate_v7() NOT NULL,
 	"platform_location_id" uuid NOT NULL,
