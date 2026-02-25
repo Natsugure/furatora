@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import Link from 'next/link';
-import { Accessibility, Baby, Train } from 'lucide-react';
+import Image from 'next/image';
+import { Train } from 'lucide-react';
 import { Providers } from './providers';
 import { Container } from '@/components/ui/Container';
 import '@mantine/core/styles.css';
 import './globals.css';
+import iconSvg from './icon.svg';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
@@ -28,8 +30,7 @@ export default function RootLayout({
             <Container className="h-20 flex items-center justify-between">
               <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                 <div className="flex items-end gap-1 text-blue-500">
-                  <Accessibility size={30} />
-                  <Baby size={26} />
+                  <Image src={iconSvg} alt="ふらとらアイコン" width={30} height={30} unoptimized />
                 </div>
                 <div>
                   <p className="font-bold text-lg leading-tight text-gray-900">

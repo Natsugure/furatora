@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import postgres from 'postgres';
-import { neon, neonConfig } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 import { drizzle as drizzleHttp } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import * as schema from './schema';
 
-let connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error('DATABASE_URL is not defined');
