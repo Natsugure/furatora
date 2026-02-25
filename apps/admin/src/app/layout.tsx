@@ -6,6 +6,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Admin - ふらとら',
   description: 'Administration panel',
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default async function RootLayout({

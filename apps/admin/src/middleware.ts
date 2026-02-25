@@ -11,6 +11,10 @@ export default auth((req) => {
     }
     return NextResponse.redirect(new URL('/login', req.url));
   }
+
+  const response = NextResponse.next();
+  response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return response;
 });
 
 export const config = {
