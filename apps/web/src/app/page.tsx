@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { Train } from 'lucide-react';
 import { db } from '@furatora/database/client';
 import { operators, lines } from '@furatora/database/schema';
