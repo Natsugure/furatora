@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
+import { GoogleAnalytics } from '@next/third-parties/google';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Train } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function RootLayout({
           </footer>
         </Providers>
       </body>
+      <GoogleAnalytics gaId={process.env.GA_ID || ''} />
     </html>
   );
 }
