@@ -61,7 +61,9 @@ export default function RootLayout({
           </footer>
         </Providers>
       </body>
-      <GoogleAnalytics gaId={process.env.GA_ID || ''} />
+      { process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_GA_ID && (
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID } />
+      )}
     </html>
   );
 }

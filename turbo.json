@@ -27,7 +27,7 @@
         "POSTGRES_DATABASE",
         "POSTGRES_URL_NO_SSL",
         "POSTGRES_PRISMA_URL",
-        "GA_ID"
+        "NEXT_PUBLIC_GA_ID"
       ]
     },
     "dev": {
