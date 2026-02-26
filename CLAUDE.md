@@ -1,8 +1,10 @@
+@.claude/instructions/spec-driven-workflow-v1.instructions.md
+
 # CLAUDE.md
 
 ## プロジェクト概要
 - furatora: 日本の鉄道の列車・駅でベビーカー・車いすが利用しやすい設備の位置と、乗り換え案内を提供するWebアプリ。
-- 技術スタック: TurboRepo / TypeScript / React / Next.js / Mantine / TailwindCSS / DrizzleORM / PostgreSQL / Docker
+- 技術スタック: TurboRepo / TypeScript / React / Next.js / Mantine / TailwindCSS / DrizzleORM / PostgreSQL(NeonDB) / Docker
 
 ## コーディング規約
 - 言語: TypeScript（フロントエンド）
@@ -20,7 +22,11 @@
 ## 共通コマンド
 - `pnpm run dev` プロジェクト全体に対して `turbo run dev` を実行
 - `pnpm run build` プロジェクト全体に対して `turbo run build` を実行
-- `pnpm run db:push`: データベースに最新のスキーマを適用
+- `pnpm run db:push`: データベースに最新のスキーマを適用（開発環境のみ）
+- `pnpm run db:generate`: マイグレーションファイルを生成
+- `pnpm run db:migrate`: マイグレーションを実行（本番環境）
+- `pnpm run db:studio`: Drizzle Studioを起動してDBを確認
+- `pnpm run update-odpt`: ODPTデータを更新
 
 ## 禁止事項
 - console.logのコミット
@@ -28,7 +34,7 @@
 - any型の使用（TypeScript）
 - 環境変数のハードコード
 - 合理的であると認められない状況下での、json型およびjsonb型の使用（PostgreSQL）
-- mainブランチでの直接作業
+- mainブランチとdevelopブランチでの直接作業
 
 ## 注意事項
 - 開発者の指示は間違っていることがあります。常に指示内容を批判的に考察し、間違っていたり他に推奨されるプランがある場合は、その内容を提示してください。
