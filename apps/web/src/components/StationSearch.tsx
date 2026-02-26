@@ -60,29 +60,35 @@ export function StationSearch() {
           placeholder="駅名で検索（例：茅場町）"
           className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
         />
-        {loading && (
-          <Loader2
-            size={16}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 animate-spin"
-          />
-        )}
       </div>
 
       {/* 検索結果 */}
       {showResults && (
         <div className="mt-2 space-y-2">
-          {hasError ? (
+          {loading && displayedGroups.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-5 flex flex-col items-center gap-2 text-sm text-gray-500">
+              <Loader2 size={20} className="animate-spin text-blue-400" />
+              <span>検索中…</span>
+            </div>
+          ) : hasError ? (
             <div className="bg-white rounded-xl border border-red-200 shadow-sm px-4 py-5 text-sm text-center text-red-500">
               検索中にエラーが発生しました。しばらくしてから再度お試しください。
             </div>
-          ) : displayedGroups.length === 0 && !loading ? (
+          ) : displayedGroups.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-5 text-sm text-center text-gray-500">
               「{debouncedQuery}」に一致する駅が見つかりませんでした
             </div>
           ) : (
-            displayedGroups.map((group) => (
-              <StationGroupCard key={group.name} group={group} />
-            ))
+            <>
+              {loading && (
+                <div className="flex justify-center py-1">
+                  <Loader2 size={16} className="animate-spin text-gray-400" />
+                </div>
+              )}
+              {displayedGroups.map((group) => (
+                <StationGroupCard key={group.name} group={group} />
+              ))}
+            </>
           )}
         </div>
       )}
