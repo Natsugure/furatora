@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { NavLink, Stack, Button } from '@mantine/core';
 import { logout } from '@/actions';
 
 const navItems = [
@@ -12,45 +13,44 @@ const navItems = [
   { href: '/unresolved-connections', label: '未解決接続' },
 ];
 
-export function Sidebar() {
+type Props = {
+  onNavigate?: () => void;
+};
+
+export function Sidebar({ onNavigate }: Props) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 min-h-screen bg-[var(--sidebar-bg)] text-[var(--sidebar-text)] flex flex-col">
-      <div className="p-4 border-b border-slate-600">
-        <h1 className="text-lg font-bold">Admin</h1>
-      </div>
-      <nav className="flex-1 p-2">
+    <Stack justify="space-between" h="100%">
+      <div>
         {navItems.map((item) => {
           const isActive =
             item.href === '/'
               ? pathname === '/'
               : pathname.startsWith(item.href);
           return (
-            <Link
+            <NavLink
               key={item.href}
+              component={Link}
               href={item.href}
-              className={`block px-3 py-2 rounded text-sm ${
-                isActive
-                  ? 'bg-slate-700 text-white font-medium'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`}
-            >
-              {item.label}
-            </Link>
+              label={item.label}
+              active={isActive}
+              onClick={onNavigate}
+            />
           );
         })}
-      </nav>
-      <div className="p-2 border-t border-slate-600">
-        <form action={logout}>
-          <button
-            type="submit"
-            className="w-full px-3 py-2 rounded text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white text-left"
-          >
-            ログアウト
-          </button>
-        </form>
       </div>
-    </aside>
+      <form action={logout}>
+        <Button
+          type="submit"
+          variant="subtle"
+          color="gray"
+          fullWidth
+          justify="flex-start"
+        >
+          ログアウト
+        </Button>
+      </form>
+    </Stack>
   );
 }

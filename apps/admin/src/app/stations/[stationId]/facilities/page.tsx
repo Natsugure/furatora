@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import {
@@ -11,8 +10,12 @@ import {
   facilityTypes,
 } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
+import {
+  Badge, Card, Group, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title,
+} from '@mantine/core';
 import { DeleteButton } from '@/components/DeleteButton';
 import { FacilityDuplicateButton } from '@/components/FacilityDuplicateButton';
+import { LinkAnchor, LinkButton } from '@/components/LinkElements';
 
 export default async function FacilitiesPage({
   params,
@@ -109,97 +112,90 @@ export default async function FacilitiesPage({
 
   return (
     <div>
-      <div className="mb-6">
-        <Link href="/stations" className="text-sm text-blue-600 hover:underline">
-          &larr; Back to Stations
-        </Link>
-      </div>
+      <LinkAnchor href="/stations" size="sm" mb="lg" style={{ display: 'block' }}>
+        &larr; Back to Stations
+      </LinkAnchor>
 
-      <div className="flex items-center justify-between mb-6">
+      <Group justify="space-between" mb="lg">
         <div>
-          <h2 className="text-xl font-bold">{station.name}</h2>
+          <Title order={2}>{station.name}</Title>
           {station.nameEn && (
-            <p className="text-sm text-gray-500">{station.nameEn}</p>
+            <Text size="sm" c="dimmed">{station.nameEn}</Text>
           )}
         </div>
-        <div className="flex gap-2">
-          <Link
-            href={`/stations/${stationId}/platforms/new`}
-            className="px-4 py-2 border rounded hover:bg-gray-100 text-sm"
-          >
+        <Group gap="xs">
+          <LinkButton href={`/stations/${stationId}/platforms/new`} variant="default">
             + New Platform
-          </Link>
-          <Link
-            href={`/stations/${stationId}/facilities/new`}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
+          </LinkButton>
+          <LinkButton href={`/stations/${stationId}/facilities/new`}>
             + New Location
-          </Link>
-        </div>
-      </div>
+          </LinkButton>
+        </Group>
+      </Group>
 
       {/* Platforms Section */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-3">Platforms</h3>
+      <Stack gap="md" mb="xl">
+        <Title order={3}>Platforms</Title>
         {platformList.length === 0 ? (
-          <p className="text-gray-500 text-sm">No platforms registered yet.</p>
+          <Text size="sm" c="dimmed">No platforms registered yet.</Text>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="px-3 py-2">Platform</th>
-                  <th className="px-3 py-2">Line</th>
-                  <th className="px-3 py-2">Direction</th>
-                  <th className="px-3 py-2">Max Cars</th>
-                  <th className="px-3 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {platformList.map((platform) => {
-                  const directions = [];
-                  if (platform.inboundDirectionId) {
-                    directions.push(directionMap[platform.inboundDirectionId] ?? '上り');
-                  }
-                  if (platform.outboundDirectionId) {
-                    directions.push(directionMap[platform.outboundDirectionId] ?? '下り');
-                  }
-                  const directionText = directions.length > 0 ? directions.join(' / ') : '-';
+          <Table striped highlightOnHover withTableBorder>
+            <TableThead>
+              <TableTr>
+                <TableTh>Platform</TableTh>
+                <TableTh>Line</TableTh>
+                <TableTh>Direction</TableTh>
+                <TableTh>Max Cars</TableTh>
+                <TableTh>Actions</TableTh>
+              </TableTr>
+            </TableThead>
+            <TableTbody>
+              {platformList.map((platform) => {
+                const directions = [];
+                if (platform.inboundDirectionId) {
+                  directions.push(directionMap[platform.inboundDirectionId] ?? '上り');
+                }
+                if (platform.outboundDirectionId) {
+                  directions.push(directionMap[platform.outboundDirectionId] ?? '下り');
+                }
+                const directionText = directions.length > 0 ? directions.join(' / ') : '-';
 
-                  return (
-                    <tr key={platform.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="px-3 py-2 font-medium">{platform.platformNumber}</td>
-                      <td className="px-3 py-2">{lineNameMap[platform.lineId] ?? '-'}</td>
-                      <td className="px-3 py-2">{directionText}</td>
-                      <td className="px-3 py-2">{platform.maxCarCount}</td>
-                      <td className="px-3 py-2 flex gap-2">
-                        <Link
+                return (
+                  <TableTr key={platform.id}>
+                    <TableTd fw={500}>{platform.platformNumber}</TableTd>
+                    <TableTd>{lineNameMap[platform.lineId] ?? '-'}</TableTd>
+                    <TableTd>{directionText}</TableTd>
+                    <TableTd>{platform.maxCarCount}</TableTd>
+                    <TableTd>
+                      <Group gap="xs">
+                        <LinkButton
                           href={`/stations/${stationId}/platforms/${platform.id}/edit`}
-                          className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                          variant="default"
+                          size="compact-xs"
                         >
                           Edit
-                        </Link>
+                        </LinkButton>
                         <DeleteButton
                           endpoint={`/api/stations/${stationId}/platforms/${platform.id}`}
                           redirectTo={`/stations/${stationId}/facilities`}
                           label="Delete"
                         />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </Group>
+                    </TableTd>
+                  </TableTr>
+                );
+              })}
+            </TableTbody>
+          </Table>
         )}
-      </div>
+      </Stack>
 
       {/* Platform Locations Section - grouped by platform */}
-      <h3 className="text-lg font-semibold mb-3">Platform Locations</h3>
+      <Title order={3} mb="sm">Platform Locations</Title>
       {locationList.length === 0 ? (
-        <p className="text-gray-500">No locations registered yet.</p>
+        <Text size="sm" c="dimmed">No locations registered yet.</Text>
       ) : (
-        <div className="space-y-6">
+        <Stack gap="xl">
           {platformList.map((platform) => {
             const locations = locationsByPlatform.get(platform.id) ?? [];
             if (locations.length === 0) return null;
@@ -211,10 +207,10 @@ export default async function FacilitiesPage({
 
             return (
               <div key={platform.id}>
-                <h4 className="text-sm font-semibold text-gray-600 mb-2 border-b pb-1">
+                <Text size="sm" fw={600} c="dimmed" mb="xs" pb={4} style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
                   Platform {platform.platformNumber}{directionText}
-                </h4>
-                <div className="space-y-2">
+                </Text>
+                <Stack gap="xs">
                   {locations.map((location) => {
                     const locFacilities = facilitiesByLocation.get(location.id) ?? [];
                     const hasLimitedAccessibility = locFacilities.some(
@@ -222,49 +218,44 @@ export default async function FacilitiesPage({
                     );
 
                     return (
-                      <div key={location.id} className="bg-white rounded-lg shadow p-4">
-                        <div className="flex items-start justify-between">
+                      <Card key={location.id} withBorder padding="md">
+                        <Group justify="space-between" align="flex-start">
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
+                            <Group gap="xs" mb={4}>
                               {location.nearPlatformCell && (
-                                <span className="text-sm text-gray-500 font-medium">
+                                <Text size="sm" c="dimmed" fw={500}>
                                   枠 #{location.nearPlatformCell}
-                                </span>
+                                </Text>
                               )}
                               {hasLimitedAccessibility && (
-                                <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
+                                <Badge color="yellow" variant="light" size="sm">
                                   Limited accessibility
-                                </span>
+                                </Badge>
                               )}
-                            </div>
+                            </Group>
                             {location.exits && (
-                              <p className="text-sm text-gray-600 mb-1">{location.exits}</p>
+                              <Text size="sm" c="dimmed" mb={4}>{location.exits}</Text>
                             )}
-                            {/* Facility types list */}
-                            <div className="flex flex-wrap gap-1.5 mb-1">
+                            <Group gap={6} mb={4} wrap="wrap">
                               {locFacilities.map((f) => (
-                                <span
-                                  key={f.id}
-                                  className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded"
-                                >
+                                <Badge key={f.id} variant="light" color="gray" size="sm">
                                   {typeMap[f.typeCode] ?? f.typeCode}
-                                  {(!f.isWheelchairAccessible || !f.isStrollerAccessible) && (
-                                    <span className="ml-1 text-yellow-600">*</span>
-                                  )}
-                                </span>
+                                  {(!f.isWheelchairAccessible || !f.isStrollerAccessible) && ' *'}
+                                </Badge>
                               ))}
-                            </div>
+                            </Group>
                             {location.notes && (
-                              <p className="text-sm text-gray-400 mt-1">{location.notes}</p>
+                              <Text size="sm" c="gray.5" mt="xs">{location.notes}</Text>
                             )}
                           </div>
-                          <div className="flex gap-2">
-                            <Link
+                          <Group gap="xs">
+                            <LinkButton
                               href={`/stations/${stationId}/facilities/${location.id}/edit`}
-                              className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
+                              variant="default"
+                              size="compact-sm"
                             >
                               Edit
-                            </Link>
+                            </LinkButton>
                             <FacilityDuplicateButton
                               endpoint={`/api/stations/${stationId}/platform-locations/${location.id}/duplicate`}
                             />
@@ -272,16 +263,16 @@ export default async function FacilitiesPage({
                               endpoint={`/api/stations/${stationId}/platform-locations/${location.id}`}
                               redirectTo={`/stations/${stationId}/facilities`}
                             />
-                          </div>
-                        </div>
-                      </div>
+                          </Group>
+                        </Group>
+                      </Card>
                     );
                   })}
-                </div>
+                </Stack>
               </div>
             );
           })}
-        </div>
+        </Stack>
       )}
     </div>
   );

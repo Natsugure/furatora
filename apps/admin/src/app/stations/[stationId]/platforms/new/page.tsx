@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { stations } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
+import { Title } from '@mantine/core';
 import { PlatformForm } from '@/components/PlatformForm';
 
 export default async function NewPlatformPage({
@@ -16,7 +17,7 @@ export default async function NewPlatformPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">New Platform - {station.name}</h2>
+      <Title order={2} mb="lg">New Platform - {station.name}</Title>
       <PlatformForm stationId={stationId} />
     </div>
   );

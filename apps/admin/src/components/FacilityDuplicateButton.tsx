@@ -1,7 +1,8 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@mantine/core';
 
 type Props = {
   endpoint: string;
@@ -23,12 +24,13 @@ export function FacilityDuplicateButton({ endpoint }: Props) {
   }
 
   return (
-    <button
+    <Button
+      variant="default"
+      size="compact-sm"
+      loading={loading}
       onClick={handleDuplicate}
-      disabled={loading}
-      className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100 disabled:opacity-50"
     >
-      {loading ? '...' : 'Duplicate'}
-    </button>
+      Duplicate
+    </Button>
   );
 }

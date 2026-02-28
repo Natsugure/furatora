@@ -1,6 +1,7 @@
 import { db } from '@furatora/database/client';
 import { operators, lines, stations, trains, stationFacilities } from '@furatora/database/schema';
 import { count } from 'drizzle-orm';
+import { Card, SimpleGrid, Text, Title } from '@mantine/core';
 
 async function fetchCounts() {
   const [operatorCount] = await db.select({ count: count() }).from(operators);
@@ -31,18 +32,15 @@ export default async function Dashboard() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">Dashboard</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <Title order={2} mb="lg">Dashboard</Title>
+      <SimpleGrid cols={{ base: 2, md: 3, lg: 5 }}>
         {cards.map((card) => (
-          <div
-            key={card.label}
-            className="bg-white rounded-lg shadow p-4 text-center"
-          >
-            <p className="text-2xl font-bold">{card.value}</p>
-            <p className="text-sm text-gray-500 mt-1">{card.label}</p>
-          </div>
+          <Card key={card.label} shadow="sm" padding="lg" withBorder ta="center">
+            <Text size="xl" fw={700}>{card.value}</Text>
+            <Text size="sm" c="dimmed" mt="xs">{card.label}</Text>
+          </Card>
         ))}
-      </div>
+      </SimpleGrid>
     </div>
   );
 }

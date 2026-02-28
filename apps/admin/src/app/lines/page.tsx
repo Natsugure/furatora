@@ -1,7 +1,8 @@
-import Link from 'next/link';
 import { db } from '@furatora/database/client';
 import { lines, operators } from '@furatora/database/schema';
 import { asc } from 'drizzle-orm';
+import { LinkAnchor } from '@/components/LinkElements';
+import { Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 
 export default async function LinesPage() {
   const lineList = await db.select().from(lines).orderBy(asc(lines.displayOrder));
@@ -10,46 +11,42 @@ export default async function LinesPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">Lines</h2>
+      <Title order={2} mb="lg">Lines</Title>
 
       {lineList.length === 0 ? (
-        <p className="text-gray-500">No lines found.</p>
+        <Text c="dimmed">No lines found.</Text>
       ) : (
-        <table className="w-full bg-white rounded-lg shadow">
-          <thead>
-            <tr className="border-b text-left text-sm text-gray-500">
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Operator</th>
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table striped highlightOnHover withTableBorder>
+          <TableThead>
+            <TableTr>
+              <TableTh>Name</TableTh>
+              <TableTh>Operator</TableTh>
+              <TableTh>Code</TableTh>
+              <TableTh>Actions</TableTh>
+            </TableTr>
+          </TableThead>
+          <TableTbody>
             {lineList.map((line) => (
-              <tr key={line.id} className="border-b last:border-0 hover:bg-gray-50">
-                <td className="px-4 py-3">{line.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {operatorMap[line.operatorId] ?? '-'}
-                </td>
-                <td className="px-4 py-3 text-sm font-mono">{line.lineCode ?? '-'}</td>
-                <td className="px-4 py-3 flex gap-2">
-                  <Link
-                    href={`/lines/${line.id}/edit`}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
-                  >
+              <TableTr key={line.id}>
+                <TableTd>{line.name}</TableTd>
+                <TableTd>
+                  <Text size="sm" c="dimmed">{operatorMap[line.operatorId] ?? '-'}</Text>
+                </TableTd>
+                <TableTd>
+                  <Text size="sm" ff="monospace">{line.lineCode ?? '-'}</Text>
+                </TableTd>
+                <TableTd>
+                  <LinkAnchor href={`/lines/${line.id}/edit`} size="sm" mr="sm">
                     Edit
-                  </Link>
-                  <Link
-                    href={`/lines/${line.id}/directions`}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
-                  >
+                  </LinkAnchor>
+                  <LinkAnchor href={`/lines/${line.id}/directions`} size="sm">
                     Manage Directions
-                  </Link>
-                </td>
-              </tr>
+                  </LinkAnchor>
+                </TableTd>
+              </TableTr>
             ))}
-          </tbody>
-        </table>
+          </TableTbody>
+        </Table>
       )}
     </div>
   );

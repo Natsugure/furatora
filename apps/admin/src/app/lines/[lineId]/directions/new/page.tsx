@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { lines } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
+import { Title } from '@mantine/core';
 import { LineDirectionForm } from '@/components/LineDirectionForm';
 
 export default async function NewDirectionPage({
@@ -16,7 +17,7 @@ export default async function NewDirectionPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">New Direction - {line.name}</h2>
+      <Title order={2} mb="lg">New Direction - {line.name}</Title>
       <LineDirectionForm lineId={lineId} />
     </div>
   );

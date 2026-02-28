@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
-import { Sidebar } from '@/components/Sidebar';
+import { AdminShell } from '@/components/AdminShell';
 import { auth } from '@/auth';
 import './globals.css';
 
@@ -22,14 +22,17 @@ export default async function RootLayout({
   const session = await auth();
 
   return (
-    <html lang="ja">
+    <html lang="ja" suppressHydrationWarning>
       <head>
         <ColorSchemeScript defaultColorScheme="light" />
       </head>
-      <body className="flex">
+      <body>
         <MantineProvider defaultColorScheme="light">
-          {session && <Sidebar />}
-          <main className="flex-1 p-6">{children}</main>
+          {session ? (
+            <AdminShell>{children}</AdminShell>
+          ) : (
+            <main style={{ padding: '1.5rem' }}>{children}</main>
+          )}
         </MantineProvider>
       </body>
     </html>

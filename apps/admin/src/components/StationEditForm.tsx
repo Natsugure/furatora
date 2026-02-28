@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import { STROLLER_DIFFICULTY_META, WHEELCHAIR_DIFFICULTY_META } from '@/constants/difficulty';
+import {
+  Button, Card, Group, NativeSelect, SimpleGrid, Stack, Text, TextInput, Textarea, Title,
+} from '@mantine/core';
 
 export type ConnectionRow = {
   id: string;
@@ -41,6 +44,20 @@ function displayName(conn: ConnectionRow): string {
   const station = conn.odptStationId?.replace('odpt.Station:', '') ?? '';
   return station || railway || '(不明)';
 }
+
+const strollerOptions = [
+  { value: '', label: '— 未設定 —' },
+  ...Object.entries(STROLLER_DIFFICULTY_META)
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([key, { label }]) => ({ value: key, label })),
+];
+
+const wheelchairOptions = [
+  { value: '', label: '— 未設定 —' },
+  ...Object.entries(WHEELCHAIR_DIFFICULTY_META)
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([key, { label }]) => ({ value: key, label })),
+];
 
 export function StationEditForm({ stationId, initialNameKana, initialNotes, connections }: Props) {
   const router = useRouter();
@@ -104,156 +121,99 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
   }
 
   return (
-    <div className="max-w-3xl space-y-10">
-      {/* 駅情報 */}
-      <section className="space-y-4">
-        <h3 className="text-base font-semibold">駅情報</h3>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">よみがな - Optional</label>
-          <input
-            type="text"
+    <Stack gap="xl" maw="48rem">
+      <section>
+        <Title order={4} mb="md">駅情報</Title>
+        <Stack gap="md">
+          <TextInput
+            label="よみがな - Optional"
+            placeholder="例: かやばちょう"
             value={nameKana}
             onChange={(e) => setNameKana(e.target.value)}
-            placeholder="例: かやばちょう"
-            className="w-full border rounded px-3 py-2 text-sm"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">備考 - Optional</label>
-          <textarea
+          <Textarea
+            label="備考 - Optional"
+            placeholder="例: 東急東横線との直通運転あり"
+            rows={4}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            placeholder="例: 東急東横線との直通運転あり"
-            className="w-full border rounded px-3 py-2 text-sm"
           />
-        </div>
+        </Stack>
       </section>
 
-      {/* 乗り換え接続 */}
       <section>
-        <h3 className="text-base font-semibold mb-3">
+        <Title order={4} mb="md">
           乗り換え接続 ({connections.length}件)
-        </h3>
+        </Title>
 
         {connections.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">乗り換え接続情報がありません</p>
+          <Text size="sm" c="dimmed" fs="italic">乗り換え接続情報がありません</Text>
         ) : (
-          <div className="space-y-6">
+          <Stack gap="lg">
             {connections.map((conn) => {
               const s = connectionStates[conn.id];
               return (
-                <div key={conn.id} className="border rounded-lg p-4 bg-white">
-                  <p className="font-medium text-sm mb-4">{displayName(conn)}</p>
+                <Card key={conn.id} withBorder padding="md">
+                  <Text fw={500} size="sm" mb="md">{displayName(conn)}</Text>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        ベビーカー難易度
-                      </label>
-                      <select
-                        value={s.strollerDifficulty}
-                        onChange={(e) =>
-                          updateConnection(conn.id, {
-                            strollerDifficulty: e.target.value as StrollerDifficulty | '',
-                          })
-                        }
-                        className="w-full border rounded px-2 py-1.5 text-sm"
-                      >
-                        <option value="">— 未設定 —</option>
-                        {Object.entries(STROLLER_DIFFICULTY_META)
-                          .sort(([, a], [, b]) => a.order - b.order)
-                          .map(([key, { label }]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
+                  <SimpleGrid cols={2} mb="md">
+                    <NativeSelect
+                      label="ベビーカー難易度"
+                      data={strollerOptions}
+                      value={s.strollerDifficulty}
+                      onChange={(e) =>
+                        updateConnection(conn.id, {
+                          strollerDifficulty: e.target.value as StrollerDifficulty | '',
+                        })
+                      }
+                    />
+                    <NativeSelect
+                      label="車いす難易度"
+                      data={wheelchairOptions}
+                      value={s.wheelchairDifficulty}
+                      onChange={(e) =>
+                        updateConnection(conn.id, {
+                          wheelchairDifficulty: e.target.value as WheelchairDifficulty | '',
+                        })
+                      }
+                    />
+                  </SimpleGrid>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        車いす難易度
-                      </label>
-                      <select
-                        value={s.wheelchairDifficulty}
-                        onChange={(e) =>
-                          updateConnection(conn.id, {
-                            wheelchairDifficulty: e.target.value as WheelchairDifficulty | '',
-                          })
-                        }
-                        className="w-full border rounded px-2 py-1.5 text-sm"
-                      >
-                        <option value="">— 未設定 —</option>
-                        {Object.entries(WHEELCHAIR_DIFFICULTY_META)
-                          .sort(([, a], [, b]) => a.order - b.order)
-                          .map(([key, { label }]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        ベビーカー備考
-                      </label>
-                      <textarea
-                        value={s.notesAboutStroller}
-                        onChange={(e) =>
-                          updateConnection(conn.id, { notesAboutStroller: e.target.value })
-                        }
-                        rows={2}
-                        placeholder="例: A2出口エレベーターを利用"
-                        className="w-full border rounded px-2 py-1.5 text-sm resize-y"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        車いす備考
-                      </label>
-                      <textarea
-                        value={s.notesAboutWheelchair}
-                        onChange={(e) =>
-                          updateConnection(conn.id, { notesAboutWheelchair: e.target.value })
-                        }
-                        rows={2}
-                        placeholder="例: 駅員への申告が必要"
-                        className="w-full border rounded px-2 py-1.5 text-sm resize-y"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  <SimpleGrid cols={2}>
+                    <Textarea
+                      label="ベビーカー備考"
+                      placeholder="例: A2出口エレベーターを利用"
+                      rows={2}
+                      value={s.notesAboutStroller}
+                      onChange={(e) =>
+                        updateConnection(conn.id, { notesAboutStroller: e.target.value })
+                      }
+                    />
+                    <Textarea
+                      label="車いす備考"
+                      placeholder="例: 駅員への申告が必要"
+                      rows={2}
+                      value={s.notesAboutWheelchair}
+                      onChange={(e) =>
+                        updateConnection(conn.id, { notesAboutWheelchair: e.target.value })
+                      }
+                    />
+                  </SimpleGrid>
+                </Card>
               );
             })}
-          </div>
+          </Stack>
         )}
       </section>
 
-      {/* 一括保存ボタン */}
-      <div className="flex gap-3 pt-2">
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={handleSave}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push('/stations')}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
+      <Group gap="sm">
+        <Button loading={submitting} onClick={handleSave}>
+          Save
+        </Button>
+        <Button variant="default" onClick={() => router.push('/stations')}>
           Cancel
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Group>
+    </Stack>
   );
 }

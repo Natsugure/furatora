@@ -1,8 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
+import {
+  Button, Card, Checkbox, Group, MultiSelect, NativeSelect, NavLink,
+  NumberInput, ScrollArea, SimpleGrid, Stack, Text, TextInput,
+} from '@mantine/core';
 
 type Operator = { id: string; name: string };
 type Line = { id: string; name: string; nameEn: string; operatorId: string };
@@ -31,8 +35,6 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [operators, setOperators] = useState<Operator[]>([]);
   const [allLines, setAllLines] = useState<Line[]>([]);
   const [name, setName] = useState(initialData?.name ?? '');
-  const [searchLinesText, setSearchLinesText] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
   const [operatorId, setOperatorId] = useState(initialData?.operatorId ?? '');
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>(initialData?.lineIds ?? []);
   const [carCount, setCarCount] = useState(initialData?.carCount ?? 10);
@@ -73,34 +75,10 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
     }
   }, []);
 
-  const filteredLines = allLines.filter((l) =>
-    l.name.toLowerCase().includes(searchLinesText.toLowerCase()) ||
-    l.nameEn?.toLowerCase().includes(searchLinesText.toLowerCase())
-  );
-
   const pickerAvailableLines = allLines.filter(l => selectedLineIds.includes(l.id));
 
-  const dropdownRef=useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  function toggleLine(lineId: string) {
-    setSelectedLineIds((prev) =>
-      prev.includes(lineId) ? prev.filter((id) => id !== lineId) : [...prev, lineId]
-    );
-  }
-
   function addFreeSpace() {
-    setFreeSpaces((prev) => [...prev, { carNumber: 1, nearDoor: 1,  isStandard: true }]);
+    setFreeSpaces((prev) => [...prev, { carNumber: 1, nearDoor: 1, isStandard: true }]);
   }
   function removeFreeSpace(index: number) {
     setFreeSpaces((prev) => prev.filter((_, i) => i !== index));
@@ -187,86 +165,46 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
     }
   }
 
+  const lineSelectData = allLines.map((l) => ({ value: l.id, label: l.name }));
+
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-      {/* Name */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Name</label>
-        <input
-          type="text"
+    <form onSubmit={handleSubmit}>
+      <Stack gap="lg" maw="42rem">
+        <TextInput
+          label="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          className="w-full border rounded px-3 py-2"
         />
-      </div>
 
-      {/* Operator */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Operator</label>
-        <select
+        <NativeSelect
+          label="Operator"
+          data={[
+            { value: '', label: 'Select operator' },
+            ...operators.map((op) => ({ value: op.id, label: op.name })),
+          ]}
           value={operatorId}
           onChange={(e) => {
             setOperatorId(e.target.value);
             setSelectedLineIds([]);
           }}
           required
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">Select operator</option>
-          {operators.map((op) => (
-            <option key={op.id} value={op.id}>{op.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Lines (multi-select) */}
-      <div className="relative">
-        <label className="block text-sm font-medium mb-1">Lines</label>
-        {/* Displayed selectedLines */}
-        <div className="flex flex-wrap gap-2">
-          {selectedLineIds.map(id => {
-            const line = allLines.find(l => l.id === id);
-            return (
-              <span key={line?.id} className="bg-blue-100 px-2 py-1 rounded">
-                {line?.name}
-              </span>
-            );
-          })}
-        </div>
-
-        <input
-          value={searchLinesText}
-          onChange={(e) => setSearchLinesText(e.target.value)}
-          onFocus={() => setIsOpen(true)}
-          type="text"
-          className="w-full border rounded px-2 py-2 text-sm"
         />
-        {isOpen && (
-          <div ref={dropdownRef} className="absolute z-10 max-h-60 overflow-auto bg-[var(--background)] shadow-lg w-full">
-            {filteredLines.map(line => (
-              <div onClick={() => toggleLine(line.id)} key={line.id}>
-              <input 
-                type="checkbox"
-                checked={selectedLineIds.includes(line.id)} 
-                onChange={(e) => e.stopPropagation()}
-              />
-              {line.name}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Car Count */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Car Count</label>
-        <input
-          type="number"
+        <MultiSelect
+          label="Lines"
+          searchable
+          data={lineSelectData}
+          value={selectedLineIds}
+          onChange={setSelectedLineIds}
+        />
+
+        <NumberInput
+          label="Car Count"
           min={1}
           value={carCount}
-          onChange={(e) => {
-            const newCount = Number(e.target.value);
+          onChange={(v) => {
+            const newCount = typeof v === 'number' ? v : 10;
             setCarCount(newCount);
             setCarStructures((prev) =>
               Array.from({ length: newCount }, (_, i) => ({
@@ -276,202 +214,183 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
             );
           }}
           required
-          className="w-32 border rounded px-3 py-2"
+          w={128}
         />
-      </div>
 
-      {/* Car Structure */}
-      <div>
-        <label className="block text-sm font-medium mb-2">Car Structure (号車ごとのドア数)</label>
-        <div className="space-y-1">
-          {carStructures.map((cs, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="text-sm text-gray-500 w-14 text-right">{cs.carNumber}号車</span>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={cs.doorCount}
-                onChange={(e) =>
-                  setCarStructures((prev) =>
-                    prev.map((c, j) => j === i ? { ...c, doorCount: Number(e.target.value) } : c)
-                  )
-                }
-                className="w-20 border rounded px-2 py-1 text-sm"
-              />
-              <span className="text-sm text-gray-500">枚</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Free Spaces */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-sm font-medium">Free Spaces</label>
-          <button type="button" onClick={addFreeSpace} className="text-sm text-blue-600 hover:underline">+ Add</button>
-        </div>
-        {freeSpaces.map((fs, i) => (
-          <div key={i} className="flex items-center gap-2 mb-1">
-            <span className="text-sm text-gray-500 w-16">Car #</span>
-            <input
-              type="number" min={1} max={carCount} value={fs.carNumber}
-              onChange={(e) => updateFreeSpace(i, 'carNumber', Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1 text-sm"
-            />
-            <span className="text-sm text-gray-500 w-16">Door #</span>
-            <input
-              type="number" min={1} value={fs.nearDoor}
-              onChange={(e) => updateFreeSpace(i, 'nearDoor', Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1 text-sm"
-            />
-            <span className="text-sm text-gray-500 w-16">isStandard</span>
-            <input
-              type="checkbox"
-              checked={fs.isStandard}
-              onChange={(e) => updateFreeSpace(i, 'isStandard', e.target.checked)}
-            />
-            <button type="button" onClick={() => removeFreeSpace(i)} className="ml-auto mr-2 text-red-500 text-sm">Remove</button>
-          </div>
-        ))}
-      </div>
-
-      {/* Priority Seats */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-sm font-medium">Priority Seats</label>
-          <button type="button" onClick={addPrioritySeat} className="text-sm text-blue-600 hover:underline">+ Add</button>
-        </div>
-        {prioritySeats.map((ps, i) => (
-          <div key={i} className="flex items-center gap-2 mb-1">
-            <span className="text-sm text-gray-500 w-16">Car #</span>
-            <input
-              type="number" min={1} max={carCount} value={ps.carNumber}
-              onChange={(e) => updatePrioritySeat(i, 'carNumber', Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1 text-sm"
-            />
-            <span className="text-sm text-gray-500 w-16">Door #</span>
-            <input
-              type="number" min={1} value={ps.nearDoor}
-              onChange={(e) => updatePrioritySeat(i, 'nearDoor', Number(e.target.value))}
-              className="w-20 border rounded px-2 py-1 text-sm"
-            />
-            <span className="text-sm text-gray-500 w-16">isStandard</span>
-            <input
-              type="checkbox"
-              checked={ps.isStandard}
-              onChange={(e) => updatePrioritySeat(i, 'isStandard', e.target.checked)}
-            />
-            <button type="button" onClick={() => removePrioritySeat(i)} className="ml-auto mr-2 text-red-500 text-sm">Remove</button>
-          </div>
-        ))}
-      </div>
-
-      {/* Limited To Platform IDs */}
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          走行制限ホーム
-          <span className="ml-1 text-xs text-gray-500 font-normal">(区間限定運用のみ。制限なしの場合は空欄)</span>
-        </label>
-
-        {/* Column picker */}
-        {pickerAvailableLines.length > 0 ? (
-          <>
-            <div className="flex border rounded text-sm mb-2 divide-x h-48">
-              {/* Column 1: Lines */}
-              <div className="w-1/3 overflow-y-auto">
-                {pickerAvailableLines.map(line => (
-                  <button
-                    key={line.id}
-                    type="button"
-                    onClick={() => selectPickerLine(line.id)}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-gray-100 ${pickerLineId === line.id ? 'bg-blue-100 text-blue-700 font-medium' : ''}`}
-                  >
-                    {line.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Column 2: Stations */}
-              <div className="w-1/3 overflow-y-auto">
-                {pickerStations.map(station => (
-                  <button
-                    key={station.id}
-                    type="button"
-                    onClick={() => selectPickerStation(station.id)}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-gray-100 ${pickerStationId === station.id ? 'bg-blue-100 text-blue-700 font-medium' : ''}`}
-                  >
-                    {station.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Column 3: Platforms */}
-              <div className="w-1/3 overflow-y-auto">
-                {pickerPlatforms.map(platform => (
-                  <button
-                    key={platform.id}
-                    type="button"
-                    onClick={() => setPickerPlatformId(platform.id)}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-gray-100 ${pickerPlatformId === platform.id ? 'bg-blue-100 text-blue-700 font-medium' : ''}`}
-                  >
-                    {platform.platformNumber}番ホーム
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={addPickerPlatform}
-              disabled={!pickerPlatformId || limitedToPlatformIds.includes(pickerPlatformId)}
-              className="mb-3 px-3 py-1.5 text-sm bg-blue-600 text-white rounded disabled:opacity-40 hover:bg-blue-700"
-            >
-              追加
-            </button>
-          </>
-        ) : (
-          <p className="text-sm text-gray-400 mb-3">路線を選択してからホームを追加してください</p>
-        )}
-
-        {/* Added platforms list */}
-        {limitedToPlatformIds.length === 0 ? (
-          <p className="text-sm text-gray-400">走行制限なし</p>
-        ) : (
-          <ul className="space-y-1">
-            {limitedToPlatformIds.map(id => (
-              <li key={id} className="flex items-center justify-between text-sm bg-gray-50 border rounded px-3 py-1.5">
-                <span>{platformLabels[id] ?? id}</span>
-                <button
-                  type="button"
-                  onClick={() => removeLimitedPlatform(id)}
-                  className="text-red-500 hover:text-red-700 text-xs ml-4 flex-shrink-0"
-                >
-                  削除
-                </button>
-              </li>
+        <div>
+          <Text size="sm" fw={500} mb="xs">Car Structure (号車ごとのドア数)</Text>
+          <Stack gap={4}>
+            {carStructures.map((cs, i) => (
+              <Group key={i} gap="sm" align="center">
+                <Text size="sm" c="dimmed" w={56} ta="right">{cs.carNumber}号車</Text>
+                <NumberInput
+                  min={1}
+                  max={10}
+                  value={cs.doorCount}
+                  onChange={(v) =>
+                    setCarStructures((prev) =>
+                      prev.map((c, j) => j === i ? { ...c, doorCount: typeof v === 'number' ? v : 4 } : c)
+                    )
+                  }
+                  w={80}
+                  size="xs"
+                  suffix="枚"
+                />
+              </Group>
             ))}
-          </ul>
-        )}
-      </div>
+          </Stack>
+        </div>
 
-      {/* Submit */}
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push('/trains')}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-      </div>
+        <div>
+          <Group justify="space-between" mb="xs">
+            <Text size="sm" fw={500}>Free Spaces</Text>
+            <Button variant="subtle" size="compact-sm" onClick={addFreeSpace}>+ Add</Button>
+          </Group>
+          <Stack gap="xs">
+            {freeSpaces.map((fs, i) => (
+              <Group key={i} gap="sm" align="center" wrap="wrap">
+                <NumberInput label="Car #" min={1} max={carCount} value={fs.carNumber}
+                  onChange={(v) => updateFreeSpace(i, 'carNumber', typeof v === 'number' ? v : 1)}
+                  w={80} size="xs"
+                />
+                <NumberInput label="Door #" min={1} value={fs.nearDoor}
+                  onChange={(v) => updateFreeSpace(i, 'nearDoor', typeof v === 'number' ? v : 1)}
+                  w={80} size="xs"
+                />
+                <Checkbox label="isStandard" checked={fs.isStandard}
+                  onChange={(e) => updateFreeSpace(i, 'isStandard', e.currentTarget.checked)}
+                  size="sm" mt="lg"
+                />
+                <Button variant="subtle" color="red" size="compact-xs" onClick={() => removeFreeSpace(i)} mt="lg">
+                  Remove
+                </Button>
+              </Group>
+            ))}
+          </Stack>
+        </div>
+
+        <div>
+          <Group justify="space-between" mb="xs">
+            <Text size="sm" fw={500}>Priority Seats</Text>
+            <Button variant="subtle" size="compact-sm" onClick={addPrioritySeat}>+ Add</Button>
+          </Group>
+          <Stack gap="xs">
+            {prioritySeats.map((ps, i) => (
+              <Group key={i} gap="sm" align="center" wrap="wrap">
+                <NumberInput label="Car #" min={1} max={carCount} value={ps.carNumber}
+                  onChange={(v) => updatePrioritySeat(i, 'carNumber', typeof v === 'number' ? v : 1)}
+                  w={80} size="xs"
+                />
+                <NumberInput label="Door #" min={1} value={ps.nearDoor}
+                  onChange={(v) => updatePrioritySeat(i, 'nearDoor', typeof v === 'number' ? v : 1)}
+                  w={80} size="xs"
+                />
+                <Checkbox label="isStandard" checked={ps.isStandard}
+                  onChange={(e) => updatePrioritySeat(i, 'isStandard', e.currentTarget.checked)}
+                  size="sm" mt="lg"
+                />
+                <Button variant="subtle" color="red" size="compact-xs" onClick={() => removePrioritySeat(i)} mt="lg">
+                  Remove
+                </Button>
+              </Group>
+            ))}
+          </Stack>
+        </div>
+
+        <div>
+          <Text size="sm" fw={500} mb="xs">
+            走行制限ホーム
+            <Text span size="xs" c="dimmed" fw={400} ml="xs">
+              (区間限定運用のみ。制限なしの場合は空欄)
+            </Text>
+          </Text>
+
+          {pickerAvailableLines.length > 0 ? (
+            <>
+              <SimpleGrid cols={3} mb="xs">
+                <Card withBorder padding={0}>
+                  <ScrollArea h={192}>
+                    {pickerAvailableLines.map(line => (
+                      <NavLink
+                        key={line.id}
+                        label={line.name}
+                        active={pickerLineId === line.id}
+                        onClick={() => selectPickerLine(line.id)}
+                      />
+                    ))}
+                  </ScrollArea>
+                </Card>
+                <Card withBorder padding={0}>
+                  <ScrollArea h={192}>
+                    {pickerStations.map(station => (
+                      <NavLink
+                        key={station.id}
+                        label={station.name}
+                        active={pickerStationId === station.id}
+                        onClick={() => selectPickerStation(station.id)}
+                      />
+                    ))}
+                  </ScrollArea>
+                </Card>
+                <Card withBorder padding={0}>
+                  <ScrollArea h={192}>
+                    {pickerPlatforms.map(platform => (
+                      <NavLink
+                        key={platform.id}
+                        label={`${platform.platformNumber}番ホーム`}
+                        active={pickerPlatformId === platform.id}
+                        onClick={() => setPickerPlatformId(platform.id)}
+                      />
+                    ))}
+                  </ScrollArea>
+                </Card>
+              </SimpleGrid>
+
+              <Button
+                size="compact-sm"
+                onClick={addPickerPlatform}
+                disabled={!pickerPlatformId || limitedToPlatformIds.includes(pickerPlatformId)}
+                mb="sm"
+              >
+                追加
+              </Button>
+            </>
+          ) : (
+            <Text size="sm" c="dimmed" mb="sm">路線を選択してからホームを追加してください</Text>
+          )}
+
+          {limitedToPlatformIds.length === 0 ? (
+            <Text size="sm" c="dimmed">走行制限なし</Text>
+          ) : (
+            <Stack gap="xs">
+              {limitedToPlatformIds.map(id => (
+                <Card key={id} withBorder padding="xs" bg="gray.0">
+                  <Group justify="space-between">
+                    <Text size="sm">{platformLabels[id] ?? id}</Text>
+                    <Button
+                      variant="subtle"
+                      color="red"
+                      size="compact-xs"
+                      onClick={() => removeLimitedPlatform(id)}
+                    >
+                      削除
+                    </Button>
+                  </Group>
+                </Card>
+              ))}
+            </Stack>
+          )}
+        </div>
+
+        <Group gap="sm">
+          <Button type="submit" loading={submitting}>
+            {isEdit ? 'Update' : 'Create'}
+          </Button>
+          <Button variant="default" onClick={() => router.push('/trains')}>
+            Cancel
+          </Button>
+        </Group>
+      </Stack>
     </form>
   );
 }

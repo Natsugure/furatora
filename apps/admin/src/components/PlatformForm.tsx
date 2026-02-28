@@ -3,6 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import type { CarStopPosition } from '@furatora/database/schema';
+import {
+  Button, Card, Group, NativeSelect, NumberInput, Stack, Text, TextInput, Textarea,
+} from '@mantine/core';
 
 type Line = { id: string; name: string };
 type LineDirection = {
@@ -64,7 +67,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
         .then((r) => r.json())
         .then(setDirections);
     } else {
-      Promise.resolve([]).then(setDirections);
+      setDirections([]);
     }
   }, [lineId]);
 
@@ -126,25 +129,26 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   const inboundDirections = directions.filter((d) => d.directionType === 'inbound');
   const outboundDirections = directions.filter((d) => d.directionType === 'outbound');
 
+  const lineSelectData = [
+    { value: '', label: 'Select line' },
+    ...lines.map((l) => ({ value: l.id, label: l.name })),
+  ];
+
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-      {/* Platform Number */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Platform Number</label>
-        <input
-          type="text"
+    <form onSubmit={handleSubmit}>
+      <Stack gap="lg" maw="42rem">
+        <TextInput
+          label="Platform Number"
+          placeholder="e.g. 1, 2a"
           value={platformNumber}
           onChange={(e) => setPlatformNumber(e.target.value)}
           required
-          placeholder="e.g. 1, 2a"
-          className="w-32 border rounded px-3 py-2"
+          w={128}
         />
-      </div>
 
-      {/* Line */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Line</label>
-        <select
+        <NativeSelect
+          label="Line"
+          data={lineSelectData}
           value={lineId}
           onChange={(e) => {
             setLineId(e.target.value);
@@ -152,204 +156,152 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
             setOutboundDirectionId('');
           }}
           required
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">Select line</option>
-          {lines.map((line) => (
-            <option key={line.id} value={line.id}>
-              {line.name}
-            </option>
-          ))}
-        </select>
-      </div>
+        />
 
-      {/* Inbound Direction */}
-      {lineId && (
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Inbound Direction (上り方面) - Optional
-          </label>
-          <select
-            value={inboundDirectionId}
-            onChange={(e) => setInboundDirectionId(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value="">None</option>
-            {inboundDirections.map((dir) => (
-              <option key={dir.id} value={dir.id}>
-                {dir.displayName}
-              </option>
-            ))}
-          </select>
-          {inboundDirections.length === 0 && lineId && (
-            <p className="text-xs text-gray-500 mt-1">
-              No inbound directions defined for this line. Please create one first.
-            </p>
-          )}
-        </div>
-      )}
+        {lineId && (
+          <>
+            <div>
+              <NativeSelect
+                label="Inbound Direction (上り方面) - Optional"
+                data={[
+                  { value: '', label: 'None' },
+                  ...inboundDirections.map((d) => ({ value: d.id, label: d.displayName })),
+                ]}
+                value={inboundDirectionId}
+                onChange={(e) => setInboundDirectionId(e.target.value)}
+              />
+              {inboundDirections.length === 0 && (
+                <Text size="xs" c="dimmed" mt="xs">
+                  No inbound directions defined for this line. Please create one first.
+                </Text>
+              )}
+            </div>
 
-      {/* Outbound Direction */}
-      {lineId && (
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Outbound Direction (下り方面) - Optional
-          </label>
-          <select
-            value={outboundDirectionId}
-            onChange={(e) => setOutboundDirectionId(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value="">None</option>
-            {outboundDirections.map((dir) => (
-              <option key={dir.id} value={dir.id}>
-                {dir.displayName}
-              </option>
-            ))}
-          </select>
-          {outboundDirections.length === 0 && lineId && (
-            <p className="text-xs text-gray-500 mt-1">
-              No outbound directions defined for this line. Please create one first.
-            </p>
-          )}
-        </div>
-      )}
+            <div>
+              <NativeSelect
+                label="Outbound Direction (下り方面) - Optional"
+                data={[
+                  { value: '', label: 'None' },
+                  ...outboundDirections.map((d) => ({ value: d.id, label: d.displayName })),
+                ]}
+                value={outboundDirectionId}
+                onChange={(e) => setOutboundDirectionId(e.target.value)}
+              />
+              {outboundDirections.length === 0 && (
+                <Text size="xs" c="dimmed" mt="xs">
+                  No outbound directions defined for this line. Please create one first.
+                </Text>
+              )}
+            </div>
+          </>
+        )}
 
-      {/* Max Car Count */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Maximum Car Count</label>
-        <input
-          type="number"
+        <NumberInput
+          label="Maximum Car Count"
           min={1}
           value={maxCarCount}
-          onChange={(e) => setMaxCarCount(Number(e.target.value))}
+          onChange={(v) => setMaxCarCount(typeof v === 'number' ? v : 10)}
           required
-          className="w-32 border rounded px-3 py-2"
+          w={128}
         />
-      </div>
 
-      {/* Car Stop Positions */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium">Car Stop Positions</label>
-          <button
-            type="button"
-            onClick={addStopPosition}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            + Add Position
-          </button>
+        <div>
+          <Group justify="space-between" mb="xs">
+            <Text size="sm" fw={500}>Car Stop Positions</Text>
+            <Button variant="subtle" size="compact-sm" onClick={addStopPosition}>
+              + Add Position
+            </Button>
+          </Group>
+          <Text size="xs" c="dimmed" mb="xs">
+            編成両数ごとに停車位置を定義します。基準号車とその停車枠番号、進行方向を指定してください。
+          </Text>
+          <Stack gap="xs">
+            {carStopPositions.map((sp, i) => (
+              <Card key={i} withBorder padding="sm" bg="gray.0">
+                <Group gap="md" wrap="wrap" align="flex-end">
+                  <NumberInput
+                    label="編成両数"
+                    min={1}
+                    max={maxCarCount}
+                    value={sp.carCount}
+                    onChange={(v) => updateStopPositionNumber(i, 'carCount', typeof v === 'number' ? v : 1)}
+                    w={80}
+                    size="xs"
+                    suffix="両"
+                  />
+                  <NumberInput
+                    label="基準号車"
+                    min={1}
+                    max={sp.carCount}
+                    value={sp.referenceCarNumber}
+                    onChange={(v) => updateStopPositionNumber(i, 'referenceCarNumber', typeof v === 'number' ? v : 1)}
+                    w={80}
+                    size="xs"
+                    suffix="号車"
+                  />
+                  <NumberInput
+                    label="停車枠"
+                    min={1}
+                    max={maxCarCount}
+                    value={sp.referencePlatformCell}
+                    onChange={(v) => updateStopPositionNumber(i, 'referencePlatformCell', typeof v === 'number' ? v : 1)}
+                    w={80}
+                    size="xs"
+                    suffix="番"
+                  />
+                  <NativeSelect
+                    label="進行方向"
+                    data={[
+                      { value: 'ascending', label: 'ascending (1号車→小枠番号側)' },
+                      { value: 'descending', label: 'descending (1号車→大枠番号側)' },
+                    ]}
+                    value={sp.direction}
+                    onChange={(e) => updateStopPositionDirection(i, e.target.value as 'ascending' | 'descending')}
+                    size="xs"
+                  />
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="compact-xs"
+                    onClick={() => removeStopPosition(i)}
+                  >
+                    Remove
+                  </Button>
+                </Group>
+              </Card>
+            ))}
+          </Stack>
         </div>
-        <p className="text-xs text-gray-500 mb-2">
-          編成両数ごとに停車位置を定義します。基準号車とその停車枠番号、進行方向を指定してください。
-        </p>
-        {carStopPositions.map((sp, i) => (
-          <div key={i} className="border rounded p-3 mb-2 bg-gray-50">
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-500">編成両数:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={maxCarCount}
-                  value={sp.carCount}
-                  onChange={(e) => updateStopPositionNumber(i, 'carCount', Number(e.target.value))}
-                  className="w-16 border rounded px-2 py-1 text-sm"
-                />
-                <span className="text-xs text-gray-400">両</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-500">基準号車:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={sp.carCount}
-                  value={sp.referenceCarNumber}
-                  onChange={(e) => updateStopPositionNumber(i, 'referenceCarNumber', Number(e.target.value))}
-                  className="w-16 border rounded px-2 py-1 text-sm"
-                />
-                <span className="text-xs text-gray-400">号車</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-500">停車枠:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={maxCarCount}
-                  value={sp.referencePlatformCell}
-                  onChange={(e) => updateStopPositionNumber(i, 'referencePlatformCell', Number(e.target.value))}
-                  className="w-16 border rounded px-2 py-1 text-sm"
-                />
-                <span className="text-xs text-gray-400">番</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-500">進行方向:</span>
-                <select
-                  value={sp.direction}
-                  onChange={(e) => updateStopPositionDirection(i, e.target.value as 'ascending' | 'descending')}
-                  className="border rounded px-2 py-1 text-sm"
-                >
-                  <option value="ascending">ascending (1号車→小枠番号側)</option>
-                  <option value="descending">descending (1号車→大枠番号側)</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeStopPosition(i)}
-                className="text-red-500 text-sm ml-auto"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Platform Side */}
-      <div>
-        <label className="block text-sm font-medium mb-1">ホーム位置 (Platform Side)</label>
-        <select
+        <NativeSelect
+          label="ホーム位置 (Platform Side)"
+          description="可視化で列車図の上下どちらにホーム帯を表示するか"
+          data={[
+            { value: '', label: '未設定（デフォルト: 下）' },
+            { value: 'bottom', label: 'bottom（列車の下側）' },
+            { value: 'top', label: 'top（列車の上側）' },
+          ]}
           value={platformSide}
           onChange={(e) => setPlatformSide(e.target.value)}
-          className="w-48 border rounded px-3 py-2"
-        >
-          <option value="">未設定（デフォルト: 下）</option>
-          <option value="bottom">bottom（列車の下側）</option>
-          <option value="top">top（列車の上側）</option>
-        </select>
-        <p className="text-xs text-gray-500 mt-1">
-          可視化で列車図の上下どちらにホーム帯を表示するか
-        </p>
-      </div>
+          w={256}
+        />
 
-      {/* Notes */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Notes</label>
-        <textarea
+        <Textarea
+          label="Notes"
+          rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="w-full border rounded px-3 py-2"
         />
-      </div>
 
-      {/* Submit */}
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push(`/stations/${stationId}/facilities`)}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-      </div>
+        <Group gap="sm">
+          <Button type="submit" loading={submitting}>
+            {isEdit ? 'Update' : 'Create'}
+          </Button>
+          <Button variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
+            Cancel
+          </Button>
+        </Group>
+      </Stack>
     </form>
   );
 }
