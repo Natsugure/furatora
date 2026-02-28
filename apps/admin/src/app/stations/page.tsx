@@ -7,7 +7,7 @@ import {
 } from '@furatora/database/schema';
 import { asc, eq } from 'drizzle-orm';
 import { LinkAnchor } from '@/components/LinkElements';
-import { Group, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
+import { Group, ScrollArea, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 
 export default async function StationsPage() {
   const operatorList = await db.select().from(operators).orderBy(asc(operators.name));
@@ -63,44 +63,46 @@ export default async function StationsPage() {
                     <Text fw={500}>{line.name}</Text>
                     <Text size="sm" c="dimmed">({stns.length} stations)</Text>
                   </Group>
-                  <Table striped highlightOnHover withTableBorder ml="md" fz="sm">
-                    <TableThead>
-                      <TableTr>
-                        <TableTh>#</TableTh>
-                        <TableTh>Code</TableTh>
-                        <TableTh>Name</TableTh>
-                        <TableTh>Name (EN)</TableTh>
-                        <TableTh>Facilities</TableTh>
-                        <TableTh>Edit</TableTh>
-                      </TableTr>
-                    </TableThead>
-                    <TableTbody>
-                      {stns.map((stn) => (
-                        <TableTr key={stn.id}>
-                          <TableTd>
-                            <Text c="dimmed">{stn.stationOrder}</Text>
-                          </TableTd>
-                          <TableTd>
-                            <Text ff="monospace">{stn.code ?? '-'}</Text>
-                          </TableTd>
-                          <TableTd>{stn.name}</TableTd>
-                          <TableTd>
-                            <Text c="dimmed">{stn.nameEn ?? '-'}</Text>
-                          </TableTd>
-                          <TableTd>
-                            <LinkAnchor href={`/stations/${stn.id}/facilities`} size="sm">
-                              Manage
-                            </LinkAnchor>
-                          </TableTd>
-                          <TableTd>
-                            <LinkAnchor href={`/stations/${stn.id}/edit`} size="sm" c="dimmed">
-                              Edit
-                            </LinkAnchor>
-                          </TableTd>
+                  <ScrollArea ml="md">
+                    <Table striped highlightOnHover withTableBorder fz="sm">
+                      <TableThead>
+                        <TableTr>
+                          <TableTh>#</TableTh>
+                          <TableTh>Code</TableTh>
+                          <TableTh>Name</TableTh>
+                          <TableTh>Name (EN)</TableTh>
+                          <TableTh>Facilities</TableTh>
+                          <TableTh>Edit</TableTh>
                         </TableTr>
-                      ))}
-                    </TableTbody>
-                  </Table>
+                      </TableThead>
+                      <TableTbody>
+                        {stns.map((stn) => (
+                          <TableTr key={stn.id}>
+                            <TableTd>
+                              <Text c="dimmed">{stn.stationOrder}</Text>
+                            </TableTd>
+                            <TableTd>
+                              <Text ff="monospace">{stn.code ?? '-'}</Text>
+                            </TableTd>
+                            <TableTd>{stn.name}</TableTd>
+                            <TableTd>
+                              <Text c="dimmed">{stn.nameEn ?? '-'}</Text>
+                            </TableTd>
+                            <TableTd>
+                              <LinkAnchor href={`/stations/${stn.id}/facilities`} size="sm">
+                                Manage
+                              </LinkAnchor>
+                            </TableTd>
+                            <TableTd>
+                              <LinkAnchor href={`/stations/${stn.id}/edit`} size="sm" c="dimmed">
+                                Edit
+                              </LinkAnchor>
+                            </TableTd>
+                          </TableTr>
+                        ))}
+                      </TableTbody>
+                    </Table>
+                  </ScrollArea>
                 </div>
               ))}
             </Stack>

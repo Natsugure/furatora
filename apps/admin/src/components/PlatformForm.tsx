@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import type { CarStopPosition } from '@furatora/database/schema';
 import {
-  Button, Card, Group, NativeSelect, NumberInput, Stack, Text, TextInput, Textarea,
+  Button, Card, Group, Loader, NativeSelect, NumberInput, Stack, Text, TextInput, Textarea,
 } from '@mantine/core';
 
 type Line = { id: string; name: string };
@@ -53,12 +53,16 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
     initialData?.platformSide ?? ''
   );
   const [notes, setNotes] = useState(initialData?.notes ?? '');
+  const [linesLoading, setLinesLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetch('/api/lines')
       .then((r) => r.json())
-      .then(setLines);
+      .then((data) => {
+        setLines(data);
+        setLinesLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -143,20 +147,27 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           value={platformNumber}
           onChange={(e) => setPlatformNumber(e.target.value)}
           required
-          w={128}
+          w={{ base: '100%', xs: 128 }}
         />
 
-        <NativeSelect
-          label="Line"
-          data={lineSelectData}
-          value={lineId}
-          onChange={(e) => {
-            setLineId(e.target.value);
-            setInboundDirectionId('');
-            setOutboundDirectionId('');
-          }}
-          required
-        />
+        {linesLoading ? (
+          <Group gap="xs" align="center">
+            <Loader size="sm" />
+            <Text size="sm" c="dimmed">路線を読み込み中...</Text>
+          </Group>
+        ) : (
+          <NativeSelect
+            label="Line"
+            data={lineSelectData}
+            value={lineId}
+            onChange={(e) => {
+              setLineId(e.target.value);
+              setInboundDirectionId('');
+              setOutboundDirectionId('');
+            }}
+            required
+          />
+        )}
 
         {lineId && (
           <>
@@ -202,7 +213,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           value={maxCarCount}
           onChange={(v) => setMaxCarCount(typeof v === 'number' ? v : 10)}
           required
-          w={128}
+          w={{ base: '100%', xs: 128 }}
         />
 
         <div>
@@ -225,7 +236,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
                     max={maxCarCount}
                     value={sp.carCount}
                     onChange={(v) => updateStopPositionNumber(i, 'carCount', typeof v === 'number' ? v : 1)}
-                    w={80}
+                    w={{ base: '100%', xs: 80 }}
                     size="xs"
                     suffix="両"
                   />
@@ -235,7 +246,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
                     max={sp.carCount}
                     value={sp.referenceCarNumber}
                     onChange={(v) => updateStopPositionNumber(i, 'referenceCarNumber', typeof v === 'number' ? v : 1)}
-                    w={80}
+                    w={{ base: '100%', xs: 80 }}
                     size="xs"
                     suffix="号車"
                   />
@@ -245,7 +256,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
                     max={maxCarCount}
                     value={sp.referencePlatformCell}
                     onChange={(v) => updateStopPositionNumber(i, 'referencePlatformCell', typeof v === 'number' ? v : 1)}
-                    w={80}
+                    w={{ base: '100%', xs: 80 }}
                     size="xs"
                     suffix="番"
                   />
@@ -283,7 +294,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           ]}
           value={platformSide}
           onChange={(e) => setPlatformSide(e.target.value)}
-          w={256}
+          w={{ base: '100%', sm: 256 }}
         />
 
         <Textarea

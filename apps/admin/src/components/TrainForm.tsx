@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 import {
-  Button, Card, Checkbox, Group, MultiSelect, NativeSelect, NavLink,
+  Button, Card, Checkbox, Group, Loader, MultiSelect, NativeSelect, NavLink,
   NumberInput, ScrollArea, SimpleGrid, Stack, Text, TextInput,
 } from '@mantine/core';
 
@@ -56,23 +56,29 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [pickerPlatformId, setPickerPlatformId] = useState<string | null>(null);
   const [pickerStations, setPickerStations] = useState<PickerStation[]>([]);
   const [pickerPlatforms, setPickerPlatforms] = useState<PickerPlatform[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch('/api/operators').then((r) => r.json()).then(setOperators);
-    fetch('/api/lines').then((r) => r.json()).then(setAllLines);
     const initialIds = initialData?.limitedToPlatformIds;
+    const fetches: Promise<void>[] = [
+      fetch('/api/operators').then((r) => r.json()).then(setOperators),
+      fetch('/api/lines').then((r) => r.json()).then(setAllLines),
+    ];
     if (initialIds && initialIds.length > 0) {
-      fetch(`/api/platforms?ids=${initialIds.join(',')}`)
-        .then(r => r.json() as Promise<{ id: string; platformNumber: number; stationName: string; lineName: string }[]>)
-        .then(data => {
-          const labels: Record<string, string> = {};
-          for (const p of data) {
-            labels[p.id] = `${p.lineName} > ${p.stationName} > ${p.platformNumber}番ホーム`;
-          }
-          setPlatformLabels(labels);
-        });
+      fetches.push(
+        fetch(`/api/platforms?ids=${initialIds.join(',')}`)
+          .then(r => r.json() as Promise<{ id: string; platformNumber: number; stationName: string; lineName: string }[]>)
+          .then(data => {
+            const labels: Record<string, string> = {};
+            for (const p of data) {
+              labels[p.id] = `${p.lineName} > ${p.stationName} > ${p.platformNumber}番ホーム`;
+            }
+            setPlatformLabels(labels);
+          })
+      );
     }
+    Promise.all(fetches).then(() => setDataLoading(false));
   }, []);
 
   const pickerAvailableLines = allLines.filter(l => selectedLineIds.includes(l.id));
@@ -167,6 +173,15 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
   const lineSelectData = allLines.map((l) => ({ value: l.id, label: l.name }));
 
+  if (dataLoading) {
+    return (
+      <Group gap="xs" align="center">
+        <Loader size="sm" />
+        <Text size="sm" c="dimmed">データを読み込み中...</Text>
+      </Group>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
@@ -214,7 +229,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
             );
           }}
           required
-          w={128}
+          w={{ base: '100%', xs: 128 }}
         />
 
         <div>
@@ -307,7 +322,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
           {pickerAvailableLines.length > 0 ? (
             <>
-              <SimpleGrid cols={3} mb="xs">
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} mb="xs">
                 <Card withBorder padding={0}>
                   <ScrollArea h={192}>
                     {pickerAvailableLines.map(line => (

@@ -19,7 +19,8 @@
       "Bash(gh label list --limit 50)",
       "Bash(gh issue list --limit 10)",
       "Bash(gh label create \"admin-ui\" --description \"Admin UI刷新 \\(Mantine v8\\)\" --color \"1d76db\")",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(pnpm --filter admin exec tsc --noEmit)"
     ]
   }
 }

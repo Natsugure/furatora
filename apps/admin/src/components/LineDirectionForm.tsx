@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
-  Button, Checkbox, Group, NativeSelect, ScrollArea,
+  Button, Checkbox, Group, Loader, NativeSelect, ScrollArea,
   Stack, Text, TextInput, Textarea,
 } from '@mantine/core';
 
@@ -47,12 +47,17 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
     initialData?.terminalStationIds ?? []
   );
   const [notes, setNotes] = useState(initialData?.notes ?? '');
+  const [stationsLoading, setStationsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    setStationsLoading(true);
     fetch(`/api/stations?lineId=${lineId}`)
       .then((r) => r.json())
-      .then(setStations);
+      .then((data) => {
+        setStations(data);
+        setStationsLoading(false);
+      });
   }, [lineId]);
 
   function toggleTerminalStation(stationId: string) {
@@ -143,8 +148,11 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
             Select possible terminal stations for this direction
           </Text>
           <ScrollArea.Autosize mah={240} type="auto" offsetScrollbars>
-            {stations.length === 0 ? (
-              <Text size="sm" c="dimmed">Loading stations...</Text>
+            {stationsLoading ? (
+              <Group gap="xs" align="center">
+                <Loader size="sm" />
+                <Text size="sm" c="dimmed">駅を読み込み中...</Text>
+              </Group>
             ) : (
               <Stack gap="xs">
                 {stations.map((station) => (
