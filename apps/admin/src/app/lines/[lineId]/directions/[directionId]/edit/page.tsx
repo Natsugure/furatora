@@ -24,7 +24,7 @@ export default async function EditDirectionPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">Edit Direction - {line.name}</Title>
+      <Title order={2} mb="lg">方面を編集 - {line.name}</Title>
       <LineDirectionForm
         lineId={lineId}
         isEdit

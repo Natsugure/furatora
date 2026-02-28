@@ -144,7 +144,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -161,10 +161,10 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
         <NativeSelect
-          label="Platform"
+          label="ホーム"
           data={[
-            { value: '', label: 'Select platform' },
-            ...platforms.map((p) => ({ value: p.id, label: `Platform ${p.platformNumber}` })),
+            { value: '', label: 'ホームを選択' },
+            ...platforms.map((p) => ({ value: p.id, label: `${p.platformNumber}番ホーム` })),
           ]}
           value={platformId}
           onChange={(e) => setPlatformId(e.target.value)}
@@ -172,17 +172,17 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
         />
 
         <NumberInput
-          label="ホーム枠番号 (Near Platform Cell)"
+          label="ホーム枠番号"
           description="設備が位置するホームの枠番号（1〜maxCarCount）。空欄でホーム全体。"
           min={1}
-          placeholder="e.g. 3"
+          placeholder="例: 3"
           value={nearPlatformCell}
           onChange={(v) => setNearPlatformCell(typeof v === 'number' ? v : '')}
           w={128}
         />
 
         <TextInput
-          label="出口 (Exits)"
+          label="出口"
           description="この場所に繋がる出口を記載してください"
           placeholder="例: A3出口・B1出口"
           value={exits}
@@ -190,14 +190,14 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
         />
 
         <Textarea
-          label="場所メモ (Location Notes)"
+          label="場所メモ"
           rows={2}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
 
         <div>
-          <Text size="sm" fw={500} mb="xs">設備タイプ (Facility Types)</Text>
+          <Text size="sm" fw={500} mb="xs">設備タイプ</Text>
           <Text size="xs" c="dimmed" mb="sm">
             この場所にある設備を選択してください（複数選択可）
           </Text>
@@ -216,13 +216,13 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
                     <Stack gap="xs" mt="sm" ml="xl">
                       <Group gap="lg">
                         <Checkbox
-                          label="Wheelchair accessible"
+                          label="車いす対応"
                           checked={selected?.isWheelchairAccessible ?? false}
                           onChange={(e) => updateFacility(ft.code, 'isWheelchairAccessible', e.currentTarget.checked)}
                           size="sm"
                         />
                         <Checkbox
-                          label="Stroller accessible"
+                          label="ベビーカー対応"
                           checked={selected?.isStrollerAccessible ?? false}
                           onChange={(e) => updateFacility(ft.code, 'isStrollerAccessible', e.currentTarget.checked)}
                           size="sm"
@@ -247,7 +247,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
 
         <div>
           <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={500}>乗換可能な駅 (Connected Stations)</Text>
+            <Text size="sm" fw={500}>乗換可能な駅</Text>
             <Button variant="subtle" size="compact-sm" onClick={addConnection}>
               + 接続を追加
             </Button>
@@ -290,10 +290,10 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
 
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
-            {isEdit ? 'Update' : 'Create'}
+            {isEdit ? '更新' : '登録'}
           </Button>
           <Button variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
-            Cancel
+            キャンセル
           </Button>
         </Group>
       </Stack>

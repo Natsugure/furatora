@@ -20,7 +20,7 @@ export default async function LineEditPage({
 
   return (
     <div>
-      <Title order={2} mb="xs">Edit Line</Title>
+      <Title order={2} mb="xs">路線を編集</Title>
       <Text size="sm" c="dimmed" mb="lg">{line.name}</Text>
       <LineForm lineId={lineId} initialData={{ nameKana: line.nameKana }} />
     </div>

@@ -167,7 +167,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -186,16 +186,16 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
         <TextInput
-          label="Name"
+          label="列車名"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
         />
 
         <NativeSelect
-          label="Operator"
+          label="事業者"
           data={[
-            { value: '', label: 'Select operator' },
+            { value: '', label: '事業者を選択' },
             ...operators.map((op) => ({ value: op.id, label: op.name })),
           ]}
           value={operatorId}
@@ -207,7 +207,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         />
 
         <MultiSelect
-          label="Lines"
+          label="路線"
           searchable
           data={lineSelectData}
           value={selectedLineIds}
@@ -215,7 +215,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         />
 
         <NumberInput
-          label="Car Count"
+          label="両数"
           min={1}
           value={carCount}
           onChange={(v) => {
@@ -233,7 +233,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         />
 
         <div>
-          <Text size="sm" fw={500} mb="xs">Car Structure (号車ごとのドア数)</Text>
+          <Text size="sm" fw={500} mb="xs">車両構成（号車ごとのドア数）</Text>
           <Stack gap={4}>
             {carStructures.map((cs, i) => (
               <Group key={i} gap="sm" align="center">
@@ -258,26 +258,26 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
         <div>
           <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={500}>Free Spaces</Text>
-            <Button variant="subtle" size="compact-sm" onClick={addFreeSpace}>+ Add</Button>
+            <Text size="sm" fw={500}>フリースペース</Text>
+            <Button variant="subtle" size="compact-sm" onClick={addFreeSpace}>+ 追加</Button>
           </Group>
           <Stack gap="xs">
             {freeSpaces.map((fs, i) => (
               <Group key={i} gap="sm" align="center" wrap="wrap">
-                <NumberInput label="Car #" min={1} max={carCount} value={fs.carNumber}
+                <NumberInput label="号車" min={1} max={carCount} value={fs.carNumber}
                   onChange={(v) => updateFreeSpace(i, 'carNumber', typeof v === 'number' ? v : 1)}
                   w={80} size="xs"
                 />
-                <NumberInput label="Door #" min={1} value={fs.nearDoor}
+                <NumberInput label="ドア番号" min={1} value={fs.nearDoor}
                   onChange={(v) => updateFreeSpace(i, 'nearDoor', typeof v === 'number' ? v : 1)}
                   w={80} size="xs"
                 />
-                <Checkbox label="isStandard" checked={fs.isStandard}
+                <Checkbox label="標準" checked={fs.isStandard}
                   onChange={(e) => updateFreeSpace(i, 'isStandard', e.currentTarget.checked)}
                   size="sm" mt="lg"
                 />
                 <Button variant="subtle" color="red" size="compact-xs" onClick={() => removeFreeSpace(i)} mt="lg">
-                  Remove
+                  削除
                 </Button>
               </Group>
             ))}
@@ -286,26 +286,26 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
         <div>
           <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={500}>Priority Seats</Text>
-            <Button variant="subtle" size="compact-sm" onClick={addPrioritySeat}>+ Add</Button>
+            <Text size="sm" fw={500}>優先席</Text>
+            <Button variant="subtle" size="compact-sm" onClick={addPrioritySeat}>+ 追加</Button>
           </Group>
           <Stack gap="xs">
             {prioritySeats.map((ps, i) => (
               <Group key={i} gap="sm" align="center" wrap="wrap">
-                <NumberInput label="Car #" min={1} max={carCount} value={ps.carNumber}
+                <NumberInput label="号車" min={1} max={carCount} value={ps.carNumber}
                   onChange={(v) => updatePrioritySeat(i, 'carNumber', typeof v === 'number' ? v : 1)}
                   w={80} size="xs"
                 />
-                <NumberInput label="Door #" min={1} value={ps.nearDoor}
+                <NumberInput label="ドア番号" min={1} value={ps.nearDoor}
                   onChange={(v) => updatePrioritySeat(i, 'nearDoor', typeof v === 'number' ? v : 1)}
                   w={80} size="xs"
                 />
-                <Checkbox label="isStandard" checked={ps.isStandard}
+                <Checkbox label="標準" checked={ps.isStandard}
                   onChange={(e) => updatePrioritySeat(i, 'isStandard', e.currentTarget.checked)}
                   size="sm" mt="lg"
                 />
                 <Button variant="subtle" color="red" size="compact-xs" onClick={() => removePrioritySeat(i)} mt="lg">
-                  Remove
+                  削除
                 </Button>
               </Group>
             ))}
@@ -399,10 +399,10 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
-            {isEdit ? 'Update' : 'Create'}
+            {isEdit ? '更新' : '登録'}
           </Button>
           <Button variant="default" onClick={() => router.push('/trains')}>
-            Cancel
+            キャンセル
           </Button>
         </Group>
       </Stack>

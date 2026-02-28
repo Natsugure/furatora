@@ -126,7 +126,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -134,7 +134,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   const outboundDirections = directions.filter((d) => d.directionType === 'outbound');
 
   const lineSelectData = [
-    { value: '', label: 'Select line' },
+    { value: '', label: '路線を選択' },
     ...lines.map((l) => ({ value: l.id, label: l.name })),
   ];
 
@@ -142,8 +142,8 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
         <TextInput
-          label="Platform Number"
-          placeholder="e.g. 1, 2a"
+          label="ホーム番号"
+          placeholder="例: 1, 2a"
           value={platformNumber}
           onChange={(e) => setPlatformNumber(e.target.value)}
           required
@@ -157,7 +157,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           </Group>
         ) : (
           <NativeSelect
-            label="Line"
+            label="路線"
             data={lineSelectData}
             value={lineId}
             onChange={(e) => {
@@ -173,9 +173,9 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           <>
             <div>
               <NativeSelect
-                label="Inbound Direction (上り方面) - Optional"
+                label="上り方面（任意）"
                 data={[
-                  { value: '', label: 'None' },
+                  { value: '', label: 'なし' },
                   ...inboundDirections.map((d) => ({ value: d.id, label: d.displayName })),
                 ]}
                 value={inboundDirectionId}
@@ -183,16 +183,16 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
               />
               {inboundDirections.length === 0 && (
                 <Text size="xs" c="dimmed" mt="xs">
-                  No inbound directions defined for this line. Please create one first.
+                  この路線に上り方面が定義されていません。先に作成してください。
                 </Text>
               )}
             </div>
 
             <div>
               <NativeSelect
-                label="Outbound Direction (下り方面) - Optional"
+                label="下り方面（任意）"
                 data={[
-                  { value: '', label: 'None' },
+                  { value: '', label: 'なし' },
                   ...outboundDirections.map((d) => ({ value: d.id, label: d.displayName })),
                 ]}
                 value={outboundDirectionId}
@@ -200,7 +200,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
               />
               {outboundDirections.length === 0 && (
                 <Text size="xs" c="dimmed" mt="xs">
-                  No outbound directions defined for this line. Please create one first.
+                  この路線に下り方面が定義されていません。先に作成してください。
                 </Text>
               )}
             </div>
@@ -208,7 +208,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
         )}
 
         <NumberInput
-          label="Maximum Car Count"
+          label="最大両数"
           min={1}
           value={maxCarCount}
           onChange={(v) => setMaxCarCount(typeof v === 'number' ? v : 10)}
@@ -218,9 +218,9 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
 
         <div>
           <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={500}>Car Stop Positions</Text>
+            <Text size="sm" fw={500}>停車位置</Text>
             <Button variant="subtle" size="compact-sm" onClick={addStopPosition}>
-              + Add Position
+              + 追加
             </Button>
           </Group>
           <Text size="xs" c="dimmed" mb="xs">
@@ -276,7 +276,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
                     size="compact-xs"
                     onClick={() => removeStopPosition(i)}
                   >
-                    Remove
+                    削除
                   </Button>
                 </Group>
               </Card>
@@ -285,7 +285,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
         </div>
 
         <NativeSelect
-          label="ホーム位置 (Platform Side)"
+          label="ホーム位置"
           description="可視化で列車図の上下どちらにホーム帯を表示するか"
           data={[
             { value: '', label: '未設定（デフォルト: 下）' },
@@ -298,7 +298,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
         />
 
         <Textarea
-          label="Notes"
+          label="備考"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -306,10 +306,10 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
 
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
-            {isEdit ? 'Update' : 'Create'}
+            {isEdit ? '更新' : '登録'}
           </Button>
           <Button variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
-            Cancel
+            キャンセル
           </Button>
         </Group>
       </Stack>

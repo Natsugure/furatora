@@ -27,7 +27,7 @@ export function StationNotesForm({ stationId, initialNotes }: Props) {
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -35,7 +35,7 @@ export function StationNotesForm({ stationId, initialNotes }: Props) {
     <form onSubmit={handleSubmit}>
       <Stack gap="md" maw="42rem">
         <Textarea
-          label="備考 (Notes)"
+          label="備考"
           placeholder="例: 東急東横線との直通運転あり"
           rows={5}
           value={notes}
@@ -43,10 +43,10 @@ export function StationNotesForm({ stationId, initialNotes }: Props) {
         />
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
-            Save
+            保存
           </Button>
           <Button variant="default" onClick={() => router.push('/stations')}>
-            Cancel
+            キャンセル
           </Button>
         </Group>
       </Stack>

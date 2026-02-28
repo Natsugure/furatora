@@ -93,7 +93,7 @@ export function ConnectionsEditSection({ connections }: Props) {
       update(id, { saving: false, saved: true });
     } else {
       update(id, { saving: false });
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -159,7 +159,7 @@ export function ConnectionsEditSection({ connections }: Props) {
 
             <Group gap="sm">
               <Button size="compact-sm" loading={s.saving} onClick={() => handleSave(conn.id)}>
-                Save
+                保存
               </Button>
               {s.saved && (
                 <Text size="xs" c="green">保存しました</Text>

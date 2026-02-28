@@ -22,7 +22,7 @@ export default async function EditTrainPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">Edit Train</Title>
+      <Title order={2} mb="lg">列車を編集</Title>
       <TrainForm
         isEdit
         initialData={{

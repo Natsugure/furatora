@@ -33,26 +33,26 @@ export default async function LineDirectionsPage({
   return (
     <div>
       <LinkAnchor href="/lines" size="sm" mb="lg" style={{ display: 'block' }}>
-        &larr; Back to Lines
+        &larr; 路線一覧に戻る
       </LinkAnchor>
 
       <Group justify="space-between" mb="lg">
         <div>
           <Title order={2}>{line.name}</Title>
-          <Text size="sm" c="dimmed">Manage Directions</Text>
+          <Text size="sm" c="dimmed">方面を管理</Text>
         </div>
         <LinkButton href={`/lines/${lineId}/directions/new`}>
-          + New Direction
+          + 新規方面
         </LinkButton>
       </Group>
 
       <Text size="sm" c="dimmed" mb="md">
-        Define direction information for this line. This will be used when registering platforms.
+        この路線の方面情報を設定します。ホームを登録する際に使用されます。
       </Text>
 
       {directions.length === 0 ? (
         <Text size="sm" c="dimmed">
-          No directions defined yet. Click &quot;+ New Direction&quot; to create one.
+          方面がまだ定義されていません。「+ 新規方面」をクリックして作成してください。
         </Text>
       ) : (
         <Stack gap="sm">
@@ -67,10 +67,10 @@ export default async function LineDirectionsPage({
                     )}
                   </Group>
                   <Text size="sm" c="dimmed">
-                    Type: {direction.directionType === 'inbound' ? '上り (Inbound)' : '下り (Outbound)'}
+                    タイプ: {direction.directionType === 'inbound' ? '上り' : '下り'}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    Representative Station: {stationMap[direction.representativeStationId] ?? '-'}
+                    代表駅: {stationMap[direction.representativeStationId] ?? '-'}
                   </Text>
                   {direction.notes && (
                     <Text size="sm" c="gray.5" mt="xs">{direction.notes}</Text>
@@ -82,12 +82,11 @@ export default async function LineDirectionsPage({
                     variant="default"
                     size="compact-sm"
                   >
-                    Edit
+                    編集
                   </LinkButton>
                   <DeleteButton
                     endpoint={`/api/lines/${lineId}/directions/${direction.id}`}
                     redirectTo={`/lines/${lineId}/directions`}
-                    label="Delete"
                   />
                 </Group>
               </Group>

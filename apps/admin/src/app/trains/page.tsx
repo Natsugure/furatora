@@ -14,23 +14,23 @@ export default async function TrainsPage() {
   return (
     <div>
       <Group justify="space-between" mb="lg">
-        <Title order={2}>Trains</Title>
+        <Title order={2}>列車</Title>
         <LinkButton href="/trains/new">
-          + New Train
+          + 新規列車
         </LinkButton>
       </Group>
 
       {trainList.length === 0 ? (
-        <Text c="dimmed">No trains registered yet.</Text>
+        <Text c="dimmed">列車がまだ登録されていません。</Text>
       ) : (
         <ScrollArea>
           <Table striped highlightOnHover withTableBorder>
             <TableThead>
               <TableTr>
-                <TableTh>Name</TableTh>
-                <TableTh>Operator</TableTh>
-                <TableTh>Cars</TableTh>
-                <TableTh>Actions</TableTh>
+                <TableTh>名称</TableTh>
+                <TableTh>事業者</TableTh>
+                <TableTh>両数</TableTh>
+                <TableTh>操作</TableTh>
               </TableTr>
             </TableThead>
             <TableTbody>
@@ -46,7 +46,7 @@ export default async function TrainsPage() {
                   <TableTd>
                     <Group gap="xs">
                       <LinkAnchor href={`/trains/${train.id}/edit`} size="sm">
-                        Edit
+                        編集
                       </LinkAnchor>
                       <DuplicateButton trainId={train.id} trainName={train.name} />
                       <DeleteButton

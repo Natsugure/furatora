@@ -17,7 +17,7 @@ export default async function NewPlatformPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">New Platform - {station.name}</Title>
+      <Title order={2} mb="lg">新規ホーム - {station.name}</Title>
       <PlatformForm stationId={stationId} />
     </div>
   );

@@ -49,7 +49,7 @@ export default async function EditLocationPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">Edit Platform Location - {station.name}</Title>
+      <Title order={2} mb="lg">設備場所を編集 - {station.name}</Title>
       <FacilityForm
         stationId={stationId}
         isEdit

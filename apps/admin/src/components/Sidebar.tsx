@@ -6,10 +6,10 @@ import { NavLink, Stack, Button } from '@mantine/core';
 import { logout } from '@/actions';
 
 const navItems = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/trains', label: 'Trains' },
-  { href: '/stations', label: 'Stations' },
-  { href: '/lines', label: 'Lines' },
+  { href: '/', label: 'ダッシュボード' },
+  { href: '/trains', label: '列車' },
+  { href: '/stations', label: '駅' },
+  { href: '/lines', label: '路線' },
   { href: '/unresolved-connections', label: '未解決接続' },
 ];
 

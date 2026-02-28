@@ -18,7 +18,7 @@ export function DuplicateButton({ trainId, trainName }: Props) {
   const [error, setError] = useState('');
 
   function handleOpen() {
-    setNewName(`${trainName} (Copy)`);
+    setNewName(`${trainName} (複製)`);
     setError('');
     open();
   }
@@ -67,7 +67,7 @@ export function DuplicateButton({ trainId, trainName }: Props) {
   return (
     <>
       <Button variant="default" size="compact-sm" onClick={handleOpen}>
-        Duplicate
+        複製
       </Button>
       <Modal opened={opened} onClose={close} title="列車を複製" centered>
         <TextInput

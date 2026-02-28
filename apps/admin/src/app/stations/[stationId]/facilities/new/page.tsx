@@ -17,7 +17,7 @@ export default async function NewFacilityPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">New Platform Location - {station.name}</Title>
+      <Title order={2} mb="lg">新規設備場所 - {station.name}</Title>
       <FacilityForm stationId={stationId} />
     </div>
   );

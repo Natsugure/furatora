@@ -116,7 +116,7 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -126,13 +126,13 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
         <Title order={4} mb="md">駅情報</Title>
         <Stack gap="md">
           <TextInput
-            label="よみがな - Optional"
+            label="よみがな - 任意"
             placeholder="例: かやばちょう"
             value={nameKana}
             onChange={(e) => setNameKana(e.target.value)}
           />
           <Textarea
-            label="備考 - Optional"
+            label="備考 - 任意"
             placeholder="例: 東急東横線との直通運転あり"
             rows={4}
             value={notes}
@@ -208,10 +208,10 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
 
       <Group gap="sm">
         <Button loading={submitting} onClick={handleSave}>
-          Save
+          保存
         </Button>
         <Button variant="default" onClick={() => router.push('/stations')}>
-          Cancel
+          キャンセル
         </Button>
       </Group>
     </Stack>

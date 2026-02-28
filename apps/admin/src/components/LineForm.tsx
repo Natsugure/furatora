@@ -31,7 +31,7 @@ export function LineForm({ lineId, initialData }: Props) {
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -39,17 +39,17 @@ export function LineForm({ lineId, initialData }: Props) {
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
         <TextInput
-          label="よみがな - Optional"
-          placeholder="e.g. ぎんざせん"
+          label="よみがな - 任意"
+          placeholder="例: ぎんざせん"
           value={nameKana}
           onChange={(e) => setNameKana(e.target.value)}
         />
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
-            Update
+            更新
           </Button>
           <Button variant="default" onClick={() => router.push('/lines')}>
-            Cancel
+            キャンセル
           </Button>
         </Group>
       </Stack>

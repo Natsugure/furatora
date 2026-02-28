@@ -23,16 +23,16 @@ export default async function Dashboard() {
   const counts = await fetchCounts();
 
   const cards = [
-    { label: 'Operators', value: counts.operators },
-    { label: 'Lines', value: counts.lines },
-    { label: 'Stations', value: counts.stations },
-    { label: 'Trains', value: counts.trains },
-    { label: 'Facilities', value: counts.facilities },
+    { label: '事業者', value: counts.operators },
+    { label: '路線', value: counts.lines },
+    { label: '駅', value: counts.stations },
+    { label: '列車', value: counts.trains },
+    { label: '設備', value: counts.facilities },
   ];
 
   return (
     <div>
-      <Title order={2} mb="lg">Dashboard</Title>
+      <Title order={2} mb="lg">ダッシュボード</Title>
       <SimpleGrid cols={{ base: 2, md: 3, lg: 5 }}>
         {cards.map((card) => (
           <Card key={card.label} shadow="sm" padding="lg" withBorder ta="center">

@@ -95,7 +95,7 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
@@ -108,10 +108,10 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
         <NativeSelect
-          label="Direction Type"
+          label="方面タイプ"
           data={[
-            { value: 'inbound', label: 'Inbound (上り)' },
-            { value: 'outbound', label: 'Outbound (下り)' },
+            { value: 'inbound', label: '上り' },
+            { value: 'outbound', label: '下り' },
           ]}
           value={directionType}
           onChange={(e) => setDirectionType(e.target.value)}
@@ -119,33 +119,33 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
         />
 
         <TextInput
-          label="Display Name (日本語)"
-          placeholder="e.g. 渋谷方面"
+          label="表示名（日本語）"
+          placeholder="例: 渋谷方面"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           required
         />
 
         <TextInput
-          label="Display Name (English) - Optional"
+          label="表示名（英語）- 任意"
           placeholder="e.g. For Shibuya"
           value={displayNameEn}
           onChange={(e) => setDisplayNameEn(e.target.value)}
         />
 
         <NativeSelect
-          label="Representative Station"
-          description="The main station representing this direction (e.g., Shibuya for &quot;Shibuya-bound&quot;)"
-          data={[{ value: '', label: 'Select station' }, ...stationSelectData]}
+          label="代表駅"
+          description="この方面を表す代表的な駅（例：渋谷方面の場合は渋谷駅）"
+          data={[{ value: '', label: '駅を選択' }, ...stationSelectData]}
           value={representativeStationId}
           onChange={(e) => setRepresentativeStationId(e.target.value)}
           required
         />
 
         <div>
-          <Text size="sm" fw={500} mb="xs">Terminal Stations - Optional</Text>
+          <Text size="sm" fw={500} mb="xs">終点駅 - 任意</Text>
           <Text size="xs" c="dimmed" mb="xs">
-            Select possible terminal stations for this direction
+            この方面の終点となりうる駅を選択してください
           </Text>
           <ScrollArea.Autosize mah={240} type="auto" offsetScrollbars>
             {stationsLoading ? (
@@ -169,7 +169,7 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
         </div>
 
         <Textarea
-          label="Notes"
+          label="備考"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -177,10 +177,10 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
 
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
-            {isEdit ? 'Update' : 'Create'}
+            {isEdit ? '更新' : '登録'}
           </Button>
           <Button variant="default" onClick={() => router.push(`/lines/${lineId}/directions`)}>
-            Cancel
+            キャンセル
           </Button>
         </Group>
       </Stack>

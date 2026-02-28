@@ -30,7 +30,7 @@ export function FacilityDuplicateButton({ endpoint }: Props) {
       loading={loading}
       onClick={handleDuplicate}
     >
-      Duplicate
+      複製
     </Button>
   );
 }

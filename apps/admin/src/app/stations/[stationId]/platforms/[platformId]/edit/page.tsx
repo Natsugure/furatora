@@ -29,7 +29,7 @@ export default async function EditPlatformPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">Edit Platform - {station.name}</Title>
+      <Title order={2} mb="lg">ホームを編集 - {station.name}</Title>
       <PlatformForm
         stationId={stationId}
         isEdit

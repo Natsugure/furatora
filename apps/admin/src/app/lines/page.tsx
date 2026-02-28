@@ -11,19 +11,19 @@ export default async function LinesPage() {
 
   return (
     <div>
-      <Title order={2} mb="lg">Lines</Title>
+      <Title order={2} mb="lg">路線</Title>
 
       {lineList.length === 0 ? (
-        <Text c="dimmed">No lines found.</Text>
+        <Text c="dimmed">路線が見つかりません。</Text>
       ) : (
         <ScrollArea>
           <Table striped highlightOnHover withTableBorder>
             <TableThead>
               <TableTr>
-                <TableTh>Name</TableTh>
-                <TableTh>Operator</TableTh>
-                <TableTh>Code</TableTh>
-                <TableTh>Actions</TableTh>
+                <TableTh>名称</TableTh>
+                <TableTh>事業者</TableTh>
+                <TableTh>コード</TableTh>
+                <TableTh>操作</TableTh>
               </TableTr>
             </TableThead>
             <TableTbody>
@@ -38,10 +38,10 @@ export default async function LinesPage() {
                   </TableTd>
                   <TableTd>
                     <LinkAnchor href={`/lines/${line.id}/edit`} size="sm" mr="sm">
-                      Edit
+                      編集
                     </LinkAnchor>
                     <LinkAnchor href={`/lines/${line.id}/directions`} size="sm">
-                      Manage Directions
+                      方面を管理
                     </LinkAnchor>
                   </TableTd>
                 </TableTr>

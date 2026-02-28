@@ -17,7 +17,7 @@ export default async function NewDirectionPage({
 
   return (
     <div>
-      <Title order={2} mb="lg">New Direction - {line.name}</Title>
+      <Title order={2} mb="lg">新規方面 - {line.name}</Title>
       <LineDirectionForm lineId={lineId} />
     </div>
   );

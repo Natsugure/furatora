@@ -39,7 +39,7 @@ export default async function StationsPage() {
 
   return (
     <div>
-      <Title order={2} mb="lg">Stations</Title>
+      <Title order={2} mb="lg">駅</Title>
 
       <Stack gap="xl">
         {byOperator.map(({ operator, lines: opLines }) => (
@@ -61,18 +61,18 @@ export default async function StationsPage() {
                       />
                     )}
                     <Text fw={500}>{line.name}</Text>
-                    <Text size="sm" c="dimmed">({stns.length} stations)</Text>
+                    <Text size="sm" c="dimmed">({stns.length}駅)</Text>
                   </Group>
                   <ScrollArea ml="md">
                     <Table striped highlightOnHover withTableBorder fz="sm">
                       <TableThead>
                         <TableTr>
                           <TableTh>#</TableTh>
-                          <TableTh>Code</TableTh>
-                          <TableTh>Name</TableTh>
-                          <TableTh>Name (EN)</TableTh>
-                          <TableTh>Facilities</TableTh>
-                          <TableTh>Edit</TableTh>
+                          <TableTh>コード</TableTh>
+                          <TableTh>名称</TableTh>
+                          <TableTh>名称（英語）</TableTh>
+                          <TableTh>設備</TableTh>
+                          <TableTh>編集</TableTh>
                         </TableTr>
                       </TableThead>
                       <TableTbody>
@@ -90,12 +90,12 @@ export default async function StationsPage() {
                             </TableTd>
                             <TableTd>
                               <LinkAnchor href={`/stations/${stn.id}/facilities`} size="sm">
-                                Manage
+                                管理
                               </LinkAnchor>
                             </TableTd>
                             <TableTd>
                               <LinkAnchor href={`/stations/${stn.id}/edit`} size="sm" c="dimmed">
-                                Edit
+                                編集
                               </LinkAnchor>
                             </TableTd>
                           </TableTr>

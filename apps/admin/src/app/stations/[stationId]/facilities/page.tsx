@@ -113,7 +113,7 @@ export default async function FacilitiesPage({
   return (
     <div>
       <LinkAnchor href="/stations" size="sm" mb="lg" style={{ display: 'block' }}>
-        &larr; Back to Stations
+        &larr; 駅一覧に戻る
       </LinkAnchor>
 
       <Group justify="space-between" mb="lg">
@@ -125,28 +125,28 @@ export default async function FacilitiesPage({
         </div>
         <Group gap="xs">
           <LinkButton href={`/stations/${stationId}/platforms/new`} variant="default">
-            + New Platform
+            + 新規ホーム
           </LinkButton>
           <LinkButton href={`/stations/${stationId}/facilities/new`}>
-            + New Location
+            + 新規設備場所
           </LinkButton>
         </Group>
       </Group>
 
       {/* Platforms Section */}
       <Stack gap="md" mb="xl">
-        <Title order={3}>Platforms</Title>
+        <Title order={3}>ホーム</Title>
         {platformList.length === 0 ? (
-          <Text size="sm" c="dimmed">No platforms registered yet.</Text>
+          <Text size="sm" c="dimmed">ホームがまだ登録されていません。</Text>
         ) : (
           <Table striped highlightOnHover withTableBorder>
             <TableThead>
               <TableTr>
-                <TableTh>Platform</TableTh>
-                <TableTh>Line</TableTh>
-                <TableTh>Direction</TableTh>
-                <TableTh>Max Cars</TableTh>
-                <TableTh>Actions</TableTh>
+                <TableTh>ホーム</TableTh>
+                <TableTh>路線</TableTh>
+                <TableTh>方面</TableTh>
+                <TableTh>最大両数</TableTh>
+                <TableTh>操作</TableTh>
               </TableTr>
             </TableThead>
             <TableTbody>
@@ -173,12 +173,11 @@ export default async function FacilitiesPage({
                           variant="default"
                           size="compact-xs"
                         >
-                          Edit
+                          編集
                         </LinkButton>
                         <DeleteButton
                           endpoint={`/api/stations/${stationId}/platforms/${platform.id}`}
                           redirectTo={`/stations/${stationId}/facilities`}
-                          label="Delete"
                         />
                       </Group>
                     </TableTd>
@@ -191,9 +190,9 @@ export default async function FacilitiesPage({
       </Stack>
 
       {/* Platform Locations Section - grouped by platform */}
-      <Title order={3} mb="sm">Platform Locations</Title>
+      <Title order={3} mb="sm">設備場所</Title>
       {locationList.length === 0 ? (
-        <Text size="sm" c="dimmed">No locations registered yet.</Text>
+        <Text size="sm" c="dimmed">設備場所がまだ登録されていません。</Text>
       ) : (
         <Stack gap="xl">
           {platformList.map((platform) => {
@@ -208,7 +207,7 @@ export default async function FacilitiesPage({
             return (
               <div key={platform.id}>
                 <Text size="sm" fw={600} c="dimmed" mb="xs" pb={4} style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
-                  Platform {platform.platformNumber}{directionText}
+                  {platform.platformNumber}番ホーム{directionText}
                 </Text>
                 <Stack gap="xs">
                   {locations.map((location) => {
@@ -229,7 +228,7 @@ export default async function FacilitiesPage({
                               )}
                               {hasLimitedAccessibility && (
                                 <Badge color="yellow" variant="light" size="sm">
-                                  Limited accessibility
+                                  アクセス制限あり
                                 </Badge>
                               )}
                             </Group>
@@ -254,7 +253,7 @@ export default async function FacilitiesPage({
                               variant="default"
                               size="compact-sm"
                             >
-                              Edit
+                              編集
                             </LinkButton>
                             <FacilityDuplicateButton
                               endpoint={`/api/stations/${stationId}/platform-locations/${location.id}/duplicate`}
