@@ -62,8 +62,6 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const initialLimitedPlatformIds = useRef(initialData?.limitedToPlatformIds);
 
-  const [hasInvalidInput, setHasInvalidInput] = useState(false);
-
   useEffect(() => {
     const initialIds = initialLimitedPlatformIds.current;
     const fetches: Promise<void>[] = [
