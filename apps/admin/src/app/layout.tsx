@@ -1,5 +1,9 @@
 import type { Metadata } from 'next';
-import { Sidebar } from '@/components/Sidebar';
+import { ColorSchemeScript, MantineProvider } from '@mantine/core';
+import '@mantine/core/styles.css';
+import { Notifications } from '@mantine/notifications';
+import '@mantine/notifications/styles.css';
+import { AdminShell } from '@/components/AdminShell';
 import { auth } from '@/auth';
 import './globals.css';
 
@@ -20,10 +24,19 @@ export default async function RootLayout({
   const session = await auth();
 
   return (
-    <html lang="ja">
-      <body className="flex">
-        {session && <Sidebar />}
-        <main className="flex-1 p-6">{children}</main>
+    <html lang="ja" suppressHydrationWarning>
+      <head>
+        <ColorSchemeScript defaultColorScheme="light" />
+      </head>
+      <body>
+        <MantineProvider defaultColorScheme="light">
+          <Notifications />
+          {session ? (
+            <AdminShell>{children}</AdminShell>
+          ) : (
+            <main style={{ padding: '1.5rem' }}>{children}</main>
+          )}
+        </MantineProvider>
       </body>
     </html>
   );

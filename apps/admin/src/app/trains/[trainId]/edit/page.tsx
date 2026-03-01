@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
+import { Title } from '@mantine/core';
 import { TrainForm } from '@/components/TrainForm';
 
 export default async function EditTrainPage({
@@ -21,7 +22,7 @@ export default async function EditTrainPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">Edit Train</h2>
+      <Title order={2} mb="lg">列車を編集</Title>
       <TrainForm
         isEdit
         initialData={{

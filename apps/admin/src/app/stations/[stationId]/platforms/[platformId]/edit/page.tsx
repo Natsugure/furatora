@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { stations, platforms, platformCarStopPositions } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
+import { Title } from '@mantine/core';
 import { PlatformForm } from '@/components/PlatformForm';
 
 export default async function EditPlatformPage({
@@ -28,7 +29,7 @@ export default async function EditPlatformPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">Edit Platform - {station.name}</h2>
+      <Title order={2} mb="lg">ホームを編集 - {station.name}</Title>
       <PlatformForm
         stationId={stationId}
         isEdit

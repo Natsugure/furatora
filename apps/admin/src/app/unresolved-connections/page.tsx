@@ -1,6 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  Badge, Button, Card, Collapse, Group, Loader, NativeSelect,
+  SegmentedControl, Stack, Text, TextInput, Title,
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { suggestRailwaysFromOdptIds, suggestStationsFromOdptIds } from '@/actions/gemini';
+import type { RailwaySuggestion, StationSuggestion } from '@/actions/gemini';
+import { RailwayBulkSuggestModal } from '@/components/RailwayBulkSuggestModal';
+import { StationBulkSuggestModal } from '@/components/StationBulkSuggestModal';
 
 type Operator = { id: string; name: string; odptOperatorId: string | null };
 
@@ -23,8 +32,7 @@ type UnresolvedStation = {
 };
 
 type AllStation = { id: string; name: string; code: string | null; operatorId: string };
-
-// ───── Operator Section ────────────────────────────────────────────────────
+type AllLine = { id: string; name: string; odptRailwayId: string | null };
 
 function OperatorSection({
   operators,
@@ -59,53 +67,42 @@ function OperatorSection({
   }
 
   return (
-    <section className="border rounded p-4 bg-gray-50">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">
+    <Card withBorder padding="md" bg="gray.0">
+      <Group justify="space-between">
+        <Text size="sm" fw={600}>
           登録済み事業者 ({operators.length}件)：
           {operators.map((o) => o.name).join('、')}
-        </h2>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="text-sm text-blue-600 hover:underline"
-        >
+        </Text>
+        <Button variant="subtle" size="compact-sm" onClick={() => setOpen((v) => !v)}>
           {open ? 'キャンセル' : '+ 事業者を追加'}
-        </button>
-      </div>
-      {open && (
-        <div className="mt-3 flex items-end gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">名称 *</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例: JR東日本"
-              className="border rounded px-2 py-1.5 text-sm w-40"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">ODPT ID</label>
-            <input
-              value={odptOperatorId}
-              onChange={(e) => setOdptOperatorId(e.target.value)}
-              placeholder="odpt.Operator:JR-East"
-              className="border rounded px-2 py-1.5 text-sm w-56"
-            />
-          </div>
-          <button
-            onClick={handleCreate}
-            disabled={submitting || !name.trim()}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-          >
+        </Button>
+      </Group>
+      <Collapse in={open}>
+        <Group gap="sm" mt="sm" align="flex-end">
+          <TextInput
+            label="名称 *"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: JR東日本"
+            size="sm"
+            w={160}
+          />
+          <TextInput
+            label="ODPT ID"
+            value={odptOperatorId}
+            onChange={(e) => setOdptOperatorId(e.target.value)}
+            placeholder="odpt.Operator:JR-East"
+            size="sm"
+            w={224}
+          />
+          <Button size="sm" onClick={handleCreate} disabled={submitting || !name.trim()}>
             作成
-          </button>
-        </div>
-      )}
-    </section>
+          </Button>
+        </Group>
+      </Collapse>
+    </Card>
   );
 }
-
-// ───── Railway Row ─────────────────────────────────────────────────────────
 
 function RailwayRow({
   railway,
@@ -149,93 +146,48 @@ function RailwayRow({
   }
 
   return (
-    <div className="border-b last:border-b-0">
-      <div className="flex items-center px-4 py-3 gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-mono text-gray-600 truncate">{railway.odptRailwayId}</div>
-          <div className="text-xs text-gray-400 mt-0.5">
+    <div style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+      <Group px="md" py="sm" gap="md">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Text size="sm" ff="monospace" c="dimmed" truncate>{railway.odptRailwayId}</Text>
+          <Text size="xs" c="dimmed" mt={2}>
             {railway.referencingStationNames.slice(0, 5).join('・')}
             {railway.referencingStationNames.length > 5 && ` 他${railway.referencingStationNames.length - 5}駅`}
-          </div>
+          </Text>
         </div>
-        <span className="text-xs text-gray-500 shrink-0">{railway.referenceCount}件</span>
-        <button
-          onClick={onToggle}
-          className="text-sm text-blue-600 hover:underline shrink-0"
-        >
+        <Badge size="sm" variant="light">{railway.referenceCount}件</Badge>
+        <Button variant="subtle" size="compact-sm" onClick={onToggle}>
           {isExpanded ? '閉じる' : '解決'}
-        </button>
-      </div>
+        </Button>
+      </Group>
 
-      {isExpanded && (
-        <div className="px-4 pb-4 bg-blue-50 border-t flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">路線名 *</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="border rounded px-2 py-1.5 text-sm w-32"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">英語名</label>
-            <input
-              value={nameEn}
-              onChange={(e) => setNameEn(e.target.value)}
-              className="border rounded px-2 py-1.5 text-sm w-32"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">事業者 *</label>
-            <select
-              value={operatorId}
-              onChange={(e) => setOperatorId(e.target.value)}
-              required
-              className="border rounded px-2 py-1.5 text-sm"
-            >
-              <option value="">選択</option>
-              {operators.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">路線コード</label>
-            <input
-              value={lineCode}
-              onChange={(e) => setLineCode(e.target.value)}
-              placeholder="例: JC"
-              className="border rounded px-2 py-1.5 text-sm w-20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">カラー</label>
-            <input
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              placeholder="#F15A22"
-              className="border rounded px-2 py-1.5 text-sm w-24"
-            />
-          </div>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || !name.trim() || !operatorId}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {submitting ? '作成中...' : '路線を作成'}
-          </button>
-        </div>
-      )}
+      <Collapse in={isExpanded}>
+        <Group gap="sm" px="md" pb="md" bg="blue.0" pt="sm" align="flex-end" wrap="wrap">
+          <TextInput label="路線名 *" value={name} onChange={(e) => setName(e.target.value)} size="sm" w={128} />
+          <TextInput label="英語名" value={nameEn} onChange={(e) => setNameEn(e.target.value)} size="sm" w={128} />
+          <NativeSelect
+            label="事業者 *"
+            data={[{ value: '', label: '選択' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
+            value={operatorId}
+            onChange={(e) => setOperatorId(e.target.value)}
+            size="sm"
+          />
+          <TextInput label="路線コード" value={lineCode} onChange={(e) => setLineCode(e.target.value)} placeholder="例: JC" size="sm" w={80} />
+          <TextInput label="カラー" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#F15A22" size="sm" w={96} />
+          <Button size="sm" onClick={handleSubmit} disabled={submitting || !name.trim() || !operatorId} loading={submitting}>
+            路線を作成
+          </Button>
+        </Group>
+      </Collapse>
     </div>
   );
 }
-
-// ───── Station Row ─────────────────────────────────────────────────────────
 
 function StationRow({
   station,
   operators,
   allStations,
+  allLines,
   isExpanded,
   onToggle,
   onResolved,
@@ -243,11 +195,12 @@ function StationRow({
   station: UnresolvedStation;
   operators: Operator[];
   allStations: AllStation[];
+  allLines: AllLine[];
   isExpanded: boolean;
   onToggle: () => void;
   onResolved: () => void;
 }) {
-  const [mode, setMode] = useState<'create' | 'link'>('create');
+  const [mode, setMode] = useState<string>('create');
   const [name, setName] = useState(station.suggestedName);
   const [nameEn, setNameEn] = useState(station.suggestedName);
   const [code, setCode] = useState('');
@@ -256,6 +209,10 @@ function StationRow({
       o.odptOperatorId?.toLowerCase().includes(station.operatorKey.toLowerCase())
     );
     return match?.id ?? '';
+  });
+  const [lineId, setLineId] = useState(() => {
+    if (!station.odptRailwayId) return '';
+    return allLines.find((l) => l.odptRailwayId === station.odptRailwayId)?.id ?? '';
   });
   const [linkStationId, setLinkStationId] = useState('');
   const [stationFilter, setStationFilter] = useState('');
@@ -273,7 +230,7 @@ function StationRow({
     setSubmitting(true);
     const body =
       mode === 'create'
-        ? { action: 'create', odptStationId: station.odptStationId, name, nameEn, code, operatorId }
+        ? { action: 'create', odptStationId: station.odptStationId, name, nameEn, code, operatorId, lineId: lineId || undefined }
         : { action: 'link', odptStationId: station.odptStationId, stationId: linkStationId };
 
     const res = await fetch('/api/unresolved-connections/stations', {
@@ -293,184 +250,213 @@ function StationRow({
     mode === 'create' ? name.trim() !== '' && operatorId !== '' : linkStationId !== '';
 
   return (
-    <div className="border-b last:border-b-0">
-      <div className="flex items-center px-4 py-3 gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-mono text-gray-600 truncate">{station.odptStationId}</div>
-          <div className="text-xs text-gray-400 mt-0.5">
+    <div style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+      <Group px="md" py="sm" gap="md">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Text size="sm" ff="monospace" c="dimmed" truncate>{station.odptStationId}</Text>
+          <Text size="xs" c="dimmed" mt={2}>
             {station.referencingStationNames.slice(0, 5).join('・')}
             {station.referencingStationNames.length > 5 &&
               ` 他${station.referencingStationNames.length - 5}駅`}
-          </div>
+          </Text>
         </div>
-        <span className="text-xs text-gray-500 shrink-0">{station.referenceCount}件</span>
-        <button
-          onClick={onToggle}
-          className="text-sm text-blue-600 hover:underline shrink-0"
-        >
+        <Badge size="sm" variant="light">{station.referenceCount}件</Badge>
+        <Button variant="subtle" size="compact-sm" onClick={onToggle}>
           {isExpanded ? '閉じる' : '解決'}
-        </button>
-      </div>
+        </Button>
+      </Group>
 
-      {isExpanded && (
-        <div className="px-4 pb-4 bg-blue-50 border-t">
-          {/* Mode toggle */}
-          <div className="flex gap-2 mt-3 mb-3">
-            <button
-              onClick={() => setMode('create')}
-              className={`px-3 py-1 text-sm rounded ${mode === 'create' ? 'bg-blue-600 text-white' : 'border text-gray-600 hover:bg-gray-100'}`}
-            >
-              新規作成
-            </button>
-            <button
-              onClick={() => setMode('link')}
-              className={`px-3 py-1 text-sm rounded ${mode === 'link' ? 'bg-blue-600 text-white' : 'border text-gray-600 hover:bg-gray-100'}`}
-            >
-              既存駅に紐付け
-            </button>
-          </div>
+      <Collapse in={isExpanded}>
+        <Stack gap="sm" px="md" pb="md" bg="blue.0" pt="sm">
+          <SegmentedControl
+            value={mode}
+            onChange={setMode}
+            data={[
+              { value: 'create', label: '新規作成' },
+              { value: 'link', label: '既存駅に紐付け' },
+            ]}
+            size="sm"
+          />
 
           {mode === 'create' ? (
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">駅名 *</label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="border rounded px-2 py-1.5 text-sm w-28"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">英語名</label>
-                <input
-                  value={nameEn}
-                  onChange={(e) => setNameEn(e.target.value)}
-                  className="border rounded px-2 py-1.5 text-sm w-28"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">駅コード</label>
-                <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="例: JC05"
-                  className="border rounded px-2 py-1.5 text-sm w-20"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">事業者 *</label>
-                <select
-                  value={operatorId}
-                  onChange={(e) => setOperatorId(e.target.value)}
-                  className="border rounded px-2 py-1.5 text-sm"
-                >
-                  <option value="">選択</option>
-                  {operators.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !canSubmit}
-                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submitting ? '作成中...' : '駅を作成'}
-              </button>
-            </div>
+            <Group gap="sm" align="flex-end" wrap="wrap">
+              <TextInput label="駅名 *" value={name} onChange={(e) => setName(e.target.value)} size="sm" w={112} />
+              <TextInput label="英語名" value={nameEn} onChange={(e) => setNameEn(e.target.value)} size="sm" w={112} />
+              <TextInput label="駅コード" value={code} onChange={(e) => setCode(e.target.value)} placeholder="例: JC05" size="sm" w={80} />
+              <NativeSelect
+                label="事業者 *"
+                data={[{ value: '', label: '選択' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
+                value={operatorId}
+                onChange={(e) => setOperatorId(e.target.value)}
+                size="sm"
+              />
+              <NativeSelect
+                label="路線"
+                data={[{ value: '', label: '未選択' }, ...allLines.map((l) => ({ value: l.id, label: l.name }))]}
+                value={lineId}
+                onChange={(e) => setLineId(e.target.value)}
+                size="sm"
+              />
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || !canSubmit} loading={submitting}>
+                駅を作成
+              </Button>
+            </Group>
           ) : (
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">駅を検索</label>
-                <input
-                  value={stationFilter}
-                  onChange={(e) => setStationFilter(e.target.value)}
-                  placeholder="駅名・コードで絞り込み"
-                  className="border rounded px-2 py-1.5 text-sm w-44"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">紐付け先 *</label>
-                <select
-                  value={linkStationId}
-                  onChange={(e) => setLinkStationId(e.target.value)}
-                  className="border rounded px-2 py-1.5 text-sm w-56"
-                >
-                  <option value="">選択</option>
-                  {filteredStations.slice(0, 100).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{s.code ? ` (${s.code})` : ''}
-                    </option>
-                  ))}
-                  {filteredStations.length > 100 && (
-                    <option disabled>... 絞り込んでください ({filteredStations.length}件)</option>
-                  )}
-                </select>
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !canSubmit}
-                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submitting ? '保存中...' : '紐付け'}
-              </button>
-            </div>
+            <Group gap="sm" align="flex-end" wrap="wrap">
+              <TextInput
+                label="駅を検索"
+                value={stationFilter}
+                onChange={(e) => setStationFilter(e.target.value)}
+                placeholder="駅名・コードで絞り込み"
+                size="sm"
+                w={176}
+              />
+              <NativeSelect
+                label="紐付け先 *"
+                data={[
+                  { value: '', label: '選択' },
+                  ...filteredStations.slice(0, 100).map((s) => ({
+                    value: s.id,
+                    label: `${s.name}${s.code ? ` (${s.code})` : ''}`,
+                  })),
+                  ...(filteredStations.length > 100
+                    ? [{ value: '__overflow', label: `... 絞り込んでください (${filteredStations.length}件)`, disabled: true }]
+                    : []),
+                ]}
+                value={linkStationId}
+                onChange={(e) => setLinkStationId(e.target.value)}
+                size="sm"
+                w={224}
+              />
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || !canSubmit} loading={submitting}>
+                紐付け
+              </Button>
+            </Group>
           )}
-        </div>
-      )}
+        </Stack>
+      </Collapse>
     </div>
   );
 }
-
-// ───── Page ────────────────────────────────────────────────────────────────
 
 export default function UnresolvedConnectionsPage() {
   const [railways, setRailways] = useState<UnresolvedRailway[]>([]);
   const [stations, setStations] = useState<UnresolvedStation[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
   const [allStations, setAllStations] = useState<AllStation[]>([]);
+  const [allLines, setAllLines] = useState<AllLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRailwayId, setExpandedRailwayId] = useState<string | null>(null);
   const [expandedStationId, setExpandedStationId] = useState<string | null>(null);
+
+  // AI提案モーダル
+  const [railwayModalOpen, setRailwayModalOpen] = useState(false);
+  const [stationModalOpen, setStationModalOpen] = useState(false);
+  const [pendingRailwaySuggestions, setPendingRailwaySuggestions] = useState<RailwaySuggestion[]>([]);
+  const [pendingStationSuggestions, setPendingStationSuggestions] = useState<StationSuggestion[]>([]);
+  const [railwayModalKey, setRailwayModalKey] = useState(0);
+  const [stationModalKey, setStationModalKey] = useState(0);
+  const [aiRailwayLoading, setAiRailwayLoading] = useState(false);
+  const [aiStationLoading, setAiStationLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/unresolved-connections').then((r) => r.json()),
       fetch('/api/operators').then((r) => r.json()),
       fetch('/api/stations').then((r) => r.json()),
-    ]).then(([connectionsData, operatorsData, stationsData]) => {
+      fetch('/api/lines').then((r) => r.json()),
+    ]).then(([connectionsData, operatorsData, stationsData, linesData]) => {
       setRailways(connectionsData.railways);
       setStations(connectionsData.stations);
       setOperators(operatorsData);
       setAllStations(stationsData);
+      setAllLines(linesData);
       setLoading(false);
     });
   }, []);
 
-  if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
+  async function handleBulkRailwaySuggest() {
+    setAiRailwayLoading(true);
+    try {
+      const ids = railways.map((r) => r.odptRailwayId);
+      const results = await suggestRailwaysFromOdptIds(ids);
+      setPendingRailwaySuggestions(results);
+      setRailwayModalKey((k) => k + 1);
+      setRailwayModalOpen(true);
+    } catch (e) {
+      notifications.show({
+        title: 'AI提案エラー',
+        message: (e as Error).message,
+        color: 'red',
+        autoClose: 6000,
+      });
+    }
+    setAiRailwayLoading(false);
+  }
+
+  async function handleBulkStationSuggest() {
+    setAiStationLoading(true);
+    try {
+      const ids = stations.map((s) => s.odptStationId);
+      const results = await suggestStationsFromOdptIds(ids);
+      setPendingStationSuggestions(results);
+      setStationModalKey((k) => k + 1);
+      setStationModalOpen(true);
+    } catch (e) {
+      notifications.show({
+        title: 'AI提案エラー',
+        message: (e as Error).message,
+        color: 'red',
+        autoClose: 6000,
+      });
+    }
+    setAiStationLoading(false);
+  }
+
+  if (loading) {
+    return (
+      <Group justify="center" py="xl">
+        <Loader />
+      </Group>
+    );
+  }
 
   return (
-    <div className="space-y-8 max-w-4xl">
-      <h1 className="text-2xl font-bold">未解決の乗換接続</h1>
-      <p className="text-sm text-gray-500 -mt-4">
-        stationConnectionsテーブル内で、DBレコードに紐付けられていない路線・駅を登録します。
-      </p>
+    <Stack gap="xl" maw="56rem">
+      <div>
+        <Title order={1} mb="xs">未解決の乗換接続</Title>
+        <Text size="sm" c="dimmed">
+          stationConnectionsテーブル内で、DBレコードに紐付けられていない路線・駅を登録します。
+        </Text>
+      </div>
 
       <OperatorSection
         operators={operators}
         onCreated={(op) => setOperators((prev) => [...prev, op])}
       />
 
-      {/* Railways */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">
-          未解決の路線
-          <span className="text-gray-500 text-sm font-normal ml-2">({railways.length}件)</span>
-        </h2>
+        <Group justify="space-between" mb="sm">
+          <Title order={3}>
+            未解決の路線
+            <Text span size="sm" c="dimmed" fw={400} ml="xs">({railways.length}件)</Text>
+          </Title>
+          {railways.length > 0 && (
+            <Button
+              variant="light"
+              color="violet"
+              size="sm"
+              loading={aiRailwayLoading}
+              onClick={handleBulkRailwaySuggest}
+            >
+              一括AI提案
+            </Button>
+          )}
+        </Group>
         {railways.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">未解決の路線はありません</p>
+          <Text size="sm" c="dimmed" fs="italic">未解決の路線はありません</Text>
         ) : (
-          <div className="border rounded overflow-hidden bg-white">
+          <Card withBorder padding={0}>
             {railways.map((railway) => (
               <RailwayRow
                 key={railway.odptRailwayId}
@@ -488,26 +474,39 @@ export default function UnresolvedConnectionsPage() {
                 }}
               />
             ))}
-          </div>
+          </Card>
         )}
       </section>
 
-      {/* Stations */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">
-          未解決の駅
-          <span className="text-gray-500 text-sm font-normal ml-2">({stations.length}件)</span>
-        </h2>
+        <Group justify="space-between" mb="sm">
+          <Title order={3}>
+            未解決の駅
+            <Text span size="sm" c="dimmed" fw={400} ml="xs">({stations.length}件)</Text>
+          </Title>
+          {stations.length > 0 && (
+            <Button
+              variant="light"
+              color="violet"
+              size="sm"
+              loading={aiStationLoading}
+              onClick={handleBulkStationSuggest}
+            >
+              一括AI提案
+            </Button>
+          )}
+        </Group>
         {stations.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">未解決の駅はありません</p>
+          <Text size="sm" c="dimmed" fs="italic">未解決の駅はありません</Text>
         ) : (
-          <div className="border rounded overflow-hidden bg-white">
+          <Card withBorder padding={0}>
             {stations.map((station) => (
               <StationRow
                 key={station.odptStationId}
                 station={station}
                 operators={operators}
                 allStations={allStations}
+                allLines={allLines}
                 isExpanded={expandedStationId === station.odptStationId}
                 onToggle={() =>
                   setExpandedStationId(
@@ -522,9 +521,36 @@ export default function UnresolvedConnectionsPage() {
                 }}
               />
             ))}
-          </div>
+          </Card>
         )}
       </section>
-    </div>
+
+      <RailwayBulkSuggestModal
+        key={`railway-${railwayModalKey}`}
+        opened={railwayModalOpen}
+        onClose={() => setRailwayModalOpen(false)}
+        railways={railways}
+        suggestions={pendingRailwaySuggestions}
+        operators={operators}
+        onResolved={(resolvedIds) => {
+          setRailways((prev) => prev.filter((r) => !resolvedIds.includes(r.odptRailwayId)));
+          setRailwayModalOpen(false);
+        }}
+      />
+
+      <StationBulkSuggestModal
+        key={`station-${stationModalKey}`}
+        opened={stationModalOpen}
+        onClose={() => setStationModalOpen(false)}
+        stations={stations}
+        suggestions={pendingStationSuggestions}
+        operators={operators}
+        lines={allLines}
+        onResolved={(resolvedIds) => {
+          setStations((prev) => prev.filter((s) => !resolvedIds.includes(s.odptStationId)));
+          setStationModalOpen(false);
+        }}
+      />
+    </Stack>
   );
 }

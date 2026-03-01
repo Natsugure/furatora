@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { stations } from '@furatora/database/schema';
+import { stations, stationLines } from '@furatora/database/schema';
 import { sql } from 'drizzle-orm';
 import { unresolvedStationSchema } from '@/lib/validations';
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     let resolvedStationId: string;
 
     if (parsed.data.action === 'create') {
-      const { odptStationId, name, nameEn, code, operatorId } = parsed.data;
+      const { odptStationId, name, nameEn, code, operatorId, lineId } = parsed.data;
       const [station] = await db
         .insert(stations)
         .values({
@@ -35,6 +35,10 @@ export async function POST(request: Request) {
         })
         .returning();
       resolvedStationId = station.id;
+
+      if (lineId) {
+        await db.insert(stationLines).values({ stationId: resolvedStationId, lineId });
+      }
     } else {
       const { stationId } = parsed.data;
       resolvedStationId = stationId;

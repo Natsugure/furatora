@@ -1,9 +1,10 @@
+import { Title } from '@mantine/core';
 import { TrainForm } from '@/components/TrainForm';
 
 export default function NewTrainPage() {
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">New Train</h2>
+      <Title order={2} mb="lg">新規列車</Title>
       <TrainForm />
     </div>
   );

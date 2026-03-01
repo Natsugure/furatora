@@ -1,9 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import { STROLLER_DIFFICULTY_META, WHEELCHAIR_DIFFICULTY_META } from '@/constants/difficulty';
+import {
+  Button, Card, Group, NativeSelect, SimpleGrid, Stack, Text, TextInput, Textarea, Title,
+} from '@mantine/core';
+
+type Operator = {
+  id: string;
+  name: string;
+};
 
 export type ConnectionRow = {
   id: string;
@@ -26,8 +34,18 @@ type ConnectionState = {
 
 type Props = {
   stationId: string;
-  initialNameKana: string | null;
-  initialNotes: string | null;
+  initialData: {
+    name: string;
+    nameKana: string | null;
+    nameEn: string | null;
+    odptStationId: string | null;
+    slug: string | null;
+    code: string | null;
+    lat: string | null;
+    lon: string | null;
+    operatorId: string;
+    notes: string | null;
+  };
   connections: ConnectionRow[];
 };
 
@@ -42,10 +60,33 @@ function displayName(conn: ConnectionRow): string {
   return station || railway || '(不明)';
 }
 
-export function StationEditForm({ stationId, initialNameKana, initialNotes, connections }: Props) {
+const strollerOptions = [
+  { value: '', label: '— 未設定 —' },
+  ...Object.entries(STROLLER_DIFFICULTY_META)
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([key, { label }]) => ({ value: key, label })),
+];
+
+const wheelchairOptions = [
+  { value: '', label: '— 未設定 —' },
+  ...Object.entries(WHEELCHAIR_DIFFICULTY_META)
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([key, { label }]) => ({ value: key, label })),
+];
+
+export function StationEditForm({ stationId, initialData, connections }: Props) {
   const router = useRouter();
-  const [nameKana, setNameKana] = useState(initialNameKana ?? '');
-  const [notes, setNotes] = useState(initialNotes ?? '');
+  const [name, setName] = useState(initialData.name);
+  const [nameKana, setNameKana] = useState(initialData.nameKana ?? '');
+  const [nameEn, setNameEn] = useState(initialData.nameEn ?? '');
+  const [odptStationId, setOdptStationId] = useState(initialData.odptStationId ?? '');
+  const [slug, setSlug] = useState(initialData.slug ?? '');
+  const [code, setCode] = useState(initialData.code ?? '');
+  const [lat, setLat] = useState(initialData.lat ?? '');
+  const [lon, setLon] = useState(initialData.lon ?? '');
+  const [operatorId, setOperatorId] = useState(initialData.operatorId);
+  const [notes, setNotes] = useState(initialData.notes ?? '');
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>(() =>
     Object.fromEntries(
       connections.map((c) => [
@@ -61,6 +102,12 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
   );
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    fetch('/api/operators')
+      .then((r) => r.json())
+      .then(setOperators);
+  }, []);
+
   function updateConnection(id: string, patch: Partial<ConnectionState>) {
     setConnectionStates((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   }
@@ -72,7 +119,15 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        name,
         nameKana: nameKana || null,
+        nameEn: nameEn || null,
+        odptStationId: odptStationId || null,
+        slug: slug || null,
+        code: code || null,
+        lat: lat || null,
+        lon: lon || null,
+        operatorId,
         notes: notes || null,
       }),
     });
@@ -99,161 +154,158 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
-  return (
-    <div className="max-w-3xl space-y-10">
-      {/* 駅情報 */}
-      <section className="space-y-4">
-        <h3 className="text-base font-semibold">駅情報</h3>
+  const operatorOptions = operators.map((op) => ({ value: op.id, label: op.name }));
 
-        <div>
-          <label className="block text-sm font-medium mb-1">よみがな - Optional</label>
-          <input
-            type="text"
+  return (
+    <Stack gap="xl" maw="48rem">
+      <section>
+        <Title order={4} mb="md">駅情報</Title>
+        <Stack gap="md">
+          <TextInput
+            label="駅名"
+            placeholder="例: 茅場町"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <TextInput
+            label="よみがな - 任意"
+            placeholder="例: かやばちょう"
             value={nameKana}
             onChange={(e) => setNameKana(e.target.value)}
-            placeholder="例: かやばちょう"
-            className="w-full border rounded px-3 py-2 text-sm"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">備考 - Optional</label>
-          <textarea
+          <TextInput
+            label="英語名 - 任意"
+            placeholder="例: Kayabacho"
+            value={nameEn}
+            onChange={(e) => setNameEn(e.target.value)}
+          />
+          <NativeSelect
+            label="事業者"
+            required
+            value={operatorId}
+            onChange={(e) => setOperatorId(e.target.value)}
+            data={operatorOptions}
+          />
+          <TextInput
+            label="ODPTコード - 任意"
+            placeholder="例: odpt.Station:TokyoMetro.Hibiya.Kayabacho"
+            value={odptStationId}
+            onChange={(e) => setOdptStationId(e.target.value)}
+          />
+          <TextInput
+            label="スラッグ - 任意"
+            placeholder="例: tokyo-metro-hibiya-kayabacho"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          />
+          <TextInput
+            label="駅コード - 任意"
+            placeholder="例: H14"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <SimpleGrid cols={2}>
+            <TextInput
+              label="緯度 - 任意"
+              placeholder="例: 35.681236"
+              value={lat}
+              onChange={(e) => setLat(e.target.value)}
+            />
+            <TextInput
+              label="経度 - 任意"
+              placeholder="例: 139.767125"
+              value={lon}
+              onChange={(e) => setLon(e.target.value)}
+            />
+          </SimpleGrid>
+          <Textarea
+            label="備考 - 任意"
+            placeholder="例: 東急東横線との直通運転あり"
+            rows={4}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            placeholder="例: 東急東横線との直通運転あり"
-            className="w-full border rounded px-3 py-2 text-sm"
           />
-        </div>
+        </Stack>
       </section>
 
-      {/* 乗り換え接続 */}
       <section>
-        <h3 className="text-base font-semibold mb-3">
+        <Title order={4} mb="md">
           乗り換え接続 ({connections.length}件)
-        </h3>
+        </Title>
 
         {connections.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">乗り換え接続情報がありません</p>
+          <Text size="sm" c="dimmed" fs="italic">乗り換え接続情報がありません</Text>
         ) : (
-          <div className="space-y-6">
+          <Stack gap="lg">
             {connections.map((conn) => {
               const s = connectionStates[conn.id];
               return (
-                <div key={conn.id} className="border rounded-lg p-4 bg-white">
-                  <p className="font-medium text-sm mb-4">{displayName(conn)}</p>
+                <Card key={conn.id} withBorder padding="md">
+                  <Text fw={500} size="sm" mb="md">{displayName(conn)}</Text>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        ベビーカー難易度
-                      </label>
-                      <select
-                        value={s.strollerDifficulty}
-                        onChange={(e) =>
-                          updateConnection(conn.id, {
-                            strollerDifficulty: e.target.value as StrollerDifficulty | '',
-                          })
-                        }
-                        className="w-full border rounded px-2 py-1.5 text-sm"
-                      >
-                        <option value="">— 未設定 —</option>
-                        {Object.entries(STROLLER_DIFFICULTY_META)
-                          .sort(([, a], [, b]) => a.order - b.order)
-                          .map(([key, { label }]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
+                  <SimpleGrid cols={2} mb="md">
+                    <NativeSelect
+                      label="ベビーカー難易度"
+                      data={strollerOptions}
+                      value={s.strollerDifficulty}
+                      onChange={(e) =>
+                        updateConnection(conn.id, {
+                          strollerDifficulty: e.target.value as StrollerDifficulty | '',
+                        })
+                      }
+                    />
+                    <NativeSelect
+                      label="車いす難易度"
+                      data={wheelchairOptions}
+                      value={s.wheelchairDifficulty}
+                      onChange={(e) =>
+                        updateConnection(conn.id, {
+                          wheelchairDifficulty: e.target.value as WheelchairDifficulty | '',
+                        })
+                      }
+                    />
+                  </SimpleGrid>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        車いす難易度
-                      </label>
-                      <select
-                        value={s.wheelchairDifficulty}
-                        onChange={(e) =>
-                          updateConnection(conn.id, {
-                            wheelchairDifficulty: e.target.value as WheelchairDifficulty | '',
-                          })
-                        }
-                        className="w-full border rounded px-2 py-1.5 text-sm"
-                      >
-                        <option value="">— 未設定 —</option>
-                        {Object.entries(WHEELCHAIR_DIFFICULTY_META)
-                          .sort(([, a], [, b]) => a.order - b.order)
-                          .map(([key, { label }]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        ベビーカー備考
-                      </label>
-                      <textarea
-                        value={s.notesAboutStroller}
-                        onChange={(e) =>
-                          updateConnection(conn.id, { notesAboutStroller: e.target.value })
-                        }
-                        rows={2}
-                        placeholder="例: A2出口エレベーターを利用"
-                        className="w-full border rounded px-2 py-1.5 text-sm resize-y"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        車いす備考
-                      </label>
-                      <textarea
-                        value={s.notesAboutWheelchair}
-                        onChange={(e) =>
-                          updateConnection(conn.id, { notesAboutWheelchair: e.target.value })
-                        }
-                        rows={2}
-                        placeholder="例: 駅員への申告が必要"
-                        className="w-full border rounded px-2 py-1.5 text-sm resize-y"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  <SimpleGrid cols={2}>
+                    <Textarea
+                      label="ベビーカー備考"
+                      placeholder="例: A2出口エレベーターを利用"
+                      rows={2}
+                      value={s.notesAboutStroller}
+                      onChange={(e) =>
+                        updateConnection(conn.id, { notesAboutStroller: e.target.value })
+                      }
+                    />
+                    <Textarea
+                      label="車いす備考"
+                      placeholder="例: 駅員への申告が必要"
+                      rows={2}
+                      value={s.notesAboutWheelchair}
+                      onChange={(e) =>
+                        updateConnection(conn.id, { notesAboutWheelchair: e.target.value })
+                      }
+                    />
+                  </SimpleGrid>
+                </Card>
               );
             })}
-          </div>
+          </Stack>
         )}
       </section>
 
-      {/* 一括保存ボタン */}
-      <div className="flex gap-3 pt-2">
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={handleSave}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push('/stations')}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
+      <Group gap="sm">
+        <Button loading={submitting} onClick={handleSave}>
+          保存
+        </Button>
+        <Button variant="default" onClick={() => router.push('/stations')}>
+          キャンセル
+        </Button>
+      </Group>
+    </Stack>
   );
 }

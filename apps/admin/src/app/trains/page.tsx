@@ -1,9 +1,11 @@
-import Link from 'next/link';
 import { db } from '@furatora/database/client';
 import { trains, operators } from '@furatora/database/schema';
 import { asc } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
 import { DuplicateButton } from '@/components/DuplicateButton';
+import { LinkButton, LinkIcon } from '@/components/LinkElements';
+import { Group, ScrollArea, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
+import { SquarePen } from 'lucide-react';
 
 export default async function TrainsPage() {
   const trainList = await db.select().from(trains).orderBy(asc(trains.name));
@@ -12,53 +14,53 @@ export default async function TrainsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold">Trains</h2>
-        <Link
-          href="/trains/new"
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-        >
-          + New Train
-        </Link>
-      </div>
+      <Group justify="space-between" mb="lg">
+        <Title order={2}>列車</Title>
+        <LinkButton href="/trains/new">
+          + 新規
+        </LinkButton>
+      </Group>
 
       {trainList.length === 0 ? (
-        <p className="text-gray-500">No trains registered yet.</p>
+        <Text c="dimmed">列車がまだ登録されていません。</Text>
       ) : (
-        <table className="w-full bg-white rounded-lg shadow">
-          <thead>
-            <tr className="border-b text-left text-sm text-gray-500">
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Operator</th>
-              <th className="px-4 py-3">Cars</th>
-              <th className="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trainList.map((train) => (
-              <tr key={train.id} className="border-b last:border-0 hover:bg-gray-50">
-                <td className="px-4 py-3">{train.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {operatorMap[train.operators] ?? '-'}
-                </td>
-                <td className="px-4 py-3 text-sm">{train.carCount}</td>
-                <td className="px-4 py-3 flex gap-2">
-                  <Link
-                    href={`/trains/${train.id}/edit`}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
-                  >
-                    Edit
-                  </Link>
-                  <DuplicateButton trainId={train.id} trainName={train.name} />
-                  <DeleteButton
-                    endpoint={`/api/trains/${train.id}`}
-                    redirectTo="/trains"
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ScrollArea>
+          <Table striped highlightOnHover withTableBorder>
+            <TableThead>
+              <TableTr>
+                <TableTh>名称</TableTh>
+                <TableTh>事業者</TableTh>
+                <TableTh>両数</TableTh>
+                <TableTh>操作</TableTh>
+              </TableTr>
+            </TableThead>
+            <TableTbody>
+              {trainList.map((train) => (
+                <TableTr key={train.id}>
+                  <TableTd>{train.name}</TableTd>
+                  <TableTd>
+                    <Text size="sm" c="dimmed">{operatorMap[train.operators] ?? '-'}</Text>
+                  </TableTd>
+                  <TableTd>
+                    <Text size="sm">{train.carCount}</Text>
+                  </TableTd>
+                  <TableTd>
+                    <Group gap="xs">
+                      <LinkIcon href={`/trains/${train.id}/edit`} size="md">
+                        <SquarePen style={{ width: '70%', height: '70%' }}/>
+                      </LinkIcon>
+                      <DuplicateButton trainId={train.id} trainName={train.name} />
+                      <DeleteButton
+                        endpoint={`/api/trains/${train.id}`}
+                        redirectTo="/trains"
+                      />
+                    </Group>
+                  </TableTd>
+                </TableTr>
+              ))}
+            </TableTbody>
+          </Table>
+        </ScrollArea>
       )}
     </div>
   );
