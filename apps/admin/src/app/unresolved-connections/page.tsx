@@ -6,12 +6,10 @@ import {
   SegmentedControl, Stack, Text, TextInput, Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import {
-  suggestRailwaysFromOdptIds,
-  suggestStationsFromOdptIds,
-  type RailwaySuggestion,
-  type StationSuggestion,
-} from '@/actions/gemini';
+import { suggestRailwaysFromOdptIds, suggestStationsFromOdptIds } from '@/actions/gemini';
+import type { RailwaySuggestion, StationSuggestion } from '@/actions/gemini';
+import { RailwayBulkSuggestModal } from '@/components/RailwayBulkSuggestModal';
+import { StationBulkSuggestModal } from '@/components/StationBulkSuggestModal';
 
 type Operator = { id: string; name: string; odptOperatorId: string | null };
 
@@ -34,6 +32,7 @@ type UnresolvedStation = {
 };
 
 type AllStation = { id: string; name: string; code: string | null; operatorId: string };
+type AllLine = { id: string; name: string; odptRailwayId: string | null };
 
 function OperatorSection({
   operators,
@@ -111,14 +110,12 @@ function RailwayRow({
   isExpanded,
   onToggle,
   onResolved,
-  suggestion,
 }: {
   railway: UnresolvedRailway;
   operators: Operator[];
   isExpanded: boolean;
   onToggle: () => void;
   onResolved: () => void;
-  suggestion?: RailwaySuggestion;
 }) {
   const [name, setName] = useState(railway.suggestedName);
   const [nameEn, setNameEn] = useState(railway.suggestedName);
@@ -131,13 +128,6 @@ function RailwayRow({
   const [lineCode, setLineCode] = useState('');
   const [color, setColor] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!suggestion) return;
-    if (suggestion.jaName) setName(suggestion.jaName);
-    if (suggestion.nameEn) setNameEn(suggestion.nameEn);
-    if (suggestion.lineCode) setLineCode(suggestion.lineCode);
-  }, [suggestion]);
 
   async function handleSubmit() {
     if (!name.trim() || !operatorId) return;
@@ -165,9 +155,6 @@ function RailwayRow({
             {railway.referencingStationNames.length > 5 && ` 他${railway.referencingStationNames.length - 5}駅`}
           </Text>
         </div>
-        {suggestion && (
-          <Badge size="sm" variant="dot" color="violet">AI提案済</Badge>
-        )}
         <Badge size="sm" variant="light">{railway.referenceCount}件</Badge>
         <Button variant="subtle" size="compact-sm" onClick={onToggle}>
           {isExpanded ? '閉じる' : '解決'}
@@ -200,18 +187,18 @@ function StationRow({
   station,
   operators,
   allStations,
+  allLines,
   isExpanded,
   onToggle,
   onResolved,
-  suggestion,
 }: {
   station: UnresolvedStation;
   operators: Operator[];
   allStations: AllStation[];
+  allLines: AllLine[];
   isExpanded: boolean;
   onToggle: () => void;
   onResolved: () => void;
-  suggestion?: StationSuggestion;
 }) {
   const [mode, setMode] = useState<string>('create');
   const [name, setName] = useState(station.suggestedName);
@@ -223,16 +210,13 @@ function StationRow({
     );
     return match?.id ?? '';
   });
+  const [lineId, setLineId] = useState(() => {
+    if (!station.odptRailwayId) return '';
+    return allLines.find((l) => l.odptRailwayId === station.odptRailwayId)?.id ?? '';
+  });
   const [linkStationId, setLinkStationId] = useState('');
   const [stationFilter, setStationFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!suggestion) return;
-    if (suggestion.jaName) setName(suggestion.jaName);
-    if (suggestion.nameEn) setNameEn(suggestion.nameEn);
-    if (suggestion.stationCode) setCode(suggestion.stationCode);
-  }, [suggestion]);
 
   const filteredStations = stationFilter
     ? allStations.filter(
@@ -246,7 +230,7 @@ function StationRow({
     setSubmitting(true);
     const body =
       mode === 'create'
-        ? { action: 'create', odptStationId: station.odptStationId, name, nameEn, code, operatorId }
+        ? { action: 'create', odptStationId: station.odptStationId, name, nameEn, code, operatorId, lineId: lineId || undefined }
         : { action: 'link', odptStationId: station.odptStationId, stationId: linkStationId };
 
     const res = await fetch('/api/unresolved-connections/stations', {
@@ -276,9 +260,6 @@ function StationRow({
               ` 他${station.referencingStationNames.length - 5}駅`}
           </Text>
         </div>
-        {suggestion && (
-          <Badge size="sm" variant="dot" color="violet">AI提案済</Badge>
-        )}
         <Badge size="sm" variant="light">{station.referenceCount}件</Badge>
         <Button variant="subtle" size="compact-sm" onClick={onToggle}>
           {isExpanded ? '閉じる' : '解決'}
@@ -307,6 +288,13 @@ function StationRow({
                 data={[{ value: '', label: '選択' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
                 value={operatorId}
                 onChange={(e) => setOperatorId(e.target.value)}
+                size="sm"
+              />
+              <NativeSelect
+                label="路線"
+                data={[{ value: '', label: '未選択' }, ...allLines.map((l) => ({ value: l.id, label: l.name }))]}
+                value={lineId}
+                onChange={(e) => setLineId(e.target.value)}
                 size="sm"
               />
               <Button size="sm" onClick={handleSubmit} disabled={submitting || !canSubmit} loading={submitting}>
@@ -356,11 +344,18 @@ export default function UnresolvedConnectionsPage() {
   const [stations, setStations] = useState<UnresolvedStation[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
   const [allStations, setAllStations] = useState<AllStation[]>([]);
+  const [allLines, setAllLines] = useState<AllLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRailwayId, setExpandedRailwayId] = useState<string | null>(null);
   const [expandedStationId, setExpandedStationId] = useState<string | null>(null);
-  const [railwaySuggestions, setRailwaySuggestions] = useState<Record<string, RailwaySuggestion>>({});
-  const [stationSuggestions, setStationSuggestions] = useState<Record<string, StationSuggestion>>({});
+
+  // AI提案モーダル
+  const [railwayModalOpen, setRailwayModalOpen] = useState(false);
+  const [stationModalOpen, setStationModalOpen] = useState(false);
+  const [pendingRailwaySuggestions, setPendingRailwaySuggestions] = useState<RailwaySuggestion[]>([]);
+  const [pendingStationSuggestions, setPendingStationSuggestions] = useState<StationSuggestion[]>([]);
+  const [railwayModalKey, setRailwayModalKey] = useState(0);
+  const [stationModalKey, setStationModalKey] = useState(0);
   const [aiRailwayLoading, setAiRailwayLoading] = useState(false);
   const [aiStationLoading, setAiStationLoading] = useState(false);
 
@@ -369,11 +364,13 @@ export default function UnresolvedConnectionsPage() {
       fetch('/api/unresolved-connections').then((r) => r.json()),
       fetch('/api/operators').then((r) => r.json()),
       fetch('/api/stations').then((r) => r.json()),
-    ]).then(([connectionsData, operatorsData, stationsData]) => {
+      fetch('/api/lines').then((r) => r.json()),
+    ]).then(([connectionsData, operatorsData, stationsData, linesData]) => {
       setRailways(connectionsData.railways);
       setStations(connectionsData.stations);
       setOperators(operatorsData);
       setAllStations(stationsData);
+      setAllLines(linesData);
       setLoading(false);
     });
   }, []);
@@ -383,17 +380,9 @@ export default function UnresolvedConnectionsPage() {
     try {
       const ids = railways.map((r) => r.odptRailwayId);
       const results = await suggestRailwaysFromOdptIds(ids);
-      const suggestions: Record<string, RailwaySuggestion> = {};
-      results.forEach((result, i) => {
-        suggestions[ids[i]] = result;
-      });
-      setRailwaySuggestions(suggestions);
-      notifications.show({
-        title: 'AI提案完了',
-        message: `${ids.length}件の路線に提案を適用しました`,
-        color: 'blue',
-        autoClose: 4000,
-      });
+      setPendingRailwaySuggestions(results);
+      setRailwayModalKey((k) => k + 1);
+      setRailwayModalOpen(true);
     } catch (e) {
       notifications.show({
         title: 'AI提案エラー',
@@ -410,17 +399,9 @@ export default function UnresolvedConnectionsPage() {
     try {
       const ids = stations.map((s) => s.odptStationId);
       const results = await suggestStationsFromOdptIds(ids);
-      const suggestions: Record<string, StationSuggestion> = {};
-      results.forEach((result, i) => {
-        suggestions[ids[i]] = result;
-      });
-      setStationSuggestions(suggestions);
-      notifications.show({
-        title: 'AI提案完了',
-        message: `${ids.length}件の駅に提案を適用しました`,
-        color: 'blue',
-        autoClose: 4000,
-      });
+      setPendingStationSuggestions(results);
+      setStationModalKey((k) => k + 1);
+      setStationModalOpen(true);
     } catch (e) {
       notifications.show({
         title: 'AI提案エラー',
@@ -491,7 +472,6 @@ export default function UnresolvedConnectionsPage() {
                   setRailways((prev) => prev.filter((r) => r.odptRailwayId !== railway.odptRailwayId));
                   setExpandedRailwayId(null);
                 }}
-                suggestion={railwaySuggestions[railway.odptRailwayId]}
               />
             ))}
           </Card>
@@ -526,6 +506,7 @@ export default function UnresolvedConnectionsPage() {
                 station={station}
                 operators={operators}
                 allStations={allStations}
+                allLines={allLines}
                 isExpanded={expandedStationId === station.odptStationId}
                 onToggle={() =>
                   setExpandedStationId(
@@ -538,12 +519,38 @@ export default function UnresolvedConnectionsPage() {
                   );
                   setExpandedStationId(null);
                 }}
-                suggestion={stationSuggestions[station.odptStationId]}
               />
             ))}
           </Card>
         )}
       </section>
+
+      <RailwayBulkSuggestModal
+        key={`railway-${railwayModalKey}`}
+        opened={railwayModalOpen}
+        onClose={() => setRailwayModalOpen(false)}
+        railways={railways}
+        suggestions={pendingRailwaySuggestions}
+        operators={operators}
+        onResolved={(resolvedIds) => {
+          setRailways((prev) => prev.filter((r) => !resolvedIds.includes(r.odptRailwayId)));
+          setRailwayModalOpen(false);
+        }}
+      />
+
+      <StationBulkSuggestModal
+        key={`station-${stationModalKey}`}
+        opened={stationModalOpen}
+        onClose={() => setStationModalOpen(false)}
+        stations={stations}
+        suggestions={pendingStationSuggestions}
+        operators={operators}
+        lines={allLines}
+        onResolved={(resolvedIds) => {
+          setStations((prev) => prev.filter((s) => !resolvedIds.includes(s.odptStationId)));
+          setStationModalOpen(false);
+        }}
+      />
     </Stack>
   );
 }

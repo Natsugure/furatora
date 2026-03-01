@@ -132,6 +132,7 @@ export const unresolvedStationSchema = z
       nameEn: z.string().nullable().optional(),
       code: z.string().nullable().optional(),
       operatorId: z.string().uuid(),
+      lineId: z.string().uuid().optional(),
     }),
     z.object({
       action: z.literal('link'),
