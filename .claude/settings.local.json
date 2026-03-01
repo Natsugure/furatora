@@ -13,7 +13,14 @@
       "Bash(pnpm run lint:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(git ls-files:*)"
+      "Bash(git ls-files:*)",
+      "Bash(gh issue list --state open --limit 50)",
+      "Bash(brew list gh)",
+      "Bash(gh label list --limit 50)",
+      "Bash(gh issue list --limit 10)",
+      "Bash(gh label create \"admin-ui\" --description \"Admin UI刷新 \\(Mantine v8\\)\" --color \"1d76db\")",
+      "Bash(gh issue:*)",
+      "Bash(pnpm --filter admin exec tsc --noEmit)"
     ]
   }
 }

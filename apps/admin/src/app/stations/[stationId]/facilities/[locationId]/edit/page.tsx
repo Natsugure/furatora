@@ -8,6 +8,7 @@ import {
   platforms,
 } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
+import { Title } from '@mantine/core';
 import { FacilityForm } from '@/components/FacilityForm';
 
 export default async function EditLocationPage({
@@ -48,7 +49,7 @@ export default async function EditLocationPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">Edit Platform Location - {station.name}</h2>
+      <Title order={2} mb="lg">設備場所を編集 - {station.name}</Title>
       <FacilityForm
         stationId={stationId}
         isEdit

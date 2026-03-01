@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { lines, lineDirections } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
+import { Title } from '@mantine/core';
 import { LineDirectionForm } from '@/components/LineDirectionForm';
 
 export default async function EditDirectionPage({
@@ -23,7 +24,7 @@ export default async function EditDirectionPage({
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-6">Edit Direction - {line.name}</h2>
+      <Title order={2} mb="lg">方面を編集 - {line.name}</Title>
       <LineDirectionForm
         lineId={lineId}
         isEdit

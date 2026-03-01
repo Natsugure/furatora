@@ -2,6 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import {
+  Button, Checkbox, Group, Loader, NativeSelect, ScrollArea,
+  Stack, Text, TextInput, Textarea,
+} from '@mantine/core';
 
 type Station = {
   id: string;
@@ -26,6 +30,10 @@ type Props = {
   isEdit?: boolean;
 };
 
+function stationLabel(s: Station) {
+  return `${s.name}${s.nameEn ? ` (${s.nameEn})` : ''}${s.code ? ` [${s.code}]` : ''}`;
+}
+
 export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props) {
   const router = useRouter();
   const [stations, setStations] = useState<Station[]>([]);
@@ -39,13 +47,17 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
     initialData?.terminalStationIds ?? []
   );
   const [notes, setNotes] = useState(initialData?.notes ?? '');
+  const [stationsLoading, setStationsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Fetch stations on the line
+    setStationsLoading(true);
     fetch(`/api/stations?lineId=${lineId}`)
       .then((r) => r.json())
-      .then(setStations);
+      .then((data) => {
+        setStations(data);
+        setStationsLoading(false);
+      });
   }, [lineId]);
 
   function toggleTerminalStation(stationId: string) {
@@ -83,124 +95,95 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
+  const stationSelectData = stations.map((s) => ({
+    value: s.id,
+    label: stationLabel(s),
+  }));
+
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-      {/* Direction Type */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Direction Type</label>
-        <select
+    <form onSubmit={handleSubmit}>
+      <Stack gap="lg" maw="42rem">
+        <NativeSelect
+          label="方面タイプ"
+          data={[
+            { value: 'inbound', label: '上り' },
+            { value: 'outbound', label: '下り' },
+          ]}
           value={directionType}
           onChange={(e) => setDirectionType(e.target.value)}
           required
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="inbound">Inbound (上り)</option>
-          <option value="outbound">Outbound (下り)</option>
-        </select>
-      </div>
+        />
 
-      {/* Display Name */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Display Name (日本語)</label>
-        <input
-          type="text"
+        <TextInput
+          label="表示名（日本語）"
+          placeholder="例: 渋谷方面"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           required
-          placeholder="e.g. 渋谷方面"
-          className="w-full border rounded px-3 py-2"
         />
-      </div>
 
-      {/* Display Name (English) */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Display Name (English) - Optional</label>
-        <input
-          type="text"
+        <TextInput
+          label="表示名（英語）- 任意"
+          placeholder="e.g. For Shibuya"
           value={displayNameEn}
           onChange={(e) => setDisplayNameEn(e.target.value)}
-          placeholder="e.g. For Shibuya"
-          className="w-full border rounded px-3 py-2"
         />
-      </div>
 
-      {/* Representative Station */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Representative Station</label>
-        <select
+        <NativeSelect
+          label="代表駅"
+          description="この方面を表す代表的な駅（例：渋谷方面の場合は渋谷駅）"
+          data={[{ value: '', label: '駅を選択' }, ...stationSelectData]}
           value={representativeStationId}
           onChange={(e) => setRepresentativeStationId(e.target.value)}
           required
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">Select station</option>
-          {stations.map((station) => (
-            <option key={station.id} value={station.id}>
-              {station.name} {station.nameEn ? `(${station.nameEn})` : ''} {station.code ? `[${station.code}]` : ''}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-gray-500 mt-1">
-          The main station representing this direction (e.g., Shibuya for &quot;Shibuya-bound&quot;)
-        </p>
-      </div>
+        />
 
-      {/* Terminal Stations */}
-      <div>
-        <label className="block text-sm font-medium mb-2">Terminal Stations - Optional</label>
-        <div className="border rounded p-2 space-y-1 max-h-60 overflow-y-auto">
-          {stations.length === 0 ? (
-            <p className="text-sm text-gray-500">Loading stations...</p>
-          ) : (
-            stations.map((station) => (
-              <label key={station.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={terminalStationIds.includes(station.id)}
-                  onChange={() => toggleTerminalStation(station.id)}
-                />
-                {station.name} {station.nameEn ? `(${station.nameEn})` : ''} {station.code ? `[${station.code}]` : ''}
-              </label>
-            ))
-          )}
+        <div>
+          <Text size="sm" fw={500} mb="xs">終点駅 - 任意</Text>
+          <Text size="xs" c="dimmed" mb="xs">
+            この方面の終点となりうる駅を選択してください
+          </Text>
+          <ScrollArea.Autosize mah={240} type="auto" offsetScrollbars>
+            {stationsLoading ? (
+              <Group gap="xs" align="center">
+                <Loader size="sm" />
+                <Text size="sm" c="dimmed">駅を読み込み中...</Text>
+              </Group>
+            ) : (
+              <Stack gap="xs">
+                {stations.map((station) => (
+                  <Checkbox
+                    key={station.id}
+                    label={stationLabel(station)}
+                    checked={terminalStationIds.includes(station.id)}
+                    onChange={() => toggleTerminalStation(station.id)}
+                  />
+                ))}
+              </Stack>
+            )}
+          </ScrollArea.Autosize>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Select possible terminal stations for this direction
-        </p>
-      </div>
 
-      {/* Notes */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Notes</label>
-        <textarea
+        <Textarea
+          label="備考"
+          rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="w-full border rounded px-3 py-2"
         />
-      </div>
 
-      {/* Submit */}
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push(`/lines/${lineId}/directions`)}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-      </div>
+        <Group gap="sm">
+          <Button type="submit" loading={submitting}>
+            {isEdit ? '更新' : '登録'}
+          </Button>
+          <Button variant="default" onClick={() => router.push(`/lines/${lineId}/directions`)}>
+            キャンセル
+          </Button>
+        </Group>
+      </Stack>
     </form>
   );
 }

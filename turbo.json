@@ -27,7 +27,8 @@
         "POSTGRES_DATABASE",
         "POSTGRES_URL_NO_SSL",
         "POSTGRES_PRISMA_URL",
-        "NEXT_PUBLIC_GA_ID"
+        "NEXT_PUBLIC_GA_ID",
+        "GEMINI_API_KEY"
       ]
     },
     "dev": {

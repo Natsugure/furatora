@@ -34,8 +34,17 @@ export async function PUT(
     const [updated] = await db
       .update(stations)
       .set({
+        name: parsed.data.name,
         nameKana: parsed.data.nameKana ?? null,
+        nameEn: parsed.data.nameEn ?? null,
+        odptStationId: parsed.data.odptStationId ?? null,
+        slug: parsed.data.slug ?? null,
+        code: parsed.data.code ?? null,
+        lat: parsed.data.lat ?? null,
+        lon: parsed.data.lon ?? null,
+        operatorId: parsed.data.operatorId,
         notes: parsed.data.notes ?? null,
+        updatedAt: new Date(),
       })
       .where(eq(stations.id, stationId))
       .returning();

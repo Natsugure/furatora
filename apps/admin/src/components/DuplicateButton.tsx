@@ -1,6 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ActionIcon, Button, Group, Modal, TextInput } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { CopyPlus } from 'lucide-react';
 
 type Props = {
   trainId: string;
@@ -9,21 +13,35 @@ type Props = {
 
 export function DuplicateButton({ trainId, trainName }: Props) {
   const router = useRouter();
+  const [opened, { open, close }] = useDisclosure(false);
+  const [newName, setNewName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  function handleOpen() {
+    setNewName(`${trainName} (コピー)`);
+    setError('');
+    open();
+  }
 
   async function handleDuplicate() {
-    const newName = prompt(`Duplicate "${trainName}" as:`, `${trainName} (Copy)`);
-    if (!newName) return;
+    if (!newName.trim()) {
+      setError('名前を入力してください');
+      return;
+    }
 
-    // Fetch the original train data
+    setLoading(true);
+    setError('');
+
     const res = await fetch(`/api/trains/${trainId}`);
     if (!res.ok) {
-      alert('Failed to fetch train data');
+      setError('列車データの取得に失敗しました');
+      setLoading(false);
       return;
     }
 
     const original = await res.json();
 
-    // Create a duplicate with new name
     const createRes = await fetch('/api/trains', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39,18 +57,32 @@ export function DuplicateButton({ trainId, trainName }: Props) {
     });
 
     if (createRes.ok) {
+      close();
       router.refresh();
     } else {
-      alert('Failed to duplicate train');
+      setError('複製に失敗しました');
     }
+    setLoading(false);
   }
 
   return (
-    <button
-      onClick={handleDuplicate}
-      className="px-3 py-1.5 text-sm border rounded hover:bg-gray-100"
-    >
-      Duplicate
-    </button>
+    <>
+      <ActionIcon variant="default" size="md" onClick={handleOpen}>
+        <CopyPlus style={{ width: '70%', height: '70%' }}/>
+      </ActionIcon>
+      <Modal opened={opened} onClose={close} title="列車を複製" centered>
+        <TextInput
+          label="新しい列車名"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          error={error}
+          mb="lg"
+        />
+        <Group justify="flex-end">
+          <Button variant="default" onClick={close}>キャンセル</Button>
+          <Button loading={loading} onClick={handleDuplicate}>複製</Button>
+        </Group>
+      </Modal>
+    </>
   );
 }

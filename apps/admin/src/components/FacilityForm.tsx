@@ -2,6 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import {
+  Button, Card, Checkbox, Collapse, Group, Loader, NativeSelect,
+  NumberInput, Stack, Text, TextInput, Textarea,
+} from '@mantine/core';
 
 type Platform = {
   id: string;
@@ -54,6 +58,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [facilityTypes, setFacilityTypes] = useState<FacilityType[]>([]);
   const [connectedStations, setConnectedStations] = useState<ConnectedStation[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   const [platformId, setPlatformId] = useState(initialData?.platformId ?? '');
   const [nearPlatformCell, setNearPlatformCell] = useState<number | ''>(initialData?.nearPlatformCell ?? '');
@@ -74,6 +79,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
       setPlatforms(platformsData);
       setFacilityTypes(typesData);
       setConnectedStations(stationsData);
+      setDataLoading(false);
     });
   }, [stationId]);
 
@@ -138,190 +144,159 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('Failed to save');
+      alert('保存に失敗しました');
     }
   }
 
+  if (dataLoading) {
+    return <Loader />;
+  }
+
+  const connectedStationData = [
+    { value: '', label: '駅を選択' },
+    ...connectedStations.map((s) => ({ value: s.id, label: `${s.lineName} (${s.name})` })),
+  ];
+
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-      {/* Platform */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Platform</label>
-        <select
+    <form onSubmit={handleSubmit}>
+      <Stack gap="lg" maw="42rem">
+        <NativeSelect
+          label="ホーム"
+          data={[
+            { value: '', label: 'ホームを選択' },
+            ...platforms.map((p) => ({ value: p.id, label: `${p.platformNumber}番ホーム` })),
+          ]}
           value={platformId}
           onChange={(e) => setPlatformId(e.target.value)}
           required
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">Select platform</option>
-          {platforms.map((p) => (
-            <option key={p.id} value={p.id}>
-              Platform {p.platformNumber}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Near Platform Cell */}
-      <div>
-        <label className="block text-sm font-medium mb-1">ホーム枠番号 (Near Platform Cell)</label>
-        <input
-          type="number"
-          min={1}
-          value={nearPlatformCell}
-          onChange={(e) => setNearPlatformCell(e.target.value === '' ? '' : Number(e.target.value))}
-          placeholder="e.g. 3"
-          className="w-32 border rounded px-3 py-2"
         />
-        <p className="text-xs text-gray-500 mt-1">設備が位置するホームの枠番号（1〜maxCarCount）。空欄でホーム全体。</p>
-      </div>
 
-      {/* Exits */}
-      <div>
-        <label className="block text-sm font-medium mb-1">出口 (Exits)</label>
-        <input
-          type="text"
+        <NumberInput
+          label="ホーム枠番号"
+          description="設備が位置するホームの枠番号（1〜maxCarCount）。空欄でホーム全体。"
+          min={1}
+          placeholder="例: 3"
+          value={nearPlatformCell}
+          onChange={(v) => setNearPlatformCell(typeof v === 'number' ? v : '')}
+          w={128}
+        />
+
+        <TextInput
+          label="出口"
+          description="この場所に繋がる出口を記載してください"
+          placeholder="例: A3出口・B1出口"
           value={exits}
           onChange={(e) => setExits(e.target.value)}
-          placeholder="例: A3出口・B1出口"
-          className="w-full border rounded px-3 py-2"
         />
-        <p className="text-xs text-gray-500 mt-1">この場所に繋がる出口を記載してください</p>
-      </div>
 
-      {/* Notes (location-level) */}
-      <div>
-        <label className="block text-sm font-medium mb-1">場所メモ (Location Notes)</label>
-        <textarea
+        <Textarea
+          label="場所メモ"
+          rows={2}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          className="w-full border rounded px-3 py-2"
         />
-      </div>
 
-      {/* Facility Types */}
-      <div>
-        <label className="block text-sm font-medium mb-2">設備タイプ (Facility Types)</label>
-        <p className="text-xs text-gray-500 mb-3">この場所にある設備を選択してください（複数選択可）</p>
-        <div className="space-y-3">
-          {facilityTypes.map((ft) => {
-            const selected = selectedFacilities.find((f) => f.typeCode === ft.code);
-            return (
-              <div key={ft.code} className="border rounded p-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+        <div>
+          <Text size="sm" fw={500} mb="xs">設備タイプ</Text>
+          <Text size="xs" c="dimmed" mb="sm">
+            この場所にある設備を選択してください（複数選択可）
+          </Text>
+          <Stack gap="xs">
+            {facilityTypes.map((ft) => {
+              const selected = selectedFacilities.find((f) => f.typeCode === ft.code);
+              return (
+                <Card key={ft.code} withBorder padding="sm">
+                  <Checkbox
+                    label={ft.name}
                     checked={!!selected}
                     onChange={() => toggleFacilityType(ft.code)}
+                    fw={500}
                   />
-                  <span className="font-medium text-sm">{ft.name}</span>
-                </label>
-                {selected && (
-                  <div className="mt-2 ml-6 space-y-2">
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-1.5 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selected.isWheelchairAccessible}
-                          onChange={(e) => updateFacility(ft.code, 'isWheelchairAccessible', e.target.checked)}
+                  <Collapse in={!!selected}>
+                    <Stack gap="xs" mt="sm" ml="xl">
+                      <Group gap="lg">
+                        <Checkbox
+                          label="車いす対応"
+                          checked={selected?.isWheelchairAccessible ?? false}
+                          onChange={(e) => updateFacility(ft.code, 'isWheelchairAccessible', e.currentTarget.checked)}
+                          size="sm"
                         />
-                        Wheelchair accessible
-                      </label>
-                      <label className="flex items-center gap-1.5 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selected.isStrollerAccessible}
-                          onChange={(e) => updateFacility(ft.code, 'isStrollerAccessible', e.target.checked)}
+                        <Checkbox
+                          label="ベビーカー対応"
+                          checked={selected?.isStrollerAccessible ?? false}
+                          onChange={(e) => updateFacility(ft.code, 'isStrollerAccessible', e.currentTarget.checked)}
+                          size="sm"
                         />
-                        Stroller accessible
-                      </label>
-                    </div>
-                    <input
-                      type="text"
-                      value={selected.notes}
-                      onChange={(e) => updateFacility(ft.code, 'notes', e.target.value)}
-                      placeholder="設備メモ（任意）"
-                      className="w-full border rounded px-2 py-1 text-sm"
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      </Group>
+                      <TextInput
+                        placeholder="設備メモ（任意）"
+                        value={selected?.notes ?? ''}
+                        onChange={(e) => updateFacility(ft.code, 'notes', e.target.value)}
+                        size="sm"
+                      />
+                    </Stack>
+                  </Collapse>
+                </Card>
+              );
+            })}
+          </Stack>
+          {selectedFacilities.length === 0 && (
+            <Text size="sm" c="red" mt="xs">設備タイプを1つ以上選択してください</Text>
+          )}
         </div>
-        {selectedFacilities.length === 0 && (
-          <p className="text-sm text-red-500 mt-1">設備タイプを1つ以上選択してください</p>
-        )}
-      </div>
 
-      {/* Connected Stations (乗換駅) */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium">乗換可能な駅 (Connected Stations)</label>
-          <button
-            type="button"
-            onClick={addConnection}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            + 接続を追加
-          </button>
+        <div>
+          <Group justify="space-between" mb="xs">
+            <Text size="sm" fw={500}>乗換可能な駅</Text>
+            <Button variant="subtle" size="compact-sm" onClick={addConnection}>
+              + 接続を追加
+            </Button>
+          </Group>
+          <Text size="xs" c="dimmed" mb="xs">
+            この場所を経由して乗り換え可能な駅と、対応する出口ラベルを指定してください
+          </Text>
+          {connections.length === 0 && (
+            <Text size="sm" c="dimmed" fs="italic">接続なし</Text>
+          )}
+          <Stack gap="xs">
+            {connections.map((conn, i) => (
+              <Group key={i} gap="xs" wrap="nowrap">
+                <NativeSelect
+                  data={connectedStationData}
+                  value={conn.stationId}
+                  onChange={(e) => updateConnection(i, 'stationId', e.target.value)}
+                  style={{ flex: 1 }}
+                  size="sm"
+                />
+                <TextInput
+                  placeholder="出口ラベル (例: A3出口)"
+                  value={conn.exitLabel}
+                  onChange={(e) => updateConnection(i, 'exitLabel', e.target.value)}
+                  style={{ flex: 1 }}
+                  size="sm"
+                />
+                <Button
+                  variant="subtle"
+                  color="red"
+                  size="compact-sm"
+                  onClick={() => removeConnection(i)}
+                >
+                  削除
+                </Button>
+              </Group>
+            ))}
+          </Stack>
         </div>
-        <p className="text-xs text-gray-500 mb-2">
-          この場所を経由して乗り換え可能な駅と、対応する出口ラベルを指定してください
-        </p>
-        {connections.length === 0 && (
-          <p className="text-sm text-gray-400 italic">接続なし</p>
-        )}
-        {connections.map((conn, i) => (
-          <div key={i} className="flex items-center gap-2 mb-2">
-            <select
-              value={conn.stationId}
-              onChange={(e) => updateConnection(i, 'stationId', e.target.value)}
-              className="flex-1 border rounded px-2 py-1.5 text-sm"
-            >
-              <option value="">駅を選択</option>
-              {connectedStations.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.lineName} ({s.name})
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              value={conn.exitLabel}
-              onChange={(e) => updateConnection(i, 'exitLabel', e.target.value)}
-              placeholder="出口ラベル (例: A3出口)"
-              className="flex-1 border rounded px-2 py-1.5 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => removeConnection(i)}
-              className="text-red-500 text-sm px-1"
-            >
-              削除
-            </button>
-          </div>
-        ))}
-      </div>
 
-      {/* Submit */}
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {submitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push(`/stations/${stationId}/facilities`)}
-          className="px-4 py-2 border rounded hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-      </div>
+        <Group gap="sm">
+          <Button type="submit" loading={submitting}>
+            {isEdit ? '更新' : '登録'}
+          </Button>
+          <Button variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
+            キャンセル
+          </Button>
+        </Group>
+      </Stack>
     </form>
   );
 }

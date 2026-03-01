@@ -120,6 +120,7 @@ src/
 ### スタイリング
 - TailwindCSSをデフォルトとして使用
 - コンポーネントライブラリはMantine v8を推奨
+- Server Componentではcompound component構文は使用できないため、`Table.Thead`のような構文は使わずに、必ず`TableTd`のように個別でexportされている構文を使用する
 - グローバルスタイルは`app/globals.css`に定義
 - CSSモジュールやCSS-in-JSを使用する場合は統一されたアプローチを採用
 

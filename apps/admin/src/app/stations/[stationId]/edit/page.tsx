@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { stations, stationConnections, lines } from '@furatora/database/schema';
 import { eq, inArray } from 'drizzle-orm';
+import { Title, Text } from '@mantine/core';
 import { StationEditForm, type ConnectionRow } from '@/components/StationEditForm';
 
 type Props = {
@@ -63,15 +64,25 @@ export default async function StationEditPage({ params }: Props) {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-2">{station.name} — 編集</h2>
+      <Title order={2} mb="xs">{station.name} — 編集</Title>
       {station.nameEn && (
-        <p className="text-sm text-gray-500 mb-6">{station.nameEn}</p>
+        <Text size="sm" c="dimmed" mb="lg">{station.nameEn}</Text>
       )}
 
       <StationEditForm
         stationId={station.id}
-        initialNameKana={station.nameKana}
-        initialNotes={station.notes}
+        initialData={{
+          name: station.name,
+          nameKana: station.nameKana,
+          nameEn: station.nameEn,
+          odptStationId: station.odptStationId,
+          slug: station.slug,
+          code: station.code,
+          lat: station.lat,
+          lon: station.lon,
+          operatorId: station.operatorId,
+          notes: station.notes,
+        }}
         connections={connections}
       />
     </div>
