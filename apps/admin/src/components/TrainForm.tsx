@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 import {
   ActionIcon, Button, Card, Checkbox, Group, Loader, MultiSelect, NativeSelect, NavLink,
@@ -59,9 +59,10 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [pickerPlatforms, setPickerPlatforms] = useState<PickerPlatform[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const initialLimitedPlatformIds = useRef(initialData?.limitedToPlatformIds);
 
   useEffect(() => {
-    const initialIds = initialData?.limitedToPlatformIds;
+    const initialIds = initialLimitedPlatformIds.current;
     const fetches: Promise<void>[] = [
       fetch('/api/operators').then((r) => r.json()).then(setOperators),
       fetch('/api/lines').then((r) => r.json()).then(setAllLines),

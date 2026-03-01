@@ -2,9 +2,9 @@ import { db } from '@furatora/database/client';
 import { operators } from '@furatora/database/schema';
 import { asc } from 'drizzle-orm';
 import { DeleteButton } from '@/components/DeleteButton';
-import { LinkButton, LinkAnchor, LinkIcon } from '@/components/LinkElements';
+import { LinkButton, LinkIcon } from '@/components/LinkElements';
 import { Group, ScrollArea, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
 export default async function OperatorsPage() {
   const operatorList = await db.select().from(operators).orderBy(asc(operators.name));
