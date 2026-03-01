@@ -5,6 +5,13 @@ import {
   Badge, Button, Card, Collapse, Group, Loader, NativeSelect,
   SegmentedControl, Stack, Text, TextInput, Title,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import {
+  suggestRailwaysFromOdptIds,
+  suggestStationsFromOdptIds,
+  type RailwaySuggestion,
+  type StationSuggestion,
+} from '@/actions/gemini';
 
 type Operator = { id: string; name: string; odptOperatorId: string | null };
 
@@ -104,12 +111,14 @@ function RailwayRow({
   isExpanded,
   onToggle,
   onResolved,
+  suggestion,
 }: {
   railway: UnresolvedRailway;
   operators: Operator[];
   isExpanded: boolean;
   onToggle: () => void;
   onResolved: () => void;
+  suggestion?: RailwaySuggestion;
 }) {
   const [name, setName] = useState(railway.suggestedName);
   const [nameEn, setNameEn] = useState(railway.suggestedName);
@@ -122,6 +131,13 @@ function RailwayRow({
   const [lineCode, setLineCode] = useState('');
   const [color, setColor] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!suggestion) return;
+    if (suggestion.jaName) setName(suggestion.jaName);
+    if (suggestion.nameEn) setNameEn(suggestion.nameEn);
+    if (suggestion.lineCode) setLineCode(suggestion.lineCode);
+  }, [suggestion]);
 
   async function handleSubmit() {
     if (!name.trim() || !operatorId) return;
@@ -149,6 +165,9 @@ function RailwayRow({
             {railway.referencingStationNames.length > 5 && ` 他${railway.referencingStationNames.length - 5}駅`}
           </Text>
         </div>
+        {suggestion && (
+          <Badge size="sm" variant="dot" color="violet">AI提案済</Badge>
+        )}
         <Badge size="sm" variant="light">{railway.referenceCount}件</Badge>
         <Button variant="subtle" size="compact-sm" onClick={onToggle}>
           {isExpanded ? '閉じる' : '解決'}
@@ -184,6 +203,7 @@ function StationRow({
   isExpanded,
   onToggle,
   onResolved,
+  suggestion,
 }: {
   station: UnresolvedStation;
   operators: Operator[];
@@ -191,6 +211,7 @@ function StationRow({
   isExpanded: boolean;
   onToggle: () => void;
   onResolved: () => void;
+  suggestion?: StationSuggestion;
 }) {
   const [mode, setMode] = useState<string>('create');
   const [name, setName] = useState(station.suggestedName);
@@ -205,6 +226,13 @@ function StationRow({
   const [linkStationId, setLinkStationId] = useState('');
   const [stationFilter, setStationFilter] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!suggestion) return;
+    if (suggestion.jaName) setName(suggestion.jaName);
+    if (suggestion.nameEn) setNameEn(suggestion.nameEn);
+    if (suggestion.stationCode) setCode(suggestion.stationCode);
+  }, [suggestion]);
 
   const filteredStations = stationFilter
     ? allStations.filter(
@@ -248,6 +276,9 @@ function StationRow({
               ` 他${station.referencingStationNames.length - 5}駅`}
           </Text>
         </div>
+        {suggestion && (
+          <Badge size="sm" variant="dot" color="violet">AI提案済</Badge>
+        )}
         <Badge size="sm" variant="light">{station.referenceCount}件</Badge>
         <Button variant="subtle" size="compact-sm" onClick={onToggle}>
           {isExpanded ? '閉じる' : '解決'}
@@ -328,6 +359,10 @@ export default function UnresolvedConnectionsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedRailwayId, setExpandedRailwayId] = useState<string | null>(null);
   const [expandedStationId, setExpandedStationId] = useState<string | null>(null);
+  const [railwaySuggestions, setRailwaySuggestions] = useState<Record<string, RailwaySuggestion>>({});
+  const [stationSuggestions, setStationSuggestions] = useState<Record<string, StationSuggestion>>({});
+  const [aiRailwayLoading, setAiRailwayLoading] = useState(false);
+  const [aiStationLoading, setAiStationLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -342,6 +377,60 @@ export default function UnresolvedConnectionsPage() {
       setLoading(false);
     });
   }, []);
+
+  async function handleBulkRailwaySuggest() {
+    setAiRailwayLoading(true);
+    try {
+      const ids = railways.map((r) => r.odptRailwayId);
+      const results = await suggestRailwaysFromOdptIds(ids);
+      const suggestions: Record<string, RailwaySuggestion> = {};
+      results.forEach((result, i) => {
+        suggestions[ids[i]] = result;
+      });
+      setRailwaySuggestions(suggestions);
+      notifications.show({
+        title: 'AI提案完了',
+        message: `${ids.length}件の路線に提案を適用しました`,
+        color: 'blue',
+        autoClose: 4000,
+      });
+    } catch (e) {
+      notifications.show({
+        title: 'AI提案エラー',
+        message: (e as Error).message,
+        color: 'red',
+        autoClose: 6000,
+      });
+    }
+    setAiRailwayLoading(false);
+  }
+
+  async function handleBulkStationSuggest() {
+    setAiStationLoading(true);
+    try {
+      const ids = stations.map((s) => s.odptStationId);
+      const results = await suggestStationsFromOdptIds(ids);
+      const suggestions: Record<string, StationSuggestion> = {};
+      results.forEach((result, i) => {
+        suggestions[ids[i]] = result;
+      });
+      setStationSuggestions(suggestions);
+      notifications.show({
+        title: 'AI提案完了',
+        message: `${ids.length}件の駅に提案を適用しました`,
+        color: 'blue',
+        autoClose: 4000,
+      });
+    } catch (e) {
+      notifications.show({
+        title: 'AI提案エラー',
+        message: (e as Error).message,
+        color: 'red',
+        autoClose: 6000,
+      });
+    }
+    setAiStationLoading(false);
+  }
 
   if (loading) {
     return (
@@ -366,10 +455,23 @@ export default function UnresolvedConnectionsPage() {
       />
 
       <section>
-        <Title order={3} mb="sm">
-          未解決の路線
-          <Text span size="sm" c="dimmed" fw={400} ml="xs">({railways.length}件)</Text>
-        </Title>
+        <Group justify="space-between" mb="sm">
+          <Title order={3}>
+            未解決の路線
+            <Text span size="sm" c="dimmed" fw={400} ml="xs">({railways.length}件)</Text>
+          </Title>
+          {railways.length > 0 && (
+            <Button
+              variant="light"
+              color="violet"
+              size="sm"
+              loading={aiRailwayLoading}
+              onClick={handleBulkRailwaySuggest}
+            >
+              一括AI提案
+            </Button>
+          )}
+        </Group>
         {railways.length === 0 ? (
           <Text size="sm" c="dimmed" fs="italic">未解決の路線はありません</Text>
         ) : (
@@ -389,6 +491,7 @@ export default function UnresolvedConnectionsPage() {
                   setRailways((prev) => prev.filter((r) => r.odptRailwayId !== railway.odptRailwayId));
                   setExpandedRailwayId(null);
                 }}
+                suggestion={railwaySuggestions[railway.odptRailwayId]}
               />
             ))}
           </Card>
@@ -396,10 +499,23 @@ export default function UnresolvedConnectionsPage() {
       </section>
 
       <section>
-        <Title order={3} mb="sm">
-          未解決の駅
-          <Text span size="sm" c="dimmed" fw={400} ml="xs">({stations.length}件)</Text>
-        </Title>
+        <Group justify="space-between" mb="sm">
+          <Title order={3}>
+            未解決の駅
+            <Text span size="sm" c="dimmed" fw={400} ml="xs">({stations.length}件)</Text>
+          </Title>
+          {stations.length > 0 && (
+            <Button
+              variant="light"
+              color="violet"
+              size="sm"
+              loading={aiStationLoading}
+              onClick={handleBulkStationSuggest}
+            >
+              一括AI提案
+            </Button>
+          )}
+        </Group>
         {stations.length === 0 ? (
           <Text size="sm" c="dimmed" fs="italic">未解決の駅はありません</Text>
         ) : (
@@ -422,6 +538,7 @@ export default function UnresolvedConnectionsPage() {
                   );
                   setExpandedStationId(null);
                 }}
+                suggestion={stationSuggestions[station.odptStationId]}
               />
             ))}
           </Card>
