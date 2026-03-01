@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
+import { Notifications } from '@mantine/notifications';
+import '@mantine/notifications/styles.css';
 import { AdminShell } from '@/components/AdminShell';
 import { auth } from '@/auth';
 import './globals.css';
@@ -28,6 +30,7 @@ export default async function RootLayout({
       </head>
       <body>
         <MantineProvider defaultColorScheme="light">
+          <Notifications />
           {session ? (
             <AdminShell>{children}</AdminShell>
           ) : (

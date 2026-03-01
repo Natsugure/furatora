@@ -8,6 +8,7 @@ import {
   NumberInput, ScrollArea, SimpleGrid, Stack, Text, TextInput,
 } from '@mantine/core';
 import { Trash2 } from 'lucide-react';
+import { notifications } from '@mantine/notifications';
 
 type Operator = { id: string; name: string };
 type Line = { id: string; name: string; nameEn: string; operatorId: string };
@@ -60,6 +61,8 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [dataLoading, setDataLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const initialLimitedPlatformIds = useRef(initialData?.limitedToPlatformIds);
+
+  const [hasInvalidInput, setHasInvalidInput] = useState(false);
 
   useEffect(() => {
     const initialIds = initialLimitedPlatformIds.current;
@@ -142,6 +145,25 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // NumberInputからの空文字列をチェック
+    const hasInvalidFreeSpace = freeSpaces.some(
+      fs => typeof fs.carNumber !== 'number' || typeof fs.nearDoor !== 'number'
+    );
+    const hasInvalidPrioritySeat = prioritySeats.some(
+      ps => typeof ps.carNumber !== 'number' || typeof ps.nearDoor !== 'number'
+    );
+
+    if (hasInvalidFreeSpace || hasInvalidPrioritySeat) {
+      notifications.show({
+        title: '更新エラー',
+        message: '入力項目が不足しています。',
+        color: 'red',
+        autoClose: 3000,
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
