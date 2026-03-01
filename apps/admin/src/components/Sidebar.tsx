@@ -10,6 +10,7 @@ const navItems = [
   { href: '/trains', label: '列車' },
   { href: '/stations', label: '駅' },
   { href: '/lines', label: '路線' },
+  { href: '/operators', label: '事業者' },
   { href: '/unresolved-connections', label: '未解決接続' },
 ];
 

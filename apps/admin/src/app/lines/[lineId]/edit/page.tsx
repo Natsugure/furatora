@@ -22,7 +22,20 @@ export default async function LineEditPage({
     <div>
       <Title order={2} mb="xs">路線を編集</Title>
       <Text size="sm" c="dimmed" mb="lg">{line.name}</Text>
-      <LineForm lineId={lineId} initialData={{ nameKana: line.nameKana }} />
+      <LineForm
+        lineId={lineId}
+        initialData={{
+          name: line.name,
+          nameKana: line.nameKana,
+          nameEn: line.nameEn,
+          odptRailwayId: line.odptRailwayId,
+          slug: line.slug,
+          lineCode: line.lineCode,
+          color: line.color,
+          displayOrder: line.displayOrder ?? 0,
+          operatorId: line.operatorId,
+        }}
+      />
     </div>
   );
 }

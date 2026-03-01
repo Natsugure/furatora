@@ -1,12 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import { STROLLER_DIFFICULTY_META, WHEELCHAIR_DIFFICULTY_META } from '@/constants/difficulty';
 import {
   Button, Card, Group, NativeSelect, SimpleGrid, Stack, Text, TextInput, Textarea, Title,
 } from '@mantine/core';
+
+type Operator = {
+  id: string;
+  name: string;
+};
 
 export type ConnectionRow = {
   id: string;
@@ -29,8 +34,18 @@ type ConnectionState = {
 
 type Props = {
   stationId: string;
-  initialNameKana: string | null;
-  initialNotes: string | null;
+  initialData: {
+    name: string;
+    nameKana: string | null;
+    nameEn: string | null;
+    odptStationId: string | null;
+    slug: string | null;
+    code: string | null;
+    lat: string | null;
+    lon: string | null;
+    operatorId: string;
+    notes: string | null;
+  };
   connections: ConnectionRow[];
 };
 
@@ -59,10 +74,19 @@ const wheelchairOptions = [
     .map(([key, { label }]) => ({ value: key, label })),
 ];
 
-export function StationEditForm({ stationId, initialNameKana, initialNotes, connections }: Props) {
+export function StationEditForm({ stationId, initialData, connections }: Props) {
   const router = useRouter();
-  const [nameKana, setNameKana] = useState(initialNameKana ?? '');
-  const [notes, setNotes] = useState(initialNotes ?? '');
+  const [name, setName] = useState(initialData.name);
+  const [nameKana, setNameKana] = useState(initialData.nameKana ?? '');
+  const [nameEn, setNameEn] = useState(initialData.nameEn ?? '');
+  const [odptStationId, setOdptStationId] = useState(initialData.odptStationId ?? '');
+  const [slug, setSlug] = useState(initialData.slug ?? '');
+  const [code, setCode] = useState(initialData.code ?? '');
+  const [lat, setLat] = useState(initialData.lat ?? '');
+  const [lon, setLon] = useState(initialData.lon ?? '');
+  const [operatorId, setOperatorId] = useState(initialData.operatorId);
+  const [notes, setNotes] = useState(initialData.notes ?? '');
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>(() =>
     Object.fromEntries(
       connections.map((c) => [
@@ -78,6 +102,12 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
   );
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    fetch('/api/operators')
+      .then((r) => r.json())
+      .then(setOperators);
+  }, []);
+
   function updateConnection(id: string, patch: Partial<ConnectionState>) {
     setConnectionStates((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   }
@@ -89,7 +119,15 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        name,
         nameKana: nameKana || null,
+        nameEn: nameEn || null,
+        odptStationId: odptStationId || null,
+        slug: slug || null,
+        code: code || null,
+        lat: lat || null,
+        lon: lon || null,
+        operatorId,
         notes: notes || null,
       }),
     });
@@ -120,17 +158,71 @@ export function StationEditForm({ stationId, initialNameKana, initialNotes, conn
     }
   }
 
+  const operatorOptions = operators.map((op) => ({ value: op.id, label: op.name }));
+
   return (
     <Stack gap="xl" maw="48rem">
       <section>
         <Title order={4} mb="md">駅情報</Title>
         <Stack gap="md">
           <TextInput
+            label="駅名"
+            placeholder="例: 茅場町"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <TextInput
             label="よみがな - 任意"
             placeholder="例: かやばちょう"
             value={nameKana}
             onChange={(e) => setNameKana(e.target.value)}
           />
+          <TextInput
+            label="英語名 - 任意"
+            placeholder="例: Kayabacho"
+            value={nameEn}
+            onChange={(e) => setNameEn(e.target.value)}
+          />
+          <NativeSelect
+            label="事業者"
+            required
+            value={operatorId}
+            onChange={(e) => setOperatorId(e.target.value)}
+            data={operatorOptions}
+          />
+          <TextInput
+            label="ODPTコード - 任意"
+            placeholder="例: odpt.Station:TokyoMetro.Hibiya.Kayabacho"
+            value={odptStationId}
+            onChange={(e) => setOdptStationId(e.target.value)}
+          />
+          <TextInput
+            label="スラッグ - 任意"
+            placeholder="例: tokyo-metro-hibiya-kayabacho"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          />
+          <TextInput
+            label="駅コード - 任意"
+            placeholder="例: H14"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <SimpleGrid cols={2}>
+            <TextInput
+              label="緯度 - 任意"
+              placeholder="例: 35.681236"
+              value={lat}
+              onChange={(e) => setLat(e.target.value)}
+            />
+            <TextInput
+              label="経度 - 任意"
+              placeholder="例: 139.767125"
+              value={lon}
+              onChange={(e) => setLon(e.target.value)}
+            />
+          </SimpleGrid>
           <Textarea
             label="備考 - 任意"
             placeholder="例: 東急東横線との直通運転あり"

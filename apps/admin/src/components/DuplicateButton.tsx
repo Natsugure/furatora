@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Group, Modal, TextInput } from '@mantine/core';
+import { ActionIcon, Button, Group, Modal, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { CopyPlus } from 'lucide-react';
 
 type Props = {
   trainId: string;
@@ -18,7 +19,7 @@ export function DuplicateButton({ trainId, trainName }: Props) {
   const [error, setError] = useState('');
 
   function handleOpen() {
-    setNewName(`${trainName} (複製)`);
+    setNewName(`${trainName} (コピー)`);
     setError('');
     open();
   }
@@ -66,9 +67,9 @@ export function DuplicateButton({ trainId, trainName }: Props) {
 
   return (
     <>
-      <Button variant="default" size="compact-sm" onClick={handleOpen}>
-        複製
-      </Button>
+      <ActionIcon variant="default" size="md" onClick={handleOpen}>
+        <CopyPlus style={{ width: '70%', height: '70%' }}/>
+      </ActionIcon>
       <Modal opened={opened} onClose={close} title="列車を複製" centered>
         <TextInput
           label="新しい列車名"

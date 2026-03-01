@@ -71,8 +71,18 @@ export default async function StationEditPage({ params }: Props) {
 
       <StationEditForm
         stationId={station.id}
-        initialNameKana={station.nameKana}
-        initialNotes={station.notes}
+        initialData={{
+          name: station.name,
+          nameKana: station.nameKana,
+          nameEn: station.nameEn,
+          odptStationId: station.odptStationId,
+          slug: station.slug,
+          code: station.code,
+          lat: station.lat,
+          lon: station.lon,
+          operatorId: station.operatorId,
+          notes: station.notes,
+        }}
         connections={connections}
       />
     </div>

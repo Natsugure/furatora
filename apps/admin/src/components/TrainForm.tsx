@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
 import {
-  Button, Card, Checkbox, Group, Loader, MultiSelect, NativeSelect, NavLink,
+  ActionIcon, Button, Card, Checkbox, Group, Loader, MultiSelect, NativeSelect, NavLink,
   NumberInput, ScrollArea, SimpleGrid, Stack, Text, TextInput,
 } from '@mantine/core';
+import { Trash2 } from 'lucide-react';
 
 type Operator = { id: string; name: string };
 type Line = { id: string; name: string; nameEn: string; operatorId: string };
@@ -89,7 +90,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   function removeFreeSpace(index: number) {
     setFreeSpaces((prev) => prev.filter((_, i) => i !== index));
   }
-  function updateFreeSpace(index: number, field: keyof FreeSpace, value: number | boolean) {
+  function updateFreeSpace(index: number, field: keyof FreeSpace, value: number | string | boolean) {
     setFreeSpaces((prev) => prev.map((fs, i) => (i === index ? { ...fs, [field]: value } : fs)));
   }
 
@@ -99,7 +100,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   function removePrioritySeat(index: number) {
     setPrioritySeats((prev) => prev.filter((_, i) => i !== index));
   }
-  function updatePrioritySeat(index: number, field: keyof PrioritySeat, value: number | boolean) {
+  function updatePrioritySeat(index: number, field: keyof PrioritySeat, value: number | string |boolean) {
     setPrioritySeats((prev) => prev.map((ps, i) => (i === index ? { ...ps, [field]: value } : ps)));
   }
 
@@ -217,6 +218,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         <NumberInput
           label="両数"
           min={1}
+          max={17}
           value={carCount}
           onChange={(v) => {
             const newCount = typeof v === 'number' ? v : 10;
@@ -240,7 +242,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
                 <Text size="sm" c="dimmed" w={56} ta="right">{cs.carNumber}号車</Text>
                 <NumberInput
                   min={1}
-                  max={10}
+                  max={6}
                   value={cs.doorCount}
                   onChange={(v) =>
                     setCarStructures((prev) =>
@@ -249,7 +251,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
                   }
                   w={80}
                   size="xs"
-                  suffix="枚"
+                  suffix="ドア"
                 />
               </Group>
             ))}
@@ -265,20 +267,22 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
             {freeSpaces.map((fs, i) => (
               <Group key={i} gap="sm" align="center" wrap="wrap">
                 <NumberInput label="号車" min={1} max={carCount} value={fs.carNumber}
-                  onChange={(v) => updateFreeSpace(i, 'carNumber', typeof v === 'number' ? v : 1)}
+                  onChange={(v) => updateFreeSpace(i, 'carNumber', v)}
                   w={80} size="xs"
+                  error={typeof fs.carNumber === 'string' && fs.carNumber === ''}
                 />
                 <NumberInput label="ドア番号" min={1} value={fs.nearDoor}
-                  onChange={(v) => updateFreeSpace(i, 'nearDoor', typeof v === 'number' ? v : 1)}
+                  onChange={(v) => updateFreeSpace(i, 'nearDoor', v)}
                   w={80} size="xs"
+                  error={typeof fs.nearDoor === 'string' && fs.nearDoor === ''}
                 />
-                <Checkbox label="標準" checked={fs.isStandard}
+                <Checkbox label="全編成装備" checked={fs.isStandard}
                   onChange={(e) => updateFreeSpace(i, 'isStandard', e.currentTarget.checked)}
                   size="sm" mt="lg"
                 />
-                <Button variant="subtle" color="red" size="compact-xs" onClick={() => removeFreeSpace(i)} mt="lg">
-                  削除
-                </Button>
+                <ActionIcon variant="filled" color="red" size="sm" onClick={() => removeFreeSpace(i)} mt="lg">
+                  <Trash2 style={{ width: '70%', height: '70%' }}/>
+                </ActionIcon>
               </Group>
             ))}
           </Stack>
@@ -293,20 +297,22 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
             {prioritySeats.map((ps, i) => (
               <Group key={i} gap="sm" align="center" wrap="wrap">
                 <NumberInput label="号車" min={1} max={carCount} value={ps.carNumber}
-                  onChange={(v) => updatePrioritySeat(i, 'carNumber', typeof v === 'number' ? v : 1)}
+                  onChange={(v) => updatePrioritySeat(i, 'carNumber', v)}
                   w={80} size="xs"
+                  error={typeof ps.carNumber === 'string' && ps.carNumber === ''}
                 />
                 <NumberInput label="ドア番号" min={1} value={ps.nearDoor}
-                  onChange={(v) => updatePrioritySeat(i, 'nearDoor', typeof v === 'number' ? v : 1)}
+                  onChange={(v) => updatePrioritySeat(i, 'nearDoor', v)}
                   w={80} size="xs"
+                  error={typeof ps.nearDoor === 'string' && ps.nearDoor === ''}
                 />
-                <Checkbox label="標準" checked={ps.isStandard}
+                <Checkbox label="全編成装備" checked={ps.isStandard}
                   onChange={(e) => updatePrioritySeat(i, 'isStandard', e.currentTarget.checked)}
                   size="sm" mt="lg"
                 />
-                <Button variant="subtle" color="red" size="compact-xs" onClick={() => removePrioritySeat(i)} mt="lg">
-                  削除
-                </Button>
+                <ActionIcon variant="filled" color="red" size="sm" onClick={() => removePrioritySeat(i)} mt="lg">
+                  <Trash2 style={{ width: '70%', height: '70%' }}/>
+                </ActionIcon>
               </Group>
             ))}
           </Stack>

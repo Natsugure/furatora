@@ -68,9 +68,9 @@ export default async function StationsPage() {
                       <TableThead>
                         <TableTr>
                           <TableTh>#</TableTh>
-                          <TableTh>コード</TableTh>
-                          <TableTh>名称</TableTh>
-                          <TableTh>名称（英語）</TableTh>
+                          <TableTh>駅番号</TableTh>
+                          <TableTh>駅名</TableTh>
+                          <TableTh>駅名（英語）</TableTh>
                           <TableTh>設備</TableTh>
                           <TableTh>編集</TableTh>
                         </TableTr>
