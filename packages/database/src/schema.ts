@@ -168,16 +168,24 @@ export const platformCarStopPositions = pgTable('platform_car_stop_positions', {
 export const platformLocations = pgTable('platform_locations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformId: uuid('platform_id').references(() => platforms.id).notNull(),
-  nearPlatformCell: integer('near_platform_cell'), // null = ホーム全体
   exits: text('exits'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
+// アクセス点（ホーム枠番号）を表す中間テーブル
+export const platformLocationCells = pgTable('platform_location_cells', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  platformLocationId: uuid('platform_location_id')
+    .references(() => platformLocations.id, { onDelete: 'cascade' })
+    .notNull(),
+  nearPlatformCell: integer('near_platform_cell'), // null = コンコース全体
+});
+
 export const stationFacilities = pgTable('station_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  platformLocationId: uuid('platform_location_id').references(() => platformLocations.id, { onDelete: 'cascade' }).notNull(),
+  platformLocationCellId: uuid('platform_location_cell_id').references(() => platformLocationCells.id, { onDelete: 'cascade' }).notNull(),
   typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
   isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
   isStrollerAccessible: boolean('is_stroller_accessible').default(true),
@@ -191,6 +199,8 @@ export const facilityConnections = pgTable('facility_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformLocationId: uuid('platform_location_id').references(() => platformLocations.id, { onDelete: 'cascade' }).notNull(),
   connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
+  connectedPlatformId: uuid('connected_platform_id').references(() => platforms.id), // nullable
+  directionId: uuid('direction_id').references(() => lineDirections.id), // nullable
   exitLabel: text('exit_label'), // 出口ラベル (例: "A3出口", "改札外")
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => [
