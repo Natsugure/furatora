@@ -10,7 +10,8 @@
     "db:migrate": "pnpm --filter database db:migrate",
     "db:generate": "pnpm --filter database db:generate",
     "db:studio": "pnpm --filter database db:studio",
-    "update-odpt": "pnpm --filter scripts update-odpt"
+    "update-odpt": "pnpm --filter scripts update-odpt",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -24,6 +25,8 @@
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.3",
+    "husky": "^8.0.0",
+    "lint-staged": "^16.3.2",
     "postgres": "^3.4.8",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
