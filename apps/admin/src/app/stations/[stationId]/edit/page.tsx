@@ -37,23 +37,36 @@ export default async function StationEditPage({ params }: Props) {
   const connectedRailwayIds = connectionRows
     .map((c) => c.connectedRailwayId)
     .filter((id): id is string => id !== null);
+  const unresolvedOdptRailwayIds = connectionRows
+    .filter((c) => c.connectedRailwayId === null && c.odptRailwayId !== null)
+    .map((c) => c.odptRailwayId as string);
 
-  const [connectedStationList, connectedLineList] = await Promise.all([
+  const [connectedStationList, connectedLineList, unresolvedLineList] = await Promise.all([
     connectedStationIds.length > 0
       ? db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, connectedStationIds))
       : Promise.resolve([]),
     connectedRailwayIds.length > 0
       ? db.select({ id: lines.id, name: lines.name }).from(lines).where(inArray(lines.id, connectedRailwayIds))
       : Promise.resolve([]),
+    unresolvedOdptRailwayIds.length > 0
+      ? db.select({ odptRailwayId: lines.odptRailwayId, name: lines.name }).from(lines).where(inArray(lines.odptRailwayId, unresolvedOdptRailwayIds))
+      : Promise.resolve([]),
   ]);
 
   const stationNameMap = Object.fromEntries(connectedStationList.map((s) => [s.id, s.name]));
-  const lineNameMap = Object.fromEntries(connectedLineList.map((l) => [l.id, l.name]));
+  const lineNameByIdMap = Object.fromEntries(connectedLineList.map((l) => [l.id, l.name]));
+  const lineNameByOdptIdMap = Object.fromEntries(
+    unresolvedLineList
+      .filter((l): l is { odptRailwayId: string; name: string } => l.odptRailwayId !== null)
+      .map((l) => [l.odptRailwayId, l.name])
+  );
 
   const connections: ConnectionRow[] = connectionRows.map((c) => ({
     id: c.id,
     connectedStationName: c.connectedStationId ? (stationNameMap[c.connectedStationId] ?? null) : null,
-    connectedLineName: c.connectedRailwayId ? (lineNameMap[c.connectedRailwayId] ?? null) : null,
+    connectedLineName: c.connectedRailwayId
+      ? (lineNameByIdMap[c.connectedRailwayId] ?? null)
+      : (c.odptRailwayId ? (lineNameByOdptIdMap[c.odptRailwayId] ?? null) : null),
     odptStationId: c.odptStationId,
     odptRailwayId: c.odptRailwayId,
     strollerDifficulty: c.strollerDifficulty,

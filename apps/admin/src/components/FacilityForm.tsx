@@ -21,8 +21,9 @@ type ConnectedStation = {
   id: string;
   name: string;
   code: string | null;
-  lineId: string;
-  lineName: string;
+  lineId: string | null;
+  lineName: string | null;
+  odptRailwayId: string | null;
 }
 
 type Connection = {
@@ -154,7 +155,10 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
 
   const connectedStationData = [
     { value: '', label: '駅を選択' },
-    ...connectedStations.map((s) => ({ value: s.id, label: `${s.lineName} (${s.name})` })),
+    ...connectedStations.map((s) => {
+      const lineLabel = s.lineName ?? s.odptRailwayId?.replace('odpt.Railway:', '') ?? '(路線不明)';
+      return { value: s.id, label: `${lineLabel} (${s.name})` };
+    }),
   ];
 
   return (

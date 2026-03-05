@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { PUT, DELETE } from './route';
 
 vi.mock('@furatora/database/client', () => ({
@@ -35,7 +35,7 @@ describe('PUT /api/operators/[operatorId]', () => {
     const mockReturning = vi.fn().mockResolvedValue([mockOperator]);
     const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
     const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
-    vi.mocked(db.update).mockReturnValue({ set: mockSet } as ReturnType<typeof db.update>);
+    (db.update as Mock).mockReturnValue({ set: mockSet });
 
     const request = new Request(`http://localhost/api/operators/${OPERATOR_ID}`, {
       method: 'PUT',
@@ -69,7 +69,7 @@ describe('PUT /api/operators/[operatorId]', () => {
     const mockReturning = vi.fn().mockResolvedValue([]);
     const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
     const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
-    vi.mocked(db.update).mockReturnValue({ set: mockSet } as ReturnType<typeof db.update>);
+    (db.update as Mock).mockReturnValue({ set: mockSet });
 
     const request = new Request(`http://localhost/api/operators/${OPERATOR_ID}`, {
       method: 'PUT',
@@ -89,7 +89,7 @@ describe('PUT /api/operators/[operatorId]', () => {
     const mockReturning = vi.fn().mockRejectedValue(new Error('DB error'));
     const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
     const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
-    vi.mocked(db.update).mockReturnValue({ set: mockSet } as ReturnType<typeof db.update>);
+    (db.update as Mock).mockReturnValue({ set: mockSet });
 
     const request = new Request(`http://localhost/api/operators/${OPERATOR_ID}`, {
       method: 'PUT',
@@ -114,7 +114,7 @@ describe('DELETE /api/operators/[operatorId]', () => {
     const { db } = await import('@furatora/database/client');
     const mockReturning = vi.fn().mockResolvedValue([mockOperator]);
     const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
-    vi.mocked(db.delete).mockReturnValue({ where: mockWhere } as ReturnType<typeof db.delete>);
+    (db.delete as Mock).mockReturnValue({ where: mockWhere });
 
     const request = new Request(`http://localhost/api/operators/${OPERATOR_ID}`, {
       method: 'DELETE',
@@ -131,7 +131,7 @@ describe('DELETE /api/operators/[operatorId]', () => {
     const { db } = await import('@furatora/database/client');
     const mockReturning = vi.fn().mockResolvedValue([]);
     const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
-    vi.mocked(db.delete).mockReturnValue({ where: mockWhere } as ReturnType<typeof db.delete>);
+    (db.delete as Mock).mockReturnValue({ where: mockWhere });
 
     const request = new Request(`http://localhost/api/operators/${OPERATOR_ID}`, {
       method: 'DELETE',
@@ -148,7 +148,7 @@ describe('DELETE /api/operators/[operatorId]', () => {
     const { db } = await import('@furatora/database/client');
     const mockReturning = vi.fn().mockRejectedValue(new Error('DB error'));
     const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
-    vi.mocked(db.delete).mockReturnValue({ where: mockWhere } as ReturnType<typeof db.delete>);
+    (db.delete as Mock).mockReturnValue({ where: mockWhere });
 
     const request = new Request(`http://localhost/api/operators/${OPERATOR_ID}`, {
       method: 'DELETE',

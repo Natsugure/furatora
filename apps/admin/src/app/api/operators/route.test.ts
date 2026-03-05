@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { GET, POST } from './route';
 
 vi.mock('@furatora/database/client', () => ({
@@ -32,7 +32,7 @@ describe('GET /api/operators', () => {
     const { db } = await import('@furatora/database/client');
     const mockOrderBy = vi.fn().mockResolvedValue([mockOperator]);
     const mockFrom = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
-    vi.mocked(db.select).mockReturnValue({ from: mockFrom } as ReturnType<typeof db.select>);
+    (db.select as Mock).mockReturnValue({ from: mockFrom });
 
     const response = await GET();
     const data = await response.json();
@@ -45,7 +45,7 @@ describe('GET /api/operators', () => {
     const { db } = await import('@furatora/database/client');
     const mockOrderBy = vi.fn().mockRejectedValue(new Error('DB error'));
     const mockFrom = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
-    vi.mocked(db.select).mockReturnValue({ from: mockFrom } as ReturnType<typeof db.select>);
+    (db.select as Mock).mockReturnValue({ from: mockFrom });
 
     const response = await GET();
     const data = await response.json();
@@ -64,7 +64,7 @@ describe('POST /api/operators', () => {
     const { db } = await import('@furatora/database/client');
     const mockReturning = vi.fn().mockResolvedValue([mockOperator]);
     const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
-    vi.mocked(db.insert).mockReturnValue({ values: mockValues } as ReturnType<typeof db.insert>);
+    (db.insert as Mock).mockReturnValue({ values: mockValues });
 
     const request = new Request('http://localhost/api/operators', {
       method: 'POST',
@@ -97,7 +97,7 @@ describe('POST /api/operators', () => {
     const { db } = await import('@furatora/database/client');
     const mockReturning = vi.fn().mockRejectedValue(new Error('DB error'));
     const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
-    vi.mocked(db.insert).mockReturnValue({ values: mockValues } as ReturnType<typeof db.insert>);
+    (db.insert as Mock).mockReturnValue({ values: mockValues });
 
     const request = new Request('http://localhost/api/operators', {
       method: 'POST',
