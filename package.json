@@ -11,6 +11,8 @@
     "db:generate": "pnpm --filter database db:generate",
     "db:studio": "pnpm --filter database db:studio",
     "update-odpt": "pnpm --filter scripts update-odpt",
+    "migrate-platform-locations": "pnpm dotenv -e .env.local -- pnpm --filter scripts migrate-platform-locations",
+    "fix-dev-migrations": "pnpm dotenv -e .env.local -- pnpm --filter scripts fix-dev-migrations",
     "prepare": "husky install"
   },
   "devDependencies": {

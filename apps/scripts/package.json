@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "update-odpt": "tsx src/update-odpt.ts",
-    "seed": "tsx src/seed-master-data.ts"
+    "seed": "tsx src/seed-master-data.ts",
+    "migrate-platform-locations": "tsx src/migrate-platform-locations.ts",
+    "fix-dev-migrations": "tsx src/fix-dev-migrations.ts"
   },
   "dependencies": {
     "@furatora/database": "workspace:*",

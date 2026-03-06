@@ -15,6 +15,13 @@
       "when": 1772754725522,
       "tag": "0001_great_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772754725523,
+      "tag": "0002_post_migration_cleanup",
+      "breakpoints": true
     }
   ]
 }
