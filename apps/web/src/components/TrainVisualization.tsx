@@ -13,6 +13,7 @@ type Train = {
 type FacilityConnection = {
   stationName: string;
   lineNames: string[];
+  directionName: string | null;
   exitLabel: string | null;
 };
 
@@ -24,11 +25,15 @@ type Facility = {
   isStrollerAccessible: boolean | null;
 };
 
+type PlatformLocationCell = {
+  nearPlatformCell: number | null;
+  facilities: Facility[];
+};
+
 type PlatformLocation = {
   id: string;
-  nearPlatformCell: number | null;
   exits: string | null;
-  facilities: Facility[];
+  cells: PlatformLocationCell[];
   connections: FacilityConnection[];
 };
 
@@ -257,14 +262,27 @@ export function TrainVisualization({
   // ホーム全体の長さ（maxCarCount基準）
   const platformCells = Array.from({ length: platformMaxCarCount }, (_, i) => i + 1);
 
-  // ホーム枠番号 → 場所リスト のマップ
-  const locationsByCell: Record<number, PlatformLocation[]> = {};
+  // ホーム枠番号 → フラットなセルエントリのマップ
+  type FlatCell = {
+    locationId: string;
+    facilities: Facility[];
+    exits: string | null;
+    connections: FacilityConnection[];
+  };
+  const locationsByCell: Record<number, FlatCell[]> = {};
   for (const location of locations) {
-    if (location.nearPlatformCell !== null) {
-      const cell = location.nearPlatformCell;
-      if (cell >= 1 && cell <= platformMaxCarCount) {
-        if (!locationsByCell[cell]) locationsByCell[cell] = [];
-        locationsByCell[cell].push(location);
+    for (const cell of location.cells) {
+      if (cell.nearPlatformCell !== null) {
+        const cellNum = cell.nearPlatformCell;
+        if (cellNum >= 1 && cellNum <= platformMaxCarCount) {
+          if (!locationsByCell[cellNum]) locationsByCell[cellNum] = [];
+          locationsByCell[cellNum].push({
+            locationId: location.id,
+            facilities: cell.facilities,
+            exits: location.exits,
+            connections: location.connections,
+          });
+        }
       }
     }
   }
@@ -326,7 +344,7 @@ export function TrainVisualization({
               loc.facilities.map((f, idx) =>
                 FACILITY_ICONS[f.typeCode] ? (
                   <Image
-                    key={`${loc.id}-${idx}`}
+                    key={`${loc.locationId}-${idx}`}
                     src={FACILITY_ICONS[f.typeCode]}
                     alt={f.typeName}
                     title={loc.exits || f.typeName}
@@ -335,7 +353,7 @@ export function TrainVisualization({
                     className="w-6 h-6"
                   />
                 ) : (
-                  <span key={`${loc.id}-${idx}`} title={loc.exits || f.typeName} className="text-sm leading-none">📍</span>
+                  <span key={`${loc.locationId}-${idx}`} title={loc.exits || f.typeName} className="text-sm leading-none">📍</span>
                 )
               )
             )}
@@ -411,9 +429,9 @@ export function TrainVisualization({
                 {cellLocations.flatMap((loc) =>
                   loc.facilities.map((f, idx) =>
                     FACILITY_ICONS[f.typeCode] ? (
-                      <Image key={`${loc.id}-${idx}`} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={loc.exits || f.typeName} width={28} height={28} className="w-7 h-7" />
+                      <Image key={`${loc.locationId}-${idx}`} src={FACILITY_ICONS[f.typeCode]} alt={f.typeName} title={loc.exits || f.typeName} width={28} height={28} className="w-7 h-7" />
                     ) : (
-                      <span key={`${loc.id}-${idx}`} className="text-base leading-none">📍</span>
+                      <span key={`${loc.locationId}-${idx}`} className="text-base leading-none">📍</span>
                     )
                   )
                 )}

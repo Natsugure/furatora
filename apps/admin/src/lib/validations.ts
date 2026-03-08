@@ -66,17 +66,23 @@ const facilitySchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+const cellSchema = z.object({
+  nearPlatformCell: z.number().int().nullable().optional(),
+  facilities: z.array(facilitySchema).min(1),
+});
+
 const connectionSchema = z.object({
   stationId: z.string().uuid(),
+  connectedPlatformId: z.string().uuid().nullable().optional(),
+  directionId: z.string().uuid().nullable().optional(),
   exitLabel: z.string().nullable().optional(),
 });
 
 export const platformLocationSchema = z.object({
   platformId: z.string().uuid(),
-  nearPlatformCell: z.number().int().nullable().optional(),
   exits: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  facilities: z.array(facilitySchema).optional(),
+  cells: z.array(cellSchema).min(1),
   connections: z.array(connectionSchema).optional(),
 });
 

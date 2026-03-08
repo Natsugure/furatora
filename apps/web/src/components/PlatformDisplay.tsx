@@ -38,6 +38,7 @@ type Train = {
 export type FacilityConnection = {
   stationName: string;
   lineNames: string[];
+  directionName: string | null;
   exitLabel: string | null;
 };
 
@@ -49,11 +50,15 @@ export type Facility = {
   isStrollerAccessible: boolean | null;
 };
 
+export type PlatformLocationCell = {
+  nearPlatformCell: number | null;
+  facilities: Facility[];
+};
+
 export type PlatformLocation = {
   id: string;
-  nearPlatformCell: number | null;
   exits: string | null;
-  facilities: Facility[];
+  cells: PlatformLocationCell[];
   connections: FacilityConnection[];
 };
 
@@ -137,6 +142,51 @@ export function PlatformDisplay({
             </div>
           ) : (
             <p className="text-sm text-gray-400 italic">列車情報がありません</p>
+          )}
+
+          {/* Facility summary section */}
+          {locations.length > 0 && locations.some((loc) => loc.cells.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                設備・乗換情報
+              </p>
+              <div className="space-y-3">
+                {locations.map((loc) => {
+                  if (loc.cells.length === 0) return null;
+                  const connectionHeader = loc.connections.length > 0
+                    ? loc.connections.map((conn) => {
+                        const label = conn.directionName
+                          ? `${conn.stationName}（${conn.directionName}）`
+                          : conn.stationName;
+                        return label;
+                      }).join('・') + ' 方面'
+                    : null;
+                  return (
+                    <div key={loc.id}>
+                      {connectionHeader && (
+                        <p className="text-sm font-medium text-gray-700 mb-1">
+                          {connectionHeader}
+                        </p>
+                      )}
+                      <ul className="space-y-0.5">
+                        {loc.cells.map((cell, idx) => {
+                          const cellLabel = cell.nearPlatformCell !== null
+                            ? `${cell.nearPlatformCell}号車付近`
+                            : 'コンコース全体';
+                          const facilityNames = cell.facilities.map((f) => f.typeName).join('・');
+                          return (
+                            <li key={idx} className="text-sm text-gray-600 flex gap-2">
+                              <span className="text-gray-400 flex-shrink-0">{cellLabel}:</span>
+                              <span>{facilityNames}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Platform notes */}

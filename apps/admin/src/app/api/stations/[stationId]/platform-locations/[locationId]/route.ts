@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { platformLocations, stationFacilities, facilityConnections } from '@furatora/database/schema';
-import { eq } from 'drizzle-orm';
+import { platformLocations, platformLocationCells, stationFacilities, facilityConnections } from '@furatora/database/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { platformLocationSchema } from '@/lib/validations';
 
 export async function PUT(
@@ -15,13 +15,12 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { platformId, nearPlatformCell, exits, notes, facilities, connections } = parsed.data;
+    const { platformId, exits, notes, cells, connections } = parsed.data;
 
     const [updated] = await db
       .update(platformLocations)
       .set({
         platformId,
-        nearPlatformCell: nearPlatformCell ?? null,
         exits: exits ?? null,
         notes: notes ?? null,
       })
@@ -32,18 +31,39 @@ export async function PUT(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // 設備を再登録（既存削除→再挿入）
-    await db.delete(stationFacilities).where(eq(stationFacilities.platformLocationId, locationId));
-    if (facilities && facilities.length > 0) {
-      await db.insert(stationFacilities).values(
-        facilities.map((f) => ({
-          platformLocationId: locationId,
-          typeCode: f.typeCode,
-          isWheelchairAccessible: f.isWheelchairAccessible ?? true,
-          isStrollerAccessible: f.isStrollerAccessible ?? true,
-          notes: f.notes ?? null,
-        }))
+    // アクセス点を再登録（既存削除→再挿入、stationFacilitiesはCASCADEで削除）
+    const existingCells = await db
+      .select({ id: platformLocationCells.id })
+      .from(platformLocationCells)
+      .where(eq(platformLocationCells.platformLocationId, locationId));
+
+    if (existingCells.length > 0) {
+      await db.delete(stationFacilities).where(
+        inArray(stationFacilities.platformLocationCellId, existingCells.map((c) => c.id))
       );
+    }
+    await db.delete(platformLocationCells).where(eq(platformLocationCells.platformLocationId, locationId));
+
+    for (const cell of cells) {
+      const [insertedCell] = await db
+        .insert(platformLocationCells)
+        .values({
+          platformLocationId: locationId,
+          nearPlatformCell: cell.nearPlatformCell ?? null,
+        })
+        .returning();
+
+      if (cell.facilities.length > 0) {
+        await db.insert(stationFacilities).values(
+          cell.facilities.map((f) => ({
+            platformLocationCellId: insertedCell.id,
+            typeCode: f.typeCode,
+            isWheelchairAccessible: f.isWheelchairAccessible ?? true,
+            isStrollerAccessible: f.isStrollerAccessible ?? true,
+            notes: f.notes ?? null,
+          }))
+        );
+      }
     }
 
     // 乗換駅接続を再登録（既存削除→再挿入）
@@ -53,6 +73,8 @@ export async function PUT(
         connections.map((c) => ({
           platformLocationId: locationId,
           connectedStationId: c.stationId,
+          connectedPlatformId: c.connectedPlatformId ?? null,
+          directionId: c.directionId ?? null,
           exitLabel: c.exitLabel ?? null,
         }))
       );

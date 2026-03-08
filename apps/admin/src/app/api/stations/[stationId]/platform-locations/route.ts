@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { platformLocations, stationFacilities, facilityConnections, platforms } from '@furatora/database/schema';
+import { platformLocations, platformLocationCells, stationFacilities, facilityConnections, platforms } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { platformLocationSchema } from '@/lib/validations';
 
@@ -26,9 +26,72 @@ export async function GET(
       .select()
       .from(platformLocations)
       .where(inArray(platformLocations.platformId, platformIds))
-      .orderBy(asc(platformLocations.nearPlatformCell));
+      .orderBy(asc(platformLocations.createdAt));
 
-    return NextResponse.json(locations);
+    if (locations.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    const locationIds = locations.map((l) => l.id);
+
+    const cells = await db
+      .select()
+      .from(platformLocationCells)
+      .where(inArray(platformLocationCells.platformLocationId, locationIds))
+      .orderBy(asc(platformLocationCells.nearPlatformCell));
+
+    const cellIds = cells.map((c) => c.id);
+
+    const facilities = cellIds.length > 0
+      ? await db
+          .select()
+          .from(stationFacilities)
+          .where(inArray(stationFacilities.platformLocationCellId, cellIds))
+      : [];
+
+    const connections = await db
+      .select()
+      .from(facilityConnections)
+      .where(inArray(facilityConnections.platformLocationId, locationIds));
+
+    const result = locations.map((location) => {
+      const locationCells = cells
+        .filter((c) => c.platformLocationId === location.id)
+        .map((cell) => ({
+          id: cell.id,
+          nearPlatformCell: cell.nearPlatformCell,
+          facilities: facilities
+            .filter((f) => f.platformLocationCellId === cell.id)
+            .map((f) => ({
+              id: f.id,
+              typeCode: f.typeCode,
+              isWheelchairAccessible: f.isWheelchairAccessible,
+              isStrollerAccessible: f.isStrollerAccessible,
+              notes: f.notes,
+            })),
+        }));
+
+      const locationConnections = connections
+        .filter((c) => c.platformLocationId === location.id)
+        .map((c) => ({
+          id: c.id,
+          connectedStationId: c.connectedStationId,
+          connectedPlatformId: c.connectedPlatformId,
+          directionId: c.directionId,
+          exitLabel: c.exitLabel,
+        }));
+
+      return {
+        id: location.id,
+        platformId: location.platformId,
+        exits: location.exits,
+        notes: location.notes,
+        cells: locationCells,
+        connections: locationConnections,
+      };
+    });
+
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -41,28 +104,37 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { platformId, nearPlatformCell, exits, notes, facilities, connections } = parsed.data;
+    const { platformId, exits, notes, cells, connections } = parsed.data;
 
     const [location] = await db
       .insert(platformLocations)
       .values({
         platformId,
-        nearPlatformCell: nearPlatformCell ?? null,
         exits: exits ?? null,
         notes: notes ?? null,
       })
       .returning();
 
-    if (facilities && facilities.length > 0) {
-      await db.insert(stationFacilities).values(
-        facilities.map((f) => ({
+    for (const cell of cells) {
+      const [insertedCell] = await db
+        .insert(platformLocationCells)
+        .values({
           platformLocationId: location.id,
-          typeCode: f.typeCode,
-          isWheelchairAccessible: f.isWheelchairAccessible ?? true,
-          isStrollerAccessible: f.isStrollerAccessible ?? true,
-          notes: f.notes ?? null,
-        }))
-      );
+          nearPlatformCell: cell.nearPlatformCell ?? null,
+        })
+        .returning();
+
+      if (cell.facilities.length > 0) {
+        await db.insert(stationFacilities).values(
+          cell.facilities.map((f) => ({
+            platformLocationCellId: insertedCell.id,
+            typeCode: f.typeCode,
+            isWheelchairAccessible: f.isWheelchairAccessible ?? true,
+            isStrollerAccessible: f.isStrollerAccessible ?? true,
+            notes: f.notes ?? null,
+          }))
+        );
+      }
     }
 
     if (connections && connections.length > 0) {
@@ -70,6 +142,8 @@ export async function POST(request: Request) {
         connections.map((c) => ({
           platformLocationId: location.id,
           connectedStationId: c.stationId,
+          connectedPlatformId: c.connectedPlatformId ?? null,
+          directionId: c.directionId ?? null,
           exitLabel: c.exitLabel ?? null,
         }))
       );

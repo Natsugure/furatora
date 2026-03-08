@@ -12,6 +12,7 @@ import {
   trainEquipments,
   trainCarStructures,
   platformLocations,
+  platformLocationCells,
   stationFacilities,
   facilityTypes,
   facilityConnections,
@@ -67,7 +68,7 @@ async function fetchStationDetails(slug: string) {
     .where(eq(platforms.stationId, station.id));
 
   if (!platformList.length) {
-    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], locations: [], facilityList: [], facilityTypeMap: {} as Record<string, string>, connectionsByLocation: {} as Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]>, transferConnections: [], equipmentsByTrainId: {} as Record<string, { freeSpaces: { carNumber: number; nearDoor: number; isStandard: boolean }[]; prioritySeats: { carNumber: number; nearDoor: number; isStandard: boolean }[] }>, carStructuresByTrainId: {} as Record<string, { carNumber: number; doorCount: number }[]>, carStopPositionsByPlatformId: {} as Record<string, { carCount: number; referenceCarNumber: number; referencePlatformCell: number; direction: 'ascending' | 'descending' }[]> };
+    return { station, line: line[0], platforms: [], lines: [], directions: [], trains: [], locationDataList: [], facilityTypeMap: {} as Record<string, string>, connectionsByLocation: {} as Record<string, { stationName: string; lineNames: string[]; directionName: string | null; exitLabel: string | null }[]>, transferConnections: [], equipmentsByTrainId: {} as Record<string, { freeSpaces: { carNumber: number; nearDoor: number; isStandard: boolean }[]; prioritySeats: { carNumber: number; nearDoor: number; isStandard: boolean }[] }>, carStructuresByTrainId: {} as Record<string, { carNumber: number; doorCount: number }[]>, carStopPositionsByPlatformId: {} as Record<string, { carCount: number; referenceCarNumber: number; referencePlatformCell: number; direction: 'ascending' | 'descending' }[]> };
   }
 
   const platformIds = platformList.map((p) => p.id);
@@ -170,15 +171,25 @@ async function fetchStationDetails(slug: string) {
 
   const locationIds = locationList.map((l) => l.id);
 
-  // 各 location の設備タイプを取得
-  const facilityList = locationIds.length > 0
+  // 各 location のアクセス点（cells）を取得
+  const cellList = locationIds.length > 0
+    ? await db
+        .select()
+        .from(platformLocationCells)
+        .where(inArray(platformLocationCells.platformLocationId, locationIds))
+    : [];
+
+  const cellIds = cellList.map((c) => c.id);
+
+  // 各 cell の設備タイプを取得
+  const facilityList = cellIds.length > 0
     ? await db
         .select()
         .from(stationFacilities)
-        .where(inArray(stationFacilities.platformLocationId, locationIds))
+        .where(inArray(stationFacilities.platformLocationCellId, cellIds))
     : [];
 
-  // facilityConnections: 場所に紐づく乗換駅と路線名を取得
+  // facilityConnections: 場所に紐づく乗換駅と路線名・方面名を取得
   const connectionRows = locationIds.length > 0
     ? await db
         .select({
@@ -186,9 +197,11 @@ async function fetchStationDetails(slug: string) {
           exitLabel: facilityConnections.exitLabel,
           connectedStationId: facilityConnections.connectedStationId,
           stationName: stations.name,
+          directionName: lineDirections.displayName,
         })
         .from(facilityConnections)
         .innerJoin(stations, eq(facilityConnections.connectedStationId, stations.id))
+        .leftJoin(lineDirections, eq(facilityConnections.directionId, lineDirections.id))
         .where(inArray(facilityConnections.platformLocationId, locationIds))
     : [];
 
@@ -213,12 +226,13 @@ async function fetchStationDetails(slug: string) {
     linesByStation[row.stationId].push(row.lineName);
   }
 
-  const connectionsByLocation: Record<string, { stationName: string; lineNames: string[]; exitLabel: string | null }[]> = {};
+  const connectionsByLocation: Record<string, { stationName: string; lineNames: string[]; directionName: string | null; exitLabel: string | null }[]> = {};
   for (const row of connectionRows) {
     if (!connectionsByLocation[row.platformLocationId]) connectionsByLocation[row.platformLocationId] = [];
     connectionsByLocation[row.platformLocationId].push({
       stationName: row.stationName,
       lineNames: linesByStation[row.connectedStationId] ?? [],
+      directionName: row.directionName ?? null,
       exitLabel: row.exitLabel,
     });
   }
@@ -241,6 +255,27 @@ async function fetchStationDetails(slug: string) {
     (r) => r.strollerDifficulty !== null || r.wheelchairDifficulty !== null
   );
 
+  // cells と facilities をネストした構造に組み立て
+  const facilitiesByCell = new Map(cellIds.map((id) => [id, facilityList.filter((f) => f.platformLocationCellId === id)]));
+  const cellsByLocation = new Map(locationIds.map((id) => [id, cellList.filter((c) => c.platformLocationId === id)]));
+
+  const locationDataList = locationList.map((loc) => ({
+    id: loc.id,
+    platformId: loc.platformId,
+    exits: loc.exits,
+    cells: (cellsByLocation.get(loc.id) ?? []).map((cell) => ({
+      nearPlatformCell: cell.nearPlatformCell,
+      facilities: (facilitiesByCell.get(cell.id) ?? []).map((f) => ({
+        id: f.id,
+        typeCode: f.typeCode,
+        typeName: facilityTypeMap[f.typeCode] ?? f.typeCode,
+        isWheelchairAccessible: f.isWheelchairAccessible,
+        isStrollerAccessible: f.isStrollerAccessible,
+      })),
+    })),
+    connections: connectionsByLocation[loc.id] ?? [],
+  }));
+
   return {
     station,
     platforms: platformList,
@@ -248,8 +283,7 @@ async function fetchStationDetails(slug: string) {
     lines: lineList,
     directions: directionList,
     trains: trainList,
-    locations: locationList,
-    facilityList,
+    locationDataList,
     facilityTypeMap,
     connectionsByLocation,
     transferConnections,
@@ -274,8 +308,7 @@ export default async function StationDetailPage({ params }: Props) {
     lines: lineList,
     directions,
     trains: trainList,
-    locations,
-    facilityList,
+    locationDataList,
     facilityTypeMap,
     connectionsByLocation,
     transferConnections,
@@ -312,23 +345,9 @@ export default async function StationDetailPage({ params }: Props) {
         prioritySeats: equipmentsByTrainId[train.id]?.prioritySeats ?? null,
       }));
 
-    const platformLocationsForPlatform = locations
-      .filter((loc) => loc.platformId === platform.id)
-      .map((loc) => ({
-        id: loc.id,
-        nearPlatformCell: loc.nearPlatformCell,
-        exits: loc.exits,
-        facilities: facilityList
-          .filter((f) => f.platformLocationId === loc.id)
-          .map((f) => ({
-            id: f.id,
-            typeCode: f.typeCode,
-            typeName: facilityTypeMap[f.typeCode] ?? f.typeCode,
-            isWheelchairAccessible: f.isWheelchairAccessible,
-            isStrollerAccessible: f.isStrollerAccessible,
-          })),
-        connections: connectionsByLocation[loc.id] ?? [],
-      }));
+    const platformLocationsForPlatform = locationDataList.filter(
+      (loc) => loc.platformId === platform.id
+    );
 
     return {
       platform: {

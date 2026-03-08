@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { platformLocations, stationFacilities, facilityConnections } from '@furatora/database/schema';
-import { eq } from 'drizzle-orm';
+import { platformLocations, platformLocationCells, stationFacilities, facilityConnections } from '@furatora/database/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 export async function POST(
   _request: Request,
@@ -19,10 +19,17 @@ export async function POST(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const originalFacilities = await db
+    const originalCells = await db
       .select()
-      .from(stationFacilities)
-      .where(eq(stationFacilities.platformLocationId, locationId));
+      .from(platformLocationCells)
+      .where(eq(platformLocationCells.platformLocationId, locationId));
+
+    const originalFacilities = originalCells.length > 0
+      ? await db
+          .select()
+          .from(stationFacilities)
+          .where(inArray(stationFacilities.platformLocationCellId, originalCells.map((c) => c.id)))
+      : [];
 
     const originalConnections = await db
       .select()
@@ -33,22 +40,32 @@ export async function POST(
       .insert(platformLocations)
       .values({
         platformId: original.platformId,
-        nearPlatformCell: original.nearPlatformCell,
         exits: original.exits,
         notes: original.notes,
       })
       .returning();
 
-    if (originalFacilities.length > 0) {
-      await db.insert(stationFacilities).values(
-        originalFacilities.map((f) => ({
+    for (const cell of originalCells) {
+      const [duplicatedCell] = await db
+        .insert(platformLocationCells)
+        .values({
           platformLocationId: duplicated.id,
-          typeCode: f.typeCode,
-          isWheelchairAccessible: f.isWheelchairAccessible,
-          isStrollerAccessible: f.isStrollerAccessible,
-          notes: f.notes,
-        }))
-      );
+          nearPlatformCell: cell.nearPlatformCell,
+        })
+        .returning();
+
+      const cellFacilities = originalFacilities.filter((f) => f.platformLocationCellId === cell.id);
+      if (cellFacilities.length > 0) {
+        await db.insert(stationFacilities).values(
+          cellFacilities.map((f) => ({
+            platformLocationCellId: duplicatedCell.id,
+            typeCode: f.typeCode,
+            isWheelchairAccessible: f.isWheelchairAccessible,
+            isStrollerAccessible: f.isStrollerAccessible,
+            notes: f.notes,
+          }))
+        );
+      }
     }
 
     if (originalConnections.length > 0) {
@@ -56,6 +73,8 @@ export async function POST(
         originalConnections.map((c) => ({
           platformLocationId: duplicated.id,
           connectedStationId: c.connectedStationId,
+          connectedPlatformId: c.connectedPlatformId,
+          directionId: c.directionId,
           exitLabel: c.exitLabel,
         }))
       );
