@@ -32,7 +32,8 @@
       "Bash(lsof:*)",
       "Bash(docker ps:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(cat:*)"
     ]
   }
 }

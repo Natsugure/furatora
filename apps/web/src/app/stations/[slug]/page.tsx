@@ -208,7 +208,7 @@ async function fetchStationDetails(slug: string) {
   const connectedStationIds = [...new Set(connectionRows.map((r) => r.connectedStationId))];
   const stationLineNames = connectedStationIds.length > 0
     ? await db
-        .select({ stationId: stationConnections.connectedStationId, lineName: lines.name })
+        .select({ stationId: stationConnections.connectedStationId, lineName: lines.name, lineColor: lines.color })
         .from(stationConnections)
         .innerJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
         .where(
@@ -219,19 +219,21 @@ async function fetchStationDetails(slug: string) {
         )
     : [];
 
-  const linesByStation: Record<string, string[]> = {};
+  const linesByStation: Record<string, { names: string[]; colors: (string | null)[] }> = {};
   for (const row of stationLineNames) {
     if (!row.stationId) continue;
-    if (!linesByStation[row.stationId]) linesByStation[row.stationId] = [];
-    linesByStation[row.stationId].push(row.lineName);
+    if (!linesByStation[row.stationId]) linesByStation[row.stationId] = { names: [], colors: [] };
+    linesByStation[row.stationId].names.push(row.lineName);
+    linesByStation[row.stationId].colors.push(row.lineColor);
   }
 
-  const connectionsByLocation: Record<string, { stationName: string; lineNames: string[]; directionName: string | null; exitLabel: string | null }[]> = {};
+  const connectionsByLocation: Record<string, { stationName: string; lineNames: string[]; lineColors: (string | null)[]; directionName: string | null; exitLabel: string | null }[]> = {};
   for (const row of connectionRows) {
     if (!connectionsByLocation[row.platformLocationId]) connectionsByLocation[row.platformLocationId] = [];
     connectionsByLocation[row.platformLocationId].push({
       stationName: row.stationName,
-      lineNames: linesByStation[row.connectedStationId] ?? [],
+      lineNames: linesByStation[row.connectedStationId]?.names ?? [],
+      lineColors: linesByStation[row.connectedStationId]?.colors ?? [],
       directionName: row.directionName ?? null,
       exitLabel: row.exitLabel,
     });

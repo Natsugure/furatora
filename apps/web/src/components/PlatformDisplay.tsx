@@ -38,6 +38,7 @@ type Train = {
 export type FacilityConnection = {
   stationName: string;
   lineNames: string[];
+  lineColors: (string | null)[];
   directionName: string | null;
   exitLabel: string | null;
 };
@@ -151,15 +152,21 @@ export function PlatformDisplay({
                 設備・乗換情報
               </p>
               <div className="space-y-3">
-                {locations.map((loc) => {
+                {[...locations].sort((a, b) => {
+                  const aCell = a.cells.find((c) => c.nearPlatformCell !== null)?.nearPlatformCell ?? null;
+                  const bCell = b.cells.find((c) => c.nearPlatformCell !== null)?.nearPlatformCell ?? null;
+                  if (aCell === null) return 1;
+                  if (bCell === null) return -1;
+                  return aCell - bCell;
+                }).map((loc) => {
                   if (loc.cells.length === 0) return null;
                   const connectionHeader = loc.connections.length > 0
                     ? loc.connections.map((conn) => {
-                        const label = conn.directionName
-                          ? `${conn.stationName}（${conn.directionName}）`
-                          : conn.stationName;
-                        return label;
-                      }).join('・') + ' 方面'
+                        const lineLabel = conn.lineNames.join('・');
+                        return conn.directionName
+                          ? `${lineLabel}（${conn.directionName}方面）`
+                          : lineLabel;
+                      }).join('・')
                     : null;
                   return (
                     <div key={loc.id}>
@@ -169,7 +176,11 @@ export function PlatformDisplay({
                         </p>
                       )}
                       <ul className="space-y-0.5">
-                        {loc.cells.map((cell, idx) => {
+                        {[...loc.cells].sort((a, b) => {
+                            if (a.nearPlatformCell === null) return 1;
+                            if (b.nearPlatformCell === null) return -1;
+                            return a.nearPlatformCell - b.nearPlatformCell;
+                          }).map((cell, idx) => {
                           const cellLabel = cell.nearPlatformCell !== null
                             ? `${cell.nearPlatformCell}号車付近`
                             : 'コンコース全体';
