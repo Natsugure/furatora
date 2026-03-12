@@ -141,9 +141,9 @@
   --banner-info-border:         var(--color-primary);
   --banner-info-text:           var(--color-primary-text);
 
-  --card-exit-bg:               var(--color-accent-subtle);
-  --card-exit-border:           var(--color-accent);
-  --card-exit-heading:          var(--color-accent-text);
+  --card-exit-bg:               var(--orange-50);
+  --card-exit-border:           var(--orange-900);
+  --card-exit-heading:          var(--orange-900);
 
   --card-transfer-bg:           var(--color-primary-subtle);
   --card-transfer-border:       var(--color-primary);
