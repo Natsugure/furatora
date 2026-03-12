@@ -1,18 +1,181 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design Tokens — Global Color System
+   ============================================================ */
+
 :root {
-  --background: #f5f5f5;
-  --foreground: #171717;
+
+  /* Primitive Scale */
+  --blue-50:  #EBF1FA;
+  --blue-100: #C8D9F0;
+  --blue-200: #A5C0E6;
+  --blue-300: #7BA5D8;
+  --blue-400: #5A8CC8;
+  --blue-500: #4072B3;
+  --blue-600: #335A91;
+  --blue-700: #264370;
+  --blue-800: #1A2D4E;
+  --blue-900: #0E1929;
+
+  --red-50:   #FDF2F2;
+  --red-100:  #FAD9D9;
+  --red-200:  #F4AEAE;
+  --red-300:  #EE8888;
+  --red-400:  #EB8686;
+  --red-500:  #D96060;
+  --red-600:  #C14545;
+  --red-700:  #9B3030;
+  --red-800:  #6E1F1F;
+  --red-900:  #3F0E0E;
+
+  /* Orange (Priority Seat / Exit) */
+  --orange-50:  #FFF8E1;
+  --orange-100: #FFECB3;
+  --orange-200: #FFE082;
+  --orange-300: #FFE082;
+  --orange-400: #FFCA28;
+  --orange-500: #FFC107;
+  --orange-600: #FFB300;
+  --orange-700: #FFA000;
+  --orange-800: #FF8F00;
+  --orange-900: #FF6F00;
+
+  --gray-0:   #FFFFFF;
+  --gray-50:  #F9F9F9;
+  --gray-100: #F0F0F0;
+  --gray-200: #E0E0E0;
+  --gray-300: #CCCCCC;
+  --gray-400: #AAAAAA;
+  --gray-500: #888888;
+  --gray-600: #666666;
+  --gray-700: #444444;
+  --gray-800: #222222;
+  --gray-900: #111111;
+
+  --green-400: #4CAF50;
+  --green-600: #388E3C;
+
+  /* Semantic Tokens */
+  --color-bg-app:           var(--gray-50);
+  --color-bg-card:          var(--gray-0);
+  --color-bg-subtle:        var(--gray-100);
+  --color-bg-overlay:       rgba(0, 0, 0, 0.4);
+
+  --color-border-default:   var(--gray-200);
+  --color-border-strong:    var(--gray-300);
+  --color-border-focus:     var(--blue-500);
+
+  --color-text-primary:     var(--gray-800);
+  --color-text-secondary:   var(--gray-600);
+  --color-text-disabled:    var(--gray-400);
+  --color-text-on-primary:  var(--gray-0);
+  --color-text-on-accent:   var(--gray-0);
+  --color-text-link:        var(--blue-500);
+  --color-text-link-hover:  var(--blue-700);
+
+  --color-primary:          var(--blue-500);
+  --color-primary-hover:    var(--blue-600);
+  --color-primary-active:   var(--blue-700);
+  --color-primary-disabled: var(--blue-200);
+  --color-primary-subtle:   var(--blue-50);
+  --color-primary-muted:    var(--blue-100);
+  --color-primary-text:     var(--blue-700);
+
+  --color-accent:           var(--red-400);
+  --color-accent-hover:     var(--red-500);
+  --color-accent-active:    var(--red-600);
+  --color-accent-disabled:  var(--red-100);
+  --color-accent-subtle:    var(--red-50);
+  --color-accent-muted:     var(--red-100);
+  --color-accent-text:      var(--red-600);
+
+  --color-warning:          var(--orange-400);
+  --color-warning-subtle:   var(--orange-50);
+  --color-warning-muted:    var(--orange-200);
+  --color-warning-text:     var(--orange-600);
+
+  --color-success:          var(--green-400);
+  --color-success-text:     var(--green-600);
+
+  /* Train / Platform */
+  --color-train-car-bg:         #D6D3D1;
+  --color-train-car-border:     #A8A29E;
+  --color-train-empty-bg:       var(--gray-100);
+  --color-train-empty-border:   var(--gray-200);
+  --color-car-number-bg:        rgba(255, 255, 255, 0.9);
+
+  --color-free-standard:         var(--blue-500);
+  --color-free-standard-text:    var(--gray-0);
+  --color-free-nonstandard:      var(--blue-200);
+  --color-free-nonstandard-text: var(--blue-800);
+
+  --color-prio-standard:         var(--orange-700);
+  --color-prio-standard-text:    var(--gray-0);
+  --color-prio-nonstandard:      var(--orange-100);
+  --color-prio-nonstandard-text: var(--orange-900);
+
+  --color-same-floor-fallback:   var(--orange-400);
+  --color-connector-line:        var(--gray-400);
+
+  /* Component Aliases */
+  --btn-primary-bg:             var(--color-primary);
+  --btn-primary-bg-hover:       var(--color-primary-hover);
+  --btn-primary-bg-active:      var(--color-primary-active);
+  --btn-primary-bg-disabled:    var(--color-primary-disabled);
+  --btn-primary-text:           var(--color-text-on-primary);
+  --btn-primary-text-disabled:  var(--gray-0);
+
+  --btn-secondary-border:           var(--color-primary);
+  --btn-secondary-border-hover:     var(--color-primary-hover);
+  --btn-secondary-border-disabled:  var(--color-primary-disabled);
+  --btn-secondary-text:             var(--color-primary);
+  --btn-secondary-text-disabled:    var(--color-primary-disabled);
+
+  --btn-danger-bg:              var(--color-accent);
+  --btn-danger-bg-hover:        var(--color-accent-hover);
+  --btn-danger-bg-disabled:     var(--color-accent-disabled);
+  --btn-danger-text:            var(--color-text-on-accent);
+
+  --banner-info-bg:             var(--color-primary-subtle);
+  --banner-info-border:         var(--color-primary);
+  --banner-info-text:           var(--color-primary-text);
+
+  --card-exit-bg:               var(--color-accent-subtle);
+  --card-exit-border:           var(--color-accent);
+  --card-exit-heading:          var(--color-accent-text);
+
+  --card-transfer-bg:           var(--color-primary-subtle);
+  --card-transfer-border:       var(--color-primary);
+  --card-transfer-heading:      var(--color-primary-text);
+
+  --card-prio-bg:               var(--color-warning-subtle);
+  --card-prio-border:           var(--color-warning-muted);
+  --card-prio-heading:          var(--color-warning-text);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--color-bg-app);
+  --color-foreground: var(--color-text-primary);
   --font-sans: var(--font-geist, Arial, sans-serif);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  margin: 0;
+  background: var(--color-bg-app);
+  color: var(--color-text-primary);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
