@@ -1,270 +1,321 @@
-# 実装タスク: 駅ホーム設備の定義方法改善 (Issue #29)
+# 実装タスク: ホーム設備・車両停車位置のメートル座標化 (Issue #29 拡張)
 
 ## 概要
 
-- **対象**: `packages/database`, `apps/admin`, `apps/web`
+- **対象**: `packages/database`, `apps/admin`, `apps/web`, `apps/scripts`
 - **参照**: [`requirements.md`](./requirements.md) / [`design.md`](./design.md)
-- **作成日**: 2026-03-06
-- **ブランチ**: `feature/issue-29-platform-facility-improvement`
+- **作成日**: 2026-08-14
+- **ブランチ**: `feature/issue29-platform-improve`
+- **信頼度**: 72%（中）→ MVP検証を先行させる（詳細は `design.md` の「適応的実行戦略」参照）
 
 ---
 
 ## フェーズ構成
 
 ```
-Phase 0: docs/spec更新                    (完了)
-Phase 1: スキーマ変更                     (基盤)
-Phase 2: データ移行スクリプト              (必須)
-Phase 3: Admin API更新                    (P0)
-Phase 4: Admin UI更新                     (P0)
-Phase 5: Web UI更新                       (P1)
-Phase 6: 検証・振り返り                   (必須)
+Phase 0: docs/spec更新                     (完了)
+Phase 1: スキーマ変更                      (基盤)
+Phase 2: 既存データのリセット               (必須)
+Phase 3: Admin API更新                     (P0)
+Phase 4: Admin UI更新                      (P0)
+Phase 5: Web UI更新                        (P1)
+Phase 6: MVP検証・全体検証・振り返り        (必須)
 ```
+
+Phase 3〜5 は互いに独立して着手できるが、Phase 6 のMVP検証は Phase 1〜5 すべてが揃った時点で1駅1ホーム分を通しで行う。
 
 ---
 
 ## Phase 0: docs/spec更新（完了）
 
 ### TASK-0.1: requirements.md 更新
-- **状態**: ✅ 完了 (2026-03-06)
-- **内容**: Issue #29向けに全面書き換え
+- **状態**: ✅ 完了 (2026-08-14)
 
 ### TASK-0.2: design.md 更新
-- **状態**: ✅ 完了 (2026-03-06)
-- **内容**: 新スキーマ設計・データフロー・インターフェース定義を記述
+- **状態**: ✅ 完了 (2026-08-14)
 
 ### TASK-0.3: tasks.md 更新
-- **状態**: ✅ 完了 (2026-03-06)
-- **内容**: 全実装タスクを定義
+- **状態**: ✅ 完了 (2026-08-14)
 
 ---
 
 ## Phase 1: スキーマ変更
 
-### TASK-1.1: `platformLocations` テーブルから `nearPlatformCell` カラムを削除
-- **説明**: `packages/database/src/schema.ts` の `platformLocations` テーブル定義から `nearPlatformCell` カラムを削除する
+### TASK-1.1: `platforms` テーブルの `maxCarCount` を `physicalLength` に置き換え
 - **対象ファイル**: `packages/database/src/schema.ts`
-- **期待結果**: `platformLocations` テーブルが `nearPlatformCell` を持たなくなる
+- **実装内容**:
+  - `maxCarCount: integer('max_car_count').notNull()` を削除
+  - `physicalLength: decimal('physical_length', { precision: 6, scale: 2 }).notNull()` を追加
+- **期待結果**: `platforms` テーブルが号車数ではなくメートル単位の物理長を持つ
 - **依存**: なし
 
-### TASK-1.2: `platformLocationCells` テーブルを新規追加
-- **説明**: コンコースへのアクセス点を表す新テーブルを追加する
+### TASK-1.2: `platformCarStopPositions` テーブルを削除
+- **対象ファイル**: `packages/database/src/schema.ts`
+- **実装内容**: `platformCarStopPositions` テーブル定義および `CarStopPosition` 型を削除する
+- **期待結果**: 号車基準の停車位置テーブルが存在しなくなる
+- **依存**: なし
+
+### TASK-1.3: `trainStopPatterns` テーブルを新規追加
 - **対象ファイル**: `packages/database/src/schema.ts`
 - **実装内容**:
   ```typescript
-  export const platformLocationCells = pgTable('platform_location_cells', {
+  export const trainStopPatterns = pgTable('train_stop_patterns', {
     id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-    platformLocationId: uuid('platform_location_id')
-      .references(() => platformLocations.id, { onDelete: 'cascade' })
-      .notNull(),
-    nearPlatformCell: integer('near_platform_cell'),
-  });
+    platformId: uuid('platform_id').references(() => platforms.id, { onDelete: 'cascade' }).notNull(),
+    trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+  }, (t) => [
+    unique('unique_train_stop_pattern').on(t.platformId, t.trainId),
+  ]);
   ```
-- **期待結果**: `platform_location_cells` テーブルが定義される
-- **依存**: TASK-1.1
+- **期待結果**: ホーム・列車の組み合わせごとに1つの停車位置パターンを持てる
+- **依存**: なし
 
-### TASK-1.3: `stationFacilities` のFKを `platformLocationCells` へ変更
-- **説明**: `stationFacilities` テーブルの `platformLocationId` FK を `platformLocationCellId` FK に変更する
+### TASK-1.4: `trainStopPatternCars` テーブルを新規追加
 - **対象ファイル**: `packages/database/src/schema.ts`
 - **実装内容**:
-  - `platformLocationId` カラムを削除
-  - `platformLocationCellId: uuid('platform_location_cell_id').references(() => platformLocationCells.id, { onDelete: 'cascade' }).notNull()` を追加
-- **期待結果**: `station_facilities.platform_location_cell_id` が `platform_location_cells.id` を参照する
-- **依存**: TASK-1.2
+  ```typescript
+  export const trainStopPatternCars = pgTable('train_stop_pattern_cars', {
+    id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+    trainStopPatternId: uuid('train_stop_pattern_id')
+      .references(() => trainStopPatterns.id, { onDelete: 'cascade' })
+      .notNull(),
+    carNumber: integer('car_number').notNull(),
+    startMeters: decimal('start_meters', { precision: 6, scale: 2 }).notNull(),
+    endMeters: decimal('end_meters', { precision: 6, scale: 2 }).notNull(),
+  }, (t) => [
+    unique('unique_train_stop_pattern_car').on(t.trainStopPatternId, t.carNumber),
+  ]);
+  ```
+- **期待結果**: 号車ごとの開始・終了位置（メートル）を保持できる
+- **依存**: TASK-1.3
 
-### TASK-1.4: `facilityConnections` に `connectedPlatformId`・`directionId` を追加
-- **説明**: 乗り換え先の特定ホームおよび方面を指定できるようカラムを追加する
+### TASK-1.5: `trainCarStructures` に `carLength` を追加
+- **対象ファイル**: `packages/database/src/schema.ts`
+- **実装内容**: `trainCarStructures` に `carLength: decimal('car_length', { precision: 5, scale: 2 })`（nullable）を追加
+- **期待結果**: 号車ごとの実長を任意で保持できる。未指定時はアプリ側で標準値（20.0m）を使う
+- **依存**: なし
+
+### TASK-1.6: `trains` から `limitedToPlatformIds` を削除
+- **対象ファイル**: `packages/database/src/schema.ts`
+- **実装内容**: `limitedToPlatformIds: uuid('limited_to_platform_ids').array()` を削除
+- **期待結果**: 列車のホーム表示判定が `trainStopPatterns` の存在のみに一本化される
+- **依存**: なし
+
+### TASK-1.7: `platformLocationCells` の `nearPlatformCell` を `xPositionMeters` に置き換え
 - **対象ファイル**: `packages/database/src/schema.ts`
 - **実装内容**:
-  - `connectedPlatformId: uuid('connected_platform_id').references(() => platforms.id)` を追加（nullable）
-  - `directionId: uuid('direction_id').references(() => lineDirections.id)` を追加（nullable）
-  - ユニーク制約: `(platformLocationId, connectedStationId)` を見直し、`connectedPlatformId`, `directionId` を含む制約に変更を検討
-- **期待結果**: 方面・ホーム指定が可能になる
-- **依存**: TASK-1.1
+  - `nearPlatformCell: integer('near_platform_cell')` を削除
+  - `xPositionMeters: decimal('x_position_meters', { precision: 6, scale: 2 })`（nullable、null=コンコース全体）を追加
+- **期待結果**: 設備アクセス点の位置がメートル単位になる
+- **依存**: なし
 
-### TASK-1.5: マイグレーションファイル生成
-- **説明**: DrizzleのCLIでマイグレーションファイルを生成する
+### TASK-1.8: `facilityConnections` に対面乗り換え帯の範囲カラムを追加
+- **対象ファイル**: `packages/database/src/schema.ts`
+- **実装内容**:
+  - `xRangeStart: decimal('x_range_start', { precision: 6, scale: 2 })`（nullable）を追加
+  - `xRangeEnd: decimal('x_range_end', { precision: 6, scale: 2 })`（nullable）を追加
+- **期待結果**: `connectedPlatformId` を指定した対面乗り換え接続に、自ホーム座標系での帯範囲を持たせられる
+- **依存**: なし
+
+### TASK-1.9: マイグレーションファイル生成
 - **コマンド**: `pnpm run db:generate`
 - **期待結果**: `packages/database/drizzle/` 配下に新しいマイグレーションファイルが生成される
-- **依存**: TASK-1.1, TASK-1.2, TASK-1.3, TASK-1.4
-- **注意**: `pnpm run db:push` で対話型ウィザードが表示された場合、開発者に確認を取る
+- **依存**: TASK-1.1〜TASK-1.8
+- **注意**: `pnpm run db:push` で対話型ウィザードが表示された場合は、選択内容を開発者に提示して完了まで待機すること
 
 ---
 
-## Phase 2: データ移行スクリプト
+## Phase 2: 既存データのリセット
 
-### TASK-2.1: 移行スクリプト作成
-- **説明**: 既存 `platformLocations` データを新スキーマへ自動変換するスクリプトを作成する
-- **対象ファイル**: `apps/scripts/src/migrate-platform-locations.ts`（新規作成）
-- **実装内容**:
-  1. 全 `platformLocations` レコードを取得
-  2. 各レコードに対して `platformLocationCells` レコードを1件作成（`nearPlatformCell` を移行）
-  3. 該当する全 `stationFacilities` の `platformLocationCellId` を更新
-- **期待結果**: 既存データが新スキーマで正しく表現される
-- **依存**: TASK-1.5 (マイグレーション適用後に実行)
+`requirements.md` REQ-8.1/8.2 の通り、開発中データのため移行スクリプトは作成せずリセットする。
 
-### TASK-2.2: `package.json` にスクリプト実行コマンド追加
-- **説明**: `apps/scripts/package.json` に移行スクリプト実行コマンドを追加する
-- **対象ファイル**: `apps/scripts/package.json`
-- **実装内容**: `"migrate-platform-locations": "ts-node src/migrate-platform-locations.ts"` を追加
-- **依存**: TASK-2.1
+### TASK-2.1: 旧移行スクリプトを削除
+- **対象ファイル**: `apps/scripts/src/migrate-platform-locations.ts`（削除）
+- **実装内容**: ファイル自体を削除し、`apps/scripts/package.json` の `migrate-platform-locations` コマンドも削除する
+- **依存**: なし
+
+### TASK-2.2: 開発DBへのマイグレーション適用
+- **コマンド**: `pnpm run db:migrate`（または開発環境なら `pnpm run db:push`、対話ウィザードが出た場合は開発者に選択内容を確認）
+- **期待結果**: 新スキーマが開発DBに反映される。旧テーブル・カラムに依存していたデータは失われる
+- **依存**: TASK-1.9, TASK-2.1
+
+### TASK-2.3: ODPTデータの再取得
+- **コマンド**: `pnpm run update-odpt`
+- **期待結果**: 駅・路線・ホームの基礎データが再構築される（`physicalLength` 等の手動項目は別途入力が必要）
+- **依存**: TASK-2.2
 
 ---
 
 ## Phase 3: Admin API更新
 
 ### TASK-3.1: バリデーションスキーマ更新
-- **説明**: `platformLocationSchema` を新構造（cells配列）に合わせて更新する
 - **対象ファイル**: `apps/admin/src/lib/validations.ts`
 - **実装内容**:
-  - `cellSchema` を追加: `nearPlatformCell` + `facilities[]`
-  - `platformLocationSchema` を変更: `nearPlatformCell`・`facilities` を削除し、`cells: z.array(cellSchema).min(1)` を追加
-  - `connectionSchema` を拡張: `connectedPlatformId`・`directionId` を追加（任意）
-- **依存**: なし（スキーマ変更前でも先行して定義可能）
+  - `platformSchema`: `maxCarCount: z.number().int().min(1)` を `physicalLength: z.number().positive()` に変更
+  - `trainSchema`: `limitedToPlatformIds` を削除
+  - `carStructureSchema`: `carLength: z.number().positive().nullable().optional()` を追加
+  - `cellSchema`: `nearPlatformCell` を `xPositionMeters: z.number().nullable()` に変更
+  - `connectionSchema`: `xRangeStart: z.number().nullable().optional()`, `xRangeEnd: z.number().nullable().optional()` を追加
+  - `trainStopPatternSchema` を新規追加:
+    ```typescript
+    const trainStopPatternCarSchema = z.object({
+      carNumber: z.number().int().min(1),
+      startMeters: z.number(),
+      endMeters: z.number(),
+    }).refine((v) => v.startMeters < v.endMeters, {
+      message: '開始位置は終了位置より小さい値にしてください',
+    });
 
-### TASK-3.2: GET API更新（一覧取得）
-- **説明**: `GET /api/stations/:stationId/platform-locations` が `cells` と `connections` を含む新構造を返すよう更新する
-- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/platform-locations/route.ts`
-- **実装内容**:
-  - `platformLocationCells` と `stationFacilities` を JOIN して取得
-  - `facilityConnections` の `connectedPlatformId`・`directionId` を取得
-  - レスポンスをネスト構造に組み立て
-- **依存**: TASK-1.5
+    const trainStopPatternSchema = z.object({
+      platformId: z.string().uuid(),
+      trainId: z.string().uuid(),
+      cars: z.array(trainStopPatternCarSchema).min(1),
+    });
+    ```
+- **依存**: なし
 
-### TASK-3.3: POST API更新（新規作成）
-- **説明**: `POST /api/stations/:stationId/platform-locations` が新構造で受け取れるよう更新する
-- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/platform-locations/route.ts`
-- **実装内容**:
-  1. `platformLocations` に挿入（`nearPlatformCell` なし）
-  2. `cells[]` を反復: `platformLocationCells` 挿入 → 各 `stationFacilities` 挿入
-  3. `connections[]` を `facilityConnections` に挿入（`connectedPlatformId`・`directionId` 含む）
-- **依存**: TASK-3.1, TASK-1.5
+### TASK-3.2: `platforms` API更新
+- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/platforms/route.ts`, `apps/admin/src/app/api/stations/[stationId]/platforms/[platformId]/route.ts`
+- **実装内容**: リクエスト/レスポンスの `maxCarCount` を `physicalLength` に置き換える。`carStopPositions` の受け渡し処理（`platformCarStopPositions` 由来）を削除する
+- **依存**: TASK-3.1, TASK-1.9
 
-### TASK-3.4: PUT API更新（更新）
-- **説明**: `PUT /api/stations/:stationId/platform-locations/:locationId` を更新する
-- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/platform-locations/[locationId]/route.ts`
-- **実装内容**:
-  - `platformLocations` レコード更新
-  - 既存 `platformLocationCells`（CASCADE で `stationFacilities` も削除）を削除
-  - 新 `cells[]` を挿入（TASK-3.3 と同様の処理）
-  - 既存 `facilityConnections` 削除 → 新規挿入（`connectedPlatformId`・`directionId` 含む）
-- **依存**: TASK-3.1, TASK-1.5
+### TASK-3.3: `trains` API更新
+- **対象ファイル**: `apps/admin/src/app/api/trains/[trainId]/route.ts`
+- **実装内容**: `limitedToPlatformIds` の受け渡しを削除。`carStructure` の各要素に `carLength` を追加して保存する
+- **依存**: TASK-3.1, TASK-1.9
 
-### TASK-3.5: Duplicate API更新
-- **説明**: コンコース複製APIが `platformLocationCells` と `stationFacilities` も複製するよう更新する
-- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/platform-locations/[locationId]/duplicate/route.ts`
+### TASK-3.4: `platform-locations` API更新（GET/POST/PUT/duplicate）
+- **対象ファイル**:
+  - `apps/admin/src/app/api/stations/[stationId]/platform-locations/route.ts`
+  - `apps/admin/src/app/api/stations/[stationId]/platform-locations/[locationId]/route.ts`
+  - `apps/admin/src/app/api/stations/[stationId]/platform-locations/[locationId]/duplicate/route.ts`
+- **実装内容**: `cells[].nearPlatformCell` → `cells[].xPositionMeters`、`connections[]` に `xRangeStart`/`xRangeEnd` を追加してCRUD・複製処理を更新する
+- **依存**: TASK-3.1, TASK-1.9
+
+### TASK-3.5: `train-stop-patterns` API新規作成
+- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/train-stop-patterns/route.ts`（新規）、`apps/admin/src/app/api/stations/[stationId]/train-stop-patterns/[patternId]/route.ts`（新規）
 - **実装内容**:
-  - 元の `platformLocationCells` を全件取得
-  - 各 cell に紐づく `stationFacilities` を取得
-  - 新しい `platformLocations` レコード作成後、`platformLocationCells` + `stationFacilities` を複製
-- **依存**: TASK-1.5
+  - `GET`: 指定ホームの全 `trainStopPatterns` を `trainStopPatternCars` とJOINして返す
+  - `POST`: リクエストで受け取った `cars[]`（自動算出済みまたは手動調整済みの号車ごとのstart/end）をそのまま `trainStopPatterns` + `trainStopPatternCars` に保存する（自動算出のロジック自体はTASK-4.4のクライアント側で行い、APIは保存に徹する）
+  - `DELETE`: `trainStopPatterns` を削除（CASCADEで `trainStopPatternCars` も削除）
+- **期待結果**: ホーム・列車ごとに停車位置パターンを保存・取得・削除できる
+- **依存**: TASK-3.1, TASK-1.9
 
 ---
 
 ## Phase 4: Admin UI更新
 
-### TASK-4.1: FacilityForm.tsx 大幅改修
-- **説明**: 「1枠番号+複数設備」から「複数アクセス点（各々が枠番号+設備）のリスト」に変更する
-- **対象ファイル**: `apps/admin/src/components/FacilityForm.tsx`
-- **実装内容**:
-  - `LocationData` 型変更: `nearPlatformCell`・`facilities` を `cells: CellData[]` に統合
-  - `CellData` 型追加: `{ nearPlatformCell: number | null; facilities: FacilitySelection[] }`
-  - アクセス点の動的追加/削除UI実装
-  - 接続フォームに `connectedPlatformId`（ホーム選択）と `directionId`（方面選択）ドロップダウンを追加
-  - 初期化時のデータ取得: 方面リスト取得APIの呼び出しを追加
-- **依存**: TASK-3.2, TASK-3.3
-
-### TASK-4.2: 設備一覧ページ更新
-- **説明**: コンコース単位で複数アクセス点を表示するよう更新する
-- **対象ファイル**: `apps/admin/src/app/stations/[stationId]/facilities/page.tsx`
-- **実装内容**:
-  - データ取得を新構造（`platformLocationCells` を含む）に合わせて更新
-  - 表示: コンコースCardに複数アクセス点を列挙
-  - `facilityConnections` 表示: 方面名・ホーム番号も表示
+### TASK-4.1: `PlatformForm.tsx` 更新
+- **対象ファイル**: `apps/admin/src/components/PlatformForm.tsx`
+- **実装内容**: `maxCarCount` の数値入力（号車数）を `physicalLength` の数値入力（メートル、小数対応）に置き換える。`carStopPositions` 関連の入力UI（基準号車・基準枠番号・方向）を削除する
 - **依存**: TASK-3.2
 
-### TASK-4.3: 設備編集ページ更新
-- **説明**: 編集ページのデータ取得を新構造に合わせて更新する
-- **対象ファイル**: `apps/admin/src/app/stations/[stationId]/facilities/[locationId]/edit/page.tsx`
+### TASK-4.2: `TrainForm.tsx` 更新
+- **対象ファイル**: `apps/admin/src/components/TrainForm.tsx`
+- **実装内容**: `limitedToPlatformIds` のホーム選択UIを削除する。号車構成（`carStructure`）の各行に、実長（メートル、任意入力）の数値フィールドを追加する
+- **依存**: TASK-3.3
+
+### TASK-4.3: `FacilityForm.tsx` 更新
+- **対象ファイル**: `apps/admin/src/components/FacilityForm.tsx`
 - **実装内容**:
-  - `platformLocationCells` + `stationFacilities` を取得し `cells[]` として組み立て
-  - `facilityConnections` の `connectedPlatformId`・`directionId` を取得
-  - `FacilityForm` の `initialData` に `cells[]` を渡す
-- **依存**: TASK-3.2, TASK-4.1
+  - アクセス点の「枠番号」数値入力を「ホーム原点からのメートル位置」入力に置き換える（`description` の文言も更新）
+  - 接続（`connections`）に `connectedPlatformId` を指定した場合のみ表示される、対面乗り換え帯の範囲入力（開始・終了メートル）を追加する
+- **依存**: TASK-3.4
+
+### TASK-4.4: `TrainStopPatternForm.tsx` 新規作成
+- **対象ファイル**: `apps/admin/src/components/TrainStopPatternForm.tsx`（新規）
+- **実装内容**:
+  - ホーム・列車のドロップダウン選択
+  - 原点への寄せ方（「1号車先端をx=0に揃える」／「オフセットを直接入力」）の選択UI
+  - 選択された列車の `carStructure`（`carLength`、未指定時は標準値20.0m）と号車数から、各号車の `startMeters`/`endMeters` をクライアント側で計算してプレビュー表示する関数を実装:
+    ```typescript
+    const DEFAULT_CAR_LENGTH = 20.0;
+
+    function buildCarSegments(
+      carStructure: { carNumber: number; carLength: number | null }[],
+      offsetMeters: number
+    ): { carNumber: number; startMeters: number; endMeters: number }[] {
+      const sorted = [...carStructure].sort((a, b) => a.carNumber - b.carNumber);
+      let cursor = offsetMeters;
+      return sorted.map((car) => {
+        const length = car.carLength ?? DEFAULT_CAR_LENGTH;
+        const start = cursor;
+        const end = cursor + length;
+        cursor = end;
+        return { carNumber: car.carNumber, startMeters: start, endMeters: end };
+      });
+    }
+    ```
+  - プレビューされた各号車の `startMeters`/`endMeters` を個別に上書きできる入力欄を用意する
+  - 保存時に `POST /api/stations/:stationId/train-stop-patterns` へ送信する
+- **依存**: TASK-3.5
+
+### TASK-4.5: 停車位置パターン一覧・編集ページ作成
+- **対象ファイル**: `apps/admin/src/app/stations/[stationId]/platforms/[platformId]/stop-patterns/page.tsx`（新規）
+- **実装内容**: 対象ホームに登録済みの `trainStopPatterns` を一覧表示し、`TrainStopPatternForm` への導線（新規作成・編集・削除）を提供する
+- **依存**: TASK-4.4
 
 ---
 
 ## Phase 5: Web UI更新
 
-### TASK-5.1: 駅詳細ページのクエリ更新
-- **説明**: `platformLocationCells` → `stationFacilities` の階層クエリに変更する
+### TASK-5.1: 駅詳細ページのクエリ・列車表示判定を更新
 - **対象ファイル**: `apps/web/src/app/stations/[slug]/page.tsx`
 - **実装内容**:
-  ```typescript
-  // 追加クエリ
-  const cellList = await db
-    .select()
-    .from(platformLocationCells)
-    .where(inArray(platformLocationCells.platformLocationId, locationIds));
+  - `platforms.maxCarCount` の取得・比較処理を削除し、`physicalLength` を取得する
+  - `train.carCount > platform.maxCarCount` および `train.limitedToPlatformIds` による判定（337〜340行目付近）を削除し、`trainStopPatterns`（+`trainStopPatternCars`）を `platformId` でJOIN取得し、パターンが存在する列車のみを `platformTrains` に含めるロジックに置き換える
+  - `platformLocationCells.xPositionMeters`、`facilityConnections.xRangeStart/xRangeEnd` を取得するクエリに更新する
+- **依存**: TASK-1.9, TASK-2.2
 
-  const facilityList = await db
-    .select()
-    .from(stationFacilities)
-    .where(inArray(stationFacilities.platformLocationCellId, cellIds));
-  ```
-  - `facilityConnections` クエリに `connectedPlatformId`・`directionId`・方面名JOINを追加
-  - データ組み立て: `concourse → cells → facilities` の階層構造に変換
-- **依存**: TASK-1.5
-
-### TASK-5.2: PlatformDisplay.tsx 型と表示更新
-- **説明**: 型定義とレンダリングをコンコース単位グルーピングに変更する
-- **対象ファイル**: `apps/web/src/components/PlatformDisplay.tsx`
-- **実装内容**:
-  - `PlatformLocation` 型を新構造に変更（`cells[]` を含む）
-  - `PlatformLocationCell` 型を追加
-  - `FacilityConnection` 型に `directionName: string | null` を追加
-  - 表示ロジック: コンコース（接続先）を見出しとしてグルーピング表示
+### TASK-5.2: `TrainVisualization.tsx` をSVG viewBox方式に全面書き換え
+- **対象ファイル**: `apps/web/src/components/TrainVisualization.tsx`
+- **実装内容**: `design.md` の「座標系のルール」に従い、`physicalLength`・`trainStopPatternCars`・`platformLocationCells.xPositionMeters`・`facilityConnections`（`xRangeStart/xRangeEnd`含む）を受け取り、`<svg viewBox="...">` で描画するコンポーネントに書き換える。viewBoxの範囲（`minX`/`maxX`）は `physicalLength` と全設備・全パターン座標から動的に算出する
 - **依存**: TASK-5.1
+
+### TASK-5.3: `PlatformDisplay.tsx` / `PlatformTabs.tsx` 型更新
+- **対象ファイル**: `apps/web/src/components/PlatformDisplay.tsx`, `apps/web/src/components/PlatformTabs.tsx`
+- **実装内容**: `maxCarCount`・`carStopPositions`（旧型）への参照を削除し、`physicalLength`・新しい `TrainStopPattern` 型・`xPositionMeters`・`xRangeStart/xRangeEnd` を扱う型に更新する
+- **依存**: TASK-5.1, TASK-5.2
 
 ---
 
-## Phase 6: 検証・振り返り
+## Phase 6: MVP検証・全体検証・振り返り
 
 ### TASK-6.1: ビルド確認
-- **説明**: TypeScript型エラーがないことを確認する
 - **コマンド**: `pnpm run build`
 - **期待結果**: ビルドエラーなし
 - **依存**: Phase 1〜5 全体
 
-### TASK-6.2: 移行スクリプト検証
-- **説明**: 開発DBで移行スクリプトを実行し、データ整合性を確認する
-- **確認項目**:
-  - 移行前後で `platformLocations` 件数が一致する
-  - 全 `platformLocations` に対して `platformLocationCells` が1件以上存在する
-  - 全 `stationFacilities` が有効な `platformLocationCellId` を参照する
-  - Drizzle Studio (`pnpm run db:studio`) でテーブル構造を目視確認
-- **依存**: TASK-2.1
+### TASK-6.2: MVP検証（1駅1ホーム）
+- **対象**: 新宿駅 3・4番線相当（複数の停車位置パターンが存在するホーム）
+- **確認項目**（`requirements.md` MVP成功基準 / `design.md` 参照）:
+  1. 号車数が同じで停車位置・向きが異なる2列車パターンを矛盾なく登録できる
+  2. 1両の前方・後方に別々の設備を区別して登録・表示できる
+  3. 車両の停車範囲外（ホーム原点基準で `physicalLength` を超える、または負の位置）に設備を登録・表示できる
+  4. ブラウザ幅を変えてもSVG要素間の位置比率が崩れない
+- **依存**: TASK-6.1
 
 ### TASK-6.3: Admin手動テスト
 - **確認項目**:
-  - 新規コンコース（複数アクセス点）の登録ができる
-  - 既存コンコースの編集でデータが正しく表示・編集できる
-  - 対面乗り換え（`connectedPlatformId` 指定）の登録ができる
-  - 方面別設備（`directionId` 指定）の登録ができる
-  - コンコース複製が正しく動作する
-  - コンコース削除でcellsとfacilitiesが連鎖削除される
+  - `physicalLength` を指定してホームを新規登録できる
+  - 列車の号車構成に `carLength` を指定・未指定の両方で保存できる
+  - 停車位置パターンの自動算出プレビューが表示され、個別の号車位置を上書きして保存できる
+  - 同一ホーム・同一列車で2件目の停車位置パターンを登録しようとすると一意制約エラーになる
+  - 設備のメートル位置入力、対面乗り換え帯の範囲入力が保存・編集できる
 - **依存**: Phase 3, Phase 4
 
 ### TASK-6.4: Web手動テスト
 - **確認項目**:
-  - 駅詳細ページでコンコース単位グルーピング表示が正しい
-  - 方面情報が乗り換え接続に表示される
-  - TrainVisualizationコンポーネントへの影響がない
+  - 停車位置パターンが未登録の列車がホーム表示に出てこない
+  - コンコース単位グルーピング表示（#29機能）が引き続き正しく動作する
+  - 対面乗り換え帯がSVG上に正しい範囲で描画される
 - **依存**: Phase 5
 
 ### TASK-6.5: docs/spec最終更新
-- **説明**: 実装を通じて明らかになった変更点をspecに反映する
 - **対象ファイル**: `docs/spec/requirements.md`, `docs/spec/design.md`, `docs/spec/tasks.md`
+- **内容**: 実装を通じて明らかになった変更点（自動算出ロジックの調整、標準車両長の妥当性など）をspecに反映する
 - **依存**: TASK-6.1〜TASK-6.4
 
 ---
@@ -274,39 +325,39 @@ Phase 6: 検証・振り返り                   (必須)
 | フェーズ | タスク数 | 優先度 | 推定規模 |
 |---------|---------|-------|---------|
 | Phase 0: docs/spec更新 | 3 | P0 | S |
-| Phase 1: スキーマ変更 | 5 | P0 | M |
-| Phase 2: 移行スクリプト | 2 | P0 | M |
+| Phase 1: スキーマ変更 | 9 | P0 | M |
+| Phase 2: 既存データのリセット | 3 | P0 | S |
 | Phase 3: Admin API更新 | 5 | P0 | L |
-| Phase 4: Admin UI更新 | 3 | P0 | L |
-| Phase 5: Web UI更新 | 2 | P1 | M |
+| Phase 4: Admin UI更新 | 5 | P0 | L |
+| Phase 5: Web UI更新 | 3 | P1 | L |
 | Phase 6: 検証 | 5 | P0 | M |
-| **合計** | **25** | | |
+| **合計** | **33** | | |
 
 ---
 
 ## 実装順序の依存関係
 
 ```
-TASK-1.1〜1.4 (スキーマ) → TASK-1.5 (マイグレーション生成)
-                                    │
-                    ┌───────────────┤
-                    │               │
-               TASK-2.1             ├── TASK-3.1 (バリデーション)
-               (移行スクリプト)     │       │
-                                    │   TASK-3.2 (GET API)
-                                    │   TASK-3.3 (POST API)
-                                    │   TASK-3.4 (PUT API)
-                                    │   TASK-3.5 (Duplicate API)
-                                    │       │
-                                    │   TASK-4.1 (FacilityForm)
-                                    │   TASK-4.2 (一覧ページ)
-                                    │   TASK-4.3 (編集ページ)
-                                    │
-                                    └── TASK-5.1 (webクエリ)
-                                                │
-                                            TASK-5.2 (PlatformDisplay)
-                                                │
-                                        TASK-6.1〜6.5 (検証)
+TASK-1.1〜1.8 (スキーマ) → TASK-1.9 (マイグレーション生成)
+                                  │
+                    ┌─────────────┼─────────────────┐
+                    │             │                 │
+              TASK-2.1〜2.3  TASK-3.1 (バリデーション)
+              (データリセット)     │
+                                  ├── TASK-3.2 (platforms API)
+                                  ├── TASK-3.3 (trains API)
+                                  ├── TASK-3.4 (platform-locations API)
+                                  └── TASK-3.5 (train-stop-patterns API)
+                                        │
+                                  ┌─────┼─────┬─────────────┐
+                                  │     │     │             │
+                            TASK-4.1 4.2  4.3         TASK-4.4 (StopPatternForm)
+                                                              │
+                                                        TASK-4.5 (一覧・編集ページ)
+
+TASK-1.9, TASK-2.2 → TASK-5.1 (webクエリ) → TASK-5.2 (TrainVisualization) → TASK-5.3 (型更新)
+
+Phase 3・4・5 すべて完了 → TASK-6.1〜6.5 (検証)
 ```
 
 ---
@@ -315,28 +366,12 @@ TASK-1.1〜1.4 (スキーマ) → TASK-1.5 (マイグレーション生成)
 
 | タスクID | 状態 | 完了日 |
 |---------|------|-------|
-| TASK-0.1 | ✅ 完了 | 2026-03-06 |
-| TASK-0.2 | ✅ 完了 | 2026-03-06 |
-| TASK-0.3 | ✅ 完了 | 2026-03-06 |
-| TASK-1.1 | ✅ 完了 | 2026-03-06 |
-| TASK-1.2 | ✅ 完了 | 2026-03-06 |
-| TASK-1.3 | ✅ 完了 | 2026-03-06 |
-| TASK-1.4 | ✅ 完了 | 2026-03-06 |
-| TASK-1.5 | ✅ 完了 | 2026-03-06 |
-| TASK-2.1 | ✅ 完了 | 2026-03-06 |
-| TASK-2.2 | ✅ 完了 | 2026-03-06 |
-| TASK-3.1 | ✅ 完了 | 2026-03-08 |
-| TASK-3.2 | ✅ 完了 | 2026-03-08 |
-| TASK-3.3 | ✅ 完了 | 2026-03-08 |
-| TASK-3.4 | ✅ 完了 | 2026-03-08 |
-| TASK-3.5 | ✅ 完了 | 2026-03-08 |
-| TASK-4.1 | ✅ 完了 | 2026-03-08 |
-| TASK-4.2 | ✅ 完了 | 2026-03-08 |
-| TASK-4.3 | ✅ 完了 | 2026-03-08 |
-| TASK-5.1 | ✅ 完了 | 2026-03-08 |
-| TASK-5.2 | ✅ 完了 | 2026-03-08 |
-| TASK-6.1 | ⬜ 未着手 | - |
-| TASK-6.2 | ⬜ 未着手 | - |
-| TASK-6.3 | ⬜ 未着手 | - |
-| TASK-6.4 | ⬜ 未着手 | - |
-| TASK-6.5 | ⬜ 未着手 | - |
+| TASK-0.1 | ✅ 完了 | 2026-08-14 |
+| TASK-0.2 | ✅ 完了 | 2026-08-14 |
+| TASK-0.3 | ✅ 完了 | 2026-08-14 |
+| TASK-1.1〜1.9 | ⬜ 未着手 | - |
+| TASK-2.1〜2.3 | ⬜ 未着手 | - |
+| TASK-3.1〜3.5 | ⬜ 未着手 | - |
+| TASK-4.1〜4.5 | ⬜ 未着手 | - |
+| TASK-5.1〜5.3 | ⬜ 未着手 | - |
+| TASK-6.1〜6.5 | ⬜ 未着手 | - |
