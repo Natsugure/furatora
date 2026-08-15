@@ -22,6 +22,13 @@
       "when": 1772754725523,
       "tag": "0002_post_migration_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786778206883,
+      "tag": "0003_living_scrambler",
+      "breakpoints": true
     }
   ]
 }
