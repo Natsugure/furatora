@@ -1,4 +1,4 @@
-@.claude/instructions/spec-driven-workflow-v1.instructions.md
+@.claude/instructions/spec-driven-workflow-v2.instructions.md
 
 # CLAUDE.md
 
