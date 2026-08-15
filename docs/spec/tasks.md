@@ -5,7 +5,8 @@
 - **対象**: `packages/database`, `packages/eslint-config`(新規), `apps/admin`, `apps/web`, `apps/scripts`
 - **参照**: [`requirements.md`](./requirements.md) / [`design.md`](./design.md) / [ADR一覧](../adr/README.md)
 - **作成日**: 2026-08-14
-- **最終更新**: 2026-08-15（ADR-0001〜0005 の決定を反映 / レビュー指摘 1〜4 を反映）
+- **最終更新**: 2026-08-15（ADR-0001〜0005 の決定を反映 / レビュー指摘 1〜4 を反映 /
+  TASK-0.5.1 を `.env` 実態調査の結果で全面改訂）
 - **ブランチ**: `feature/issue29-platform-improve`
 - **信頼度**: 72%（中）→ MVP検証を先行させる（詳細は `design.md` の「適応的実行戦略」参照）
 
@@ -61,18 +62,44 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 > **⚠️ TASK-0.5.2 〜 0.5.5 は同一PRで行うこと。**
 > 途中で分割すると `update-odpt` が本番で壊れる。
 
-### TASK-0.5.1: Neon に `development` ブランチを作成
+### TASK-0.5.1: Neon に `development` ブランチを作成し、`.env` を4ファイルに整理する
 - **実装内容**:
-  - Neon コンソール（または Neon CLI / MCP）で `main` から `development` ブランチを作成
-  - **3箇所すべて**の `.env` の `DATABASE_URL` を `development` ブランチの接続文字列に変更する
-    - `.env`（ルート）
-    - `apps/scripts/.env`
-    - `packages/database/.env`
-    - （それぞれ `.env.local` が存在する場合は同様に確認する）
-- **期待結果**: ローカル開発が Neon の `development` ブランチに接続する
+  1. Neon コンソール（または Neon CLI / MCP）で `main` から `development` ブランチを作成
+  2. `.env` を**下表の4ファイルだけ**に整理する
+
+     | ファイル | 読む主体 | `DATABASE_URL` | 同居させる変数 |
+     |---|---|---|---|
+     | `apps/web/.env.local` | Next.js | **プールド**（`-pooler` 付き） | `NEXT_PUBLIC_GA_ID` |
+     | `apps/admin/.env.local` | Next.js | **プールド** | `AUTH_*`, `GEMINI_API_KEY` |
+     | `apps/scripts/.env` | `dotenv/config`（TASK-0.5.4 以降は `--env-file-if-exists`） | **直結**（`-pooler` 無し） | `ODPT_API_KEY` |
+     | `packages/database/.env` | `dotenv/config`（`drizzle.config.ts`） | **直結** | — |
+
+  3. 上記以外の `.env` 系ファイルを削除する:
+     `.env`（ルート）, `.env.local`（ルート）, `apps/web/.env`,
+     `apps/scripts/.env.local`, `packages/database/.env.local`
+  4. ルート `.env.local` の削除に伴い、`package.json` の `dev` / `build` から
+     `pnpm dotenv -e .env.local --` を外す（`fix-dev-migrations` は TASK-0.5.4 で対応、
+     `migrate-platform-locations` は TASK-2.1 で削除）
+- **期待結果**: Web・Admin・スクリプト・drizzle-kit のすべてが Neon の
+  `development` ブランチに接続し、`DATABASE_URL` の定義箇所が用途ごとに1つずつになる
 - **依存**: なし
-- **注意**: 1つでも取り残すと `db:push` は `development`・`update-odpt` は `main` といった
-  食い違いが起きる。**本番ブランチにテストデータを流し込む事故につながる**
+- **注意**:
+  - **`.env.local` を読むのは Next.js だけである。** `dotenv`（`packages/database`）も
+    Node の `--env-file`（TASK-0.5.4）も `.env` しか読まない。
+    そのため Next.js アプリは `.env.local`、それ以外は `.env` に統一する
+  - **`apps/web` / `apps/admin` を忘れないこと。** この2つが Web・Admin の接続先を
+    決めている。漏らすと「Admin で入力したデータが Web に出てこない」状態になる
+  - **4ファイルすべてが同じエンドポイントID（`ep-...`）を指すことを確認する。**
+    `main` のIDと取り違えると**本番ブランチにテストデータを流し込む事故**になる。
+    `development` ブランチのIDは Neon コンソールの Branches → development で確認する
+  - **プールド／直結を取り違えないこと**（判断根拠は下記）
+- **参照**: プールド／直結の使い分け
+
+  | 用途 | 接続 | 理由 |
+  |---|---|---|
+  | Next.js（`neon-http`、リクエストごとの接続） | プールド | PgBouncer が効く典型ケース |
+  | drizzle-kit（`db:push` / `db:generate` / `db:studio`） | 直結 | プールドは PgBouncer の **transaction モード**でセッション状態が残らない。`drizzle.config.ts` が渡す `options=-c search_path=public` が効かず、`relation "..." does not exist` など**無関係に見えるエラー**で落ちる |
+  | `update-odpt`（`withTransaction` = `Pool`） | 直結 | 長めのトランザクションはどのみち接続を1本占有するため、プーラを挟む利点が無い |
 
 ### TASK-0.5.2: `packages/database/src/tx.ts` を新規作成
 - **対象ファイル**: `packages/database/src/tx.ts`（新規）, `packages/database/package.json`
@@ -95,6 +122,9 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   - `apps/scripts/package.json`（**先に**行う。下記参照）
   - `packages/database/src/client.ts`（三項分岐・`postgres`・`dotenv/config` を削除し `neon-http` 固定に）
   - `packages/database/package.json`（`postgres` を削除、`dotenv` を `devDependencies` へ移動）
+  - `package.json`（ルート。`postgres` と `dotenv-cli` を devDependencies から削除）
+  - `apps/web/package.json`（`dotenv` を削除）
+  - **`.env` 4ファイルすべて**（`USE_LOCAL_DB` の行を削除。TASK-0.5.1 の表を参照）
 - **実装内容**（この順序で行う）:
   1. `.github/workflows/update-odpt.yml` から `USE_LOCAL_DB: 'true'` を削除する
   2. `apps/scripts/package.json` の3スクリプトに `--env-file-if-exists=.env` を付ける
@@ -109,11 +139,19 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
      `import 'dotenv/config'` を削除する
   4. `packages/database/package.json` から `postgres`（devDependencies）を削除し、
      `dotenv` を dependencies → devDependencies へ移す
+  5. `.env` 4ファイルから `USE_LOCAL_DB` の行を削除する
+  6. ルート `package.json` から `postgres` / `dotenv-cli`、`apps/web/package.json` から
+     `dotenv` を削除する（いずれも手順3で参照元が消えるため。`apps/web` の `dotenv` は
+     `client.ts` の `import 'dotenv/config'` がバンドルに引き込まれていた間接依存）
 - **期待結果**: `client.ts` が `neon-http` 固定になり、`postgres` と `dotenv` への依存が消える。
   ローカルの `pnpm run update-odpt` は従来通り `.env` を読む
 - **依存**: TASK-0.5.3
 - **注意**:
   - **必ず TASK-0.5.3 の後**。順序を逆にすると本番のODPT更新が停止する
+  - TASK-0.5.1 完了直後は `USE_LOCAL_DB=true` のまま `DATABASE_URL` が Neon を指すため、
+    `client.ts` は **`postgres-js` で Neon に接続する**（TCP接続なので動作はする）。
+    `db.transaction()` が壊れていないのはこのためであり、
+    手順3で分岐を消した瞬間に `neon-http` へ切り替わって壊れる
   - **手順2を手順3より先に行う。** 逆順にすると、その間ローカルのスクリプトが
     `DATABASE_URL` を読めなくなる
   - **`--env-file`（`-if-exists` 無し）は使用禁止。** `.env` が無いと `exit 9` で即死する。
@@ -122,14 +160,19 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     `db:generate` / `db:push` / `db:studio` で使っている
   - `apps/web` / `apps/admin` は Next.js が `.env` を読むため対応不要
 
-### TASK-0.5.5: Docker 構成を削除
-- **対象ファイル**: `docker/Dockerfile.postgres`, `docker/init.sql`, `docker-compose.yml`（すべて削除）, `README.md`
+### TASK-0.5.5: Docker 構成を削除し、`.env.example` を追加
+- **対象ファイル**: `docker/Dockerfile.postgres`, `docker/init.sql`, `docker-compose.yml`（すべて削除）,
+  `README.md`, `.env.example`（新規）, `.gitignore`
 - **実装内容**:
   - 上記3ファイルを削除
   - `README.md` の `docker compose up -d` 手順を Neon ブランチ接続手順へ差し替え
     （**日本語・英語の両セクション**）
   - データ再構築手順（`development` ブランチ再作成 → `db:push` → `seed-master-data` → `update-odpt`）を追記
-- **期待結果**: `pg_uuidv7` ビルド用の Dockerfile 維持が不要になる（Neonが標準サポート）
+  - `.env.example` を新規作成する。TASK-0.5.1 の4ファイル表をそのまま反映し、
+    **どのファイルがプールドでどれが直結か**を値ではなくコメントで示す
+  - `.gitignore` の `.env*` の後に `!.env.example` を追加する（**これが無いと追跡されない**）
+- **期待結果**: `pg_uuidv7` ビルド用の Dockerfile 維持が不要になる（Neonが標準サポート）。
+  新規clone時に必要な環境変数と、その配置先・プールド／直結の区別がリポジトリ内で自己完結する
 - **依存**: TASK-0.5.1
 
 ### TASK-0.5.6: `update-odpt` の疎通をローカル・CIの両方で確認

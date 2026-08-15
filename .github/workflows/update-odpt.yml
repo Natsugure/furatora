@@ -25,5 +25,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ODPT_API_KEY: ${{ secrets.ODPT_API_KEY }}
-          USE_LOCAL_DB: 'true'
         run: pnpm update-odpt
