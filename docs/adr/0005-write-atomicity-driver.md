@@ -152,25 +152,24 @@ export async function withTransaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T>
 > 実際に型検査を通ることは、`drizzle-orm@0.45.1` /
 > `@neondatabase/serverless@1.0.2` の実環境で確認済み（2026-08-15）。
 
-#### 追記（2026-08-15・実装時に判明）: Node.js 実行環境での `WebSocket` 設定が必須
+#### 追記（2026-08-15・実装時に判明）: CI の Node.js バージョンに `WebSocket` グローバルが必要
 
-`neon-serverless` の `Pool` は接続に `WebSocket` を使うが、グローバル `WebSocket` を
-持たない Node.js（v20系。`.github/workflows/update-odpt.yml` の CI 実行環境を含む）では
-`fetch failed` として接続が失敗する（ローカルの Node v24.18.0 はグローバル `WebSocket`
-を持つため気づけなかった）。
+`neon-serverless` の `Pool` は接続に `WebSocket` を使う。Node.js は v22 以降で
+グローバル `WebSocket` を標準搭載するが、`.github/workflows/update-odpt.yml` の
+CI 実行環境が `node-version: 20` だったため、`workflow_dispatch` での実行時に
+`fetch failed`（WebSocket接続失敗）で落ちた（ローカルの Node v24.18.0 は
+グローバル `WebSocket` を持つため、ローカル確認では気づけなかった）。
 
-`tx.ts` は `neonConfig.webSocketConstructor` に `ws` パッケージを明示的に設定する必要がある。
+`@neondatabase/serverless` の `CONFIG.md` は `neonConfig.webSocketConstructor`
+（`ws` パッケージ）による明示的な差し替えも提示しているが、これは
+「`WebSocket` グローバルが無い環境向け」の条件付きの選択肢であり、
+Node.js だからといって恒久的に必要というわけではない
+（[`CONFIG.md`](https://github.com/neondatabase/serverless/blob/main/CONFIG.md#websocketconstructor-typeof-websocket--undefined)）。
 
-```ts
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import ws from 'ws';
-
-neonConfig.webSocketConstructor = ws;
-```
-
-`ws` は `packages/database` の dependencies に追加する（`@neondatabase/serverless` は
-`ws` を devDependencies にしか持たず、利用側に伝播しないため）。
-詳細: [`CONFIG.md`](https://github.com/neondatabase/serverless/blob/main/CONFIG.md#websocketconstructor-typeof-websocket--undefined)
+Node 20 は 2026年4月に EOL を迎える（本ADR作成時点で運用継続の根拠が薄い）ため、
+本Issueでは `ws` を追加せず、**CI の `node-version` を `24` に上げることで解決する**。
+ローカル開発環境（Node v24.18.0）と実行環境が揃うことで、
+今回のような「ローカルでは動くがCIでは動かない」バージョン差異の再発も防げる。
 
 使用例:
 
