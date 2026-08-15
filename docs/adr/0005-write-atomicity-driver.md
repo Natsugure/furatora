@@ -152,6 +152,26 @@ export async function withTransaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T>
 > 実際に型検査を通ることは、`drizzle-orm@0.45.1` /
 > `@neondatabase/serverless@1.0.2` の実環境で確認済み（2026-08-15）。
 
+#### 追記（2026-08-15・実装時に判明）: Node.js 実行環境での `WebSocket` 設定が必須
+
+`neon-serverless` の `Pool` は接続に `WebSocket` を使うが、グローバル `WebSocket` を
+持たない Node.js（v20系。`.github/workflows/update-odpt.yml` の CI 実行環境を含む）では
+`fetch failed` として接続が失敗する（ローカルの Node v24.18.0 はグローバル `WebSocket`
+を持つため気づけなかった）。
+
+`tx.ts` は `neonConfig.webSocketConstructor` に `ws` パッケージを明示的に設定する必要がある。
+
+```ts
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
+
+neonConfig.webSocketConstructor = ws;
+```
+
+`ws` は `packages/database` の dependencies に追加する（`@neondatabase/serverless` は
+`ws` を devDependencies にしか持たず、利用側に伝播しないため）。
+詳細: [`CONFIG.md`](https://github.com/neondatabase/serverless/blob/main/CONFIG.md#websocketconstructor-typeof-websocket--undefined)
+
 使用例:
 
 ```ts
