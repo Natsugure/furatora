@@ -299,17 +299,56 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 > TASK-2.4 は Admin UI（Phase 4）の完成を待つため、**Phase 4 の後に実行する**。
 
 ### TASK-2.1: 旧移行スクリプトを削除
-- **対象ファイル**: `apps/scripts/src/migrate-platform-locations.ts`（削除）
-- **実装内容**: ファイル自体を削除し、`apps/scripts/package.json` の `migrate-platform-locations` コマンドも削除する
+- **対象ファイル**: `apps/scripts/src/migrate-platform-locations.ts`（削除）,
+  `apps/scripts/src/fix-dev-migrations.ts`（削除）
+- **実装内容**: ファイル自体を削除し、`package.json`（ルート・`apps/scripts` 両方）の
+  `migrate-platform-locations` / `fix-dev-migrations` コマンドも削除する
 - **依存**: なし
+- **注意**: `fix-dev-migrations.ts` は `migrate-platform-locations` を案内する出力を含んでおり、
+  削除対象のコマンドを指したまま残すと無効な参照になる。同スクリプトの実行条件
+  （`__drizzle_migrations` に0000未記録・`platform_location_cells`未作成）自体は、
+  TASK-2.2 実施時点の `development` ブランチで実際に該当することが判明した
+  （0000のみ記録・0001以降未適用。原因は `main` 自体が過去に一度も
+  `db:migrate` されていなかったため）。ただし対応はスクリプトの実行ではなく
+  TASK-2.2 で採った「未使用データのTRUNCATE→`db:migrate`で0001〜0003を通しで適用」で
+  十分だったため、削除の判断自体は変えていない
 
 ### TASK-2.2: 開発DB（Neon `development`）へのマイグレーション適用
-- **コマンド**: `pnpm run db:push`（対話ウィザードが出た場合は開発者に選択内容を確認）
+- **コマンド**: `pnpm run db:migrate`（**`db:push` ではない。理由は下記「実施結果」参照**）
 - **期待結果**: 新スキーマが Neon の `development` ブランチに反映される。旧テーブル・カラムに依存していたデータは失われる
 - **依存**: TASK-1.9, TASK-2.1, TASK-0.5.1
 - **備考**: データを壊した場合は `main` から `development` を作り直す（コピーオンライトで即時）
 - **注意**: 既存の `platforms` 行には `physicalLength = 0`（未入力の暫定値）が入る。
   `maxCarCount` からの自動変換は行わない（TASK-1.1 の注意参照）
+- **実施結果**（2026-08-15）:
+  - `db:push` ではなく `db:migrate` を使用した。0003（本Issueで生成）は
+    TASK-1.9 で既に生成済みのため、`db:push` を使うと drizzle-kit が
+    rename/新規追加を判別できず対話ウィザードが発生する。特に
+    `physicalLength`/`xPositionMeters` は既存カラムからのrenameではなく
+    新規追加（drop+add）であり、誤ってrenameを選択すると号車数（整数）が
+    メートル値として残る静かなデータ破損になるため、生成済みマイグレーションを
+    そのまま適用する `db:migrate` を選んだ
+  - 適用前チェックで `development` ブランチの `__drizzle_migrations` が
+    **1行（0000のみ）** であることが判明した。TASK-0.5.1 で `main` から
+    ブランチ作成したにもかかわらず、`main` 自体が過去に一度も `db:migrate`
+    されていなかったため（`db:push` のみで運用されていた）、0001〜0002
+    （元のIssue #29のスキーマ変更）も未適用の状態だった
+  - 0001〜0002 の適用には `station_facilities.platform_location_cell_id`
+    への `NOT NULL` 制約（0002）があり、これを満たすデータ移行を行っていた
+    `migrate-platform-locations.ts` は TASK-2.1 で削除済みだったため、
+    適用前に `TRUNCATE TABLE platform_locations CASCADE`（`platform_locations`
+    24件・`station_facilities` 37件・`facility_connections` 32件を削除。
+    `platforms` 14件・`trains` 10件は列変更のみで維持）を実施した。
+    REQ-8.1/8.2 が想定するリセット対象そのものであり、0002→0003の
+    号車→メートル変換もどのみち自動移行不可能（TASK-1.1参照）なため、
+    0001→0002の間だけデータを保持する意味は無いと判断した
+  - `main`（本番）へ同様の変更を適用する際の戦略は本Issueのスコープ外の
+    意思決定であり、開発者の判断待ち（TASK-2.2実施時点で `main` の実データ量は未確認）
+  - 適用後、`pnpm run db:migrate` は0001〜0003を通しで正常適用。
+    `__drizzle_migrations` は4行、削除対象カラム・テーブル
+    （`max_car_count`/`near_platform_cell`/`limited_to_platform_ids`/
+    `platform_car_stop_positions`）は全て消え、新規カラム・テーブル・一意制約は
+    全て存在することを確認した
 
 ### TASK-2.3: ODPTデータの再取得
 - **コマンド**: `pnpm run update-odpt`
@@ -319,6 +358,12 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **注意**: **`update-odpt` は `platforms` 以下を一切作らない。**
   ホーム・列車・停車位置・コンコース・設備は元々 Admin での手入力データであり、
   このタスクでは復旧しない（TASK-2.4 で扱う）
+- **実施結果**（2026-08-15）: 0003は `stations`/`lines`/`stationLines`/`stationConnections`/
+  `operators`/`odptMetadata` に影響しないため、これらは元々リセット対象外。
+  実行結果は両オペレーター（TokyoMetro・Toei）とも `No updates detected`
+  （ODPTハッシュ一致による正常スキップ）。これはPhase 0.5で移行した
+  `withTransaction` 経由の書き込みパイプラインが、マイグレーション適用後も
+  壊れていないことの疎通確認として機能した
 
 ### TASK-2.4: MVP対象範囲のデータを Admin で手入力
 - **実装内容**: リセットで失われた手入力データのうち、#29 の検証に必要な範囲を再入力する
@@ -351,6 +396,15 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     （`@furatora/database/enums` を意図的に除外するため）
 - **期待結果**: 4層の依存ルールが共有パッケージとして定義される
 - **依存**: なし
+- **実施結果**（2026-08-17）: `package.json` に `exports`（`./base`/`./next-app`）を明示した。
+  理由: Node ESMの `import` はサブパス指定時に `exports` マップが無いと拡張子解決を
+  行わず、`@furatora/eslint-config/next-app` が解決できずビルドエラーになったため
+  （`@furatora/typescript-config` はJSONの `extends` 解決経路が異なり `exports` 不要だが、
+  ESLint flat configはNode ESM importなので必須）。`next-app.mjs` は依存ルールに加えて
+  既存の `eslint-config-next`（`core-web-vitals`/`typescript`）も内包させた
+  （各アプリが専用configを持つと、従来ルートが担っていたNext.js標準ルールが
+  引き継がれず消えてしまうため）。`eslint-config-next` は
+  `packages/eslint-config` 自身の `dependencies` として宣言（暗黙のルート経由解決に頼らない）
 
 ### TASK-2.5.2: 各アプリに `eslint.config.mjs` を配置
 - **対象ファイル**: `apps/web/eslint.config.mjs`, `apps/admin/eslint.config.mjs`（新規）
@@ -362,6 +416,17 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **注意**: ルートの `eslint.config.mjs` 1つでは
   `files: ['src/app/**']` が `apps/web/src/app/**` にマッチせず、
   **ルールが1件も適用されないまま lint が成功する**
+- **実施結果**（2026-08-17）: 除外リストは `src/components/**` のようなディレクトリ丸ごとの
+  offにはせず、既存違反ファイルを個別に列挙した（web 11件・admin 45件）。理由:
+  TASK-2.5.3の検証は「`src/app/**` 配下に新規追加したファイルにルールが効くこと」を
+  要求しており、ディレクトリ単位の除外だと検証用の新規ファイルも道連れで除外されて
+  しまい検証にならないため。また `[stationId]` 等のNext.js動的ルートの角括弧は
+  minimatchの文字クラス構文と衝突し無視されるため、`\\[`/`\\]` でエスケープが必要
+  だった（JS文字列リテラル内では `\[`（バックスラッシュ1つ）は認識されないエスケープ
+  として無視されるため、ファイル中には `\\[`（2つ）が必要）。この除外リストとは無関係に、
+  `apps/admin/src/components/{LineDirectionForm,PlatformForm}.tsx` に
+  `react-hooks/set-state-in-effect` エラーが2件存在するが、これはルートの旧設定でも
+  同様に発生する既存の別問題であり本タスクの対象外
 
 ### TASK-2.5.3: ESLint ルールが発火することを検証
 - **実装内容**:
@@ -372,6 +437,9 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **期待結果**: 依存ルールが実際に強制されていることの確証が得られる
 - **依存**: TASK-2.5.2
 - **注意**: **省略禁止。**「違反ゼロで通った」と「ルールが未適用」は lint の出力上区別がつかない
+- **実施結果**（2026-08-17）: web・admin両方で確認。一時ファイル
+  （`src/app/__lint_verify_tmp/page.tsx`）が `no-restricted-imports` エラーになることを
+  確認後、削除した
 
 ### TASK-2.5.4: `apps/web` にテスト実行環境を構築
 - **対象ファイル**: `apps/web/vitest.config.ts`, `apps/web/package.json`, `apps/web/src/test/setup.ts`（新規）
@@ -380,12 +448,20 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **依存**: なし
 - **注意**: [ADR-0002](../adr/0002-dependency-inversion-ports.md) の**前提条件**。
   これが無いまま #29 をマージすると ADR-0002 は Level 1 へ差し戻しになる
+- **実施結果**（2026-08-17）: `pnpm --filter @furatora/frontend test` はvitest・jsdom・
+  setupファイルを正常に読み込んで実行された。テストファイルがまだ0件のため
+  `No test files found` で終了コード1になるが、これは想定通り（最初のテストは
+  TASK-5.8で追加する）。バージョンは `apps/admin` と完全に揃えた
+  （`vitest@^4.0.18`/`jsdom@^28.1.0`/`@testing-library/*`/`@vitejs/plugin-react@^5.1.4`）
 
 ### TASK-2.5.5: ディレクトリ骨組みを作成
 - **対象**: `apps/web/src/{features,shared,external}/`, `apps/admin/src/{features,shared,external}/`
 - **実装内容**: `design.md`「変更対象」のツリーに沿って空ディレクトリを作成する
 - **期待結果**: Phase 3・5 の移行先が確定する
 - **依存**: なし
+- **実施結果**（2026-08-17）: Gitは空ディレクトリを追跡しないため、各ディレクトリに
+  `.gitkeep` を置いた（Phase 3・4・5で実ファイルが追加され次第、不要になったものから
+  削除してよい）
 
 ---
 
@@ -792,9 +868,9 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | TASK-0.4 | ✅ 完了 | 2026-08-15 |
 | TASK-0.5.1〜0.5.6 | ✅ 完了 | 2026-08-15 |
 | TASK-1.1〜1.9 | ✅ 完了 | 2026-08-15 |
-| TASK-2.1〜2.3 | ⬜ 未着手 | - |
+| TASK-2.1〜2.3 | ✅ 完了 | 2026-08-15 |
 | TASK-2.4（Phase 4 の後に実行） | ⬜ 未着手 | - |
-| TASK-2.5.1〜2.5.5 | ⬜ 未着手 | - |
+| TASK-2.5.1〜2.5.5 | ✅ 完了 | 2026-08-17 |
 | TASK-3.1〜3.6 | ⬜ 未着手 | - |
 | TASK-4.1〜4.5 | ⬜ 未着手 | - |
 | TASK-5.1〜5.8 | ⬜ 未着手 | - |

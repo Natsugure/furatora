@@ -6,13 +6,12 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "db:push": "pnpm --filter database db:push",
     "db:migrate": "pnpm --filter database db:migrate",
     "db:generate": "pnpm --filter database db:generate",
     "db:studio": "pnpm --filter database db:studio",
     "update-odpt": "pnpm --filter scripts update-odpt",
-    "migrate-platform-locations": "pnpm --filter scripts migrate-platform-locations",
-    "fix-dev-migrations": "pnpm --filter scripts fix-dev-migrations",
     "prepare": "husky install"
   },
   "devDependencies": {

@@ -4,9 +4,7 @@
   "private": true,
   "scripts": {
     "update-odpt": "tsx --env-file-if-exists=.env src/update-odpt.ts",
-    "seed": "tsx --env-file-if-exists=.env src/seed-master-data.ts",
-    "migrate-platform-locations": "tsx src/migrate-platform-locations.ts",
-    "fix-dev-migrations": "tsx --env-file-if-exists=.env src/fix-dev-migrations.ts"
+    "seed": "tsx --env-file-if-exists=.env src/seed-master-data.ts"
   },
   "dependencies": {
     "@furatora/database": "workspace:*",
