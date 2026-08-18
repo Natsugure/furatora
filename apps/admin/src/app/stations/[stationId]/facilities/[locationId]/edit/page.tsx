@@ -67,7 +67,7 @@ export default async function EditLocationPage({
           exits: location.exits ?? '',
           notes: location.notes ?? '',
           cells: cells.map((cell) => ({
-            nearPlatformCell: cell.nearPlatformCell,
+            xPositionMeters: cell.xPositionMeters != null ? Number(cell.xPositionMeters) : null,
             facilities: facilities
               .filter((f) => f.platformLocationCellId === cell.id)
               .map((f) => ({
@@ -82,6 +82,8 @@ export default async function EditLocationPage({
             connectedPlatformId: c.connectedPlatformId,
             directionId: c.directionId,
             exitLabel: c.exitLabel ?? '',
+            xRangeStart: c.xRangeStart != null ? Number(c.xRangeStart) : null,
+            xRangeEnd: c.xRangeEnd != null ? Number(c.xRangeEnd) : null,
           })),
         }}
       />

@@ -89,7 +89,7 @@ export default async function FacilitiesPage({
           .select()
           .from(platformLocationCells)
           .where(inArray(platformLocationCells.platformLocationId, locationIds))
-          .orderBy(asc(platformLocationCells.nearPlatformCell))
+          .orderBy(asc(platformLocationCells.xPositionMeters))
       : [];
 
   const cellIds = cellList.map((c) => c.id);
@@ -166,7 +166,7 @@ export default async function FacilitiesPage({
                 <TableTh>ホーム</TableTh>
                 <TableTh>路線</TableTh>
                 <TableTh>方面</TableTh>
-                <TableTh>最大両数</TableTh>
+                <TableTh>ホーム長</TableTh>
                 <TableTh>操作</TableTh>
               </TableTr>
             </TableThead>
@@ -186,7 +186,9 @@ export default async function FacilitiesPage({
                     <TableTd fw={500}>{platform.platformNumber}</TableTd>
                     <TableTd>{lineNameMap[platform.lineId] ?? '-'}</TableTd>
                     <TableTd>{directionText}</TableTd>
-                    <TableTd>{platform.maxCarCount}</TableTd>
+                    <TableTd>
+                      {Number(platform.physicalLength) > 0 ? `${platform.physicalLength} m` : '未入力'}
+                    </TableTd>
                     <TableTd>
                       <Group gap="xs">
                         <LinkButton
@@ -253,8 +255,8 @@ export default async function FacilitiesPage({
                               const cellFacilities = facilitiesByCell.get(cell.id) ?? [];
                               return (
                                 <Group key={cell.id} gap={6} mb={4} wrap="wrap">
-                                  {cell.nearPlatformCell !== null && (
-                                    <Text size="xs" c="dimmed" fw={500}>枠 #{cell.nearPlatformCell}:</Text>
+                                  {cell.xPositionMeters !== null && (
+                                    <Text size="xs" c="dimmed" fw={500}>{cell.xPositionMeters}m地点:</Text>
                                   )}
                                   {cellFacilities.map((f) => (
                                     <Badge key={f.id} variant="light" color="gray" size="sm">

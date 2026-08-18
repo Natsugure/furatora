@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
-import { stations, platforms, platformCarStopPositions } from '@furatora/database/schema';
+import { stations, platforms } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { Title } from '@mantine/core';
 import { PlatformForm } from '@/components/PlatformForm';
@@ -22,11 +22,6 @@ export default async function EditPlatformPage({
 
   if (!platform) notFound();
 
-  const stopPositions = await db
-    .select()
-    .from(platformCarStopPositions)
-    .where(eq(platformCarStopPositions.platformId, platformId));
-
   return (
     <div>
       <Title order={2} mb="lg">ホームを編集 - {station.name}</Title>
@@ -39,13 +34,7 @@ export default async function EditPlatformPage({
           lineId: platform.lineId,
           inboundDirectionId: platform.inboundDirectionId,
           outboundDirectionId: platform.outboundDirectionId,
-          maxCarCount: platform.maxCarCount,
-          carStopPositions: stopPositions.map((sp) => ({
-            carCount: sp.carCount,
-            referenceCarNumber: sp.referenceCarNumber,
-            referencePlatformCell: sp.referencePlatformCell,
-            direction: sp.direction,
-          })),
+          physicalLength: Number(platform.physicalLength),
           platformSide: platform.platformSide ?? null,
           notes: platform.notes ?? '',
         }}

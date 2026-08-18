@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { asc } from 'drizzle-orm';
-import { trainSchema } from '@/lib/validations';
+import { trainSchema } from '@/features/train/schema';
 
 export async function GET() {
   try {
@@ -34,7 +34,12 @@ export async function POST(request: Request) {
 
     if (carStructure && carStructure.length > 0) {
       await db.insert(trainCarStructures).values(
-        carStructure.map((cs) => ({ trainId: created.id, carNumber: cs.carNumber, doorCount: cs.doorCount }))
+        carStructure.map((cs) => ({
+          trainId: created.id,
+          carNumber: cs.carNumber,
+          doorCount: cs.doorCount,
+          carLength: cs.carLength != null ? String(cs.carLength) : null,
+        }))
       );
     }
 

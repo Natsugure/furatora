@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
 import { platformLocations, platformLocationCells, stationFacilities, facilityConnections, platforms } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
-import { platformLocationSchema } from '@/lib/validations';
+import { platformLocationSchema } from '@/features/facility/schema';
+import { platformLocationRepository } from '@/di';
 
 export async function GET(
   _request: Request,
@@ -38,7 +39,7 @@ export async function GET(
       .select()
       .from(platformLocationCells)
       .where(inArray(platformLocationCells.platformLocationId, locationIds))
-      .orderBy(asc(platformLocationCells.nearPlatformCell));
+      .orderBy(asc(platformLocationCells.xPositionMeters));
 
     const cellIds = cells.map((c) => c.id);
 
@@ -59,7 +60,7 @@ export async function GET(
         .filter((c) => c.platformLocationId === location.id)
         .map((cell) => ({
           id: cell.id,
-          nearPlatformCell: cell.nearPlatformCell,
+          xPositionMeters: cell.xPositionMeters,
           facilities: facilities
             .filter((f) => f.platformLocationCellId === cell.id)
             .map((f) => ({
@@ -79,6 +80,8 @@ export async function GET(
           connectedPlatformId: c.connectedPlatformId,
           directionId: c.directionId,
           exitLabel: c.exitLabel,
+          xRangeStart: c.xRangeStart,
+          xRangeEnd: c.xRangeEnd,
         }));
 
       return {
@@ -104,50 +107,8 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { platformId, exits, notes, cells, connections } = parsed.data;
 
-    const [location] = await db
-      .insert(platformLocations)
-      .values({
-        platformId,
-        exits: exits ?? null,
-        notes: notes ?? null,
-      })
-      .returning();
-
-    for (const cell of cells) {
-      const [insertedCell] = await db
-        .insert(platformLocationCells)
-        .values({
-          platformLocationId: location.id,
-          nearPlatformCell: cell.nearPlatformCell ?? null,
-        })
-        .returning();
-
-      if (cell.facilities.length > 0) {
-        await db.insert(stationFacilities).values(
-          cell.facilities.map((f) => ({
-            platformLocationCellId: insertedCell.id,
-            typeCode: f.typeCode,
-            isWheelchairAccessible: f.isWheelchairAccessible ?? true,
-            isStrollerAccessible: f.isStrollerAccessible ?? true,
-            notes: f.notes ?? null,
-          }))
-        );
-      }
-    }
-
-    if (connections && connections.length > 0) {
-      await db.insert(facilityConnections).values(
-        connections.map((c) => ({
-          platformLocationId: location.id,
-          connectedStationId: c.stationId,
-          connectedPlatformId: c.connectedPlatformId ?? null,
-          directionId: c.directionId ?? null,
-          exitLabel: c.exitLabel ?? null,
-        }))
-      );
-    }
+    const location = await platformLocationRepository.create(parsed.data);
 
     return NextResponse.json(location, { status: 201 });
   } catch {

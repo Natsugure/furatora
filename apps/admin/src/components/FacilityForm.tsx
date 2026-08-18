@@ -41,6 +41,8 @@ type Connection = {
   connectedPlatformId: string | null;
   directionId: string | null;
   exitLabel: string;
+  xRangeStart: number | null;
+  xRangeEnd: number | null;
 };
 
 type FacilitySelection = {
@@ -51,7 +53,7 @@ type FacilitySelection = {
 };
 
 type CellData = {
-  nearPlatformCell: number | null;
+  xPositionMeters: number | null;
   facilities: FacilitySelection[];
 };
 
@@ -65,7 +67,7 @@ type LocationData = {
 };
 
 type CellState = {
-  nearPlatformCell: number | '';
+  xPositionMeters: number | '';
   facilities: FacilitySelection[];
 };
 
@@ -74,6 +76,8 @@ type ConnectionRowState = {
   connectedPlatformId: string | null;
   directionId: string | null;
   notes: string;
+  xRangeStart: number | '';
+  xRangeEnd: number | '';
   checked: boolean;
 };
 
@@ -97,9 +101,9 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
   const [notes, setNotes] = useState(initialData?.notes ?? '');
   const [cells, setCells] = useState<CellState[]>(
     initialData?.cells.map((c) => ({
-      nearPlatformCell: c.nearPlatformCell ?? '',
+      xPositionMeters: c.xPositionMeters ?? '',
       facilities: c.facilities,
-    })) ?? [{ nearPlatformCell: '', facilities: [] }]
+    })) ?? [{ xPositionMeters: '', facilities: [] }]
   );
   const [connectionRows, setConnectionRows] = useState<ConnectionRowState[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -152,6 +156,8 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
             connectedPlatformId: existing?.connectedPlatformId ?? null,
             directionId: existing?.directionId ?? null,
             notes: existing?.exitLabel ?? '',
+            xRangeStart: existing?.xRangeStart ?? '',
+            xRangeEnd: existing?.xRangeEnd ?? '',
             checked: !!existing,
           };
         })
@@ -162,16 +168,16 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
   }, [stationId, initialData?.connections]);
 
   function addCell() {
-    setCells((prev) => [...prev, { nearPlatformCell: '', facilities: [] }]);
+    setCells((prev) => [...prev, { xPositionMeters: '', facilities: [] }]);
   }
 
   function removeCell(cellIndex: number) {
     setCells((prev) => prev.filter((_, i) => i !== cellIndex));
   }
 
-  function updateCellNearPlatformCell(cellIndex: number, value: number | '') {
+  function updateCellXPositionMeters(cellIndex: number, value: number | '') {
     setCells((prev) =>
-      prev.map((cell, i) => (i === cellIndex ? { ...cell, nearPlatformCell: value } : cell))
+      prev.map((cell, i) => (i === cellIndex ? { ...cell, xPositionMeters: value } : cell))
     );
   }
 
@@ -224,6 +230,12 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
       alert('各アクセス点に設備タイプを1つ以上選択してください');
       return;
     }
+    if (connectionRows.some((r) => r.checked && r.connectedPlatformId
+      && typeof r.xRangeStart === 'number' && typeof r.xRangeEnd === 'number'
+      && r.xRangeStart >= r.xRangeEnd)) {
+      alert('対面乗り換え帯は開始位置が終了位置より小さい値である必要があります');
+      return;
+    }
     setSubmitting(true);
 
     const payload = {
@@ -231,7 +243,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
       exits: exits || null,
       notes: notes || null,
       cells: cells.map((cell) => ({
-        nearPlatformCell: typeof cell.nearPlatformCell === 'number' ? cell.nearPlatformCell : null,
+        xPositionMeters: typeof cell.xPositionMeters === 'number' ? cell.xPositionMeters : null,
         facilities: cell.facilities.map((f) => ({
           typeCode: f.typeCode,
           isWheelchairAccessible: f.isWheelchairAccessible,
@@ -244,6 +256,8 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
         connectedPlatformId: r.connectedPlatformId || null,
         directionId: r.directionId || null,
         exitLabel: r.notes || null,
+        xRangeStart: typeof r.xRangeStart === 'number' ? r.xRangeStart : null,
+        xRangeEnd: typeof r.xRangeEnd === 'number' ? r.xRangeEnd : null,
       })),
     };
 
@@ -308,7 +322,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
             </Button>
           </Group>
           <Text size="xs" c="dimmed" mb="sm">
-            ホーム上の設備位置（枠番号）ごとにアクセス点を登録してください
+            ホーム上の設備位置（ホーム端からのメートル距離）ごとにアクセス点を登録してください
           </Text>
           {cells.length === 0 && (
             <Text size="sm" c="red" mt="xs">アクセス点を1つ以上追加してください</Text>
@@ -331,13 +345,15 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
                 </Group>
 
                 <NumberInput
-                  label="ホーム枠番号"
-                  description="設備が位置するホームの枠番号（1〜maxCarCount）。空欄でホーム全体。"
-                  min={1}
-                  placeholder="例: 3"
-                  value={cell.nearPlatformCell}
-                  onChange={(v) => updateCellNearPlatformCell(cellIndex, typeof v === 'number' ? v : '')}
-                  w={128}
+                  label="ホーム端からの距離"
+                  description="ホーム端（メートル座標の0地点）からの距離。負の値やホーム長を超える値も入力できます。空欄でホーム全体。"
+                  step={0.1}
+                  decimalScale={2}
+                  placeholder="例: 42.5"
+                  value={cell.xPositionMeters}
+                  onChange={(v) => updateCellXPositionMeters(cellIndex, typeof v === 'number' ? v : '')}
+                  suffix=" m"
+                  w={160}
                   mb="sm"
                 />
 
@@ -461,6 +477,31 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
                         disabled={!row.checked}
                         size="xs"
                       />
+                      {row.connectedPlatformId && (
+                        <Group gap="xs" grow>
+                          <NumberInput
+                            label="対面乗り換え帯 開始"
+                            description="自ホーム座標系（ホーム端=0）での範囲"
+                            step={0.1}
+                            decimalScale={2}
+                            value={row.xRangeStart}
+                            onChange={(v) => updateConnectionRow(i, { xRangeStart: typeof v === 'number' ? v : '' })}
+                            disabled={!row.checked}
+                            suffix=" m"
+                            size="xs"
+                          />
+                          <NumberInput
+                            label="対面乗り換え帯 終了"
+                            step={0.1}
+                            decimalScale={2}
+                            value={row.xRangeEnd}
+                            onChange={(v) => updateConnectionRow(i, { xRangeEnd: typeof v === 'number' ? v : '' })}
+                            disabled={!row.checked}
+                            suffix=" m"
+                            size="xs"
+                          />
+                        </Group>
+                      )}
                     </Stack>
                   </Group>
                 </div>

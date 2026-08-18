@@ -1,19 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
-import type { CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
+import { useState, useEffect } from 'react';
 import {
-  ActionIcon, Button, Card, Checkbox, Group, Loader, MultiSelect, NativeSelect, NavLink,
-  NumberInput, ScrollArea, SimpleGrid, Stack, Text, TextInput,
+  ActionIcon, Button, Checkbox, Group, Loader, MultiSelect, NativeSelect,
+  NumberInput, Stack, Text, TextInput,
 } from '@mantine/core';
 import { Trash2 } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 
 type Operator = { id: string; name: string };
 type Line = { id: string; name: string; nameEn: string; operatorId: string };
-type PickerStation = { id: string; name: string };
-type PickerPlatform = { id: string; platformNumber: number };
+
+// @furatora/database/schema には carLength を含まないため、admin側でローカルに定義する
+type CarStructureItem = { carNumber: number; doorCount: number; carLength: number | null };
+type EquipmentItem = { carNumber: number; nearDoor: number; isStandard: boolean };
 
 type TrainData = {
   id?: string;
@@ -21,10 +22,9 @@ type TrainData = {
   operatorId: string;
   lineIds: string[];
   carCount: number;
-  carStructure: CarStructure[] | null;
-  freeSpaces: FreeSpace[] | null;
-  prioritySeats: PrioritySeat[] | null;
-  limitedToPlatformIds: string[] | null;
+  carStructure: CarStructureItem[] | null;
+  freeSpaces: EquipmentItem[] | null;
+  prioritySeats: EquipmentItem[] | null;
 };
 
 type Props = {
@@ -41,50 +41,25 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>(initialData?.lineIds ?? []);
   const [carCount, setCarCount] = useState(initialData?.carCount ?? 10);
 
-  const initCarStructures = (): { carNumber: number; doorCount: number }[] => {
+  const initCarStructures = (): CarStructureItem[] => {
     const cs = initialData?.carStructure;
     if (cs && cs.length > 0) return cs;
     const count = initialData?.carCount ?? 10;
-    return Array.from({ length: count }, (_, i) => ({ carNumber: i + 1, doorCount: 4 }));
+    return Array.from({ length: count }, (_, i) => ({ carNumber: i + 1, doorCount: 4, carLength: null }));
   };
   const [carStructures, setCarStructures] = useState(initCarStructures);
 
-  const [freeSpaces, setFreeSpaces] = useState<FreeSpace[]>(initialData?.freeSpaces ?? []);
-  const [prioritySeats, setPrioritySeats] = useState<PrioritySeat[]>(initialData?.prioritySeats ?? []);
-  const [limitedToPlatformIds, setLimitedToPlatformIds] = useState<string[]>(initialData?.limitedToPlatformIds ?? []);
-  const [platformLabels, setPlatformLabels] = useState<Record<string, string>>({});
-  const [pickerLineId, setPickerLineId] = useState<string | null>(null);
-  const [pickerStationId, setPickerStationId] = useState<string | null>(null);
-  const [pickerPlatformId, setPickerPlatformId] = useState<string | null>(null);
-  const [pickerStations, setPickerStations] = useState<PickerStation[]>([]);
-  const [pickerPlatforms, setPickerPlatforms] = useState<PickerPlatform[]>([]);
+  const [freeSpaces, setFreeSpaces] = useState<EquipmentItem[]>(initialData?.freeSpaces ?? []);
+  const [prioritySeats, setPrioritySeats] = useState<EquipmentItem[]>(initialData?.prioritySeats ?? []);
   const [dataLoading, setDataLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const initialLimitedPlatformIds = useRef(initialData?.limitedToPlatformIds);
 
   useEffect(() => {
-    const initialIds = initialLimitedPlatformIds.current;
-    const fetches: Promise<void>[] = [
+    Promise.all([
       fetch('/api/operators').then((r) => r.json()).then(setOperators),
       fetch('/api/lines').then((r) => r.json()).then(setAllLines),
-    ];
-    if (initialIds && initialIds.length > 0) {
-      fetches.push(
-        fetch(`/api/platforms?ids=${initialIds.join(',')}`)
-          .then(r => r.json() as Promise<{ id: string; platformNumber: number; stationName: string; lineName: string }[]>)
-          .then(data => {
-            const labels: Record<string, string> = {};
-            for (const p of data) {
-              labels[p.id] = `${p.lineName} > ${p.stationName} > ${p.platformNumber}番ホーム`;
-            }
-            setPlatformLabels(labels);
-          })
-      );
-    }
-    Promise.all(fetches).then(() => setDataLoading(false));
+    ]).then(() => setDataLoading(false));
   }, []);
-
-  const pickerAvailableLines = allLines.filter(l => selectedLineIds.includes(l.id));
 
   function addFreeSpace() {
     setFreeSpaces((prev) => [...prev, { carNumber: 1, nearDoor: 1, isStandard: true }]);
@@ -92,7 +67,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   function removeFreeSpace(index: number) {
     setFreeSpaces((prev) => prev.filter((_, i) => i !== index));
   }
-  function updateFreeSpace(index: number, field: keyof FreeSpace, value: number | string | boolean) {
+  function updateFreeSpace(index: number, field: keyof EquipmentItem, value: number | string | boolean) {
     setFreeSpaces((prev) => prev.map((fs, i) => (i === index ? { ...fs, [field]: value } : fs)));
   }
 
@@ -102,43 +77,8 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
   function removePrioritySeat(index: number) {
     setPrioritySeats((prev) => prev.filter((_, i) => i !== index));
   }
-  function updatePrioritySeat(index: number, field: keyof PrioritySeat, value: number | string |boolean) {
+  function updatePrioritySeat(index: number, field: keyof EquipmentItem, value: number | string | boolean) {
     setPrioritySeats((prev) => prev.map((ps, i) => (i === index ? { ...ps, [field]: value } : ps)));
-  }
-
-  function selectPickerLine(lineId: string) {
-    setPickerLineId(lineId);
-    setPickerStationId(null);
-    setPickerPlatformId(null);
-    setPickerStations([]);
-    setPickerPlatforms([]);
-    fetch(`/api/stations?lineId=${lineId}`)
-      .then(r => r.json() as Promise<PickerStation[]>)
-      .then(setPickerStations);
-  }
-
-  function selectPickerStation(stationId: string) {
-    setPickerStationId(stationId);
-    setPickerPlatformId(null);
-    setPickerPlatforms([]);
-    fetch(`/api/stations/${stationId}/platforms`)
-      .then(r => r.json() as Promise<PickerPlatform[]>)
-      .then(setPickerPlatforms);
-  }
-
-  function addPickerPlatform() {
-    if (!pickerPlatformId || limitedToPlatformIds.includes(pickerPlatformId)) return;
-    const platformId = pickerPlatformId;
-    const line = allLines.find(l => l.id === pickerLineId);
-    const station = pickerStations.find(s => s.id === pickerStationId);
-    const platform = pickerPlatforms.find(p => p.id === platformId);
-    const label = `${line?.name ?? ''} > ${station?.name ?? ''} > ${platform?.platformNumber ?? ''}番ホーム`;
-    setLimitedToPlatformIds(prev => [...prev, platformId]);
-    setPlatformLabels(prev => ({ ...prev, [platformId]: label }));
-  }
-
-  function removeLimitedPlatform(id: string) {
-    setLimitedToPlatformIds(prev => prev.filter(p => p !== id));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -172,7 +112,6 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
       carStructure: carStructures.length > 0 ? carStructures : null,
       freeSpaces: freeSpaces.length > 0 ? freeSpaces : null,
       prioritySeats: prioritySeats.length > 0 ? prioritySeats : null,
-      limitedToPlatformIds: limitedToPlatformIds.length > 0 ? limitedToPlatformIds : null,
     };
 
     const url = isEdit ? `/api/trains/${initialData!.id}` : '/api/trains';
@@ -248,6 +187,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
               Array.from({ length: newCount }, (_, i) => ({
                 carNumber: i + 1,
                 doorCount: prev[i]?.doorCount ?? 4,
+                carLength: prev[i]?.carLength ?? null,
               }))
             );
           }}
@@ -256,7 +196,10 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         />
 
         <div>
-          <Text size="sm" fw={500} mb="xs">車両構成（号車ごとのドア数）</Text>
+          <Text size="sm" fw={500} mb="xs">車両構成（号車ごとのドア数・実長）</Text>
+          <Text size="xs" c="dimmed" mb="xs">
+            実長（メートル）は任意入力です。未指定の場合は標準値（20.0m）を使用します。
+          </Text>
           <Stack gap={4}>
             {carStructures.map((cs, i) => (
               <Group key={i} gap="sm" align="center">
@@ -273,6 +216,21 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
                   w={80}
                   size="xs"
                   suffix="ドア"
+                />
+                <NumberInput
+                  min={0}
+                  step={0.1}
+                  decimalScale={2}
+                  placeholder="20.0"
+                  value={cs.carLength ?? ''}
+                  onChange={(v) =>
+                    setCarStructures((prev) =>
+                      prev.map((c, j) => j === i ? { ...c, carLength: typeof v === 'number' ? v : null } : c)
+                    )
+                  }
+                  w={100}
+                  size="xs"
+                  suffix=" m"
                 />
               </Group>
             ))}
@@ -337,91 +295,6 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
               </Group>
             ))}
           </Stack>
-        </div>
-
-        <div>
-          <Text size="sm" fw={500} mb="xs">
-            走行制限ホーム
-            <Text span size="xs" c="dimmed" fw={400} ml="xs">
-              (区間限定運用のみ。制限なしの場合は空欄)
-            </Text>
-          </Text>
-
-          {pickerAvailableLines.length > 0 ? (
-            <>
-              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} mb="xs">
-                <Card withBorder padding={0}>
-                  <ScrollArea h={192}>
-                    {pickerAvailableLines.map(line => (
-                      <NavLink
-                        key={line.id}
-                        label={line.name}
-                        active={pickerLineId === line.id}
-                        onClick={() => selectPickerLine(line.id)}
-                      />
-                    ))}
-                  </ScrollArea>
-                </Card>
-                <Card withBorder padding={0}>
-                  <ScrollArea h={192}>
-                    {pickerStations.map(station => (
-                      <NavLink
-                        key={station.id}
-                        label={station.name}
-                        active={pickerStationId === station.id}
-                        onClick={() => selectPickerStation(station.id)}
-                      />
-                    ))}
-                  </ScrollArea>
-                </Card>
-                <Card withBorder padding={0}>
-                  <ScrollArea h={192}>
-                    {pickerPlatforms.map(platform => (
-                      <NavLink
-                        key={platform.id}
-                        label={`${platform.platformNumber}番ホーム`}
-                        active={pickerPlatformId === platform.id}
-                        onClick={() => setPickerPlatformId(platform.id)}
-                      />
-                    ))}
-                  </ScrollArea>
-                </Card>
-              </SimpleGrid>
-
-              <Button
-                size="compact-sm"
-                onClick={addPickerPlatform}
-                disabled={!pickerPlatformId || limitedToPlatformIds.includes(pickerPlatformId)}
-                mb="sm"
-              >
-                追加
-              </Button>
-            </>
-          ) : (
-            <Text size="sm" c="dimmed" mb="sm">路線を選択してからホームを追加してください</Text>
-          )}
-
-          {limitedToPlatformIds.length === 0 ? (
-            <Text size="sm" c="dimmed">走行制限なし</Text>
-          ) : (
-            <Stack gap="xs">
-              {limitedToPlatformIds.map(id => (
-                <Card key={id} withBorder padding="xs" bg="gray.0">
-                  <Group justify="space-between">
-                    <Text size="sm">{platformLabels[id] ?? id}</Text>
-                    <Button
-                      variant="subtle"
-                      color="red"
-                      size="compact-xs"
-                      onClick={() => removeLimitedPlatform(id)}
-                    >
-                      削除
-                    </Button>
-                  </Group>
-                </Card>
-              ))}
-            </Stack>
-          )}
         </div>
 
         <Group gap="sm">

@@ -495,32 +495,62 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     ```
   - 既存テスト `lib/validations.test.ts` も移動先に追随させる
 - **依存**: TASK-2.5.5
+- **実施結果**（2026-08-17）: `platformSchema` → `features/platform/schema.ts`、
+  `trainSchema`（＋`carStructureItemSchema`/`trainEquipmentSchema`） → `features/train/schema.ts`、
+  `cellSchema`/`connectionSchema`/`facilitySchema`/`platformLocationSchema` → `features/facility/schema.ts`、
+  新規 `trainStopPatternSchema` → `features/stop-pattern/schema.ts` に配置した。ADR-0001の対象3feature
+  （`platform`/`stop-pattern`）に該当しない `operatorSchema` 等7スキーマは `lib/validations.ts` に残した。
+  テストも各 `features/*/schema.test.ts` に分割し、`lib/validations.test.ts` は残存スキーマのみに縮小した
+  （プロジェクトの「テストファイルの配置」規約に従い同階層へ配置）。移動時に
+  `platformLocationSchema.safeParse({ platformId })` を成功と誤って期待していた既存テストの不整合
+  （`cells`が必須のため実際は失敗する）を発見し、期待値を修正した
 
 ### TASK-3.2: `platforms` API更新
-- **対象ファイル**: `apps/admin/src/app/api/stations/[stationId]/platforms/route.ts`, `.../[platformId]/route.ts`
+- **対象ファイル**:
+  - `apps/admin/src/features/platform/ports.ts`（新規）: `PlatformRepository`
+  - `apps/admin/src/external/repository/platformRepository.ts`（新規）
+  - `apps/admin/src/app/api/stations/[stationId]/platforms/route.ts`, `.../[platformId]/route.ts`
 - **実装内容**:
   - リクエスト/レスポンスの `maxCarCount` を `physicalLength` に置き換える
   - `carStopPositions` の受け渡し処理（`platformCarStopPositions` 由来）を削除する
-  - `route.ts` は「Zod検証 → Repository/Query呼び出し → レスポンス整形」のみに薄くする
+  - POST/PUT/DELETEを `PlatformRepository` 経由に薄くする（GETは直dbのまま。理由は下記「GETをQuery Service化しない理由」参照）。`platforms` は子テーブルを持たない単一テーブルのため `withTransaction` は使わない（ADR-0005「単一テーブルの単純な書き込みは`db`のままでよい」）
 - **依存**: TASK-3.1, TASK-1.9
+- **実施結果**（2026-08-17）: `PlatformRepository`は`create`/`update`/`delete`の3メソッドのみを持ち、
+  `findById`等の読み取りメソッドは公開しない（ADR-0003が禁止する汎用CRUD Repositoryを避けるため）
 
 ### TASK-3.3: `trains` API更新
-- **対象ファイル**: `apps/admin/src/app/api/trains/[trainId]/route.ts`
+- **対象ファイル**: `apps/admin/src/features/train/schema.ts`（新規）, `apps/admin/src/app/api/trains/route.ts`, `.../[trainId]/route.ts`
 - **実装内容**: `limitedToPlatformIds` の受け渡しを削除。`carStructure` の各要素に `carLength` を追加して保存する
+- **注意**: `train`は「既存のtrain/facilityは最小限」の対象。Repository化は行わず、直dbのまま（既存の非原子な delete→insert パターンも変更しない。ADR-0005の適用範囲表にも`trains`は含まれていない）
 - **依存**: TASK-3.1, TASK-1.9
+- **実施結果**（2026-08-17）: 方針通りRepository化は行わず、`trainCarStructures`/`trainEquipments`の
+  delete→insertも既存のまま維持した
 
-### TASK-3.4: `platform-locations` API更新 + 原子化
+### TASK-3.4: `platform-locations` API更新 + Repository化 + 原子化
 - **対象ファイル**:
+  - `apps/admin/src/features/facility/{schema.ts,ports.ts}`（新規）: `PlatformLocationRepository`
+  - `apps/admin/src/external/repository/platformLocationRepository.ts`（新規）
   - `apps/admin/src/app/api/stations/[stationId]/platform-locations/route.ts`
   - `.../platform-locations/[locationId]/route.ts`
   - `.../platform-locations/[locationId]/duplicate/route.ts`
 - **実装内容**:
   - `cells[].nearPlatformCell` → `cells[].xPositionMeters`
   - `connections[]` に `xRangeStart`/`xRangeEnd` を追加してCRUD・複製処理を更新
-  - **`[locationId]/route.ts` の3テーブル delete → insert を `withTransaction` で囲む**
-    （現状は非原子。途中失敗で設備が消えたまま復元されない）
+  - POST/PUT/DELETE/duplicateを `PlatformLocationRepository` 経由に薄くする。`create`/`update`/`duplicate` は複数テーブルにまたがるため `withTransaction` で原子化する
+    （現状は非原子。途中失敗で設備が消えたまま復元されない）。`delete` は単一DELETE文＋CASCADEで完結するため`db`のまま
+  - GETは直dbのまま（下記「GETをQuery Service化しない理由」参照）
 - **依存**: TASK-3.1, TASK-1.9, TASK-0.5.2
 - **参照**: [ADR-0005](../adr/0005-write-atomicity-driver.md)
+- **実施結果**（2026-08-17）: `PlatformLocationRepository`の`duplicate`は「元データの読み取り→複製書き込み」を
+  1メソッドに閉じ込めた。読み取り部分はメソッド内部の実装詳細であり、`findById`のような公開読み取りメソッドは
+  追加していない。この結果、`[locationId]/route.ts`（PUT/DELETE）と`[locationId]/duplicate/route.ts`は
+  `@furatora/database`を一切importしなくなり、`eslint.config.mjs`の除外リストから削除した
+
+### GETをQuery Service化しない理由（TASK-3.2/3.3/3.4/3.5共通）
+
+[ADR-0003](../adr/0003-read-write-separation.md)「適用範囲」節が「admin の一覧・編集ページの Query Service 化（N+1解消）は後続Issue」と明記している通り、Phase 3では上記各APIのGETをQuery Service化せず、`route.ts` 内で `db` を直接使う現状の実装を維持する。書き込み（POST/PUT/DELETE）のみ各Repositoryに切り出す。
+
+この後続作業は [Issue #48](https://github.com/Natsugure/furatora/issues/48) として起票済み。
 
 ### TASK-3.5: `train-stop-patterns` API + `StopPatternRepository` 新規作成
 - **対象ファイル**:
@@ -530,13 +560,16 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   - `.../train-stop-patterns/[patternId]/route.ts`（新規）
   - `apps/admin/src/di.ts`（新規）
 - **実装内容**:
-  - `GET`: 指定ホームの全 `trainStopPatterns` を `trainStopPatternCars` とJOINして返す
+  - `GET`: 指定ホームの全 `trainStopPatterns` を `trainStopPatternCars` とJOINして返す（直db。理由は上記「GETをQuery Service化しない理由」参照）
   - `POST`: 受け取った `cars[]`（クライアント算出済み）をそのまま保存する。
     **`withTransaction` 必須**（親の採番IDを子に渡すため `db.batch()` では表現できない）
-  - `DELETE`: `trainStopPatterns` を削除（CASCADEで `trainStopPatternCars` も削除）
+  - `DELETE`: `trainStopPatterns` を削除（CASCADEで `trainStopPatternCars` も削除）。`[patternId]/route.ts` はこのDELETEのみのため、DB importを一切持たない完全に薄いファイルになる
 - **期待結果**: ホーム・列車ごとに停車位置パターンを原子的に保存・取得・削除できる
 - **依存**: TASK-3.1, TASK-1.9, **TASK-0.5.2**
 - **参照**: [ADR-0005](../adr/0005-write-atomicity-driver.md)
+- **実施結果**（2026-08-17）: `apps/admin/src/di.ts` は `platformRepository` / `platformLocationRepository` /
+  `stopPatternRepository` の3つを手動配線するコンポジションルートとして実装した（ADR-0002「DIライブラリを使わない」）。
+  admin は usecases 層を持たず、route.ts が各Repositoryを直接呼び出す構成とした（design.mdのツリー通り）
 
 ### TASK-3.6: 削除カラムを参照している既存ページを追随させる（層移行はしない）
 - **対象ファイル**:
@@ -548,13 +581,23 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   | `apps/admin/src/app/stations/[stationId]/facilities/[locationId]/edit/page.tsx` | `nearPlatformCell` | `xPositionMeters` に置き換え |
   | `apps/admin/src/app/trains/[trainId]/edit/page.tsx` | `limitedToPlatformIds` | 受け渡しを削除 |
   | `apps/admin/src/lib/validations.test.ts` | `maxCarCount` のフィクスチャ | `physicalLength` に更新（TASK-3.1 の移動とあわせて行う） |
+  | `apps/admin/src/components/PlatformForm.tsx` | `CarStopPosition`型import・`maxCarCount`・停車位置UI | `physicalLength`（小数対応）入力に置き換え、停車位置UIを削除（`@furatora/database/schema`のimportが不要になる） |
+  | `apps/admin/src/components/TrainForm.tsx` | `limitedToPlatformIds`・`CarStructure`/`FreeSpace`/`PrioritySeat`型import | 走行制限ホームUIを削除し`carLength`入力を追加。DB型importをローカル型定義に置き換え（`@furatora/database/schema`のimportが不要になる） |
+  | `apps/admin/src/components/FacilityForm.tsx` | `nearPlatformCell` | `xPositionMeters`入力に置き換え、`xRangeStart`/`xRangeEnd`入力を追加 |
 
 - **実装内容**: 上記を**現在の位置のまま**修正する。`features/` へは移さない
-- **期待結果**: `pnpm run build` が通る
+- **期待結果**: `apps/admin` の型チェック（`tsc --noEmit`）が通る
 - **依存**: TASK-1.9, TASK-3.1
 - **注意**: **これらは `design.md` の「後続Issue」対象ではない。**
   後続Issueに送るのは*層移行*であって、削除したカラムへの追随は #29 の必須範囲である。
   漏らすと TASK-6.1（ビルド確認）で必ず落ちる
+- **実施結果**（2026-08-17）: フォーム3本（`PlatformForm`/`TrainForm`/`FacilityForm`）は型チェックを通すため
+  Phase 3 の時点で新カラムに対応する最小限の入力コンポーネントへ更新した。ただし
+  **`features/*/components/` への物理的な移動と、design.mdが要求する完成されたUX
+  （ホーム長併記・範囲外許容の説明文・自動算出プレビュー等）はPhase 4のタスクとして残す。**
+  `apps/web`側は本タスクの対象外（Phase 5）であり、依然として旧カラムを参照し型エラーが残る。
+  `pnpm --filter @furatora/admin exec tsc --noEmit` は通るが、ルートの `pnpm run build` は
+  `apps/web` が原因で依然失敗する（TASK-6.1 で解消）
 
 ---
 
@@ -871,7 +914,7 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | TASK-2.1〜2.3 | ✅ 完了 | 2026-08-15 |
 | TASK-2.4（Phase 4 の後に実行） | ⬜ 未着手 | - |
 | TASK-2.5.1〜2.5.5 | ✅ 完了 | 2026-08-17 |
-| TASK-3.1〜3.6 | ⬜ 未着手 | - |
+| TASK-3.1〜3.6 | ✅ 完了 | 2026-08-17 |
 | TASK-4.1〜4.5 | ⬜ 未着手 | - |
 | TASK-5.1〜5.8 | ⬜ 未着手 | - |
 | TASK-6.1〜6.6 | ⬜ 未着手 | - |

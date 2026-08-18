@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { platforms, platformCarStopPositions } from '@furatora/database/schema';
+import { platforms } from '@furatora/database/schema';
 import { eq, asc } from 'drizzle-orm';
-import { platformSchema } from '@/lib/validations';
+import { platformSchema } from '@/features/platform/schema';
+import { platformRepository } from '@/di';
 
 export async function GET(
   _request: Request,
@@ -32,33 +33,8 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { platformNumber, lineId, inboundDirectionId, outboundDirectionId, maxCarCount, platformSide, notes, carStopPositions } = parsed.data;
 
-    const [platform] = await db
-      .insert(platforms)
-      .values({
-        stationId,
-        platformNumber,
-        lineId,
-        inboundDirectionId: inboundDirectionId ?? null,
-        outboundDirectionId: outboundDirectionId ?? null,
-        maxCarCount,
-        platformSide: platformSide ?? null,
-        notes: notes ?? null,
-      })
-      .returning();
-
-    const stopPositionRows = (carStopPositions ?? []).map((sp) => ({
-      platformId: platform.id,
-      carCount: sp.carCount,
-      referenceCarNumber: sp.referenceCarNumber,
-      referencePlatformCell: sp.referencePlatformCell,
-      direction: sp.direction,
-    }));
-
-    if (stopPositionRows.length > 0) {
-      await db.insert(platformCarStopPositions).values(stopPositionRows);
-    }
+    const platform = await platformRepository.create(stationId, parsed.data);
 
     return NextResponse.json(platform, { status: 201 });
   } catch {

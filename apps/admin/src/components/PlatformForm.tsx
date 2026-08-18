@@ -2,9 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import type { CarStopPosition } from '@furatora/database/schema';
 import {
-  Button, Card, Group, Loader, NativeSelect, NumberInput, Stack, Text, TextInput, Textarea,
+  Button, Group, Loader, NativeSelect, NumberInput, Stack, Text, TextInput, Textarea,
 } from '@mantine/core';
 
 type Line = { id: string; name: string };
@@ -21,8 +20,7 @@ type PlatformData = {
   lineId: string;
   inboundDirectionId: string | null;
   outboundDirectionId: string | null;
-  maxCarCount: number;
-  carStopPositions: CarStopPosition[] | null;
+  physicalLength: number;
   platformSide: string | null;
   notes: string;
 };
@@ -45,10 +43,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   const [outboundDirectionId, setOutboundDirectionId] = useState<string>(
     initialData?.outboundDirectionId ?? ''
   );
-  const [maxCarCount, setMaxCarCount] = useState(initialData?.maxCarCount ?? 10);
-  const [carStopPositions, setCarStopPositions] = useState<CarStopPosition[]>(
-    initialData?.carStopPositions ?? []
-  );
+  const [physicalLength, setPhysicalLength] = useState(initialData?.physicalLength ?? 0);
   const [platformSide, setPlatformSide] = useState<string>(
     initialData?.platformSide ?? ''
   );
@@ -66,34 +61,14 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   }, []);
 
   useEffect(() => {
-    if (lineId) {
-      fetch(`/api/lines/${lineId}/directions`)
-        .then((r) => r.json())
-        .then(setDirections);
-    } else {
-      setDirections([]);
+    if (!lineId) {
+      Promise.resolve().then(() => setDirections([]));
+      return;
     }
+    fetch(`/api/lines/${lineId}/directions`)
+      .then((r) => r.json())
+      .then(setDirections);
   }, [lineId]);
-
-  function addStopPosition() {
-    setCarStopPositions((prev) => [
-      ...prev,
-      { carCount: 8, referenceCarNumber: 1, referencePlatformCell: 1, direction: 'ascending' as const },
-    ]);
-  }
-  function removeStopPosition(index: number) {
-    setCarStopPositions((prev) => prev.filter((_, i) => i !== index));
-  }
-  function updateStopPositionNumber(index: number, field: 'carCount' | 'referenceCarNumber' | 'referencePlatformCell', value: number) {
-    setCarStopPositions((prev) =>
-      prev.map((sp, i) => (i === index ? { ...sp, [field]: value } : sp))
-    );
-  }
-  function updateStopPositionDirection(index: number, value: 'ascending' | 'descending') {
-    setCarStopPositions((prev) =>
-      prev.map((sp, i) => (i === index ? { ...sp, direction: value } : sp))
-    );
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,8 +79,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
       lineId,
       inboundDirectionId: inboundDirectionId || null,
       outboundDirectionId: outboundDirectionId || null,
-      maxCarCount,
-      carStopPositions: carStopPositions.length > 0 ? carStopPositions : null,
+      physicalLength,
       platformSide: platformSide || null,
       notes: notes || null,
     };
@@ -208,81 +182,17 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
         )}
 
         <NumberInput
-          label="最大両数"
-          min={1}
-          value={maxCarCount}
-          onChange={(v) => setMaxCarCount(typeof v === 'number' ? v : 10)}
+          label="ホームの物理長"
+          description="メートル単位。ホームの実体は 0 からこの値までの区間として扱われます"
+          min={0}
+          step={0.1}
+          decimalScale={2}
+          suffix=" m"
+          value={physicalLength}
+          onChange={(v) => setPhysicalLength(typeof v === 'number' ? v : 0)}
           required
-          w={{ base: '100%', xs: 128 }}
+          w={{ base: '100%', xs: 160 }}
         />
-
-        <div>
-          <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={500}>停車位置</Text>
-            <Button variant="subtle" size="compact-sm" onClick={addStopPosition}>
-              + 追加
-            </Button>
-          </Group>
-          <Text size="xs" c="dimmed" mb="xs">
-            編成両数ごとに停車位置を定義します。基準号車とその停車枠番号、進行方向を指定してください。
-          </Text>
-          <Stack gap="xs">
-            {carStopPositions.map((sp, i) => (
-              <Card key={i} withBorder padding="sm" bg="gray.0">
-                <Group gap="md" wrap="wrap" align="flex-end">
-                  <NumberInput
-                    label="編成両数"
-                    min={1}
-                    max={maxCarCount}
-                    value={sp.carCount}
-                    onChange={(v) => updateStopPositionNumber(i, 'carCount', typeof v === 'number' ? v : 1)}
-                    w={{ base: '100%', xs: 80 }}
-                    size="xs"
-                    suffix="両"
-                  />
-                  <NumberInput
-                    label="基準号車"
-                    min={1}
-                    max={sp.carCount}
-                    value={sp.referenceCarNumber}
-                    onChange={(v) => updateStopPositionNumber(i, 'referenceCarNumber', typeof v === 'number' ? v : 1)}
-                    w={{ base: '100%', xs: 80 }}
-                    size="xs"
-                    suffix="号車"
-                  />
-                  <NumberInput
-                    label="停車枠"
-                    min={1}
-                    max={maxCarCount}
-                    value={sp.referencePlatformCell}
-                    onChange={(v) => updateStopPositionNumber(i, 'referencePlatformCell', typeof v === 'number' ? v : 1)}
-                    w={{ base: '100%', xs: 80 }}
-                    size="xs"
-                    suffix="番"
-                  />
-                  <NativeSelect
-                    label="進行方向"
-                    data={[
-                      { value: 'ascending', label: 'ascending (1号車→小枠番号側)' },
-                      { value: 'descending', label: 'descending (1号車→大枠番号側)' },
-                    ]}
-                    value={sp.direction}
-                    onChange={(e) => updateStopPositionDirection(i, e.target.value as 'ascending' | 'descending')}
-                    size="xs"
-                  />
-                  <Button
-                    variant="subtle"
-                    color="red"
-                    size="compact-xs"
-                    onClick={() => removeStopPosition(i)}
-                  >
-                    削除
-                  </Button>
-                </Group>
-              </Card>
-            ))}
-          </Stack>
-        </div>
 
         <NativeSelect
           label="ホーム位置"
