@@ -10,6 +10,7 @@ import {
 type Platform = {
   id: string;
   platformNumber: string;
+  physicalLength: string;
 };
 
 type FacilityType = {
@@ -285,11 +286,18 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
     return <Loader />;
   }
 
+  const selectedPlatform = platforms.find((p) => p.id === platformId);
+  const selectedPlatformLength = selectedPlatform ? Number(selectedPlatform.physicalLength) : null;
+  const platformLengthLabel = selectedPlatformLength && selectedPlatformLength > 0
+    ? `ホーム長: ${selectedPlatformLength.toFixed(2)} m`
+    : 'ホーム長: 未入力';
+
   return (
     <form onSubmit={handleSubmit}>
       <Stack gap="lg" maw="42rem">
         <NativeSelect
           label="ホーム"
+          description={platformId ? platformLengthLabel : undefined}
           data={[
             { value: '', label: 'ホームを選択' },
             ...platforms.map((p) => ({ value: p.id, label: `${p.platformNumber}番ホーム` })),
@@ -317,7 +325,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
         <div>
           <Group justify="space-between" mb="xs">
             <Text size="sm" fw={500}>アクセス点</Text>
-            <Button variant="subtle" size="compact-sm" onClick={addCell}>
+            <Button type="button" variant="subtle" size="compact-sm" onClick={addCell}>
               + アクセス点を追加
             </Button>
           </Group>
@@ -334,6 +342,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
                   <Title order={5}>アクセス点 {cellIndex + 1}</Title>
                   {cells.length > 1 && (
                     <Button
+                      type="button"
                       variant="subtle"
                       color="red"
                       size="compact-sm"
@@ -346,7 +355,11 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
 
                 <NumberInput
                   label="ホーム端からの距離"
-                  description="ホーム端（メートル座標の0地点）からの距離。負の値やホーム長を超える値も入力できます。空欄でホーム全体。"
+                  description={
+                    selectedPlatformLength && selectedPlatformLength > 0
+                      ? `ホーム端（x=0）からの距離。${platformLengthLabel}。範囲外（負の値やホーム長を超える値）も入力できます。空欄でホーム全体。`
+                      : 'ホーム端（x=0）からの距離。負の値やホーム長を超える値も入力できます。空欄でホーム全体。'
+                  }
                   step={0.1}
                   decimalScale={2}
                   placeholder="例: 42.5"
@@ -481,7 +494,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
                         <Group gap="xs" grow>
                           <NumberInput
                             label="対面乗り換え帯 開始"
-                            description="自ホーム座標系（ホーム端=0）での範囲"
+                            description={`自ホーム座標系（ホーム端=0）での範囲。${platformLengthLabel}`}
                             step={0.1}
                             decimalScale={2}
                             value={row.xRangeStart}
@@ -514,7 +527,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
           <Button type="submit" loading={submitting}>
             {isEdit ? '更新' : '登録'}
           </Button>
-          <Button variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
+          <Button type="button" variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
             キャンセル
           </Button>
         </Group>

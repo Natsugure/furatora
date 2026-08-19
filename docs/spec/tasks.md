@@ -612,11 +612,23 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **対象ファイル**: `apps/admin/src/components/PlatformForm.tsx` → `src/features/platform/components/PlatformForm.tsx`
 - **実装内容**: `maxCarCount` の数値入力（号車数）を `physicalLength` の数値入力（メートル、小数対応）に置き換える。`carStopPositions` 関連の入力UI（基準号車・基準枠番号・方向）を削除する
 - **依存**: TASK-3.2
+- **実施結果**（2026-08-20）: 入力内容自体（`physicalLength`）は TASK-3.6 の時点で既に対応済みだったため、
+  本タスクの実質は `features/platform/components/` への移動と、`eslint.config.mjs` の
+  `legacyExclusions` から `src/components/PlatformForm.tsx` を除去することだった。除去後も
+  `pnpm --filter @furatora/admin lint` はエラー0件（`no-restricted-imports` が実際に適用された
+  上で違反が無いことを確認）。あわせて、`physicalLength` の `NumberInput` が `min={0}` かつ
+  初期値 `0` である一方 `features/platform/schema.ts` は `positive()` を要求するため、`0` のまま
+  送信すると400になり `alert('保存に失敗しました')` としか出ない不具合を発見。送信前に
+  `physicalLength <= 0` を弾き、`0` が未入力を意味する暫定値であることを `description` に明記した
+  （`docs/domain/platform-coordinate-system.md`参照）
 
 ### TASK-4.2: `TrainForm.tsx` 更新・移動
 - **対象ファイル**: `apps/admin/src/components/TrainForm.tsx` → `src/features/train/components/TrainForm.tsx`
 - **実装内容**: `limitedToPlatformIds` のホーム選択UIを削除する。号車構成（`carStructure`）の各行に、実長（メートル、任意入力）の数値フィールドを追加する
 - **依存**: TASK-3.3
+- **実施結果**（2026-08-20）: TASK-4.1 と同様、内容面は TASK-3.6 で対応済み。移動と
+  `legacyExclusions` からの除去のみ実施。既存の「未指定の場合は標準値（20.0m）を使用します」
+  という説明文が `carSegments.ts` の `DEFAULT_CAR_LENGTH` と同じ値であることを明記する形に更新した
 
 ### TASK-4.3: `FacilityForm.tsx` 更新・移動
 - **対象ファイル**: `apps/admin/src/components/FacilityForm.tsx` → `src/features/facility/components/FacilityForm.tsx`
@@ -626,6 +638,13 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     （**「原点」という語を単独で使わない**。`design.md`「`FacilityForm.tsx`」参照）
   - 接続（`connections`）に `connectedPlatformId` を指定した場合のみ表示される、対面乗り換え帯の範囲入力（開始・終了メートル）を追加する
 - **依存**: TASK-3.4
+- **実施結果**（2026-08-20）: `xPositionMeters`・対面乗り換え帯入力は TASK-3.6 で対応済み。
+  本タスクでは移動に加え、`description` にホーム長を併記する残作業を行った。
+  `GET /api/stations/[stationId]/platforms` が `id`/`platformNumber` のみ返していたため
+  `physicalLength` を追加し、選択中ホームの長さを「ホーム端（x=0）からの距離。ホーム長: n.nn m。
+  範囲外（負の値やホーム長を超える値）も入力できます。」の形で表示するようにした
+  （対面乗り換え帯の開始・終了入力も同様）。このファイルはもともと `legacyExclusions` に
+  含まれていなかった（DB importを持たないため元から `no-restricted-imports` を通過していた）
 
 ### TASK-4.4: `TrainStopPatternForm.tsx` 新規作成
 - **対象ファイル**:
@@ -671,11 +690,50 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     バリデーションもこれを要求する）。`lastCarNearest` でも各号車の区間の向きは反転しない
   - 「1号車先端を x=0 に揃える」というUIは**作らない**。原点はホーム端であり、
     列車の位置から導出しない（`design.md`「座標系のルール」参照）
+- **実施結果**（2026-08-20）: `carSegments.ts` は上記の実装をそのまま採用し、
+  `carSegments.test.ts` を追加（7ケース: `carLength`全指定/全未指定/混在、
+  `carOneNearest`/`lastCarNearest`、`order`によらず`startMeters < endMeters`が保たれること、
+  戻り値が`carNumber`昇順であること、負の`startMeters`）。全テストパス。
+  `TrainStopPatternForm.tsx` は design.md のモックに1点だけ変更を加えた:
+  **ホームの選択をドロップダウンにせず固定表示にした**（URL の `platformId` でホームが
+  一意に決まるため。開発者承認済み。design.md「Admin UI変更」を実施結果に合わせて更新した）。
+  それ以外（列車ドロップダウン、編成の端の位置、号車番号の向きの二択、自動計算プレビュー、
+  号車ごとの上書き入力）はモック通り実装した。409（重複登録）を受けた場合の専用メッセージ表示、
+  `startMeters >= endMeters` のクライアント側バリデーションも実装した
 
 ### TASK-4.5: 停車位置パターン一覧・編集ページ作成
 - **対象ファイル**: `apps/admin/src/app/stations/[stationId]/platforms/[platformId]/stop-patterns/page.tsx`（新規）
 - **実装内容**: 対象ホームに登録済みの `trainStopPatterns` を一覧表示し、`TrainStopPatternForm` への導線（新規作成・編集・削除）を提供する
 - **依存**: TASK-4.4
+- **実施結果**（2026-08-20）: 当初の想定より対応範囲が広がった。理由は以下の2点。
+  1. **「編集」の実現に `StopPatternRepository.update()` が必要だった。** Phase 3 時点の
+     `StopPatternRepository` は `save`（insert専用）と `delete` のみで、design.md の
+     port定義もこれに倣っていた。`update(id, pattern)` を追加し、`withTransaction` 内で
+     `trainStopPatternCars` を delete→insert、`trainStopPatterns` を update する実装とした。
+     `PUT /api/stations/:stationId/train-stop-patterns/:patternId` を新設（開発者承認済み。
+     design.md の ports 定義を実施結果に合わせて更新した）
+  2. **一覧・編集ページからのデータ取得に Query Service が必要だった。** `stop-patterns/`
+     配下は `src/app/**` にマッチし、ESLint の依存ルール（`no-restricted-imports`）により
+     `@furatora/database` を直接 import できない。既存ページのように「移行中の除外」に
+     加える選択肢もあったが、除外リストは段階的に削る対象であり新規ファイルで増やすのは
+     ADR-0001 の意図に反すると判断し、`features/stop-pattern/ports.ts` に
+     `StopPatternPageQuery`（`getListByPlatform`/`getEditContext`）を追加、
+     `external/query/stopPatternPageQuery.ts` で実装、`di.ts` に配線した。
+     ADR-0003 は「admin の一覧・編集ページの Query Service 化は後続Issue（#48）」としているが、
+     本件は既存ページの改修ではなく新規ページの必須要件であるため、この2画面分のみ
+     先行導入した（開発者承認済み。design.md「変更対象」ツリーを更新した）
+  - **一意制約違反の409化**: `save`/`update` とも PostgreSQL の unique_violation
+    （エラーコード `23505`）を捕捉し `DuplicateStopPatternError` を throw、
+    route.ts側で409に変換するようにした（design.mdエラーハンドリング表・TASK-6.4対応）
+  - ページ構成は一覧 (`stop-patterns/page.tsx`) / 新規 (`stop-patterns/new/page.tsx`) /
+    編集 (`stop-patterns/[patternId]/edit/page.tsx`) の3ルートとし、いずれもServer Component。
+    導線は `facilities/page.tsx` のホーム一覧テーブルに「停車位置」リンクを追加する形で設置した
+    （`platforms/` 配下に既存の一覧ページが存在しないため）
+  - 検証: `pnpm --filter @furatora/admin exec tsc --noEmit` エラー0、
+    `pnpm --filter @furatora/admin test` 76件全パス、
+    `pnpm --filter @furatora/admin lint` エラー0（警告10件は既存の`no-floating-promises`
+    warn運用によるもので新規増加なし。移動した3フォームの`legacyExclusions`除去後も
+    エラーが出ないことを確認済み）
 
 ---
 
@@ -915,7 +973,7 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | TASK-2.4（Phase 4 の後に実行） | ⬜ 未着手 | - |
 | TASK-2.5.1〜2.5.5 | ✅ 完了 | 2026-08-17 |
 | TASK-3.1〜3.6 | ✅ 完了 | 2026-08-17 |
-| TASK-4.1〜4.5 | ⬜ 未着手 | - |
+| TASK-4.1〜4.5 | ✅ 完了 | 2026-08-20 |
 | TASK-5.1〜5.8 | ⬜ 未着手 | - |
 | TASK-6.1〜6.6 | ⬜ 未着手 | - |
 

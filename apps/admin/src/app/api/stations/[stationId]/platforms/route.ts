@@ -12,7 +12,11 @@ export async function GET(
   try {
     const { stationId } = await params;
     const result = await db
-      .select({ id: platforms.id, platformNumber: platforms.platformNumber })
+      .select({
+        id: platforms.id,
+        platformNumber: platforms.platformNumber,
+        physicalLength: platforms.physicalLength,
+      })
       .from(platforms)
       .where(eq(platforms.stationId, stationId))
       .orderBy(asc(platforms.platformNumber));

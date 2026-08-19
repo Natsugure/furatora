@@ -192,6 +192,13 @@ export default async function FacilitiesPage({
                     <TableTd>
                       <Group gap="xs">
                         <LinkButton
+                          href={`/stations/${stationId}/platforms/${platform.id}/stop-patterns`}
+                          variant="default"
+                          size="compact-xs"
+                        >
+                          停車位置
+                        </LinkButton>
+                        <LinkButton
                           href={`/stations/${stationId}/platforms/${platform.id}/edit`}
                           variant="default"
                           size="compact-xs"

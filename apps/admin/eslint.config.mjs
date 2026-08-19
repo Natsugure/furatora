@@ -49,9 +49,7 @@ const legacyExclusions = {
     'src/app/api/unresolved-connections/railways/route.ts',
     'src/app/api/unresolved-connections/stations/route.ts',
     'src/components/ConnectionsEditSection.tsx',
-    'src/components/PlatformForm.tsx',
     'src/components/StationEditForm.tsx',
-    'src/components/TrainForm.tsx',
   ],
   rules: {
     'no-restricted-imports': 'off',

@@ -115,17 +115,24 @@ apps/admin/
   │   ├── ports.ts
   │   └── components/PlatformForm.tsx       ← physicalLength入力に変更
   ├── src/features/stop-pattern/            ← 新規feature
-  │   ├── domain/carSegments.ts             ← buildCarSegments()（純関数）
+  │   ├── domain/{carSegments.ts,types.ts}  ← buildCarSegments()（純関数）+ DTO
   │   ├── schema.ts / ports.ts
   │   └── components/TrainStopPatternForm.tsx
   ├── src/features/train/components/TrainForm.tsx      ← limitedToPlatformIds削除、carLength追加
   ├── src/features/facility/components/FacilityForm.tsx ← 枠番号→メートル入力に変更
   ├── src/external/repository/
-  │   ├── stopPatternRepository.ts          ← 親子insert（withTransaction必須）
+  │   ├── stopPatternRepository.ts          ← 親子insert（withTransaction必須）+ update
   │   └── platformRepository.ts
-  └── src/app/api/stations/[stationId]/
-      ├── platform-locations/...            ← 薄くする + 原子化（ADR-0005）
-      └── train-stop-patterns/...           ← 新規
+  ├── src/external/query/
+  │   └── stopPatternPageQuery.ts           ← 新規（Phase 4実施結果。一覧・編集ページ用）
+  └── src/app/
+      ├── stations/[stationId]/platforms/[platformId]/stop-patterns/
+      │   ├── page.tsx                      ← 新規（一覧）
+      │   ├── new/page.tsx                  ← 新規
+      │   └── [patternId]/edit/page.tsx     ← 新規
+      └── api/stations/[stationId]/
+          ├── platform-locations/...        ← 薄くする + 原子化（ADR-0005）
+          └── train-stop-patterns/...       ← 新規（[patternId]/route.ts に PUT を追加）
 
 apps/scripts/
   ├── package.json                          ← tsx に --env-file-if-exists を付与（ADR-0004）
@@ -576,9 +583,27 @@ export interface StationDetailQuery {
 // apps/admin/src/features/stop-pattern/ports.ts
 export interface StopPatternRepository {
   save(pattern: StopPatternInput): Promise<void>;
-  delete(id: string): Promise<void>;
+  update(id: string, pattern: StopPatternInput): Promise<boolean>;
+  delete(id: string): Promise<boolean>;
+}
+
+// 読み取り（一覧・編集ページ用）。stop-pattern の新規ページは src/app/** に置かれ、
+// ESLint の依存ルールにより @furatora/database を直接 import できないため必要になる
+export interface StopPatternPageQuery {
+  getListByPlatform(stationId: string, platformId: string): Promise<StopPatternListDTO | null>;
+  getEditContext(stationId: string, platformId: string, patternId?: string): Promise<StopPatternEditContextDTO | null>;
 }
 ```
+
+> **Phase 4 実施結果（2026-08-20）**: `update()` と `StopPatternPageQuery` は当初の定義に
+> 無かったが、TASK-4.5（一覧・編集ページ）の実装過程で追加した（開発者承認済み）。
+> `update()` は「編集」導線に必要で、`save`/`update` はいずれも一意制約違反
+> （`platformId`, `trainId`）を `DuplicateStopPatternError` として throw し、
+> route.ts 側で409に変換する。`StopPatternPageQuery` は
+> [ADR-0003](../adr/0003-read-write-separation.md) が admin の一覧・編集ページの
+> Query Service 化を後続Issue（#48）としている対象範囲を超える追加だが、
+> 本件は既存ページの改修ではなく新規ページの必須要件であるため、この2画面分のみ
+> 本Issueで先行導入した（開発者承認済み）。
 
 **port は実在する画面・ユースケースに対してのみ定義する。**
 乗換案内など未実装機能のための port を先回りして作らないこと（ADR-0002）。
@@ -622,7 +647,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
 ### 新規: 停車位置パターン編集（`TrainStopPatternForm.tsx`）
 
 ```
-ホーム: [ドロップダウン]   （ホーム長: 210.00 m）
+ホーム: 3番線（ホーム長: 210.00 m）   ← 固定表示（URLのplatformIdで確定するため）
 列車:   [ドロップダウン]
 
 編成の端の位置: [数値入力] m   ← x=0 に近い側の端の、ホーム端(x=0)からの距離
@@ -640,6 +665,11 @@ export const dbStopPatternRepository: StopPatternRepository = {
 
 ホーム長を併記するのは、入力値が `[0, physicalLength]` に対してどこに来るかを
 管理者が確認できるようにするため。範囲外の入力自体は許容する（ルール4）。
+
+> **Phase 4 実施結果（2026-08-20）**: ホームの選択は当初「ドロップダウン」としていたが、
+> このフォームは `platforms/[platformId]/stop-patterns/...` 配下のページにのみ置かれ、
+> ホームは常にURLの `platformId` で一意に決まるため、固定表示（読み取り専用テキスト）に
+> 変更した（開発者承認済み）。それ以外の要素はモック通り実装した。
 
 ### `FacilityForm.tsx`（#29から座標入力欄のみ変更）
 

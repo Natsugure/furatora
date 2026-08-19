@@ -3,7 +3,7 @@ import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { Title } from '@mantine/core';
-import { TrainForm } from '@/components/TrainForm';
+import { TrainForm } from '@/features/train/components/TrainForm';
 
 export default async function EditTrainPage({
   params,

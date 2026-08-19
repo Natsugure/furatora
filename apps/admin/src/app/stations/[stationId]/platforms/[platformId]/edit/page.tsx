@@ -3,7 +3,7 @@ import { db } from '@furatora/database/client';
 import { stations, platforms } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { Title } from '@mantine/core';
-import { PlatformForm } from '@/components/PlatformForm';
+import { PlatformForm } from '@/features/platform/components/PlatformForm';
 
 export default async function EditPlatformPage({
   params,

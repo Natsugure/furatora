@@ -10,7 +10,7 @@ import {
 } from '@furatora/database/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { Title } from '@mantine/core';
-import { FacilityForm } from '@/components/FacilityForm';
+import { FacilityForm } from '@/features/facility/components/FacilityForm';
 
 export default async function EditLocationPage({
   params,

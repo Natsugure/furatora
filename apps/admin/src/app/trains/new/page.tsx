@@ -1,5 +1,5 @@
 import { Title } from '@mantine/core';
-import { TrainForm } from '@/components/TrainForm';
+import { TrainForm } from '@/features/train/components/TrainForm';
 
 export default function NewTrainPage() {
   return (

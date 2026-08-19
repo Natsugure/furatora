@@ -3,6 +3,7 @@ import { db } from '@furatora/database/client';
 import { trainStopPatterns, trainStopPatternCars } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
 import { trainStopPatternSchema } from '@/features/stop-pattern/schema';
+import { DuplicateStopPatternError } from '@/features/stop-pattern/ports';
 import { stopPatternRepository } from '@/di';
 
 export async function GET(request: Request) {
@@ -56,7 +57,10 @@ export async function POST(request: Request) {
     await stopPatternRepository.save(parsed.data);
 
     return NextResponse.json({ success: true }, { status: 201 });
-  } catch {
+  } catch (err) {
+    if (err instanceof DuplicateStopPatternError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -50,6 +50,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
   const [notes, setNotes] = useState(initialData?.notes ?? '');
   const [linesLoading, setLinesLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/lines')
@@ -72,6 +73,15 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErrorMessage(null);
+
+    // physicalLength は既存行の未入力を表す暫定値として 0 を許容しているが（TASK-1.1）、
+    // 新規入力としては受け付けない（features/platform/schema.ts の positive() と揃える）。
+    if (physicalLength <= 0) {
+      setErrorMessage('ホーム長は0より大きい値を入力してください');
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -100,7 +110,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
       router.refresh();
     } else {
       setSubmitting(false);
-      alert('保存に失敗しました');
+      setErrorMessage('保存に失敗しました');
     }
   }
 
@@ -183,7 +193,7 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
 
         <NumberInput
           label="ホームの物理長"
-          description="メートル単位。ホームの実体は 0 からこの値までの区間として扱われます"
+          description="メートル単位。ホームの実体は 0 からこの値までの区間として扱われます。0 は未入力を意味する暫定値のため、新規登録では0より大きい値を入力してください"
           min={0}
           step={0.1}
           decimalScale={2}
@@ -214,11 +224,19 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
           onChange={(e) => setNotes(e.target.value)}
         />
 
+        {errorMessage && (
+          <Text size="sm" c="red">{errorMessage}</Text>
+        )}
+
         <Group gap="sm">
           <Button type="submit" loading={submitting}>
             {isEdit ? '更新' : '登録'}
           </Button>
-          <Button variant="default" onClick={() => router.push(`/stations/${stationId}/facilities`)}>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => router.push(`/stations/${stationId}/facilities`)}
+          >
             キャンセル
           </Button>
         </Group>

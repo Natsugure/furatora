@@ -198,7 +198,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         <div>
           <Text size="sm" fw={500} mb="xs">車両構成（号車ごとのドア数・実長）</Text>
           <Text size="xs" c="dimmed" mb="xs">
-            実長（メートル）は任意入力です。未指定の場合は標準値（20.0m）を使用します。
+            実長（メートル）は任意入力です。未指定の場合は停車位置パターンの自動算出で標準値（20.0m）を使用します。
           </Text>
           <Stack gap={4}>
             {carStructures.map((cs, i) => (
@@ -240,7 +240,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         <div>
           <Group justify="space-between" mb="xs">
             <Text size="sm" fw={500}>フリースペース</Text>
-            <Button variant="subtle" size="compact-sm" onClick={addFreeSpace}>+ 追加</Button>
+            <Button type="button" variant="subtle" size="compact-sm" onClick={addFreeSpace}>+ 追加</Button>
           </Group>
           <Stack gap="xs">
             {freeSpaces.map((fs, i) => (
@@ -270,7 +270,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
         <div>
           <Group justify="space-between" mb="xs">
             <Text size="sm" fw={500}>優先席</Text>
-            <Button variant="subtle" size="compact-sm" onClick={addPrioritySeat}>+ 追加</Button>
+            <Button type="button" variant="subtle" size="compact-sm" onClick={addPrioritySeat}>+ 追加</Button>
           </Group>
           <Stack gap="xs">
             {prioritySeats.map((ps, i) => (
@@ -301,7 +301,7 @@ export function TrainForm({ initialData, isEdit = false }: Props) {
           <Button type="submit" loading={submitting}>
             {isEdit ? '更新' : '登録'}
           </Button>
-          <Button variant="default" onClick={() => router.push('/trains')}>
+          <Button type="button" variant="default" onClick={() => router.push('/trains')}>
             キャンセル
           </Button>
         </Group>
