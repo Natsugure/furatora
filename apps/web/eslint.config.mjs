@@ -10,15 +10,10 @@ const legacyExclusions = {
   files: [
     'src/app/page.tsx',
     'src/app/lines/\\[slug\\]/stations/page.tsx',
-    'src/app/stations/\\[slug\\]/page.tsx',
     'src/app/api/v1/stations/route.ts',
     'src/app/api/v1/stations/\\[id\\]/route.ts',
     'src/app/api/v1/lines/\\[slug\\]/stations/route.ts',
     'src/app/api/v1/operators/route.ts',
-    'src/components/PlatformTabs.tsx',
-    'src/components/TransferDifficultySection.tsx',
-    'src/components/PlatformDisplay.tsx',
-    'src/components/TrainVisualization.tsx',
   ],
   rules: {
     'no-restricted-imports': 'off',

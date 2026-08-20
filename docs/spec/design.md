@@ -92,18 +92,18 @@ packages/database/
 packages/eslint-config/          ← 新規: 4層の依存ルール（ADR-0001）
 
 apps/web/
-  ├── src/app/stations/[slug]/page.tsx      ← 485行 → 約70行（合成とJSXのみ）
+  ├── src/app/stations/[slug]/page.tsx      ← 485行 → 約90行（合成とJSXのみ）
   ├── src/di.ts                             ← 新規: コンポジションルート
   ├── src/features/platform/
   │   ├── domain/types.ts                   ← PlatformDTO 等
   │   ├── domain/geometry.ts                ← 新規: computeBounds()（純関数）
-  │   ├── ports.ts                          ← PlatformQuery
+  │   ├── domain/doorOrder.ts               ← 新規: isDoorOrderReversed()（純関数）
   │   └── components/
   │       ├── TrainVisualization.tsx        ← SVG viewBox方式に全面書き換え
   │       ├── PlatformDisplay.tsx           ← DTO受け取りに変更
   │       └── PlatformTabs.tsx              ← Drizzle型importを排除
   ├── src/features/station/
-  │   ├── domain/types.ts / ports.ts
+  │   ├── domain/types.ts / domain/tabs.ts / ports.ts
   │   └── usecases/getStationDetail.ts
   └── src/external/query/
       └── stationDetailQuery.ts             ← 既存 fetchStationDetails() の移設先
@@ -142,6 +142,16 @@ apps/scripts/
 docker/                                     ← 削除（ADR-0004）
 docker-compose.yml                          ← 削除（ADR-0004）
 ```
+
+> **Phase 5 実施結果（2026-08-20）**: `features/platform/ports.ts`（`PlatformQuery`）は
+> 作成しなかった。それを呼ぶ画面・ユースケースが存在せず、駅詳細画面は
+> `features/station/ports.ts`（`StationDetailQuery`）1本で足りるため
+> （[ADR-0002](../adr/0002-dependency-inversion-ports.md)「port は実在する画面・
+> ユースケースに対してのみ定義する」に従う。開発者承認済み）。
+> 代わりに `features/platform/domain/doorOrder.ts`（`isDoorOrderReversed()`）と
+> `features/station/domain/tabs.ts`（`buildDirectionTabs()`）を追加した。
+> 前者はドア番号反転・先頭車の向きの導出、後者は方面タブの構築（旧 `page.tsx` の
+> インラインロジック）を純関数として切り出したもの。
 
 #### カラム削除への追随のみ行う範囲（層移行はしない）
 
@@ -359,6 +369,15 @@ xRangeEnd: decimal('x_range_end', { precision: 6, scale: 2 }),     // nullable
 ドア番号の反転表示（`TrainVisualization.tsx:77`, `:152` の `reversed`）は、
 `cars` を `carNumber` 昇順に並べたときの `startMeters` が減少していれば反転、として導出する。
 
+> **Phase 5 実施結果（2026-08-20）**: 旧 `TrainVisualization.tsx` が持っていた
+> 「モバイル=縦レイアウト（車両を上下に積む）／デスクトップ=横レイアウト」の2系統は廃止し、
+> **横SVG1本＋横スクロール**に統一した（開発者承認済み）。狭い画面では
+> `overflow-x-auto` のラッパで横スクロールになる。また、旧 `typeCode === 'sameFloor'` による
+> 対面乗り換えの特別扱い（`isSameFloorLocation`・専用ラベル列）も全廃し、
+> `facilityConnections.xRangeStart`/`xRangeEnd` が両方非nullの接続のみを
+> SVG上の帯として描画する形に一本化した（開発者承認済み）。`sameFloor` 設備自体は
+> 通常のアクセス点として扱う。
+
 ### 方面別の停車位置パターンは持たない（当面）
 
 `trainStopPatterns` の一意キーは `(platformId, trainId)` であり、
@@ -535,7 +554,17 @@ DTOより上の層に `string` のまま渡さない（SVG描画側に `Number()
 ```typescript
 export type PlatformDTO = {
   id: string;
-  physicalLength: number;        // decimal → number 変換済み
+  platformNumber: string;
+  lineId: string;
+  lineName: string;
+  lineColor: string | null;
+  inboundDirectionId: string | null;
+  inboundDirectionName: string | null;
+  outboundDirectionId: string | null;
+  outboundDirectionName: string | null;
+  platformSide: 'top' | 'bottom' | null;
+  notes: string | null;
+  physicalLength: number;        // decimal → number 変換済み。0 = 未入力
   stopPatterns: TrainStopPatternDTO[];
   concourses: ConcourseDTO[];
 };
@@ -543,7 +572,17 @@ export type PlatformDTO = {
 export type TrainStopPatternDTO = {
   trainId: string;
   trainLabel: string;
-  cars: { carNumber: number; startMeters: number; endMeters: number }[];
+  carCount: number;
+  cars: StopPatternCarDTO[];     // carNumber 昇順
+};
+
+export type StopPatternCarDTO = {
+  carNumber: number;
+  startMeters: number;
+  endMeters: number;
+  doorCount: number;             // trainCarStructures 由来。未登録は4で補う
+  freeSpaceDoors: { nearDoor: number; isStandard: boolean }[];
+  prioritySeatDoors: { nearDoor: number; isStandard: boolean }[];
 };
 
 export type ConcourseDTO = {
@@ -556,12 +595,27 @@ export type ConcourseDTO = {
 export type FacilityConnectionDTO = {
   stationName: string;
   lineNames: string[];
+  lineColors: (string | null)[];
   directionName: string | null;
   exitLabel: string | null;
-  xRangeStart: number | null;
+  xRangeStart: number | null;    // 両方非nullのときのみ対面乗換帯
   xRangeEnd: number | null;
 };
+
+export type DirectionTabDTO = {
+  directionId: string | null;
+  directionName: string;
+  platforms: PlatformDTO[];
+};
 ```
+
+> **Phase 5 実施結果（2026-08-20）**: 上記は実装結果に合わせて更新した。当初の
+> `PlatformDTO`（`id`/`physicalLength`/`stopPatterns`/`concourses`のみ）では
+> `PlatformDisplay`（番線・路線名・色・方面名・`platformSide`・`notes`）や
+> `TrainVisualization`（`doorCount`・フリースペース・優先席）が必要とする情報を
+> 表現できなかったため拡張した（開発者承認済み）。`DirectionTabDTO` は
+> 方面タブ構築用として新規追加（`features/station/domain/tabs.ts` の
+> `buildDirectionTabs()` が返す型）。
 
 先例として `apps/web/src/types/index.ts` の `StationSearchApiResponse` 等が
 既に Drizzle 非依存のDTOとして `/api/v1/*` のレスポンス契約になっている。
@@ -731,6 +785,15 @@ Level 1（マッピング層のみ）へ差し戻される。抽象だけを残�
    含む一時ファイルを置き、`pnpm run lint` がエラーになることを確認して削除する。
    `apps/admin` でも同様。**「違反ゼロで通った」と「ルールが未適用」は
    lint の出力上区別がつかないため、この検証を省略しない。**
+
+> **Phase 5 実施結果（2026-08-20）**: 上記1〜4をすべて満たした。`apps/web` は
+> 24件のテスト（`computeBounds()` 10 / `isDoorOrderReversed()` 4 /
+> `buildDirectionTabs()` 6 / `getStationDetail` 4）を持つに至り、
+> [ADR-0002](../adr/0002-dependency-inversion-ports.md) の前提条件を満たした。
+> ESLintルール発火の検証は `features/platform/components/` 配下で実施した
+> （TASK-2.5.3当時は `src/app/` 配下だったが、`features/*/components/**` にも
+> 同じ `no-restricted-imports` が適用されるため対象を変更。エラーになることを確認後、
+> 一時ファイルは削除した）。
 
 ### ビルド確認
 

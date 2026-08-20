@@ -751,6 +751,13 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **期待結果**: Drizzle 非依存の表示用型が確定する
 - **依存**: TASK-2.5.5
 - **注意**: UI固有の値（色コード・Tailwindクラス名・JSX）を含めないこと（ADR-0003のDTO制約）
+- **実施結果**（2026-08-20）: design.md 時点の `PlatformDTO`（`id`/`physicalLength`/`stopPatterns`/
+  `concourses` のみ）では `PlatformDisplay`（番線・路線名・色・方面名・`platformSide`・`notes`）や
+  `TrainVisualization`（`doorCount`・フリースペース・優先席）が必要とする情報を表現できないことが
+  判明したため、DTOを拡張した（開発者承認済み。design.md「Web表示用DTO定義」を実施結果に合わせて
+  更新した）。`FacilityDTO`/`ConcourseCellDTO`を新設し、`ConcourseDTO.cells`の要素型として使用。
+  `page.tsx`/`PlatformDisplay`/`PlatformTabs`/`TrainVisualization`の4箇所に重複していたローカル型
+  定義をこのDTO 1箇所へ集約した
 
 ### TASK-5.2: `features/platform/domain/geometry.ts` を実装 + テスト
 - **対象ファイル**: `apps/web/src/features/platform/domain/geometry.ts`, `geometry.test.ts`（新規）
@@ -761,6 +768,10 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     停車位置パターン0件（ホームだけが描画される）
 - **期待結果**: viewBox算出がDB非依存になり、単体テストできる
 - **依存**: TASK-5.1, TASK-2.5.4
+- **実施結果**（2026-08-20）: 指定の5ケースに加え、対面乗換帯（`xRangeStart`/`xRangeEnd`）を
+  範囲に含めるケースと、`xPositionMeters`/`xRangeStart`/`xRangeEnd`が`null`の要素を範囲計算から
+  除外するケースを追加し、計10ケースとした（`geometry.test.ts`）。`MARGIN_METERS = 5`として実装し、
+  候補点の最小・最大からマージンを加える方式。全テストパス
 
 ### TASK-5.3: `features/station` の ports と usecase を作成
 - **対象ファイル**:
@@ -773,6 +784,12 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **依存**: TASK-5.1
 - **注意**: **実在する画面に対してのみ port を定義する。** 乗換案内など未実装機能の
   port を先回りして作らないこと（ADR-0002）
+- **実施結果**（2026-08-20）: 方面タブ構築ロジック（旧 `page.tsx` L367-405）を
+  `features/station/domain/tabs.ts` の純関数 `buildDirectionTabs()` として切り出した
+  （`tabs.test.ts` 6ケース）。design.md には `PlatformQuery` の記載があったが、
+  それを呼ぶ画面が存在しないため作成しなかった（ADR-0002「port は実在する画面・
+  ユースケースに対してのみ定義する」に従う判断。開発者承認済み。design.mdの
+  変更対象ツリーから `features/platform/ports.ts` を削除した）
 
 ### TASK-5.4: `external/query/stationDetailQuery.ts` を実装
 - **対象ファイル**: `apps/web/src/external/query/stationDetailQuery.ts`（新規）
@@ -790,6 +807,14 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   - **クエリ本数を現状（10本）から増やさない。** 集約単位に分解してN+1を作らないこと
   - **`physicalLength === 0` のホームを除外する。** `0` は「未入力」を意味する暫定値であり
     （TASK-1.1 参照）、そのまま `computeBounds()` に渡すと描画範囲が破綻する
+- **実施結果**（2026-08-20）: design.md の「呼び出し前にガードする」（座標系のルール節）と
+  本タスクの「除外する」の記述が食い違っていたため、開発者に確認し**クエリでは除外せず、
+  描画側（`PlatformDisplay`）で `physicalLength === 0` の場合にSVGのみスキップする**方式を
+  採用した（開発者承認済み。TASK-5.7 参照）。ホームカード自体（番線・路線・設備一覧・備考）は
+  従来通り表示する。加えて、同一テーブル（`stationConnections ⋈ lines`）を2回引いていた既存の
+  重複クエリ（乗換路線名用・乗換難易度用）を1本に統合し、クエリ本数は現状の10本から減った。
+  列車の導出は `trains.lines && ARRAY[...]` の生SQLを廃し、`trainStopPatterns ⋈ trains` から
+  導出する方式に変更（REQ-6.1が自然に成立する）
 
 ### TASK-5.5: `di.ts` 作成と `page.tsx` の薄化
 - **対象ファイル**: `apps/web/src/di.ts`（新規）, `apps/web/src/app/stations/[slug]/page.tsx`
@@ -797,6 +822,10 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   - `di.ts` で `makeGetStationDetail({ query: dbStationDetailQuery })` を配線
   - `page.tsx` から DB組み立てロジックを削除し、`di.ts` の呼び出しとJSX合成のみにする（485行 → 約70行）
 - **依存**: TASK-5.4
+- **実施結果**（2026-08-20）: `page.tsx` は485行→約90行になった（JSX構造は維持し、
+  DB組み立てロジックのみ削除したため見積りよりやや多いが、DB非依存を達成する目的は満たしている）。
+  `di.ts` は admin と異なり `makeGetStationDetail({ query })` ファクトリを挟む形にした
+  （admin の `di.ts` は実装オブジェクトをそのまま re-export するだけで usecases 層自体を持たない）
 
 ### TASK-5.6: `TrainVisualization.tsx` をSVG viewBox方式に全面書き換え・移動
 - **対象ファイル**: `apps/web/src/components/TrainVisualization.tsx` → `src/features/platform/components/TrainVisualization.tsx`
@@ -807,11 +836,34 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   - ドア番号の反転（旧 `reversed`、`TrainVisualization.tsx:77`, `:152`）は、
     `cars` を `carNumber` 昇順に並べたとき `startMeters` が減少していれば反転、として導出する
 - **依存**: TASK-5.2, TASK-5.5
+- **実施結果**（2026-08-20）: 旧実装の「モバイル=縦レイアウト／デスクトップ=横レイアウト」の
+  2系統を廃止し、**横SVG1本＋横スクロール**に統一した（開発者承認済み）。狭い画面では
+  `overflow-x-auto` のラッパで横スクロールさせる。ドア反転の判定ロジックは
+  `features/platform/domain/doorOrder.ts` の純関数 `isDoorOrderReversed()` に切り出し、
+  `carNumber` 昇順の先頭・末尾の `startMeters` を比較する形で実装（`doorOrder.test.ts` 4ケース）。
+  先頭車（`carNumber === 1`）の「面取り」形状は、`isDoorOrderReversed()` の結果から
+  外向きの辺（左端／右端）を判定する形で導出した。対面乗り換え帯は `xRangeStart`/`xRangeEnd`
+  が両方非nullの接続のみを帯として描画し、旧 `typeCode === 'sameFloor'` による特別扱い
+  （`isSameFloorLocation`・専用ラベル列）は全廃した（開発者承認済み）。設備アイコンは
+  `xPositionMeters` が非nullのアクセス点のみSVGに描画し、`null`（コンコース全体）は
+  `PlatformDisplay` 側のテキストリストに委ねる。SVGの実表示高さは
+  `PX_PER_METER(=10) × VIEW_HEIGHT(=22)` で固定（`preserveAspectRatio="xMidYMid meet"`）
 
 ### TASK-5.7: `PlatformDisplay.tsx` / `PlatformTabs.tsx` の型更新・移動
 - **対象ファイル**: `apps/web/src/components/{PlatformDisplay,PlatformTabs}.tsx` → `src/features/platform/components/`
 - **実装内容**: `@furatora/database/schema` からの型 import を削除し、DTOを受け取る形に更新する
 - **依存**: TASK-5.6
+- **実施結果**（2026-08-20）: `PlatformDisplay` は `physicalLength === 0` の場合、SVGを描かず
+  「ホーム長が未登録のため図を表示できません」を表示する形にした（TASK-5.4の注意参照。
+  ホームカード自体は通常通り表示）。下部の「設備・乗換情報」リストは `nearPlatformCell` による
+  ソート・`${n}号車付近` ラベルを `xPositionMeters` ベース（`ホーム端から ${x}m付近`）に置換した。
+  号車番号での言い換えはしない（同一ホームに複数の停車位置パターンがあると号車が一意に
+  定まらないため）。`eslint.config.mjs` の `legacyExclusions` から本タスクで移動した3ファイル
+  （`PlatformTabs.tsx`/`PlatformDisplay.tsx`/`TrainVisualization.tsx`）と、TASK-5.5で薄化した
+  `stations/[slug]/page.tsx` を除去した。`TransferDifficultySection.tsx` は
+  `@furatora/database/enums` しか import しておらず（enumsは全層許可の例外）、除外リストから
+  外しても lint がエラー0件で通ることを確認したため同時に除去した。残り6件
+  （トップページ・路線駅一覧・API v1 × 4）は Phase 5 のスコープ外
 
 ### TASK-5.8: usecase テストを追加（Fake注入）
 - **対象ファイル**: `apps/web/src/features/station/usecases/getStationDetail.test.ts`（新規）
@@ -824,6 +876,22 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 - **依存**: TASK-5.3, TASK-2.5.4
 - **注意**: [ADR-0002](../adr/0002-dependency-inversion-ports.md) の**前提条件**。
   これが無い場合 ADR-0002 は Level 1 へ差し戻し
+- **実施結果**（2026-08-20）: 4ケース（駅が存在しない／方面タブが構築される／方面IDを
+  持たないホームが「全方面」タブへ入る／停車位置パターン0件のホームが列車0本のまま返る
+  ＝REQ-6.1）を実装。これが `apps/web` 初のテストになった（それまで0件）。全テストパス。
+  検証（型チェック・lint・テスト・ビルド）の結果:
+  - `pnpm --filter @furatora/frontend exec tsc --noEmit`: エラー0
+    （Phase 3.6実施結果に記録された9件のエラーがすべて解消）
+  - `pnpm --filter @furatora/frontend test`: 24件全パス（geometry 10 / doorOrder 4 / tabs 6 /
+    getStationDetail 4）
+  - `pnpm --filter @furatora/admin test`: 既存76件全パス（デグレなし）
+  - `pnpm --filter @furatora/frontend lint`: エラー0・警告0
+  - ESLintルール発火の確認（TASK-2.5.3と同じ手順）: `features/platform/components/` に
+    `import { db } from '@furatora/database/client';` を含む一時ファイルを置き、
+    `no-restricted-imports` エラーになることを確認後、削除した
+  - `pnpm run build`: web・admin とも成功（型チェック・ページ生成含む）
+  - `pnpm run lint` / `pnpm run test`（monorepo全体）: いずれも成功。admin側の
+    `no-floating-promises` 警告10件は既存のもの（Issue #49対象・本Issueの変更によるものではない）
 
 ---
 
@@ -974,7 +1042,7 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | TASK-2.5.1〜2.5.5 | ✅ 完了 | 2026-08-17 |
 | TASK-3.1〜3.6 | ✅ 完了 | 2026-08-17 |
 | TASK-4.1〜4.5 | ✅ 完了 | 2026-08-20 |
-| TASK-5.1〜5.8 | ⬜ 未着手 | - |
+| TASK-5.1〜5.8 | ✅ 完了 | 2026-08-20 |
 | TASK-6.1〜6.6 | ⬜ 未着手 | - |
 
 ---

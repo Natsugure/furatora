@@ -1,98 +1,18 @@
-import type { CarStopPosition, CarStructure, FreeSpace, PrioritySeat } from '@furatora/database/schema';
+import { computeBounds } from '../domain/geometry';
+import type { PlatformDTO } from '../domain/types';
 import { TrainVisualization } from './TrainVisualization';
 
-type Platform = {
-  id: string;
-  platformNumber: string;
-  lineId: string;
-  inboundDirectionId: string | null;
-  outboundDirectionId: string | null;
-  maxCarCount: number;
-  carStopPositions: CarStopPosition[] | null;
-  platformSide: string | null;
-  notes: string | null;
-};
-
-type Line = {
-  id: string;
-  name: string;
-  nameEn: string | null;
-  color: string | null;
-};
-
-type Direction = {
-  id: string;
-  displayName: string;
-  displayNameEn: string | null;
-};
-
-type Train = {
-  id: string;
-  name: string;
-  carCount: number;
-  carStructure: CarStructure[] | null;
-  freeSpaces: FreeSpace[] | null;
-  prioritySeats: PrioritySeat[] | null;
-};
-
-export type FacilityConnection = {
-  stationName: string;
-  lineNames: string[];
-  lineColors: (string | null)[];
-  directionName: string | null;
-  exitLabel: string | null;
-};
-
-export type Facility = {
-  id: string;
-  typeCode: string;
-  typeName: string;
-  isWheelchairAccessible: boolean | null;
-  isStrollerAccessible: boolean | null;
-};
-
-export type PlatformLocationCell = {
-  nearPlatformCell: number | null;
-  facilities: Facility[];
-};
-
-export type PlatformLocation = {
-  id: string;
-  exits: string | null;
-  cells: PlatformLocationCell[];
-  connections: FacilityConnection[];
-};
-
 type Props = {
-  platform: Platform;
-  line: Line;
-  inboundDirection: Direction | null;
-  outboundDirection: Direction | null;
-  trains: Train[];
-  locations: PlatformLocation[];
+  platform: PlatformDTO;
 };
 
-export function PlatformDisplay({
-  platform,
-  line,
-  inboundDirection,
-  outboundDirection,
-  trains,
-  locations,
-}: Props) {
-  const directions = [
-    inboundDirection?.displayName,
-    outboundDirection?.displayName,
-  ]
+export function PlatformDisplay({ platform }: Props) {
+  const directions = [platform.inboundDirectionName, platform.outboundDirectionName]
     .filter(Boolean)
     .join(' / ');
 
-  const platformSide =
-    platform.platformSide === 'top' || platform.platformSide === 'bottom'
-      ? platform.platformSide
-      : null;
-
-  const lineColor = line.color || '#6b7280';
+  const lineColor = platform.lineColor || '#6b7280';
+  const bounds = computeBounds(platform.physicalLength, platform.stopPatterns, platform.concourses);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -116,27 +36,31 @@ export function PlatformDisplay({
                 {platform.platformNumber}番線
               </h3>
               <p className="text-sm text-gray-500">
-                {line.name}
+                {platform.lineName}
                 {directions && ` — ${directions}`}
               </p>
             </div>
           </div>
 
           {/* Trains stopping at this platform */}
-          {trains.length > 0 ? (
+          {platform.physicalLength === 0 ? (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 text-center">
+              ホーム長が未登録のため図を表示できません
+            </div>
+          ) : platform.stopPatterns.length > 0 ? (
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 列車・ホーム設備
               </p>
               <div className="space-y-4">
-                {trains.map((train) => (
+                {platform.stopPatterns.map((pattern) => (
                   <TrainVisualization
-                    key={train.id}
-                    train={train}
-                    platformMaxCarCount={platform.maxCarCount}
-                    carStopPositions={platform.carStopPositions}
-                    locations={locations}
-                    platformSide={platformSide}
+                    key={pattern.trainId}
+                    pattern={pattern}
+                    physicalLength={platform.physicalLength}
+                    concourses={platform.concourses}
+                    platformSide={platform.platformSide}
+                    bounds={bounds}
                   />
                 ))}
               </div>
@@ -146,22 +70,22 @@ export function PlatformDisplay({
           )}
 
           {/* Facility summary section */}
-          {locations.length > 0 && locations.some((loc) => loc.cells.length > 0) && (
+          {platform.concourses.length > 0 && platform.concourses.some((c) => c.cells.length > 0) && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 設備・乗換情報
               </p>
               <div className="space-y-3">
-                {[...locations].sort((a, b) => {
-                  const aCell = a.cells.find((c) => c.nearPlatformCell !== null)?.nearPlatformCell ?? null;
-                  const bCell = b.cells.find((c) => c.nearPlatformCell !== null)?.nearPlatformCell ?? null;
-                  if (aCell === null) return 1;
-                  if (bCell === null) return -1;
-                  return aCell - bCell;
-                }).map((loc) => {
-                  if (loc.cells.length === 0) return null;
-                  const connectionHeader = loc.connections.length > 0
-                    ? loc.connections.map((conn) => {
+                {[...platform.concourses].sort((a, b) => {
+                  const aX = a.cells.find((c) => c.xPositionMeters !== null)?.xPositionMeters ?? null;
+                  const bX = b.cells.find((c) => c.xPositionMeters !== null)?.xPositionMeters ?? null;
+                  if (aX === null) return 1;
+                  if (bX === null) return -1;
+                  return aX - bX;
+                }).map((concourse) => {
+                  if (concourse.cells.length === 0) return null;
+                  const connectionHeader = concourse.connections.length > 0
+                    ? concourse.connections.map((conn) => {
                         const lineLabel = conn.lineNames.join('・');
                         return conn.directionName
                           ? `${lineLabel}（${conn.directionName}方面）`
@@ -169,20 +93,20 @@ export function PlatformDisplay({
                       }).join('・')
                     : null;
                   return (
-                    <div key={loc.id}>
+                    <div key={concourse.id}>
                       {connectionHeader && (
                         <p className="text-sm font-medium text-gray-700 mb-1">
                           {connectionHeader}
                         </p>
                       )}
                       <ul className="space-y-0.5">
-                        {[...loc.cells].sort((a, b) => {
-                            if (a.nearPlatformCell === null) return 1;
-                            if (b.nearPlatformCell === null) return -1;
-                            return a.nearPlatformCell - b.nearPlatformCell;
+                        {[...concourse.cells].sort((a, b) => {
+                            if (a.xPositionMeters === null) return 1;
+                            if (b.xPositionMeters === null) return -1;
+                            return a.xPositionMeters - b.xPositionMeters;
                           }).map((cell, idx) => {
-                          const cellLabel = cell.nearPlatformCell !== null
-                            ? `${cell.nearPlatformCell}号車付近`
+                          const cellLabel = cell.xPositionMeters !== null
+                            ? `ホーム端から ${cell.xPositionMeters}m付近`
                             : 'コンコース全体';
                           const facilityNames = cell.facilities.map((f) => f.typeName).join('・');
                           return (
