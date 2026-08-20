@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Group, Stack, Table, Text, Title } from '@mantine/core';
+import { Group, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 import { LinkButton } from '@/components/LinkElements';
 import { DeleteButton } from '@/components/DeleteButton';
 import { stopPatternPageQuery } from '@/di';
@@ -32,14 +32,14 @@ export default async function StopPatternsPage({
         </Text>
       ) : (
         <Table striped highlightOnHover withTableBorder>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>列車</Table.Th>
-              <Table.Th>号車範囲</Table.Th>
-              <Table.Th>操作</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
+          <TableThead>
+            <TableTr>
+              <TableTh>列車</TableTh>
+              <TableTh>号車範囲</TableTh>
+              <TableTh>操作</TableTh>
+            </TableTr>
+          </TableThead>
+          <TableTbody>
             {data.patterns.map((pattern) => {
               const sortedCars = [...pattern.cars].sort((a, b) => a.carNumber - b.carNumber);
               const first = sortedCars[0];
@@ -48,10 +48,10 @@ export default async function StopPatternsPage({
                 ? `${first.carNumber}号車〜${last.carNumber}号車 (${Math.min(first.startMeters, last.startMeters).toFixed(2)}〜${Math.max(first.endMeters, last.endMeters).toFixed(2)} m)`
                 : '-';
               return (
-                <Table.Tr key={pattern.id}>
-                  <Table.Td fw={500}>{pattern.trainName}</Table.Td>
-                  <Table.Td>{rangeLabel}</Table.Td>
-                  <Table.Td>
+                <TableTr key={pattern.id}>
+                  <TableTd fw={500}>{pattern.trainName}</TableTd>
+                  <TableTd>{rangeLabel}</TableTd>
+                  <TableTd>
                     <Group gap="xs">
                       <LinkButton
                         href={`${basePath}/${pattern.id}/edit`}
@@ -65,11 +65,11 @@ export default async function StopPatternsPage({
                         redirectTo={basePath}
                       />
                     </Group>
-                  </Table.Td>
-                </Table.Tr>
+                  </TableTd>
+                </TableTr>
               );
             })}
-          </Table.Tbody>
+          </TableTbody>
         </Table>
       )}
 
