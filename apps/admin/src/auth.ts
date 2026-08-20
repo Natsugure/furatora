@@ -7,7 +7,9 @@ const isPlaywrightTest = process.env.PLAYWRIGHT_TEST === 'true';
 
 const nextAuth: NextAuthResult = NextAuth({
   providers: [
-    GitHub,
+    // GitHubはRFC 9207に対応し、コールバックに`iss=https://github.com/login/oauth`を含めるようになった。
+    // Auth.js側でissuerを明示しないとプレースホルダー"https://authjs.dev"と比較され検証に失敗する。
+    GitHub({ issuer: 'https://github.com/login/oauth' }),
     ...(isPlaywrightTest
       ? [
           Credentials({
