@@ -1,4 +1,22 @@
-import type { Bounds } from '../domain/geometry';
+import {
+  CONCOURSE_LABEL_FONT_SIZE,
+  CONCOURSE_LABEL_LINE_HEIGHT,
+  CONCOURSE_SLOT_HEIGHT,
+  FACILITY_ROW_HEIGHT,
+  GAP_Y,
+  PLATFORM_BAR_HEIGHT,
+  PLATFORM_LABEL_FONT_SIZE,
+  TRAIN_ROW_HEIGHT,
+  layoutRows,
+  type Bounds,
+} from '../domain/geometry';
+import {
+  CHIP_GAP,
+  CHIP_RADIUS,
+  type ConcourseLabel,
+  type ConcourseLayout,
+} from '../domain/concourseLayout';
+import { connectionLabels } from '../domain/concourse';
 import { isDoorOrderReversed } from '../domain/doorOrder';
 import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
 
@@ -8,6 +26,8 @@ type Props = {
   concourses: ConcourseDTO[];
   platformSide: 'top' | 'bottom' | null;
   bounds: Bounds;
+  /** コンコース束ね線とラベルの配置。ホーム単位で決まるので PlatformDisplay で算出する */
+  concourseLayout: ConcourseLayout;
 };
 
 const FACILITY_ICONS: Record<string, string> = {
@@ -20,28 +40,15 @@ const FACILITY_ICONS: Record<string, string> = {
 };
 
 // SVG座標系の単位はメートル。画面幅換算は viewBox + preserveAspectRatio に委ねる
-// （実表示高さは PX_PER_METER * VIEW_HEIGHT で常に一定になる。docs/spec 参照）。
+// （実表示高さは PX_PER_METER * layoutRows().viewHeight。コンコースラベルの段数ぶんだけ伸びる。
+// docs/domain/platform-coordinate-system.md 参照）。
 // 5px/m は「一度に見える両数」と「viewBox単位の文字の判読性」の折衷点。
-// 320mホームで幅1600px・高さ110px、号車番号(2.2m)が11px相当になる。
+// 320mホームで幅1600px・高さ110px（ラベル無し時）、号車番号(2.2m)が11px相当になる。
 // これ以上大きくするとモバイルで2両弱しか収まらない。
 const PX_PER_METER = 5;
 
-const MARGIN_Y = 1;
-const FACILITY_ROW_HEIGHT = 8;
-const GAP_Y = 2;
-const TRAIN_ROW_HEIGHT = 10;
-const VIEW_HEIGHT = MARGIN_Y * 2 + FACILITY_ROW_HEIGHT + GAP_Y + TRAIN_ROW_HEIGHT;
-
 const ICON_SIZE = 6;
 const NOSE_INSET_RATIO = 0.15;
-
-function layoutRows(platformSide: 'top' | 'bottom' | null) {
-  const isTop = platformSide === 'top';
-  return {
-    facilityY: isTop ? MARGIN_Y : MARGIN_Y + TRAIN_ROW_HEIGHT + GAP_Y,
-    trainY: isTop ? MARGIN_Y + FACILITY_ROW_HEIGHT + GAP_Y : MARGIN_Y,
-  };
-}
 
 function leadingCarPolygon(startMeters: number, endMeters: number, y: number, noseOnRight: boolean): string {
   const width = endMeters - startMeters;
@@ -54,22 +61,96 @@ function leadingCarPolygon(startMeters: number, endMeters: number, y: number, no
     : `${startMeters + inset},${y} ${endMeters},${y} ${endMeters},${bottom} ${startMeters + inset},${bottom} ${startMeters},${mid}`;
 }
 
-export function TrainVisualization({ pattern, physicalLength, concourses, platformSide, bounds }: Props) {
+/**
+ * コンコースのラベルブロック（出口行 / 乗換行）。
+ * slotTop から常に下向きに積む。上下反転は layoutRows() が吸収済み。
+ */
+function ConcourseLabelBlock({ label, slotTop }: { label: ConcourseLabel; slotTop: number }) {
+  const kinds = [
+    ...(label.exitText !== null ? (['exit'] as const) : []),
+    ...(label.transferText !== null ? (['transfer'] as const) : []),
+  ];
+  const baselineOf = (index: number) =>
+    slotTop + CONCOURSE_LABEL_FONT_SIZE + index * CONCOURSE_LABEL_LINE_HEIGHT;
+  // 乗換行はチップ列とテキストの合計幅で中央寄せするため、左端から組み立てる
+  const transferStartX = label.labelX - label.transferLineWidth / 2;
+
+  return (
+    <g>
+      <title>{label.title}</title>
+      {kinds.map((kind, index) =>
+        kind === 'exit' ? (
+          <text
+            key="exit"
+            x={label.labelX}
+            y={baselineOf(index)}
+            fontSize={CONCOURSE_LABEL_FONT_SIZE}
+            fontWeight="bold"
+            textAnchor="middle"
+            fill="var(--color-text-primary)"
+          >
+            {label.exitText}
+          </text>
+        ) : (
+          <g key="transfer">
+            {label.lineColors.map((color, chipIndex) => (
+              <circle
+                key={chipIndex}
+                cx={transferStartX + CHIP_RADIUS + chipIndex * (CHIP_RADIUS * 2 + CHIP_GAP)}
+                cy={baselineOf(index) - CONCOURSE_LABEL_FONT_SIZE * 0.35}
+                r={CHIP_RADIUS}
+                fill={color}
+              />
+            ))}
+            <text
+              x={transferStartX + label.chipsWidth}
+              y={baselineOf(index)}
+              fontSize={CONCOURSE_LABEL_FONT_SIZE}
+              fill="var(--color-text-secondary)"
+            >
+              {label.transferText}
+            </text>
+          </g>
+        ),
+      )}
+    </g>
+  );
+}
+
+export function TrainVisualization({
+  pattern,
+  physicalLength,
+  concourses,
+  platformSide,
+  bounds,
+  concourseLayout,
+}: Props) {
   const { minX, maxX } = bounds;
   const cars = [...pattern.cars].sort((a, b) => a.carNumber - b.carNumber);
   const reversed = isDoorOrderReversed(cars);
   const leadingCar = cars.find((c) => c.carNumber === 1) ?? cars[0];
-  const { facilityY, trainY } = layoutRows(platformSide);
+  const {
+    facilityY,
+    trainY,
+    bandY,
+    platformBarY,
+    platformLabelY,
+    viewHeight,
+    concourseBracketY,
+    concourseTickStartY,
+    concourseSlotTops,
+  } = layoutRows(platformSide, concourseLayout.rowCount);
 
   const cells = concourses.flatMap((c) => c.cells.map((cell) => ({ ...cell, concourseId: c.id })));
-  const transferBands = concourses.flatMap((c) =>
-    c.connections
-      .filter((conn) => conn.xRangeStart !== null && conn.xRangeEnd !== null)
-      .map((conn) => ({ ...conn, concourseId: c.id })),
-  );
+  // connectionLabels は connections と同じ並びを返すので、帯に添える <title> を添字で取る
+  const transferBands = concourses.flatMap((c) => {
+    const labels = connectionLabels(c);
+    return c.connections
+      .map((conn, idx) => ({ ...conn, concourseId: c.id, label: labels[idx] }))
+      .filter((conn) => conn.xRangeStart !== null && conn.xRangeEnd !== null);
+  });
 
   const width = maxX - minX;
-  const bandY = platformSide === 'top' ? trainY + TRAIN_ROW_HEIGHT : trainY - GAP_Y;
 
   return (
     <div className="border-2 rounded-3xl p-6" style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border-default)' }}>
@@ -82,23 +163,23 @@ export function TrainVisualization({ pattern, physicalLength, concourses, platfo
       {/* ホーム + 列車の可視化（SVG viewBox方式。x昇順で左→右に描画する） */}
       <div className="overflow-x-auto mb-2">
         <svg
-          viewBox={`${minX} 0 ${width} ${VIEW_HEIGHT}`}
+          viewBox={`${minX} 0 ${width} ${viewHeight}`}
           preserveAspectRatio="xMidYMid meet"
           style={{ width: '100%', minWidth: width * PX_PER_METER, display: 'block' }}
         >
           {/* ホーム（[0, physicalLength] が実体） */}
           <rect
             x={0}
-            y={trainY + TRAIN_ROW_HEIGHT + 0.3}
+            y={platformBarY}
             width={physicalLength}
-            height={0.6}
+            height={PLATFORM_BAR_HEIGHT}
             fill="var(--color-border-strong)"
           />
-          <text x={0} y={trainY + TRAIN_ROW_HEIGHT + 2.2} fontSize={1.6} fill="var(--color-text-secondary)">0m</text>
+          <text x={0} y={platformLabelY} fontSize={PLATFORM_LABEL_FONT_SIZE} fill="var(--color-text-secondary)">0m</text>
           <text
             x={physicalLength}
-            y={trainY + TRAIN_ROW_HEIGHT + 2.2}
-            fontSize={1.6}
+            y={platformLabelY}
+            fontSize={PLATFORM_LABEL_FONT_SIZE}
             fill="var(--color-text-secondary)"
             textAnchor="end"
           >
@@ -115,7 +196,10 @@ export function TrainVisualization({ pattern, physicalLength, concourses, platfo
               height={GAP_Y}
               fill={band.lineColors[0] ?? '#9ca3af'}
               opacity={0.6}
-            />
+            >
+              {/* 帯の高さは GAP_Y しかなく文字が入らないため、行き先は <title> に持たせる */}
+              <title>対面乗換: {band.label}</title>
+            </rect>
           ))}
 
           {/* 号車 */}
@@ -230,6 +314,55 @@ export function TrainVisualization({ pattern, physicalLength, concourses, platfo
                 );
               }),
             )}
+
+          {/* コンコース束ね線。同一コンコースのアクセス点をまとめ、その先に出口・乗換を示す。
+              引き出し線が他段のラベルを横切りうるので、線を先に引いて文字を必ず上に置く */}
+          {concourseBracketY !== null && concourseTickStartY !== null && (
+            <g stroke="var(--color-border-strong)" strokeWidth={0.25} fill="none">
+              {concourseLayout.labels.map((label) => {
+                const slotTop = concourseSlotTops[label.row];
+                // ラベルブロックの、束ね線に近い側の端。ここに繋がないと引き出し線が文字を貫く。
+                // 上下どちらに積んでも成り立つよう、距離が近い方の端を選ぶ
+                const slotBottom = slotTop + CONCOURSE_SLOT_HEIGHT;
+                const leaderEndY =
+                  Math.abs(slotTop - concourseBracketY) <= Math.abs(slotBottom - concourseBracketY)
+                    ? slotTop
+                    : slotBottom;
+
+                return (
+                  <g key={label.concourseId}>
+                    {label.tickXs.map((x) => (
+                      <line key={x} x1={x} y1={concourseTickStartY} x2={x} y2={concourseBracketY} />
+                    ))}
+                    {label.bracketStartX !== label.bracketEndX && (
+                      <line
+                        x1={label.bracketStartX}
+                        y1={concourseBracketY}
+                        x2={label.bracketEndX}
+                        y2={concourseBracketY}
+                      />
+                    )}
+                    {/* ラベルはクランプで束ね線の中点からずれることがあるので斜めに引く */}
+                    <line
+                      x1={(label.bracketStartX + label.bracketEndX) / 2}
+                      y1={concourseBracketY}
+                      x2={label.labelX}
+                      y2={leaderEndY}
+                      opacity={0.5}
+                    />
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {concourseLayout.labels.map((label) => (
+            <ConcourseLabelBlock
+              key={label.concourseId}
+              label={label}
+              slotTop={concourseSlotTops[label.row]}
+            />
+          ))}
         </svg>
       </div>
 
@@ -258,6 +391,12 @@ export function TrainVisualization({ pattern, physicalLength, concourses, platfo
         <div className="flex items-center gap-1.5">
           <span className="text-base">🛗</span>
           <span>エレベータ</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
+            <path d="M3 13 V7 H13 V13" fill="none" stroke="var(--color-border-strong)" strokeWidth="1.5" />
+          </svg>
+          <span>同じ出口・乗換へ</span>
         </div>
       </div>
 

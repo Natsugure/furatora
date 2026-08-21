@@ -1,4 +1,6 @@
 import { computeBounds } from '../domain/geometry';
+import { layoutConcourseLabels } from '../domain/concourseLayout';
+import { connectionLabels, exitsLabel, hasDisplayableInfo } from '../domain/concourse';
 import type { PlatformDTO } from '../domain/types';
 import { TrainVisualization } from './TrainVisualization';
 
@@ -13,6 +15,9 @@ export function PlatformDisplay({ platform }: Props) {
 
   const lineColor = platform.lineColor || '#6b7280';
   const bounds = computeBounds(platform.physicalLength, platform.stopPatterns, platform.concourses);
+  // コンコースはホーム単位の情報で停車位置パターンごとに変わらない。ここで1度だけ算出し
+  // 全パターンに同じものを渡す（パターンごとに算出するとSVGの高さがずれる）
+  const concourseLayout = layoutConcourseLabels(platform.concourses, bounds);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -64,6 +69,7 @@ export function PlatformDisplay({ platform }: Props) {
                     concourses={platform.concourses}
                     platformSide={platform.platformSide}
                     bounds={bounds}
+                    concourseLayout={concourseLayout}
                   />
                 ))}
               </div>
@@ -73,7 +79,7 @@ export function PlatformDisplay({ platform }: Props) {
           )}
 
           {/* Facility summary section */}
-          {platform.concourses.length > 0 && platform.concourses.some((c) => c.cells.length > 0) && (
+          {platform.concourses.some(hasDisplayableInfo) && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 設備・乗換情報
@@ -86,21 +92,23 @@ export function PlatformDisplay({ platform }: Props) {
                   if (bX === null) return -1;
                   return aX - bX;
                 }).map((concourse) => {
-                  if (concourse.cells.length === 0) return null;
-                  const connectionHeader = concourse.connections.length > 0
-                    ? concourse.connections.map((conn) => {
-                        const lineLabel = conn.lineNames.join('・');
-                        return conn.directionName
-                          ? `${lineLabel}（${conn.directionName}方面）`
-                          : lineLabel;
-                      }).join('・')
-                    : null;
+                  if (!hasDisplayableInfo(concourse)) return null;
+                  const exits = exitsLabel(concourse);
+                  const connections = connectionLabels(concourse);
                   return (
                     <div key={concourse.id}>
-                      {connectionHeader && (
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          {connectionHeader}
-                        </p>
+                      {(exits || connections.length > 0) && (
+                        <div className="mb-1">
+                          {exits && (
+                            <p className="text-sm font-medium text-gray-700">{exits}</p>
+                          )}
+                          {connections.length > 0 && (
+                            <p className="text-sm text-gray-600">
+                              <span className="text-gray-400">乗換: </span>
+                              {connections.join('・')}
+                            </p>
+                          )}
+                        </div>
                       )}
                       <ul className="space-y-0.5">
                         {[...concourse.cells].sort((a, b) => {

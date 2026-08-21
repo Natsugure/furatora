@@ -901,6 +901,47 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   - `pnpm run lint` / `pnpm run test`（monorepo全体）: いずれも成功。admin側の
     `no-floating-promises` 警告10件は既存のもの（Issue #49対象・本Issueの変更によるものではない）
 
+### TASK-5.9: コンコース情報（出口・乗換路線）をSVG図内に描画
+
+- **対象ファイル**:
+  - `apps/web/src/features/platform/domain/geometry.ts` / `geometry.test.ts`
+  - `apps/web/src/features/platform/domain/concourseLayout.ts` / `concourseLayout.test.ts`（新規）
+  - `apps/web/src/features/platform/domain/concourse.ts` / `concourse.test.ts`
+  - `apps/web/src/features/platform/components/{TrainVisualization,PlatformDisplay}.tsx`
+- **背景**: TASK-5.6 では「コンコース単位の情報はSVG外のテキストリストに委ねる」と切り分けたため、
+  出口名（`exits`）と乗り換え先（`connections`）が図に一切現れず、
+  #29 の中核概念である「コンコース単位グルーピング」（US-4 / US-8）が図の上で表現されていなかった。
+  利用者は「どのエレベーターがどの出口・どの乗り換えに通じるか」を、図と下部リストを
+  目で往復して対応付ける必要があった
+- **実装内容**: 同一コンコースのアクセス点を束ね線（ブラケット）で結び、その先に
+  出口名と乗り換え先ラベルを置く。スキーマ・クエリの変更は不要
+  （`ConcourseDTO` が必要なデータをすべて持っている）
+- **依存**: TASK-5.6, TASK-5.7
+- **実施結果**（2026-08-21）:
+  - `layoutRows()` を `layoutRows(platformSide, labelRowCount)` に変更し、
+    `viewHeight` / `concourseBracketY` / `concourseTickStartY` / `concourseSlotTops` を返す形にした。
+    **`VIEW_HEIGHT` 定数は削除**し、SVGの高さは `layoutRows().viewHeight` に一本化した。
+    ラベルが1件も無いホームでは従来と同じ 22（実表示110px）で、段数ぶんだけ伸びる
+  - 段の割り当て・文字幅の推定・省略は `domain/concourseLayout.ts` の
+    `layoutConcourseLabels()` に純関数として切り出した（`computeBounds()` と同じ理由。
+    SVGのJSXに埋めるとテストできない）。段は x昇順の貪欲法で、
+    間隔が `LABEL_GAP_METERS` を満たす最も内側の段に置く
+  - **`lineNames` は「接続先駅に乗り入れる全路線」**（`stationDetailQuery.ts`）であり、
+    新宿・渋谷級では既存 `connectionLabels()` の出力が図に収まらない。
+    3路線以上を「先頭路線ほかN」に畳む `connectionShortLabels()` を追加し、
+    路線カラーのチップを添えた。全文は `<title>` と下部リストに残す
+  - 対面乗り換え帯（TASK-5.6 で色帯のみだったもの）に `<title>` を追加し、
+    どの駅・路線への乗り換えかを引けるようにした。帯の高さは `GAP_Y = 2` しかなく
+    文字は載せられないため `<title>` のみ
+  - **下部の「設備・乗換情報」リストは維持した**（開発者承認済み）。図のラベルは
+    省略されうるため、全文の参照先を `<title>` のホバーだけにするとタッチ環境で失われる
+  - **不具合1件を実データで発見・修正**: `platformSide='bottom'` の0段目で、
+    引き出し線の終点にラベルブロックの遠い側の端を選んでしまい、線が文字を貫通していた。
+    束ね線に近い側の端を距離比較で選ぶ形に修正（上下どちらに積んでも成り立つ）
+  - 検証: `pnpm --filter web test` 113件パス（`concourseLayout` 31件・`geometry` 47件を含む）、
+    `tsc --noEmit` / `eslint` エラー0。実データ（新宿駅 埼京線4番線）と
+    合成データ（top/bottom × 段組み × クランプ × ラベル無し）で描画を目視確認
+
 ---
 
 ## Phase 6: 検証・振り返り
@@ -977,9 +1018,9 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
 | Phase 2.5: アーキテクチャ基盤 | 5 | **P0** | M |
 | Phase 3: Admin API + features層 | 6 | P0 | L |
 | Phase 4: Admin UI更新 | 5 | P0 | L |
-| Phase 5: Web features層 + UI | 8 | P1 | L |
+| Phase 5: Web features層 + UI | 9 | P1 | L |
 | Phase 6: 検証・振り返り | 6 | P0 | M |
-| **合計** | **53** | | |
+| **合計** | **54** | | |
 
 ---
 
@@ -1051,6 +1092,7 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | TASK-3.1〜3.6 | ✅ 完了 | 2026-08-17 |
 | TASK-4.1〜4.5 | ✅ 完了 | 2026-08-20 |
 | TASK-5.1〜5.8 | ✅ 完了 | 2026-08-20 |
+| TASK-5.9 | ✅ 完了 | 2026-08-21 |
 | TASK-6.1〜6.6 | ⬜ 未着手 | - |
 
 ---
@@ -1071,4 +1113,5 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | `platforms.physicalLength` の `default('0')` を外す | 全ホームの手入力完了が前提（TASK-1.1） |
 | 停車位置パターンの方面別対応（`trainStopPatterns` に `directionId` を追加し一意キーに含める） | **上下共用の中線を持つ事業者（JR東日本等）の追加時に必須。当該Issueの見積もりに含めること。** 番線ごとに `platforms` を分ける回避策は設備の二重登録になるため不可。移行手順は [`docs/domain/train-stop-patterns.md`](../domain/train-stop-patterns.md) |
 | MVP対象外の駅・ホームのデータ再入力 | Phase 2 のリセット分。必要になった駅から順次（TASK-2.4） |
+| `platformLocationCells.xPositionMeters` の `NOT NULL` 化と、コンコース側設備の持ち場所の新設 | **モデルの誤り。** 「ホーム座標で位置を語れない設備」は `exits` と同列に `platformLocations` が持つべき情報であり、「位置を持たないアクセス点」として cells に置くのは自己矛盾。持ち場所が無いため現状 null は事実上「位置が未入力」の意味しか持たない。null のアクセス点はSVGに描けず（TASK-5.9）、データ不備が図から見えない |
 | UIライブラリ再検討（Mantine / shadcn） | 優先度低 |

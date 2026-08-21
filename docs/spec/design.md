@@ -377,6 +377,13 @@ xRangeEnd: decimal('x_range_end', { precision: 6, scale: 2 }),     // nullable
 > `facilityConnections.xRangeStart`/`xRangeEnd` が両方非nullの接続のみを
 > SVG上の帯として描画する形に一本化した（開発者承認済み）。`sameFloor` 設備自体は
 > 通常のアクセス点として扱う。
+>
+> **TASK-5.9 追加（2026-08-21）**: SVGの縦方向に**コンコースラベル段**を追加した。
+> 同一コンコースのアクセス点を束ね線で結び、その先に出口名と乗り換え先を置く。
+> これにより `VIEW_HEIGHT` は定数ではなくなり、SVGの高さは
+> `layoutRows(platformSide, labelRowCount).viewHeight` で決まる。
+> 恒久的な内容は [`docs/domain/platform-coordinate-system.md`](../domain/platform-coordinate-system.md)
+> 「描画」節に移してある。
 
 ### 方面別の停車位置パターンは持たない（当面）
 
