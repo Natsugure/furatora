@@ -847,7 +847,15 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
   （`isSameFloorLocation`・専用ラベル列）は全廃した（開発者承認済み）。設備アイコンは
   `xPositionMeters` が非nullのアクセス点のみSVGに描画し、`null`（コンコース全体）は
   `PlatformDisplay` 側のテキストリストに委ねる。SVGの実表示高さは
-  `PX_PER_METER(=10) × VIEW_HEIGHT(=22)` で固定（`preserveAspectRatio="xMidYMid meet"`）
+  `PX_PER_METER × VIEW_HEIGHT(=22)` で固定（`preserveAspectRatio="xMidYMid meet"`）
+- **追加修正**（2026-08-21・動作確認で発覚）: 実機で図が4号車付近で見切れ、横スクロールも
+  効かない不具合を修正した。根本原因は `PlatformDisplay.tsx` の `flex-1` が
+  flex アイテム既定の `min-width: auto` を持つため、990pxの親に対して縮まず
+  SVGの `min-width`（3200px）まで膨張し、内側の `overflow-x-auto` がスクロールせず
+  カードの `overflow-hidden` に切り落とされていたこと。`min-w-0` を追加して解消。
+  あわせて `PX_PER_METER` を **10 → 5** に変更した（開発者承認済み）。10px/m では
+  320mホームでデスクトップ4.5両・モバイル1.8両しか一度に見えず実用に耐えないため。
+  5px/m ではデスクトップ約9両・モバイル約3.5両が見え、号車番号は11px相当で判読できる
 
 ### TASK-5.7: `PlatformDisplay.tsx` / `PlatformTabs.tsx` の型更新・移動
 - **対象ファイル**: `apps/web/src/components/{PlatformDisplay,PlatformTabs}.tsx` → `src/features/platform/components/`

@@ -72,6 +72,16 @@ SVG の `viewBox` を用い、ホーム物理長・設備位置・車両停車�
 マージンを加えて動的に算出する（`features/platform/domain/geometry.ts` の `computeBounds()`）。
 範囲外の設備も描画対象に含める。
 
+メートル → 画面ピクセルの換算率は **5px/m 固定**（`TrainVisualization.tsx` の
+`PX_PER_METER`）。SVGの実表示サイズは「viewBox幅 × 5px」×「110px」となり、
+コンテナに収まらない分は横スクロールで見る。画面幅に応じて縮小はしない
+（viewBox単位で指定した文字が判読できなくなるため）。
+
+**この横スクロールは、SVGを包む祖先の flex アイテムに `min-width: 0`
+（Tailwind の `min-w-0`）が当たっていることに依存する。** flex アイテム既定の
+`min-width: auto` のままだと、幅がSVGの `min-width` まで膨らんでスクロールが
+成立せず、カードの `overflow-hidden` に無言で切り落とされる。
+
 ## 号車の向き
 
 **向きを表すカラムは持たない。** 列車の向きは号車座標そのものが表現する

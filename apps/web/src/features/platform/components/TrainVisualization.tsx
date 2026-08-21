@@ -21,7 +21,10 @@ const FACILITY_ICONS: Record<string, string> = {
 
 // SVG座標系の単位はメートル。画面幅換算は viewBox + preserveAspectRatio に委ねる
 // （実表示高さは PX_PER_METER * VIEW_HEIGHT で常に一定になる。docs/spec 参照）。
-const PX_PER_METER = 10;
+// 5px/m は「一度に見える両数」と「viewBox単位の文字の判読性」の折衷点。
+// 320mホームで幅1600px・高さ110px、号車番号(2.2m)が11px相当になる。
+// これ以上大きくするとモバイルで2両弱しか収まらない。
+const PX_PER_METER = 5;
 
 const MARGIN_Y = 1;
 const FACILITY_ROW_HEIGHT = 8;

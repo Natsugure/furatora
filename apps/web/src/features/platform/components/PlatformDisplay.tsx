@@ -22,7 +22,10 @@ export function PlatformDisplay({ platform }: Props) {
           className="w-1.5 flex-shrink-0"
           style={{ backgroundColor: lineColor }}
         />
-        <div className="flex-1 p-5">
+        {/* min-w-0 は必須。flex アイテム既定の min-width:auto のままだと、
+            TrainVisualization の SVG（min-width = 全長×PX_PER_METER）まで幅が膨らみ、
+            内側の overflow-x-auto がスクロールせず親の overflow-hidden に切り落とされる */}
+        <div className="flex-1 min-w-0 p-5">
           {/* Platform header */}
           <div className="flex items-center gap-3 mb-4">
             <div
