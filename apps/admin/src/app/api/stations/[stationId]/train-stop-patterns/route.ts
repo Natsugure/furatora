@@ -1,23 +1,33 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
-import { trainStopPatterns, trainStopPatternCars } from '@furatora/database/schema';
-import { eq, asc, inArray } from 'drizzle-orm';
+import { trainStopPatterns, trainStopPatternCars, platforms } from '@furatora/database/schema';
+import { and, eq, asc, inArray } from 'drizzle-orm';
 import { trainStopPatternSchema } from '@/features/stop-pattern/schema';
 import { DuplicateStopPatternError } from '@/features/stop-pattern/ports';
 import { stopPatternRepository } from '@/di';
 
-export async function GET(request: Request) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ stationId: string }> }
+) {
   try {
+    const { stationId } = await params;
     const { searchParams } = new URL(request.url);
     const platformId = searchParams.get('platformId');
     if (!platformId) {
       return NextResponse.json({ error: 'platformId is required' }, { status: 400 });
     }
 
+    // platformId はクエリ文字列由来のため、当該駅のホームであることを確認する
     const patterns = await db
-      .select()
+      .select({
+        id: trainStopPatterns.id,
+        platformId: trainStopPatterns.platformId,
+        trainId: trainStopPatterns.trainId,
+      })
       .from(trainStopPatterns)
-      .where(eq(trainStopPatterns.platformId, platformId));
+      .innerJoin(platforms, eq(platforms.id, trainStopPatterns.platformId))
+      .where(and(eq(trainStopPatterns.platformId, platformId), eq(platforms.stationId, stationId)));
 
     if (patterns.length === 0) {
       return NextResponse.json([]);
@@ -46,15 +56,23 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ stationId: string }> }
+) {
   try {
+    const { stationId } = await params;
     const body = await request.json();
     const parsed = trainStopPatternSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
 
-    await stopPatternRepository.save(parsed.data);
+    // 他駅のホームへのパターン作成は stationId で弾く
+    const saved = await stopPatternRepository.save(stationId, parsed.data);
+    if (!saved) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {

@@ -6,10 +6,15 @@ import type { StopPatternListDTO, StopPatternEditContextDTO } from './domain/typ
 export class DuplicateStopPatternError extends Error {}
 
 // 書き込み: Repository（ADR-0003）。集約単位で不変条件を守って永続化する。
+//
+// trainStopPatterns は stationId を持たず platformId 経由でしか駅に紐づかないため、
+// 駅スコープは呼び出し側では守れない。全メソッドが stationId を受け取り、
+// 対象（および付け替え先）のホームが当該駅のものであることを実装側で保証する。
+// 戻り値 false は「当該駅に該当ホーム／パターンが無い」を表し、route.ts が404に写像する。
 export interface StopPatternRepository {
-  save(pattern: TrainStopPatternInput): Promise<void>;
-  update(id: string, pattern: TrainStopPatternInput): Promise<boolean>;
-  delete(id: string): Promise<boolean>;
+  save(stationId: string, pattern: TrainStopPatternInput): Promise<boolean>;
+  update(id: string, stationId: string, pattern: TrainStopPatternInput): Promise<boolean>;
+  delete(id: string, stationId: string): Promise<boolean>;
 }
 
 // 読み取り: Query Service（ADR-0003）。画面単位でDTOを返す。

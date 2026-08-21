@@ -8,14 +8,15 @@ export async function PUT(
   { params }: { params: Promise<{ stationId: string; patternId: string }> }
 ) {
   try {
-    const { patternId } = await params;
+    const { stationId, patternId } = await params;
     const body = await request.json();
     const parsed = trainStopPatternSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
 
-    const updated = await stopPatternRepository.update(patternId, parsed.data);
+    // 他駅のパターンの更新、および他駅のホームへの付け替えは stationId で弾く
+    const updated = await stopPatternRepository.update(patternId, stationId, parsed.data);
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -33,8 +34,8 @@ export async function DELETE(
   { params }: { params: Promise<{ stationId: string; patternId: string }> }
 ) {
   try {
-    const { patternId } = await params;
-    const deleted = await stopPatternRepository.delete(patternId);
+    const { stationId, patternId } = await params;
+    const deleted = await stopPatternRepository.delete(patternId, stationId);
     if (!deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
