@@ -3,13 +3,14 @@ import { db } from '@furatora/database/client';
 import {
   stations,
   platformLocations,
+  platformLocationCells,
   stationFacilities,
   facilityConnections,
   platforms,
 } from '@furatora/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { Title } from '@mantine/core';
-import { FacilityForm } from '@/components/FacilityForm';
+import { FacilityForm } from '@/features/facility/components/FacilityForm';
 
 export default async function EditLocationPage({
   params,
@@ -37,10 +38,17 @@ export default async function EditLocationPage({
 
   if (!location || !platformIds.includes(location.platformId)) notFound();
 
-  const facilities = await db
+  const cells = await db
     .select()
-    .from(stationFacilities)
-    .where(eq(stationFacilities.platformLocationId, locationId));
+    .from(platformLocationCells)
+    .where(eq(platformLocationCells.platformLocationId, locationId));
+
+  const facilities = cells.length > 0
+    ? await db
+        .select()
+        .from(stationFacilities)
+        .where(inArray(stationFacilities.platformLocationCellId, cells.map((c) => c.id)))
+    : [];
 
   const connections = await db
     .select()
@@ -56,18 +64,26 @@ export default async function EditLocationPage({
         initialData={{
           id: location.id,
           platformId: location.platformId,
-          nearPlatformCell: location.nearPlatformCell,
           exits: location.exits ?? '',
           notes: location.notes ?? '',
-          facilities: facilities.map((f) => ({
-            typeCode: f.typeCode,
-            isWheelchairAccessible: f.isWheelchairAccessible ?? true,
-            isStrollerAccessible: f.isStrollerAccessible ?? true,
-            notes: f.notes ?? '',
+          cells: cells.map((cell) => ({
+            xPositionMeters: cell.xPositionMeters != null ? Number(cell.xPositionMeters) : null,
+            facilities: facilities
+              .filter((f) => f.platformLocationCellId === cell.id)
+              .map((f) => ({
+                typeCode: f.typeCode,
+                isWheelchairAccessible: f.isWheelchairAccessible ?? true,
+                isStrollerAccessible: f.isStrollerAccessible ?? true,
+                notes: f.notes ?? '',
+              })),
           })),
           connections: connections.map((c) => ({
             stationId: c.connectedStationId,
+            connectedPlatformId: c.connectedPlatformId,
+            directionId: c.directionId,
             exitLabel: c.exitLabel ?? '',
+            xRangeStart: c.xRangeStart != null ? Number(c.xRangeStart) : null,
+            xRangeEnd: c.xRangeEnd != null ? Number(c.xRangeEnd) : null,
           })),
         }}
       />

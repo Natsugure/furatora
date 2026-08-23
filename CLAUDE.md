@@ -1,10 +1,12 @@
-@.claude/instructions/spec-driven-workflow-v1.instructions.md
+@.claude/instructions/spec-driven-workflow-v2.instructions.md
 
 # CLAUDE.md
 
+開発者との対話はすべて日本語で行ってください。
+
 ## プロジェクト概要
 - furatora: 日本の鉄道の列車・駅でベビーカー・車いすが利用しやすい設備の位置と、乗り換え案内を提供するWebアプリ。
-- 技術スタック: TurboRepo / TypeScript / React / Next.js / Mantine / TailwindCSS / DrizzleORM / PostgreSQL(NeonDB) / Docker
+- 技術スタック: TurboRepo / TypeScript / React / Next.js / Mantine / TailwindCSS / DrizzleORM / PostgreSQL(NeonDB)
 
 ## コーディング規約
 - 言語: TypeScript（フロントエンド）
@@ -15,7 +17,6 @@
 - apps/admin - 管理者用データベース管理アプリ
 - apps/scripts - GitHub Action用スクリプト
 - apps/web - フロントエンド
-- docker - DB用Dockerfile
 - packages/database - DBクライアント
 - packages/typescript-config - ベースとなるtsconfig.json・nextjs.jsonの定義
 

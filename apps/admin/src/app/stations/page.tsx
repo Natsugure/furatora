@@ -13,24 +13,33 @@ export default async function StationsPage() {
   const operatorList = await db.select().from(operators).orderBy(asc(operators.name));
   const lineList = await db.select().from(lines).orderBy(asc(lines.displayOrder));
 
-  const lineStations = await Promise.all(
-    lineList.map(async (line) => {
-      const stns = await db
-        .select({
-          id: stations.id,
-          name: stations.name,
-          nameEn: stations.nameEn,
-          code: stations.code,
-          stationOrder: stationLines.stationOrder,
-        })
-        .from(stationLines)
-        .innerJoin(stations, eq(stationLines.stationId, stations.id))
-        .where(eq(stationLines.lineId, line.id))
-        .orderBy(asc(stationLines.stationOrder));
-
-      return { line, stations: stns };
+  const allStationLines = await db
+    .select({
+      lineId: stationLines.lineId,
+      id: stations.id,
+      name: stations.name,
+      nameEn: stations.nameEn,
+      code: stations.code,
+      stationOrder: stationLines.stationOrder,
     })
-  );
+    .from(stationLines)
+    .innerJoin(stations, eq(stationLines.stationId, stations.id))
+    .orderBy(asc(stationLines.lineId), asc(stationLines.stationOrder));
+
+  const stationsByLineId = new Map<string, typeof allStationLines>();
+  for (const row of allStationLines) {
+    const group = stationsByLineId.get(row.lineId);
+    if (group) {
+      group.push(row);
+    } else {
+      stationsByLineId.set(row.lineId, [row]);
+    }
+  }
+
+  const lineStations = lineList.map((line) => ({
+    line,
+    stations: stationsByLineId.get(line.id) ?? [],
+  }));
 
   const byOperator = operatorList.map((op) => ({
     operator: op,

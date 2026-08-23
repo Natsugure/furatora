@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   operatorSchema,
-  trainSchema,
   stationUpdateSchema,
-  platformSchema,
-  platformLocationSchema,
   lineUpdateSchema,
   directionSchema,
   stationConnectionUpdateSchema,
@@ -45,47 +42,6 @@ describe('operatorSchema', () => {
   });
 });
 
-describe('trainSchema', () => {
-  it('必須フィールドで正常にパースされる', () => {
-    const result = trainSchema.safeParse({
-      name: 'E235系',
-      operatorId: VALID_UUID,
-      lineIds: [VALID_UUID],
-      carCount: 11,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('nameがない場合は失敗する', () => {
-    const result = trainSchema.safeParse({
-      operatorId: VALID_UUID,
-      lineIds: [],
-      carCount: 10,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('operatorIdがUUIDでない場合は失敗する', () => {
-    const result = trainSchema.safeParse({
-      name: 'E235系',
-      operatorId: 'not-a-uuid',
-      lineIds: [],
-      carCount: 10,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('carCountが0以下の場合は失敗する', () => {
-    const result = trainSchema.safeParse({
-      name: 'E235系',
-      operatorId: VALID_UUID,
-      lineIds: [],
-      carCount: 0,
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
 describe('stationUpdateSchema', () => {
   it('必須フィールドで正常にパースされる', () => {
     const result = stationUpdateSchema.safeParse({
@@ -102,71 +58,6 @@ describe('stationUpdateSchema', () => {
 
   it('operatorIdがUUIDでない場合は失敗する', () => {
     const result = stationUpdateSchema.safeParse({ name: '渋谷', operatorId: 'invalid' });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('platformSchema', () => {
-  it('必須フィールドで正常にパースされる', () => {
-    const result = platformSchema.safeParse({
-      platformNumber: '1',
-      lineId: VALID_UUID,
-      maxCarCount: 11,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('platformNumberが空の場合は失敗する', () => {
-    const result = platformSchema.safeParse({
-      platformNumber: '',
-      lineId: VALID_UUID,
-      maxCarCount: 11,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('lineIdがUUIDでない場合は失敗する', () => {
-    const result = platformSchema.safeParse({
-      platformNumber: '1',
-      lineId: 'not-uuid',
-      maxCarCount: 11,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('maxCarCountが0以下の場合は失敗する', () => {
-    const result = platformSchema.safeParse({
-      platformNumber: '1',
-      lineId: VALID_UUID,
-      maxCarCount: 0,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('platformSideに不正な値が入る場合は失敗する', () => {
-    const result = platformSchema.safeParse({
-      platformNumber: '1',
-      lineId: VALID_UUID,
-      maxCarCount: 11,
-      platformSide: 'left',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('platformLocationSchema', () => {
-  it('platformIdのみで正常にパースされる', () => {
-    const result = platformLocationSchema.safeParse({ platformId: VALID_UUID });
-    expect(result.success).toBe(true);
-  });
-
-  it('platformIdがUUIDでない場合は失敗する', () => {
-    const result = platformLocationSchema.safeParse({ platformId: 'not-uuid' });
-    expect(result.success).toBe(false);
-  });
-
-  it('platformIdがない場合は失敗する', () => {
-    const result = platformLocationSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 });

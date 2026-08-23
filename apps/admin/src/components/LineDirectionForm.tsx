@@ -47,16 +47,16 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false }: Props
     initialData?.terminalStationIds ?? []
   );
   const [notes, setNotes] = useState(initialData?.notes ?? '');
-  const [stationsLoading, setStationsLoading] = useState(true);
+  const [loadedLineId, setLoadedLineId] = useState<string | null>(null);
+  const stationsLoading = loadedLineId !== lineId;
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setStationsLoading(true);
     fetch(`/api/stations?lineId=${lineId}`)
       .then((r) => r.json())
       .then((data) => {
         setStations(data);
-        setStationsLoading(false);
+        setLoadedLineId(lineId);
       });
   }, [lineId]);
 

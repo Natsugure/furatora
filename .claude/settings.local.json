@@ -25,7 +25,15 @@
       "mcp__context7__query-docs",
       "Bash(pnpm test:*)",
       "Bash(npx playwright:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(git stash:*)",
+      "Bash(pnpm:*)",
+      "Bash(npx tsc:*)",
+      "Bash(lsof:*)",
+      "Bash(docker ps:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(cat:*)"
     ]
   }
 }

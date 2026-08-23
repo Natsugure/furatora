@@ -12,6 +12,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
+    "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
@@ -41,5 +42,8 @@
     "react-dom": "19.2.3",
     "tailwindcss": "^4",
     "zod": "^4.3.6"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

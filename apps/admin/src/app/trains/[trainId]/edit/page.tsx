@@ -3,7 +3,7 @@ import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { Title } from '@mantine/core';
-import { TrainForm } from '@/components/TrainForm';
+import { TrainForm } from '@/features/train/components/TrainForm';
 
 export default async function EditTrainPage({
   params,
@@ -32,7 +32,11 @@ export default async function EditTrainPage({
           lineIds: train.lines,
           carCount: train.carCount,
           carStructure: carStructureRows.length > 0
-            ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount }))
+            ? carStructureRows.map((cs) => ({
+                carNumber: cs.carNumber,
+                doorCount: cs.doorCount,
+                carLength: cs.carLength != null ? Number(cs.carLength) : null,
+              }))
             : null,
           freeSpaces: equipments
             .filter((e) => e.type === 'free_space')
@@ -40,7 +44,6 @@ export default async function EditTrainPage({
           prioritySeats: equipments
             .filter((e) => e.type === 'priority_seat')
             .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-          limitedToPlatformIds: train.limitedToPlatformIds,
         }}
       />
     </div>

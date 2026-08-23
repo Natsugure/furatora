@@ -73,8 +73,6 @@ export const trains = pgTable('trains', {
   operators: uuid('operators').references(() => operators.id).notNull(),
   lines: uuid('lines').references(() => lines.id).array().notNull(),
   carCount: integer('car_count').notNull(),
-  limitedToPlatformIds: uuid('limited_to_platform_ids').array(),
-  // null = 容量制約のみで判定, non-null = 指定ホームにのみ表示
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
@@ -89,6 +87,7 @@ export const trainCarStructures = pgTable('train_car_structures', {
   trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
   carNumber: integer('car_number').notNull(),
   doorCount: integer('door_count').notNull(),
+  carLength: decimal('car_length', { precision: 5, scale: 2 }), // メートル、未指定=標準値(20.0m)
 }, (t) => [
   unique('unique_train_car_structure').on(t.trainId, t.carNumber),
 ]);
@@ -138,46 +137,62 @@ export const platforms = pgTable('platforms', {
   lineId: uuid('line_id').references(() => lines.id).notNull(),
   inboundDirectionId: uuid('inbound_direction_id').references(() => lineDirections.id),
   outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id),
-  maxCarCount: integer('max_car_count').notNull(),
+  // メートル。既存行があるため default('0') 付きで追加する（'0' = 未入力の暫定値）。
+  // default を外す作業は後続Issue。docs/domain/platform-coordinate-system.md 参照
+  physicalLength: decimal('physical_length', { precision: 6, scale: 2 }).notNull().default('0'),
   platformSide: varchar('platform_side', { length: 10 }).$type<PlatformSide>(), // ホームが列車の上下どちらか
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export type CarStopPosition = {
-  carCount: number;
-  referenceCarNumber: number;    // 基準とする号車番号
-  referencePlatformCell: number; // その号車が停車するホーム枠番号
-  direction: 'ascending' | 'descending';
-  // ascending:  号車番号の増加方向 = ホーム枠番号の増加方向（1号車が枠番号の小さい側）
-  // descending: 号車番号の増加方向 = ホーム枠番号の減少方向（1号車が枠番号の大きい側）
-};
-
-export const platformCarStopPositions = pgTable('platform_car_stop_positions', {
+// ホーム・列車の組み合わせごとの停車位置パターン。
+// 一意キーは (platformId, trainId) で、方面別の区別は持たない。
+// 上下共用の中線を持つ事業者を追加する場合の移行手順は
+// docs/domain/train-stop-patterns.md「現在の制約」参照
+export const trainStopPatterns = pgTable('train_stop_patterns', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformId: uuid('platform_id').references(() => platforms.id, { onDelete: 'cascade' }).notNull(),
-  carCount: integer('car_count').notNull(),
-  referenceCarNumber: integer('reference_car_number').notNull(),
-  referencePlatformCell: integer('reference_platform_cell').notNull(),
-  direction: varchar('direction', { length: 20 }).notNull().$type<'ascending' | 'descending'>(),
+  trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-  unique('unique_platform_car_stop').on(t.platformId, t.carCount),
+  unique('unique_train_stop_pattern').on(t.platformId, t.trainId),
+]);
+
+export const trainStopPatternCars = pgTable('train_stop_pattern_cars', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  trainStopPatternId: uuid('train_stop_pattern_id')
+    .references(() => trainStopPatterns.id, { onDelete: 'cascade' })
+    .notNull(),
+  carNumber: integer('car_number').notNull(),
+  startMeters: decimal('start_meters', { precision: 6, scale: 2 }).notNull(),
+  endMeters: decimal('end_meters', { precision: 6, scale: 2 }).notNull(),
+}, (t) => [
+  unique('unique_train_stop_pattern_car').on(t.trainStopPatternId, t.carNumber),
 ]);
 
 export const platformLocations = pgTable('platform_locations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformId: uuid('platform_id').references(() => platforms.id).notNull(),
-  nearPlatformCell: integer('near_platform_cell'), // null = ホーム全体
   exits: text('exits'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
+// アクセス点（ホーム座標系のメートル位置）を表す中間テーブル
+export const platformLocationCells = pgTable('platform_location_cells', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  platformLocationId: uuid('platform_location_id')
+    .references(() => platformLocations.id, { onDelete: 'cascade' })
+    .notNull(),
+  xPositionMeters: decimal('x_position_meters', { precision: 6, scale: 2 }), // null = コンコース全体
+});
+
 export const stationFacilities = pgTable('station_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  platformLocationId: uuid('platform_location_id').references(() => platformLocations.id, { onDelete: 'cascade' }).notNull(),
+  platformLocationCellId: uuid('platform_location_cell_id').references(() => platformLocationCells.id, { onDelete: 'cascade' }).notNull(),
   typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
   isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
   isStrollerAccessible: boolean('is_stroller_accessible').default(true),
@@ -191,7 +206,12 @@ export const facilityConnections = pgTable('facility_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformLocationId: uuid('platform_location_id').references(() => platformLocations.id, { onDelete: 'cascade' }).notNull(),
   connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
+  connectedPlatformId: uuid('connected_platform_id').references(() => platforms.id), // nullable
+  directionId: uuid('direction_id').references(() => lineDirections.id), // nullable
   exitLabel: text('exit_label'), // 出口ラベル (例: "A3出口", "改札外")
+  // 対面乗り換え帯（connectedPlatformId が設定されている行のみ使用）。自ホーム座標系での範囲
+  xRangeStart: decimal('x_range_start', { precision: 6, scale: 2 }), // nullable
+  xRangeEnd: decimal('x_range_end', { precision: 6, scale: 2 }),     // nullable
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => [
   unique('unique_facility_connection').on(t.platformLocationId, t.connectedStationId),
