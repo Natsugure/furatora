@@ -1,0 +1,16 @@
+{
+  "name": "@furatora/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "files": ["base.mjs", "next-app.mjs"],
+  "exports": {
+    "./base": "./base.mjs",
+    "./next-app": "./next-app.mjs"
+  },
+  "dependencies": {
+    "eslint-config-next": "16.1.3"
+  },
+  "devDependencies": {
+    "eslint": "^9"
+  }
+}

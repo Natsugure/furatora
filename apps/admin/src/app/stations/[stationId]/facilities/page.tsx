@@ -3,6 +3,7 @@ import { db } from '@furatora/database/client';
 import {
   stations,
   platformLocations,
+  platformLocationCells,
   stationFacilities,
   platforms,
   lines,
@@ -76,18 +77,30 @@ export default async function FacilitiesPage({
           .select()
           .from(platformLocations)
           .where(inArray(platformLocations.platformId, platformIds))
-          .orderBy(asc(platformLocations.nearPlatformCell))
+          .orderBy(asc(platformLocations.createdAt))
       : [];
 
   const locationIds = locationList.map((l) => l.id);
 
-  // Fetch facilities for these locations
-  const facilityList =
+  // Fetch cells for these locations
+  const cellList =
     locationIds.length > 0
       ? await db
           .select()
+          .from(platformLocationCells)
+          .where(inArray(platformLocationCells.platformLocationId, locationIds))
+          .orderBy(asc(platformLocationCells.xPositionMeters))
+      : [];
+
+  const cellIds = cellList.map((c) => c.id);
+
+  // Fetch facilities for these cells
+  const facilityList =
+    cellIds.length > 0
+      ? await db
+          .select()
           .from(stationFacilities)
-          .where(inArray(stationFacilities.platformLocationId, locationIds))
+          .where(inArray(stationFacilities.platformLocationCellId, cellIds))
       : [];
 
   // Fetch facility types
@@ -102,12 +115,20 @@ export default async function FacilitiesPage({
     locationsByPlatform.set(location.platformId, group);
   }
 
-  // Group facilities by platformLocationId
-  const facilitiesByLocation = new Map<string, typeof facilityList>();
+  // Group cells by platformLocationId
+  const cellsByLocation = new Map<string, typeof cellList>();
+  for (const cell of cellList) {
+    const group = cellsByLocation.get(cell.platformLocationId) ?? [];
+    group.push(cell);
+    cellsByLocation.set(cell.platformLocationId, group);
+  }
+
+  // Group facilities by platformLocationCellId
+  const facilitiesByCell = new Map<string, typeof facilityList>();
   for (const facility of facilityList) {
-    const group = facilitiesByLocation.get(facility.platformLocationId) ?? [];
+    const group = facilitiesByCell.get(facility.platformLocationCellId) ?? [];
     group.push(facility);
-    facilitiesByLocation.set(facility.platformLocationId, group);
+    facilitiesByCell.set(facility.platformLocationCellId, group);
   }
 
   return (
@@ -145,7 +166,7 @@ export default async function FacilitiesPage({
                 <TableTh>ホーム</TableTh>
                 <TableTh>路線</TableTh>
                 <TableTh>方面</TableTh>
-                <TableTh>最大両数</TableTh>
+                <TableTh>ホーム長</TableTh>
                 <TableTh>操作</TableTh>
               </TableTr>
             </TableThead>
@@ -165,9 +186,18 @@ export default async function FacilitiesPage({
                     <TableTd fw={500}>{platform.platformNumber}</TableTd>
                     <TableTd>{lineNameMap[platform.lineId] ?? '-'}</TableTd>
                     <TableTd>{directionText}</TableTd>
-                    <TableTd>{platform.maxCarCount}</TableTd>
+                    <TableTd>
+                      {Number(platform.physicalLength) > 0 ? `${platform.physicalLength} m` : '未入力'}
+                    </TableTd>
                     <TableTd>
                       <Group gap="xs">
+                        <LinkButton
+                          href={`/stations/${stationId}/platforms/${platform.id}/stop-patterns`}
+                          variant="default"
+                          size="compact-xs"
+                        >
+                          停車位置
+                        </LinkButton>
                         <LinkButton
                           href={`/stations/${stationId}/platforms/${platform.id}/edit`}
                           variant="default"
@@ -211,7 +241,8 @@ export default async function FacilitiesPage({
                 </Text>
                 <Stack gap="xs">
                   {locations.map((location) => {
-                    const locFacilities = facilitiesByLocation.get(location.id) ?? [];
+                    const locCells = cellsByLocation.get(location.id) ?? [];
+                    const locFacilities = locCells.flatMap((cell) => facilitiesByCell.get(cell.id) ?? []);
                     const hasLimitedAccessibility = locFacilities.some(
                       (f) => !f.isWheelchairAccessible || !f.isStrollerAccessible
                     );
@@ -221,28 +252,31 @@ export default async function FacilitiesPage({
                         <Group justify="space-between" align="flex-start">
                           <div>
                             <Group gap="xs" mb={4}>
-                              {location.nearPlatformCell && (
-                                <Text size="sm" c="dimmed" fw={500}>
-                                  枠 #{location.nearPlatformCell}
-                                </Text>
-                              )}
                               {hasLimitedAccessibility && (
                                 <Badge color="yellow" variant="light" size="sm">
                                   アクセス制限あり
                                 </Badge>
                               )}
                             </Group>
+                            {locCells.map((cell) => {
+                              const cellFacilities = facilitiesByCell.get(cell.id) ?? [];
+                              return (
+                                <Group key={cell.id} gap={6} mb={4} wrap="wrap">
+                                  {cell.xPositionMeters !== null && (
+                                    <Text size="xs" c="dimmed" fw={500}>{cell.xPositionMeters}m地点:</Text>
+                                  )}
+                                  {cellFacilities.map((f) => (
+                                    <Badge key={f.id} variant="light" color="gray" size="sm">
+                                      {typeMap[f.typeCode] ?? f.typeCode}
+                                      {(!f.isWheelchairAccessible || !f.isStrollerAccessible) && ' *'}
+                                    </Badge>
+                                  ))}
+                                </Group>
+                              );
+                            })}
                             {location.exits && (
                               <Text size="sm" c="dimmed" mb={4}>{location.exits}</Text>
                             )}
-                            <Group gap={6} mb={4} wrap="wrap">
-                              {locFacilities.map((f) => (
-                                <Badge key={f.id} variant="light" color="gray" size="sm">
-                                  {typeMap[f.typeCode] ?? f.typeCode}
-                                  {(!f.isWheelchairAccessible || !f.isStrollerAccessible) && ' *'}
-                                </Badge>
-                              ))}
-                            </Group>
                             {location.notes && (
                               <Text size="sm" c="gray.5" mt="xs">{location.notes}</Text>
                             )}

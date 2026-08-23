@@ -5,7 +5,8 @@
   "exports": {
     "./client": "./src/client.ts",
     "./schema": "./src/schema.ts",
-    "./enums": "./src/enums.ts"
+    "./enums": "./src/enums.ts",
+    "./tx": "./src/tx.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
@@ -15,14 +16,16 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
-    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {
     "@furatora/typescript-config": "workspace:*",
+    "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
-    "postgres": "^3.4.8",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

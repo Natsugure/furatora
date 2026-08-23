@@ -1,4 +1,5 @@
 import { db } from '@furatora/database/client';
+import { withTransaction } from '@furatora/database/tx';
 import { stations, lines, stationLines, stationConnections, odptMetadata, operators } from '@furatora/database/schema';
 import { eq, and, notInArray, sql } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -148,7 +149,7 @@ async function updateOdptData(operator: Operator) {
     throw new Error(`${operator}: Operator record not found in database`);
   }
 
-  await db.transaction(async (tx) => {
+  await withTransaction(async (tx) => {
     // 1. 路線データを登録/更新
     const lineValues = railwayData.map((railway) => ({
       operatorId: operatorRecord.id,

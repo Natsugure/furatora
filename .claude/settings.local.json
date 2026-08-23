@@ -20,7 +20,20 @@
       "Bash(gh issue list --limit 10)",
       "Bash(gh label create \"admin-ui\" --description \"Admin UI刷新 \\(Mantine v8\\)\" --color \"1d76db\")",
       "Bash(gh issue:*)",
-      "Bash(pnpm --filter admin exec tsc --noEmit)"
+      "Bash(pnpm --filter admin exec tsc --noEmit)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(pnpm test:*)",
+      "Bash(npx playwright:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(git stash:*)",
+      "Bash(pnpm:*)",
+      "Bash(npx tsc:*)",
+      "Bash(lsof:*)",
+      "Bash(docker ps:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(cat:*)"
     ]
   }
 }

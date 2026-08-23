@@ -1,21 +1,32 @@
 {
   "name": "@furatora/admin",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "pnpm --filter scripts seed && next build",
     "start": "next start --port 3001",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
+    "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.4",
     "eslint": "^9",
-    "typescript": "^5"
+    "jsdom": "^28.1.0",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@auth/core": "^0.41.0",
@@ -31,5 +42,8 @@
     "react-dom": "19.2.3",
     "tailwindcss": "^4",
     "zod": "^4.3.6"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

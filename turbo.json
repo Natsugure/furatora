@@ -39,6 +39,7 @@
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "test": {},
     "db:push": {
       "cache": false
     },

@@ -48,8 +48,7 @@
 |---|---|---|
 | [DrizzleORM](https://orm.drizzle.team/) | v0.45 | 型安全なORM |
 | [PostgreSQL](https://www.postgresql.org/) | - | リレーショナルデータベース |
-| [Neon](https://neon.tech/) | - | サーバーレスPostgreSQL（本番環境） |
-| [Docker](https://www.docker.com/) | - | ローカル開発DB環境 |
+| [Neon](https://neon.tech/) | - | サーバーレスPostgreSQL（開発・本番共通） |
 
 #### 認証・バリデーション（管理画面）
 
@@ -77,7 +76,7 @@
 #### 前提条件
 
 - pnpm >= 10.7.0
-- Docker（ローカルDB用）
+- Neon アカウント（開発用DBブランチの作成に必要）
 
 #### インストール
 
@@ -89,27 +88,20 @@ pnpm install
 
 #### 環境変数
 
-`.env.local` を作成し、以下の変数を設定してください。
+1. Neon コンソール（または Neon CLI / MCP）で、`main` ブランチから `development` ブランチを作成する
+2. `.env.example` を参考に、以下の4ファイルを作成する。`DATABASE_URL` は `development` ブランチの接続文字列を使用する（プールド／直結の使い分けは `.env.example` のコメントを参照）
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/main
-```
-
-管理画面（`apps/admin`）を使用する場合は追加で設定が必要です。
-
-```env
-AUTH_SECRET=your_secret
-AUTH_GITHUB_ID=your_github_oauth_app_id
-AUTH_GITHUB_SECRET=your_github_oauth_app_secret
-```
+   | ファイル | 内容 |
+   |---|---|
+   | `apps/web/.env.local` | `DATABASE_URL`（プールド）, `NEXT_PUBLIC_GA_ID` |
+   | `apps/admin/.env.local` | `DATABASE_URL`（プールド）, `AUTH_*`, `GEMINI_API_KEY` |
+   | `apps/scripts/.env` | `DATABASE_URL`（直結）, `ODPT_API_KEY` |
+   | `packages/database/.env` | `DATABASE_URL`（直結） |
 
 #### 開発サーバーの起動
 
 ```bash
-# ローカルDBの起動
-docker compose up -d
-
-# DBスキーマの適用
+# DBスキーマの適用（Neon development ブランチへ）
 pnpm run db:push
 
 # 開発サーバーの起動
@@ -118,6 +110,26 @@ pnpm run dev
 
 - フロントエンド: http://localhost:3000
 - 管理画面: http://localhost:3001
+
+#### データの再構築
+
+`development` ブランチのデータを壊した場合は、Neon コンソール（または CLI/MCP）で
+`main` ブランチから `development` ブランチを作り直す（コピーオンライトのため即時）。
+その後、以下の手順で再構築する。
+
+```bash
+# 1. スキーマを適用
+pnpm run db:push
+
+# 2. マスタデータを投入
+pnpm --filter scripts seed
+
+# 3. ODPTから駅・路線データを取得
+pnpm run update-odpt
+```
+
+ホーム・列車・停車位置・コンコース・設備は Admin での手入力データのため、
+上記のコマンドでは復元されない。必要な範囲を Admin 画面から再入力する。
 
 ### 主要コマンド
 
@@ -176,8 +188,7 @@ Users can visually check the locations of accessible facilities on platforms, tr
 |---|---|---|
 | [DrizzleORM](https://orm.drizzle.team/) | v0.45 | Type-safe ORM |
 | [PostgreSQL](https://www.postgresql.org/) | - | Relational database |
-| [Neon](https://neon.tech/) | - | Serverless PostgreSQL (production) |
-| [Docker](https://www.docker.com/) | - | Local development database |
+| [Neon](https://neon.tech/) | - | Serverless PostgreSQL (dev & production) |
 
 #### Auth & Validation (Admin)
 
@@ -205,7 +216,7 @@ Users can visually check the locations of accessible facilities on platforms, tr
 #### Prerequisites
 
 - pnpm >= 10.7.0
-- Docker (for local database)
+- A Neon account (needed to create a development DB branch)
 
 #### Installation
 
@@ -217,27 +228,22 @@ pnpm install
 
 #### Environment Variables
 
-Create a `.env.local` file with the following variables:
+1. In the Neon console (or Neon CLI / MCP), create a `development` branch from `main`.
+2. Create the following 4 files, using `.env.example` as a reference. `DATABASE_URL` should
+   use the `development` branch connection string (see `.env.example` comments for which
+   files need the pooled vs. direct connection).
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/main
-```
-
-For the admin panel (`apps/admin`), additional variables are required:
-
-```env
-AUTH_SECRET=your_secret
-AUTH_GITHUB_ID=your_github_oauth_app_id
-AUTH_GITHUB_SECRET=your_github_oauth_app_secret
-```
+   | File | Contents |
+   |---|---|
+   | `apps/web/.env.local` | `DATABASE_URL` (pooled), `NEXT_PUBLIC_GA_ID` |
+   | `apps/admin/.env.local` | `DATABASE_URL` (pooled), `AUTH_*`, `GEMINI_API_KEY` |
+   | `apps/scripts/.env` | `DATABASE_URL` (direct), `ODPT_API_KEY` |
+   | `packages/database/.env` | `DATABASE_URL` (direct) |
 
 #### Start Development Server
 
 ```bash
-# Start local database
-docker compose up -d
-
-# Apply database schema
+# Apply the database schema (to the Neon development branch)
 pnpm run db:push
 
 # Start development servers
@@ -246,6 +252,26 @@ pnpm run dev
 
 - Frontend: http://localhost:3000
 - Admin panel: http://localhost:3001
+
+#### Rebuilding Data
+
+If you break the data on the `development` branch, recreate it from `main` in the Neon
+console (or CLI/MCP) — this is instant thanks to copy-on-write. Then rebuild with:
+
+```bash
+# 1. Apply the schema
+pnpm run db:push
+
+# 2. Seed master data
+pnpm --filter scripts seed
+
+# 3. Fetch station/line data from ODPT
+pnpm run update-odpt
+```
+
+Platforms, trains, stop patterns, concourses, and facilities are manually entered via
+Admin and are not restored by the commands above; re-enter the needed data through the
+Admin UI.
 
 ### Common Commands
 

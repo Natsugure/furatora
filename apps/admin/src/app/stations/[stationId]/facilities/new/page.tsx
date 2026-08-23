@@ -3,7 +3,7 @@ import { db } from '@furatora/database/client';
 import { stations } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { Title } from '@mantine/core';
-import { FacilityForm } from '@/components/FacilityForm';
+import { FacilityForm } from '@/features/facility/components/FacilityForm';
 
 export default async function NewFacilityPage({
   params,

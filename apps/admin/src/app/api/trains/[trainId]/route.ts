@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
-import { trainSchema } from '@/lib/validations';
+import { trainSchema } from '@/features/train/schema';
 
 function shapeTrainWithEquipments(
   train: typeof trains.$inferSelect,
@@ -12,7 +12,7 @@ function shapeTrainWithEquipments(
   return {
     ...train,
     carStructure: carStructureRows.length > 0
-      ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount }))
+      ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount, carLength: cs.carLength }))
       : null,
     freeSpaces: equipments
       .filter((e) => e.type === 'free_space')
@@ -54,7 +54,7 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { name, operatorId, lineIds, carCount, carStructure, limitedToPlatformIds, freeSpaces, prioritySeats } = parsed.data;
+    const { name, operatorId, lineIds, carCount, carStructure, freeSpaces, prioritySeats } = parsed.data;
 
     const [updated] = await db
       .update(trains)
@@ -63,7 +63,6 @@ export async function PUT(
         operators: operatorId,
         lines: lineIds,
         carCount,
-        limitedToPlatformIds: limitedToPlatformIds?.length ? limitedToPlatformIds : null,
       })
       .where(eq(trains.id, trainId))
       .returning();
@@ -74,7 +73,12 @@ export async function PUT(
     await db.delete(trainCarStructures).where(eq(trainCarStructures.trainId, trainId));
     if (carStructure && carStructure.length > 0) {
       await db.insert(trainCarStructures).values(
-        carStructure.map((cs) => ({ trainId, carNumber: cs.carNumber, doorCount: cs.doorCount }))
+        carStructure.map((cs) => ({
+          trainId,
+          carNumber: cs.carNumber,
+          doorCount: cs.doorCount,
+          carLength: cs.carLength != null ? String(cs.carLength) : null,
+        }))
       );
     }
 

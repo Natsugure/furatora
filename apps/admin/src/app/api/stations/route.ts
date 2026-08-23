@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
 import { stations, stationLines, lines, stationConnections } from '@furatora/database/schema';
-import { asc, eq } from 'drizzle-orm';
+import { asc, and, eq, isNotNull } from 'drizzle-orm';
 
 export async function GET(request: Request) {
   try {
@@ -37,11 +37,15 @@ export async function GET(request: Request) {
           code: stations.code,
           lineId: lines.id,
           lineName: lines.name,
+          odptRailwayId: stationConnections.odptRailwayId,
         })
         .from(stationConnections)
         .innerJoin(stations, eq(stationConnections.connectedStationId, stations.id))
-        .innerJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
-        .where(eq(stationConnections.stationId, connectedFromStationId))
+        .leftJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
+        .where(and(
+          eq(stationConnections.stationId, connectedFromStationId),
+          isNotNull(stationConnections.connectedStationId),
+        ))
         .orderBy(asc(lines.name));
       return NextResponse.json(result);
     }
