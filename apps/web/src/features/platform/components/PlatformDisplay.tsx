@@ -1,12 +1,17 @@
 import { computeBounds } from '../domain/geometry';
-import { layoutConcourseLabels } from '../domain/concourseLayout';
+import { layoutConcoursePlates, layoutFacingBanners } from '../domain/concourseLayout';
 import { connectionLabels, exitsLabel, hasDisplayableInfo } from '../domain/concourse';
-import type { PlatformDTO } from '../domain/types';
-import { TrainVisualization } from './TrainVisualization';
+import type { ConcourseDTO, PlatformDTO } from '../domain/types';
+import { PlatformDiagram } from './PlatformDiagram';
 
 type Props = {
   platform: PlatformDTO;
 };
+
+/** 図に描けるコンコースか。座標を持つアクセス点が1つでもあれば束ね線を引ける */
+function isDrawable(concourse: ConcourseDTO): boolean {
+  return concourse.cells.some((cell) => cell.xPositionMeters !== null);
+}
 
 export function PlatformDisplay({ platform }: Props) {
   const directions = [platform.inboundDirectionName, platform.outboundDirectionName]
@@ -16,31 +21,33 @@ export function PlatformDisplay({ platform }: Props) {
   const lineColor = platform.lineColor || '#6b7280';
   const bounds = computeBounds(platform.physicalLength, platform.stopPatterns, platform.concourses);
   // コンコースはホーム単位の情報で停車位置パターンごとに変わらない。ここで1度だけ算出し
-  // 全パターンに同じものを渡す（パターンごとに算出するとSVGの高さがずれる）
-  const concourseLayout = layoutConcourseLabels(platform.concourses, bounds);
+  // 全パターンに同じものを渡す（パターンごとに算出すると段の割り当てがずれる）
+  const plateLayout = layoutConcoursePlates(platform.concourses, bounds);
+  const facingLayout = layoutFacingBanners(platform.concourses, bounds);
+
+  // 図に描けないコンコース（座標を持つアクセス点が無い）だけをテキストで補う。
+  // 描けるものは図のプレートが全文を持っているので、ここに重ねて出す意味はない。
+  const undrawable = platform.concourses.filter((c) => !isDrawable(c) && hasDisplayableInfo(c));
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex items-stretch">
         {/* Left color bar */}
-        <div
-          className="w-1.5 flex-shrink-0"
-          style={{ backgroundColor: lineColor }}
-        />
+        <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: lineColor }} />
         {/* min-w-0 は必須。flex アイテム既定の min-width:auto のままだと、
-            TrainVisualization の SVG（min-width = 全長×PX_PER_METER）まで幅が膨らみ、
+            図のキャンバス（min-width = 描画範囲×PX_PER_METER）まで幅が膨らみ、
             内側の overflow-x-auto がスクロールせず親の overflow-hidden に切り落とされる */}
-        <div className="flex-1 min-w-0 p-5">
+        <div className="min-w-0 flex-1 p-5">
           {/* Platform header */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="mb-4 flex items-center gap-3">
             <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
               style={{ backgroundColor: lineColor }}
             >
               {platform.platformNumber}
             </div>
             <div>
-              <h3 className="font-semibold text-lg leading-tight text-gray-900">
+              <h3 className="text-lg font-semibold leading-tight text-gray-900">
                 {platform.platformNumber}番線
               </h3>
               <p className="text-sm text-gray-500">
@@ -52,82 +59,65 @@ export function PlatformDisplay({ platform }: Props) {
 
           {/* Trains stopping at this platform */}
           {platform.physicalLength === 0 ? (
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 text-center">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
               ホーム長が未登録のため図を表示できません
             </div>
           ) : platform.stopPatterns.length > 0 ? (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 列車・ホーム設備
               </p>
               <div className="space-y-4">
                 {platform.stopPatterns.map((pattern) => (
-                  <TrainVisualization
+                  <PlatformDiagram
                     key={pattern.trainId}
                     pattern={pattern}
                     physicalLength={platform.physicalLength}
                     concourses={platform.concourses}
                     platformSide={platform.platformSide}
                     bounds={bounds}
-                    concourseLayout={concourseLayout}
+                    plateLayout={plateLayout}
+                    facingLayout={facingLayout}
                   />
                 ))}
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-400 italic">列車情報がありません</p>
+            <p className="text-sm italic text-gray-400">列車情報がありません</p>
           )}
 
-          {/* Facility summary section */}
-          {platform.concourses.some(hasDisplayableInfo) && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                設備・乗換情報
+          {/* 位置が登録されていないコンコース。図に描けないぶんをここで補う */}
+          {undrawable.length > 0 && (
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                位置未登録の設備・乗換
+              </p>
+              <p className="mb-3 text-xs text-gray-400">
+                ホーム上の位置が登録されていないため、図には表示していません。
               </p>
               <div className="space-y-3">
-                {[...platform.concourses].sort((a, b) => {
-                  const aX = a.cells.find((c) => c.xPositionMeters !== null)?.xPositionMeters ?? null;
-                  const bX = b.cells.find((c) => c.xPositionMeters !== null)?.xPositionMeters ?? null;
-                  if (aX === null) return 1;
-                  if (bX === null) return -1;
-                  return aX - bX;
-                }).map((concourse) => {
-                  if (!hasDisplayableInfo(concourse)) return null;
+                {undrawable.map((concourse) => {
                   const exits = exitsLabel(concourse);
                   const connections = connectionLabels(concourse);
+                  const facilityNames = [
+                    ...new Set(concourse.cells.flatMap((cell) => cell.facilities.map((f) => f.typeName))),
+                  ];
+
                   return (
                     <div key={concourse.id}>
-                      {(exits || connections.length > 0) && (
-                        <div className="mb-1">
-                          {exits && (
-                            <p className="text-sm font-medium text-gray-700">{exits}</p>
-                          )}
-                          {connections.length > 0 && (
-                            <p className="text-sm text-gray-600">
-                              <span className="text-gray-400">乗換: </span>
-                              {connections.join('・')}
-                            </p>
-                          )}
-                        </div>
+                      {exits && <p className="text-sm font-medium text-gray-700">{exits}</p>}
+                      {connections.length > 0 && (
+                        <p className="text-sm text-gray-600">
+                          <span className="text-gray-400">乗換: </span>
+                          {connections.join('・')}
+                        </p>
                       )}
-                      <ul className="space-y-0.5">
-                        {[...concourse.cells].sort((a, b) => {
-                            if (a.xPositionMeters === null) return 1;
-                            if (b.xPositionMeters === null) return -1;
-                            return a.xPositionMeters - b.xPositionMeters;
-                          }).map((cell, idx) => {
-                          const cellLabel = cell.xPositionMeters !== null
-                            ? `ホーム端から ${cell.xPositionMeters}m付近`
-                            : 'コンコース全体';
-                          const facilityNames = cell.facilities.map((f) => f.typeName).join('・');
-                          return (
-                            <li key={idx} className="text-sm text-gray-600 flex gap-2">
-                              <span className="text-gray-400 flex-shrink-0">{cellLabel}:</span>
-                              <span>{facilityNames}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      {facilityNames.length > 0 && (
+                        <p className="text-sm text-gray-600">
+                          <span className="text-gray-400">設備: </span>
+                          {facilityNames.join('・')}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -137,7 +127,7 @@ export function PlatformDisplay({ platform }: Props) {
 
           {/* Platform notes */}
           {platform.notes && (
-            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               {platform.notes}
             </div>
           )}

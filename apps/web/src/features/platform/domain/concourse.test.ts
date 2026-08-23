@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { connectionLabels, connectionShortLabels, exitsLabel, hasDisplayableInfo } from './concourse';
+import {
+  DEFAULT_LINE_COLOR,
+  connectionLabels,
+  directionPhrase,
+  exitsLabel,
+  facingTransferText,
+  hasDisplayableInfo,
+  primaryLineColor,
+  transferEntries,
+} from './concourse';
 import type { ConcourseDTO, FacilityConnectionDTO } from './types';
 
 function connection(overrides: Partial<FacilityConnectionDTO> = {}): FacilityConnectionDTO {
@@ -105,63 +114,134 @@ describe('connectionLabels', () => {
   });
 });
 
-describe('connectionShortLabels', () => {
+describe('directionPhrase', () => {
+  it('「方面」で終わっていなければ添える', () => {
+    expect(directionPhrase('池袋')).toBe('池袋方面');
+  });
+
+  // lineDirections.displayName は「新宿・荻窪・方南町方面」のように
+  // すでに「方面」を含んでいることがある。無条件に足すと「方面方面」になる
+  it('すでに「方面」で終わっていれば重ねない', () => {
+    expect(directionPhrase('新宿・荻窪・方南町方面')).toBe('新宿・荻窪・方南町方面');
+  });
+
+  it('前後の空白を取り除く', () => {
+    expect(directionPhrase('  渋谷  ')).toBe('渋谷方面');
+  });
+});
+
+describe('transferEntries', () => {
   it('接続が無ければ空配列を返す', () => {
-    expect(connectionShortLabels(concourse())).toEqual([]);
+    expect(transferEntries(concourse())).toEqual([]);
   });
 
-  it('1路線ならそのまま返す', () => {
-    expect(
-      connectionShortLabels(concourse({ connections: [connection({ lineNames: ['小田急線'] })] })),
-    ).toEqual(['小田急線']);
+  it('路線を1件も畳まずに全件返す', () => {
+    // 新宿級では接続先駅に乗り入れる全路線が入る。図でも省略しないのが本機能の要件
+    const lineNames = ['JR山手線', 'JR中央線', 'JR埼京線', 'JR湘南新宿ライン', '小田急線', '京王線'];
+    const entries = transferEntries(
+      concourse({ connections: [connection({ lineNames, lineColors: lineNames.map(() => null) })] }),
+    );
+
+    expect(entries[0].lines.map((l) => l.name)).toEqual(lineNames);
   });
 
-  it('2路線までは連結する', () => {
-    expect(
-      connectionShortLabels(
-        concourse({ connections: [connection({ lineNames: ['小田急線', '京王線'] })] }),
-      ),
-    ).toEqual(['小田急線・京王線']);
+  it('路線名と路線カラーを同じ並びで組にする', () => {
+    const entries = transferEntries(
+      concourse({
+        connections: [connection({ lineNames: ['丸ノ内線', '副都心線'], lineColors: ['#F62E36', '#9C5E31'] })],
+      }),
+    );
+
+    expect(entries[0].lines).toEqual([
+      { name: '丸ノ内線', color: '#F62E36' },
+      { name: '副都心線', color: '#9C5E31' },
+    ]);
   });
 
-  it('3路線以上は「先頭路線ほかN」に畳む', () => {
-    expect(
-      connectionShortLabels(
-        concourse({
-          connections: [connection({ lineNames: ['JR山手線', 'JR中央線', '小田急線', '京王線'] })],
-        }),
-      ),
-    ).toEqual(['JR山手線ほか3']);
+  it('路線カラーが未設定なら既定色に置き換える', () => {
+    const entries = transferEntries(
+      concourse({ connections: [connection({ lineNames: ['都営新宿線'], lineColors: [null] })] }),
+    );
+
+    expect(entries[0].lines[0].color).toBe(DEFAULT_LINE_COLOR);
   });
 
-  it('路線が引けない接続は駅名で代替する', () => {
-    expect(
-      connectionShortLabels(
-        concourse({ connections: [connection({ lineNames: [], stationName: '新宿三丁目' })] }),
-      ),
-    ).toEqual(['新宿三丁目']);
+  it('路線カラーが足りなくても路線名を落とさない', () => {
+    const entries = transferEntries(
+      concourse({ connections: [connection({ lineNames: ['A線', 'B線'], lineColors: ['#111111'] })] }),
+    );
+
+    expect(entries[0].lines).toEqual([
+      { name: 'A線', color: '#111111' },
+      { name: 'B線', color: DEFAULT_LINE_COLOR },
+    ]);
   });
 
-  it('方面名・備考は落とす（全文は connectionLabels 側にある）', () => {
-    expect(
-      connectionShortLabels(
-        concourse({
-          connections: [connection({ directionName: '藤沢', exitLabel: '西口地下' })],
-        }),
-      ),
-    ).toEqual(['小田急線']);
+  it('方面名・備考・駅名を保持する', () => {
+    const entries = transferEntries(
+      concourse({
+        connections: [connection({ stationName: '新宿三丁目', directionName: '池袋', exitLabel: 'A3出口' })],
+      }),
+    );
+
+    expect(entries[0]).toMatchObject({
+      stationName: '新宿三丁目',
+      directionName: '池袋',
+      exitLabel: 'A3出口',
+    });
   });
 
-  it('複数の接続をそれぞれ1要素として返す', () => {
+  it('接続1件につき1要素を返す', () => {
+    const entries = transferEntries(
+      concourse({ connections: [connection(), connection({ stationName: '代々木' })] }),
+    );
+
+    expect(entries).toHaveLength(2);
+  });
+});
+
+describe('primaryLineColor', () => {
+  it('先頭の路線カラーを代表色にする', () => {
+    expect(primaryLineColor(connection({ lineColors: ['#F62E36', '#9C5E31'] }))).toBe('#F62E36');
+  });
+
+  it('先頭が未設定なら既定色を返す', () => {
+    expect(primaryLineColor(connection({ lineColors: [null] }))).toBe(DEFAULT_LINE_COLOR);
+  });
+
+  it('路線カラーが1件も無ければ既定色を返す', () => {
+    expect(primaryLineColor(connection({ lineColors: [] }))).toBe(DEFAULT_LINE_COLOR);
+  });
+});
+
+describe('facingTransferText', () => {
+  it('方面名があれば括弧で添える', () => {
+    expect(facingTransferText(connection({ lineNames: ['丸ノ内線'], directionName: '池袋' }))).toBe(
+      '丸ノ内線（池袋方面）は同じホームの向かい側に到着',
+    );
+  });
+
+  it('方面名がすでに「方面」で終わっていても重ねない', () => {
     expect(
-      connectionShortLabels(
-        concourse({
-          connections: [
-            connection({ lineNames: ['小田急線'] }),
-            connection({ lineNames: ['JR山手線', 'JR中央線', 'JR埼京線'] }),
-          ],
-        }),
-      ),
-    ).toEqual(['小田急線', 'JR山手線ほか2']);
+      facingTransferText(connection({ lineNames: ['丸ノ内線'], directionName: '新宿・荻窪・方南町方面' })),
+    ).toBe('丸ノ内線（新宿・荻窪・方南町方面）は同じホームの向かい側に到着');
+  });
+
+  it('方面名が無ければ路線名だけで組み立てる', () => {
+    expect(facingTransferText(connection({ lineNames: ['丸ノ内線'] }))).toBe(
+      '丸ノ内線は同じホームの向かい側に到着',
+    );
+  });
+
+  it('複数路線は「・」で連ねる', () => {
+    expect(facingTransferText(connection({ lineNames: ['有楽町線', '南北線'] }))).toBe(
+      '有楽町線・南北線は同じホームの向かい側に到着',
+    );
+  });
+
+  it('路線が引けなければ駅名で代替する', () => {
+    expect(facingTransferText(connection({ lineNames: [], stationName: '赤坂見附' }))).toBe(
+      '赤坂見附は同じホームの向かい側に到着',
+    );
   });
 });

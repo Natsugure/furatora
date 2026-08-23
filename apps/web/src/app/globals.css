@@ -152,12 +152,36 @@
   --card-prio-bg:               var(--color-warning-subtle);
   --card-prio-border:           var(--color-warning-muted);
   --card-prio-heading:          var(--color-warning-text);
+
+  /* ------------------------------------------------------------
+     Platform Signage — ホーム図のサイン様式
+     実際の駅サインの語彙に合わせる。出口は黄地に黒、乗換は白地に黒枠。
+     この黄は図の中で出口だけに使う（他と共有しない）。
+     ------------------------------------------------------------ */
+  --sign-exit-bg:               #FFD400;
+  --sign-exit-ink:              #111111;  /* 黄地とのコントラスト比 約13:1 */
+  --sign-exit-edge:             #C99A00;  /* 白背景から浮かせないための輪郭 */
+
+  --sign-transfer-bg:           var(--gray-0);
+  --sign-transfer-edge:         #111111;
+  --sign-transfer-ink:          var(--color-text-primary);
+  --sign-transfer-note:         var(--color-text-secondary);
+
+  --sign-boarding-mark:         var(--gray-400);   /* 乗車位置目標（通常のドア） */
+  --sign-leader:                var(--gray-400);   /* 束ね線と引き出し線 */
+
+  /* 日本語のサイン用書体。駅名・路線名・出口名は公共サインでの判読性に優れた
+     UD ゴシック（BIZ UDPGothic）を図・サイン内に優先適用。
+     next/font/google により全端末で統一表示。 */
+  --font-sign: var(--font-biz-udpgothic), "BIZ UDPGothic", "BIZ UDGothic",
+               "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "YuGothic",
+               var(--font-noto-sans-jp), system-ui, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--color-bg-app);
   --color-foreground: var(--color-text-primary);
-  --font-sans: var(--font-geist, Arial, sans-serif);
+  --font-sans: var(--font-noto-sans-jp), system-ui, sans-serif;
 }
 
 *,
@@ -177,5 +201,3 @@ body {
 
 :focus-visible {
   outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
-}

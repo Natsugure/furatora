@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeBounds,
   layoutRows,
+  xFraction,
   FACILITY_ROW_HEIGHT,
   GAP_Y,
   MARGIN_METERS,
@@ -9,7 +10,6 @@ import {
   PLATFORM_LABEL_FONT_SIZE,
   TRAIN_ROW_HEIGHT,
   CONCOURSE_TICK_HEIGHT,
-  CONCOURSE_SLOT_HEIGHT,
 } from './geometry';
 import type { TrainStopPatternDTO, ConcourseDTO } from './types';
 
@@ -134,13 +134,14 @@ describe('layoutRows', () => {
 
   describe.each(sides)('$name', ({ side }) => {
     it('すべての描画要素が viewBox の高さに収まる', () => {
-      const { facilityY, trainY, bandY, platformBarY, platformLabelY, viewHeight } = layoutRows(side);
+      const { facilityY, trainY, facingBandY, facingBandHeight, platformBarY, platformLabelY, viewHeight } =
+        layoutRows(side);
       const label = labelExtent(platformLabelY);
 
       const spans: [string, number, number][] = [
         ['設備行', facilityY, facilityY + FACILITY_ROW_HEIGHT],
         ['列車行', trainY, trainY + TRAIN_ROW_HEIGHT],
-        ['対面乗換帯', bandY, bandY + GAP_Y],
+        ['対面乗換ティント', facingBandY, facingBandY + facingBandHeight],
         ['ホーム帯', platformBarY, platformBarY + PLATFORM_BAR_HEIGHT],
         ['両端ラベル', label.top, label.bottom],
       ];
@@ -159,12 +160,23 @@ describe('layoutRows', () => {
       ).toBe(true);
     });
 
-    it('対面乗換帯が設備行と列車行の隙間にちょうど収まる', () => {
-      const { facilityY, trainY, bandY } = layoutRows(side);
-      const gapTop = facilityY < trainY ? facilityY + FACILITY_ROW_HEIGHT : trainY + TRAIN_ROW_HEIGHT;
+    it('対面乗換ティントが列車の端から設備行の外端までのホーム側全体を覆う', () => {
+      const { facilityY, trainY, facingBandY, facingBandHeight } = layoutRows(side);
+      const facilityIsAbove = facilityY < trainY;
+      const platformEdge = facilityIsAbove ? trainY : trainY + TRAIN_ROW_HEIGHT;
+      const facilityOuterEdge = facilityIsAbove ? facilityY : facilityY + FACILITY_ROW_HEIGHT;
 
-      expect(bandY).toBeCloseTo(gapTop);
-      expect(bandY + GAP_Y).toBeCloseTo(facilityY < trainY ? trainY : facilityY);
+      expect(facingBandY).toBeCloseTo(Math.min(platformEdge, facilityOuterEdge));
+      expect(facingBandY + facingBandHeight).toBeCloseTo(Math.max(platformEdge, facilityOuterEdge));
+      // 隙間だけでなく設備行ぶんも覆っている
+      expect(facingBandHeight).toBeCloseTo(GAP_Y + FACILITY_ROW_HEIGHT);
+    });
+
+    it('ホーム帯が対面乗換ティントの範囲に含まれる', () => {
+      const { facingBandY, facingBandHeight, platformBarY } = layoutRows(side);
+
+      expect(platformBarY).toBeGreaterThanOrEqual(facingBandY);
+      expect(platformBarY + PLATFORM_BAR_HEIGHT).toBeLessThanOrEqual(facingBandY + facingBandHeight);
     });
 
     it('ホーム帯と両端ラベルが列車行から見て設備行と同じ側にある', () => {
@@ -217,89 +229,128 @@ describe('layoutRows', () => {
     const mirror = (y: number, height: number) => top.viewHeight - (y + height);
     expect(mirror(top.facilityY, FACILITY_ROW_HEIGHT)).toBeCloseTo(bottom.facilityY);
     expect(mirror(top.trainY, TRAIN_ROW_HEIGHT)).toBeCloseTo(bottom.trainY);
-    expect(mirror(top.bandY, GAP_Y)).toBeCloseTo(bottom.bandY);
+    expect(mirror(top.facingBandY, top.facingBandHeight)).toBeCloseTo(bottom.facingBandY);
     expect(mirror(top.platformBarY, PLATFORM_BAR_HEIGHT)).toBeCloseTo(bottom.platformBarY);
   });
-  describe('コンコースラベル段', () => {
-    it('段数0ではラベル領域の高さが加算されず、束ね線も段も無い', () => {
-      const layout = layoutRows('top', 0);
+  describe('コンコース束ね線', () => {
+    it('束ね線が無いとき高さは加算されず、束ね線も引かない', () => {
+      const layout = layoutRows('top', { hasConcourseLeaders: false });
 
       expect(layout.concourseBracketY).toBeNull();
       expect(layout.concourseTickStartY).toBeNull();
-      expect(layout.concourseSlotTops).toEqual([]);
-      // ラベル導入前の高さ（マージン2 + 設備8 + 隙間2 + 列車10）と一致する
+      // 束ね線導入前の高さ（マージン2 + 設備8 + 隙間2 + 列車10）と一致する
       expect(layout.viewHeight).toBe(2 + FACILITY_ROW_HEIGHT + GAP_Y + TRAIN_ROW_HEIGHT);
     });
 
-    it('引数を省略した場合は段数0として扱う', () => {
-      expect(layoutRows('top')).toEqual(layoutRows('top', 0));
+    it('オプションを省略した場合は束ね線無しとして扱う', () => {
+      expect(layoutRows('top')).toEqual(layoutRows('top', { hasConcourseLeaders: false }));
     });
 
-    it.each([1, 2, 3])('段数%iぶんだけ viewHeight が伸びる', (rows) => {
-      const base = layoutRows('top', 0).viewHeight;
-      expect(layoutRows('top', rows).viewHeight).toBe(
-        base + CONCOURSE_TICK_HEIGHT + rows * CONCOURSE_SLOT_HEIGHT,
+    it('束ね線があるとき viewHeight はヒゲぶんだけ伸びる', () => {
+      const base = layoutRows('top', { hasConcourseLeaders: false }).viewHeight;
+      expect(layoutRows('top', { hasConcourseLeaders: true }).viewHeight).toBe(
+        base + CONCOURSE_TICK_HEIGHT,
       );
     });
 
+    // ラベルはSVGの外（HTMLオーバーレイ）にあるので、件数がいくら増えても
+    // SVGの高さは変わらない。これが段を積んでいた頃との決定的な違い。
+    it('viewHeight はコンコースの件数に依存しない', () => {
+      const withLeaders = layoutRows('bottom', { hasConcourseLeaders: true });
+      expect(withLeaders.viewHeight).toBe(2 + FACILITY_ROW_HEIGHT + GAP_Y + TRAIN_ROW_HEIGHT + CONCOURSE_TICK_HEIGHT);
+    });
+
     describe.each(sides)('$name', ({ side }) => {
-      it('束ね線とラベル段が列車行から見て設備行と同じ側にある', () => {
-        const { facilityY, trainY, concourseBracketY, concourseSlotTops } = layoutRows(side, 2);
+      it('束ね線が列車行から見て設備行と同じ側にある', () => {
+        const { facilityY, trainY, concourseBracketY } = layoutRows(side, { hasConcourseLeaders: true });
         const facilityIsAbove = facilityY < trainY;
 
         expect(concourseBracketY).not.toBeNull();
-        for (const y of [concourseBracketY!, ...concourseSlotTops]) {
-          if (facilityIsAbove) {
-            expect(y).toBeLessThanOrEqual(facilityY);
-          } else {
-            expect(y).toBeGreaterThanOrEqual(facilityY + FACILITY_ROW_HEIGHT);
-          }
+        if (facilityIsAbove) {
+          expect(concourseBracketY!).toBeLessThanOrEqual(facilityY);
+        } else {
+          expect(concourseBracketY!).toBeGreaterThanOrEqual(facilityY + FACILITY_ROW_HEIGHT);
         }
       });
 
       it('縦ヒゲが設備行の外側の端から束ね線まで伸びる', () => {
-        const { facilityY, trainY, concourseBracketY, concourseTickStartY } = layoutRows(side, 1);
+        const { facilityY, trainY, concourseBracketY, concourseTickStartY } = layoutRows(side, {
+          hasConcourseLeaders: true,
+        });
         const facilityIsAbove = facilityY < trainY;
 
         expect(concourseTickStartY).toBe(facilityIsAbove ? facilityY : facilityY + FACILITY_ROW_HEIGHT);
         expect(Math.abs(concourseBracketY! - concourseTickStartY!)).toBeCloseTo(CONCOURSE_TICK_HEIGHT);
       });
 
-      it('すべてのラベル段が viewBox の高さに収まる', () => {
-        const { concourseSlotTops, viewHeight } = layoutRows(side, 3);
+      it('束ね線が viewBox の高さに収まる', () => {
+        const { concourseBracketY, viewHeight } = layoutRows(side, { hasConcourseLeaders: true });
 
-        const outOfView = concourseSlotTops.filter(
-          (top) => top < 0 || top + CONCOURSE_SLOT_HEIGHT > viewHeight,
-        );
-        expect(outOfView).toEqual([]);
-      });
-
-      it('段どうしが重ならず、index 0 が設備行に最も近い', () => {
-        const { facilityY, trainY, concourseSlotTops } = layoutRows(side, 3);
-        const facilityIsAbove = facilityY < trainY;
-
-        const distances = concourseSlotTops.map((top) =>
-          facilityIsAbove ? facilityY - (top + CONCOURSE_SLOT_HEIGHT) : top - (facilityY + FACILITY_ROW_HEIGHT),
-        );
-        // 設備行からの距離が段番号とともに単調増加し、間隔がちょうど1段ぶん
-        expect(distances).toEqual([
-          CONCOURSE_TICK_HEIGHT,
-          CONCOURSE_TICK_HEIGHT + CONCOURSE_SLOT_HEIGHT,
-          CONCOURSE_TICK_HEIGHT + CONCOURSE_SLOT_HEIGHT * 2,
-        ]);
+        expect(concourseBracketY!).toBeGreaterThanOrEqual(0);
+        expect(concourseBracketY!).toBeLessThanOrEqual(viewHeight);
       });
     });
 
-    it('ラベル段も top / bottom で上下が反転する', () => {
-      const top = layoutRows('top', 2);
-      const bottom = layoutRows('bottom', 2);
-      const mirror = (y: number, height: number) => top.viewHeight - (y + height);
+    it('束ね線も top / bottom で上下が反転する', () => {
+      const top = layoutRows('top', { hasConcourseLeaders: true });
+      const bottom = layoutRows('bottom', { hasConcourseLeaders: true });
 
       expect(top.viewHeight).toBe(bottom.viewHeight);
-      expect(mirror(top.concourseBracketY!, 0)).toBeCloseTo(bottom.concourseBracketY!);
-      top.concourseSlotTops.forEach((y, i) => {
-        expect(mirror(y, CONCOURSE_SLOT_HEIGHT)).toBeCloseTo(bottom.concourseSlotTops[i]);
-      });
+      expect(top.viewHeight - top.concourseBracketY!).toBeCloseTo(bottom.concourseBracketY!);
     });
+  });
+
+  describe('stripOrder', () => {
+    it("platformSide='bottom' ではプレートをSVGの下、対面乗換バナーを上に置く", () => {
+      // ホームが列車の下にある ＝ 改札へは下方向に歩く。向かい側のホームは上。
+      expect(layoutRows('bottom').stripOrder).toEqual(['facing', 'diagram', 'plates']);
+    });
+
+    it("platformSide='top' ではプレートをSVGの上、対面乗換バナーを下に置く", () => {
+      expect(layoutRows('top').stripOrder).toEqual(['plates', 'diagram', 'facing']);
+    });
+
+    it('未設定(null)は bottom と同じ並びになる', () => {
+      expect(layoutRows(null).stripOrder).toEqual(layoutRows('bottom').stripOrder);
+    });
+
+    it('プレートは常に設備行と同じ側に来る', () => {
+      for (const side of ['top', 'bottom', null] as const) {
+        const { facilityY, trainY, stripOrder } = layoutRows(side);
+        const facilityIsAbove = facilityY < trainY;
+        const platesFirst = stripOrder.indexOf('plates') < stripOrder.indexOf('diagram');
+
+        expect(platesFirst).toBe(facilityIsAbove);
+      }
+    });
+
+    it('3つの帯が過不足なく並ぶ', () => {
+      for (const side of ['top', 'bottom', null] as const) {
+        expect([...layoutRows(side).stripOrder].sort()).toEqual(['diagram', 'facing', 'plates']);
+      }
+    });
+  });
+});
+
+describe('xFraction', () => {
+  const bounds = { minX: -20, maxX: 320 };
+
+  it('描画範囲の両端を0と1に写す', () => {
+    expect(xFraction(-20, bounds)).toBe(0);
+    expect(xFraction(320, bounds)).toBe(1);
+  });
+
+  it('中点を0.5に写す', () => {
+    expect(xFraction(150, bounds)).toBeCloseTo(0.5);
+  });
+
+  it('範囲外の座標も線形に写す（クランプしない）', () => {
+    // 範囲外の設備も描画対象に含める仕様なので、0..1 の外へ出ることを許容する
+    expect(xFraction(-360, bounds)).toBeCloseTo(-1);
+    expect(xFraction(660, bounds)).toBeCloseTo(2);
+  });
+
+  it('幅が0に縮退した場合は0を返す', () => {
+    expect(xFraction(5, { minX: 5, maxX: 5 })).toBe(0);
   });
 });

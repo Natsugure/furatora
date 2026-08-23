@@ -6,6 +6,34 @@ export const MARGIN_METERS = 5;
 export type Bounds = { minX: number; maxX: number };
 
 /**
+ * メートル → 画面ピクセルの換算率。
+ *
+ * 5px/m は「一度に見える両数」と「文字の判読性」の折衷点。320mホームで幅1600pxとなり、
+ * 号車番号(2.2m)が11px相当になる。これ以上大きくするとモバイルで2両弱しか収まらない。
+ * 画面幅に応じて縮小はしない（縮めると viewBox 単位で指定した文字が判読できなくなる）。
+ *
+ * 図はSVGとHTMLオーバーレイの2層でできており、この値はキャンバスの最小幅
+ * （= viewBox幅 × PX_PER_METER）を決めるためだけに使う。層をまたぐx座標の対応は
+ * ピクセルではなく xFraction() の割合で取る。docs/domain/platform-coordinate-system.md 参照。
+ */
+export const PX_PER_METER = 5;
+
+/**
+ * ホーム座標（メートル）を描画範囲内の割合（0..1）に写す。
+ *
+ * SVG（viewBox のメートル座標）とHTMLオーバーレイ（CSSのパーセント）は単位系が異なるが、
+ * 両者が必ずこの関数を経由することで x が一致する。ピクセルで持たないのは、
+ * キャンバスが min-width 指定でコンテナに合わせて伸びるため（伸びても割合は不変）。
+ *
+ * 幅が0の縮退ケースでは 0 を返す。
+ */
+export function xFraction(x: number, bounds: Bounds): number {
+  const width = bounds.maxX - bounds.minX;
+  if (width <= 0) return 0;
+  return (x - bounds.minX) / width;
+}
+
+/**
  * ホーム物理長・全停車位置パターン・全設備・全対面乗換帯の座標から
  * SVG viewBox の描画範囲を算出する（純関数・DB非依存）。
  *
@@ -46,11 +74,11 @@ export function computeBounds(
 
 // ---- 縦方向レイアウト ----
 // SVG座標系の単位はメートル（横方向と共通）。縦方向は実寸ではなく、
-// 「コンコースラベル段 / 設備行 / 隙間 / 列車行」を積んだ図式的な高さである。
+// 「束ね線 / 設備行 / 隙間 / 列車行」を積んだ図式的な高さである。
 
 const MARGIN_Y = 1;
 export const FACILITY_ROW_HEIGHT = 8;
-/** 設備行と列車行の隙間。この領域がそのまま対面乗換帯の描画高さになる */
+/** 設備行と列車行の隙間 */
 export const GAP_Y = 2;
 export const TRAIN_ROW_HEIGHT = 10;
 
@@ -64,59 +92,72 @@ export const PLATFORM_LABEL_FONT_SIZE = 1.6;
 const PLATFORM_LABEL_GAP_BELOW = 2.2;
 const PLATFORM_LABEL_GAP_ABOVE = 1.4;
 
-// ---- コンコース束ね線とラベル ----
-// 設備行のさらに外側（列車から遠い側）に、コンコース単位の出口・乗換ラベルを積む。
+// ---- コンコース束ね線 ----
+// 設備行のさらに外側（列車から遠い側）に、コンコース単位のアクセス点を束ねる線を引く。
+// その先の出口名・乗換先ラベルはSVGの外（HTMLオーバーレイ）にあるので、
+// SVGが確保するのは束ね線ぶんの高さだけであり、ラベルの件数では伸びない。
 
 /** 設備アイコン行とブラケット横線の距離（＝縦ヒゲの長さ） */
 export const CONCOURSE_TICK_HEIGHT = 2;
-export const CONCOURSE_LABEL_FONT_SIZE = 2.2;
-export const CONCOURSE_LABEL_LINE_HEIGHT = 2.8;
-/** ラベル1段ぶんの高さ。出口行＋乗換行の2行を収める */
-export const CONCOURSE_SLOT_HEIGHT = 6;
+
+/**
+ * 図を構成する3つの帯。SVGの外にあるHTMLオーバーレイ2つを含む。
+ *
+ * - `facing`  : 対面乗換バナー（ホームと反対側 ＝ 向かい側のホームがある方）
+ * - `diagram` : SVG本体
+ * - `plates`  : 出口・乗換プレート（ホーム側 ＝ 実際に改札へ歩いていく方）
+ */
+export type StripRow = 'facing' | 'diagram' | 'plates';
 
 export type VerticalLayout = {
-  /** SVG全体の高さ。ラベル段数に応じて伸びる（viewBox の height） */
+  /** SVG全体の高さ（viewBox の height）。束ね線の有無だけで決まり、ラベル件数では伸びない */
   viewHeight: number;
   /** 設備アイコン行の上端 */
   facilityY: number;
   /** 列車行の上端 */
   trainY: number;
-  /** 対面乗換帯の上端（高さは GAP_Y） */
-  bandY: number;
+  /** 対面乗換ティントの上端。ホーム側の帯全体（列車の端〜設備行の外端）を覆う */
+  facingBandY: number;
+  /** 対面乗換ティントの高さ */
+  facingBandHeight: number;
   /** ホーム帯の上端（高さは PLATFORM_BAR_HEIGHT） */
   platformBarY: number;
   /** 両端ラベルのベースライン */
   platformLabelY: number;
-  /** コンコース束ね線（横線）のy。ラベルが1つも無い場合は null */
+  /** コンコース束ね線（横線）のy。束ね線が無い場合は null */
   concourseBracketY: number | null;
-  /** 縦ヒゲの起点y（設備行の外側の端）。ラベルが1つも無い場合は null */
+  /** 縦ヒゲの起点y（設備行の外側の端）。束ね線が無い場合は null */
   concourseTickStartY: number | null;
   /**
-   * ラベル段ごとのブロック上端y。index 0 が設備行に最も近い段。
-   * 描画側は platformSide によらず、この値から常に下向きに行を積めばよい。
+   * SVGとHTMLオーバーレイを上から並べる順序。
+   *
+   * オーバーレイをどちら側に置くかは platformSide 依存なので、ここで一手に決める。
+   * 描画側は flex-direction: column のままこの順に描けばよく、
+   * column-reverse のような side の再解釈をしてはならない。
    */
-  concourseSlotTops: number[];
+  stripOrder: StripRow[];
 };
 
 /**
- * platformSide（列車から見てホームがどちら側にあるか。schema: platform_side）と
- * コンコースラベルの段数から、縦方向の座標を一括で算出する（純関数）。
+ * platformSide（列車から見てホームがどちら側にあるか。schema: platform_side）から
+ * 縦方向の座標と帯の並び順を一括で算出する（純関数）。
  *
- * 設備・ホーム帯・対面乗換帯・コンコースラベルはいずれもホーム上（またはその先）に
+ * 設備・ホーム帯・対面乗換ティント・コンコース束ね線はいずれもホーム上（またはその先）に
  * あるものなので、必ず列車行のホーム側にまとめて配置する。個別の描画箇所で side を
  * 解釈すると片方だけ反転し忘れ、要素が列車を挟んで散らばったり viewBox 外へ出たり
- * するため、side 依存の座標はすべてここで決める。
+ * するため、side 依存の判断はすべてここで決める。SVG外のHTMLオーバーレイを
+ * どちら側に積むか（stripOrder）も同じ理由でここが持つ。
  *
- * @param labelRowCount コンコースラベルの段数。0 のときラベル領域の高さは加算せず、
- *   viewHeight はラベル導入前と完全に一致する。
+ * @param options.hasConcourseLeaders 束ね線を描くか。false のとき束ね線ぶんの高さは
+ *   加算せず、viewHeight は束ね線導入前と完全に一致する。
  */
 export function layoutRows(
   platformSide: 'top' | 'bottom' | null,
-  labelRowCount = 0,
+  options: { hasConcourseLeaders?: boolean } = {},
 ): VerticalLayout {
   const isTop = platformSide === 'top';
-  const rows = Math.max(0, Math.trunc(labelRowCount));
-  const concourseBlockHeight = rows > 0 ? CONCOURSE_TICK_HEIGHT + rows * CONCOURSE_SLOT_HEIGHT : 0;
+  const hasLeaders = options.hasConcourseLeaders ?? false;
+  const concourseBlockHeight = hasLeaders ? CONCOURSE_TICK_HEIGHT : 0;
   const viewHeight =
     MARGIN_Y * 2 + FACILITY_ROW_HEIGHT + GAP_Y + TRAIN_ROW_HEIGHT + concourseBlockHeight;
 
@@ -126,31 +167,35 @@ export function layoutRows(
   const trainY = isTop ? facilityY + FACILITY_ROW_HEIGHT + GAP_Y : MARGIN_Y;
   // 列車行のホーム側の端。ホーム上の要素はすべてこれを基準に外向きへ配置する
   const platformEdge = isTop ? trainY : trainY + TRAIN_ROW_HEIGHT;
+  // 設備行の外側の端。束ね線の縦ヒゲはここから伸びる
+  const facilityOuterEdge = isTop ? facilityY : facilityY + FACILITY_ROW_HEIGHT;
 
   // 束ね線は設備行の外側端から CONCOURSE_TICK_HEIGHT だけ外側
   const bracketY = isTop
-    ? facilityY - CONCOURSE_TICK_HEIGHT
-    : facilityY + FACILITY_ROW_HEIGHT + CONCOURSE_TICK_HEIGHT;
+    ? facilityOuterEdge - CONCOURSE_TICK_HEIGHT
+    : facilityOuterEdge + CONCOURSE_TICK_HEIGHT;
 
-  // 段は束ね線から外向きに積む。上側では上へ、下側では下へ伸びるが、
-  // どちらも「返す値はブロックの上端」に揃えるので、描画側は下向きに書けばよい。
-  const concourseSlotTops = Array.from({ length: rows }, (_, i) =>
-    isTop ? bracketY - (i + 1) * CONCOURSE_SLOT_HEIGHT : bracketY + i * CONCOURSE_SLOT_HEIGHT,
-  );
+  // 対面乗換ティントはホーム側の帯全体（列車の端から設備行の外端まで）を覆う。
+  // 「向かい側のホームに着く」のはホーム全体に関わる事実であり、
+  // 列車行と設備行の隙間だけを塗ると、文字も入らない細い帯にしかならない。
+  const facingBandY = Math.min(platformEdge, facilityOuterEdge);
+  const facingBandHeight = Math.abs(facilityOuterEdge - platformEdge);
 
   return {
     viewHeight,
     facilityY,
     trainY,
-    bandY: isTop ? trainY - GAP_Y : trainY + TRAIN_ROW_HEIGHT,
+    facingBandY,
+    facingBandHeight,
     platformBarY: isTop
       ? platformEdge - PLATFORM_BAR_GAP - PLATFORM_BAR_HEIGHT
       : platformEdge + PLATFORM_BAR_GAP,
     platformLabelY: isTop
       ? platformEdge - PLATFORM_LABEL_GAP_ABOVE
       : platformEdge + PLATFORM_LABEL_GAP_BELOW,
-    concourseBracketY: rows > 0 ? bracketY : null,
-    concourseTickStartY: rows > 0 ? (isTop ? facilityY : facilityY + FACILITY_ROW_HEIGHT) : null,
-    concourseSlotTops,
+    concourseBracketY: hasLeaders ? bracketY : null,
+    concourseTickStartY: hasLeaders ? facilityOuterEdge : null,
+    // ホーム側にプレート（出口・乗換）、反対側に対面乗換バナーを置く
+    stripOrder: isTop ? ['plates', 'diagram', 'facing'] : ['facing', 'diagram', 'plates'],
   };
 }

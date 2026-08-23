@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist } from 'next/font/google';
+import { Noto_Sans_JP, BIZ_UDPGothic } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,7 +10,19 @@ import '@mantine/core/styles.css';
 import './globals.css';
 import iconSvg from './icon.svg';
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
+const notoSansJP = Noto_Sans_JP({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-noto-sans-jp',
+  display: 'swap',
+});
+
+const bizUdpGothic = BIZ_UDPGothic({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-biz-udpgothic',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'ふらとら | バリアフリー駅・列車案内',
@@ -24,7 +36,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body className={`${geist.variable} antialiased flex flex-col min-h-screen`}>
+      <body className={`${notoSansJP.variable} ${bizUdpGothic.variable} font-sans antialiased flex flex-col min-h-screen`}>
         <Providers>
           {/* Header */}
           <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
