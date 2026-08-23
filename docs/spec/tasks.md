@@ -942,6 +942,64 @@ Phase 3.5 の実装が Phase 0.5 に依存するため、先に片付ける。
     `tsc --noEmit` / `eslint` エラー0。実データ（新宿駅 埼京線4番線）と
     合成データ（top/bottom × 段組み × クランプ × ラベル無し）で描画を目視確認
 
+### TASK-5.10: 出口・乗換の全文表示とサイン様式への刷新
+
+- **対象ファイル**:
+  - `apps/web/src/features/platform/domain/geometry.ts` / `concourseLayout.ts` / `concourse.ts`
+  - `apps/web/src/features/platform/domain/{lanes,consist}.ts`（新規）と各テスト
+  - `apps/web/src/features/platform/components/PlatformDiagram.tsx`（`TrainVisualization.tsx` を改名）
+  - `apps/web/src/features/platform/components/{diagram/DiagramSvg,overlay/ConcoursePlateRow,overlay/FacingTransferBannerRow}.tsx`（新規）
+  - `apps/web/src/app/globals.css`
+  - `docs/domain/platform-coordinate-system.md` / `docs/adr/0006-diagram-text-in-html-overlay.md`（新規）
+- **背景**: TASK-5.9 でラベルを図に載せたが、SVG `<text>` は折り返せず実幅も測れないため、
+  `truncateToWidth()` と `connectionShortLabels()` による省略が構造的に避けられなかった。
+  全文の参照先は `<title>` のホバーと下部リストだけで、**タッチ環境では事実上読めない**。
+  また車両設備を号車の色塗りで示す方式は、号車の境目を潰し、凡例を添えても
+  何の色か直感的に伝わらなかった
+- **実装内容**: 図のテキストをSVGの外のHTMLオーバーレイ層へ移し、省略を廃止する。
+  出口は黄地に黒、乗換は白地に黒枠という駅サインの様式に合わせる。
+  号車の色塗りをやめ、ドア座標に打つ乗車位置目標に置き換える
+- **依存**: TASK-5.9
+- **実施結果**（2026-08-23）:
+  - **[ADR-0006]** 図のテキストをHTMLオーバーレイへ移した。層をまたぐxの対応は
+    ピクセルではなく `xFraction()` の割合で取る。キャンバスは `width` ではなく
+    `min-width` を持ち、コンテナが広ければ伸びる（伸縮しても割合は不変）
+  - `truncateToWidth()` と `connectionShortLabels()` を**削除**。
+    `estimateTextWidth()` は残したが用途を「段の割り当ての判断」だけに限定した。
+    プレート幅の見積りを外しても折り返すだけで、情報は1文字も失われない
+  - `layoutRows()` から段の概念（`labelRowCount` / `CONCOURSE_SLOT_HEIGHT` /
+    `concourseSlotTops`）を削除し、`viewHeight` は 22（束ね線ありで 24）の固定に戻した。
+    代わりに `stripOrder` を返し、SVG外のオーバーレイをどちら側に積むかも
+    `layoutRows()` が決める形にした（side の解釈を一箇所に保つ原則の維持）
+  - `bandY`（高さ `GAP_Y`=2m、文字が載らない）を `facingBandY` / `facingBandHeight` に置換し、
+    対面乗換はホーム側の帯全体を覆うティント＋HTMLバナーの2要素で示すようにした。
+    バナーとティントの左端が一致するので引き出し線が要らない
+  - 段の割り当ては `domain/lanes.ts` の `assignLanes()` に汎用化し、
+    プレートと対面乗換バナーで共有した。**段の高さは扱わない**
+    （CSSの単一セルgridが解決する。サーバ側で行数を推定すると必ず破綻する）
+  - **不具合2件を実データで発見・修正**:
+    1. `lineDirections.displayName` が既に「方面」で終わる場合に
+       「新宿・荻窪・方南町方面**方面**」と重複していた（`connectionLabels()` から続く既存の不具合）。
+       `directionPhrase()` を追加して一元化
+    2. 旧実装の `doorX = start + (d / doorCount) * width` は**スロットの左端**であり中心ではない。
+       ドア帯がスロット幅いっぱいのrectだった間は露見しなかったが、点マーカーに流用すると
+       半スロットぶんずれる。`domain/consist.ts` の `doorCenterX()` を新設して修正
+  - フリースペースのマーカーは号車単位ではなく**ドア単位**にした（当初案から精密化）。
+    設備アイコン行と重なるため号車の中・ホーム側の縁に置く。
+    優先席は立ち位置を左右しないので図から降ろし、テキストリストに残した
+  - 図の書体を分けた（`--font-sign`）。公共サインでの判読性を目的に設計された
+    モリサワの UD ゴシック（BIZ UDPGothic）を、`next/font/google` で全端末に統一配信する。
+    本文は Noto Sans JP に統一し、欧文専用だった Geist は廃止した
+    （駅名・路線名・出口名がすべて日本語である以上、欧文書体では環境依存の
+    フォールバックに落ちていた）
+  - 検証: `pnpm --filter @furatora/frontend test` 164件パス
+    （`geometry` 55 / `concourseLayout` 35 / `concourse` 28 / `consist` 16 / `lanes` 11 / `doorOrder` 4 ほか）、
+    `tsc --noEmit` / `eslint` エラー0。実データ（赤坂見附 銀座線1番線）で
+    出口・乗換の全文表示・対面乗換バナー・ドア座標（16m車3ドア、乗車位置目標18点が
+    `doorCenterX()` の値と一致）を確認。`platformSide` は `top` を一時的に強制して
+    上下反転を目視確認した。375px幅で横スクロールが成立し、
+    キャンバス幅と `scrollWidth` が一致（無駄なスクロール余白なし）することも確認
+
 ---
 
 ## Phase 6: 検証・振り返り
@@ -1093,6 +1151,7 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | TASK-4.1〜4.5 | ✅ 完了 | 2026-08-20 |
 | TASK-5.1〜5.8 | ✅ 完了 | 2026-08-20 |
 | TASK-5.9 | ✅ 完了 | 2026-08-21 |
+| TASK-5.10 | ✅ 完了 | 2026-08-23 |
 | TASK-6.1〜6.6 | ⬜ 未着手 | - |
 
 ---
@@ -1114,4 +1173,7 @@ Phase 3・4・5 と TASK-2.4 すべて完了 → TASK-6.1〜6.6
 | 停車位置パターンの方面別対応（`trainStopPatterns` に `directionId` を追加し一意キーに含める） | **上下共用の中線を持つ事業者（JR東日本等）の追加時に必須。当該Issueの見積もりに含めること。** 番線ごとに `platforms` を分ける回避策は設備の二重登録になるため不可。移行手順は [`docs/domain/train-stop-patterns.md`](../domain/train-stop-patterns.md) |
 | MVP対象外の駅・ホームのデータ再入力 | Phase 2 のリセット分。必要になった駅から順次（TASK-2.4） |
 | `platformLocationCells.xPositionMeters` の `NOT NULL` 化と、コンコース側設備の持ち場所の新設 | **モデルの誤り。** 「ホーム座標で位置を語れない設備」は `exits` と同列に `platformLocations` が持つべき情報であり、「位置を持たないアクセス点」として cells に置くのは自己矛盾。持ち場所が無いため現状 null は事実上「位置が未入力」の意味しか持たない。null のアクセス点はSVGに描けず（TASK-5.9）、データ不備が図から見えない |
+| 乗換接続に「乗り換える路線」を持たせる | **モデルの誤り。** `facilityConnections` は接続先の**駅**しか持たないため、`stationDetailQuery` は「その駅に乗り入れる全路線」を返すしかない。新宿級では乗換プレートに6路線以上が並び、**利用者は実際にどの路線へ乗り換えるのかを特定できない**。TASK-5.10 で表示の省略はやめたが、これは表示ではなくデータの問題であり、路線を持たせない限り解けない |
+| 車両情報ページの新設（優先席・フリースペース・ドア位置） | TASK-5.10 で図から車両設備の詳細を降ろした（図は「どこに立つか」に限定）。現在は `PlatformDiagram` 下部のテキストリストが受け皿になっているが、本来は号車単位の専用ページが持つべき情報 |
+| 同一コンコースから同一駅への方面別接続 | `facilityConnections` の一意制約が `(platformLocationId, connectedStationId)` なので、方面違いを2件登録できない。対面乗換バナーもこの粒度に縛られる |
 | UIライブラリ再検討（Mantine / shadcn） | 優先度低 |

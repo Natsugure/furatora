@@ -96,10 +96,17 @@ apps/web/
   ├── src/di.ts                             ← 新規: コンポジションルート
   ├── src/features/platform/
   │   ├── domain/types.ts                   ← PlatformDTO 等
-  │   ├── domain/geometry.ts                ← 新規: computeBounds()（純関数）
-  │   ├── domain/doorOrder.ts               ← 新規: isDoorOrderReversed()（純関数）
+  │   ├── domain/geometry.ts                ← computeBounds() / layoutRows() / xFraction()
+  │   ├── domain/doorOrder.ts               ← isDoorOrderReversed()（純関数）
+  │   ├── domain/consist.ts                 ← doorCenterX()（純関数）
+  │   ├── domain/concourse.ts               ← 出口・乗換のラベル生成（純関数）
+  │   ├── domain/concourseLayout.ts         ← プレートと対面乗換バナーの配置（純関数）
+  │   ├── domain/lanes.ts                   ← assignLanes()（純関数）
   │   └── components/
-  │       ├── TrainVisualization.tsx        ← SVG viewBox方式に全面書き換え
+  │       ├── PlatformDiagram.tsx           ← SVG + HTMLオーバーレイの合成
+  │       ├── diagram/DiagramSvg.tsx        ← 図の幾何のみ
+  │       ├── overlay/ConcoursePlateRow.tsx ← 出口（黄）・乗換（白＋黒枠）プレート
+  │       ├── overlay/FacingTransferBannerRow.tsx ← 対面乗換バナー
   │       ├── PlatformDisplay.tsx           ← DTO受け取りに変更
   │       └── PlatformTabs.tsx              ← Drizzle型importを排除
   ├── src/features/station/
@@ -497,8 +504,9 @@ xRangeEnd: decimal('x_range_end', { precision: 6, scale: 2 }),     // nullable
      ▼
 [DTO] PlatformDTO { physicalLength, stopPatterns[], concourses[] }
      ▼
-[features/platform/components/TrainVisualization.tsx]
+[features/platform/components/PlatformDiagram.tsx]
      │ features/platform/domain/geometry.ts の computeBounds() で viewBox 算出
+     │ SVG と HTML オーバーレイが xFraction() で同じ x スケールを共有する（ADR-0006）
      ▼
 [ユーザー]
 ```

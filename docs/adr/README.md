@@ -55,6 +55,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0003](./0003-read-write-separation.md)       | 読み取りと書き込みで異なる抽象を用いる（Query Service / Repository）             | Proposed   | 2026-08-14 |
 | [0004](./0004-neon-branch-dev-environment.md) | 開発環境を Neon ブランチに統一し、ローカル PostgreSQL / Docker を廃止する        | Proposed   | 2026-08-15 |
 | [0005](./0005-write-atomicity-driver.md)      | 書き込みの原子性を担保するため、読み取りと書き込みで Neon のドライバを使い分ける | Proposed   | 2026-08-15 |
+| [0006](./0006-diagram-text-in-html-overlay.md) | ホーム図のテキストは SVG ではなく HTML オーバーレイ層に置く                      | Proposed   | 2026-08-23 |
 
 ## 関連ドキュメント
 
