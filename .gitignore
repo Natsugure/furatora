@@ -53,3 +53,5 @@ public/gtfs-data/*
 
 # VSCode config files
 .vscode/
+
+**/*.local.json
