@@ -1,955 +1,771 @@
-# 技術設計: ホーム設備・車両停車位置のメートル座標化 (Issue #29 拡張)
+# 設計: 駅・路線マスタの ekidata 移行 (Issue #56 / ADR-0007)
 
-## 概要
+- **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md) /
+  [ADR-0001](../adr/0001-layer-structure.md) / [ADR-0002](../adr/0002-dependency-inversion-ports.md) /
+  [ADR-0003](../adr/0003-read-write-separation.md) / [ADR-0005](../adr/0005-write-atomicity-driver.md) /
+  [ADR-0007](../adr/0007-station-master-data-source.md)
+- **作成日**: 2026-08-28
 
-- **対象**: `packages/database`, `packages/eslint-config`(新規), `apps/admin`, `apps/web`, `apps/scripts`
-- **参照**: [`requirements.md`](./requirements.md) / [ADR一覧](../adr/README.md)
-- **作成日**: 2026-08-14
-- **最終更新**: 2026-08-15（ADR-0001〜0005 の決定を反映 / レビュー指摘 1〜4 を反映）
+## 適応的実行戦略
 
-本設計は以下のADRの決定に従う。**判断の根拠は各ADRを参照すること**（本書には重複させない）。
+信頼度 88%（高）。移行対象の実測と突合の解決率確認が完了しているため、
+PoC フェーズを設けず段階的実装に進む。
 
-| ADR | 決定 | 本設計への影響 |
-|---|---|---|
-| [0001](../adr/0001-layer-structure.md) | 4層構成（app / features / shared / external）と依存ルール | ディレクトリ構成・ESLint |
-| [0002](../adr/0002-dependency-inversion-ports.md) | ports による依存性逆転 | `features/*/ports.ts`・`di.ts` |
-| [0003](../adr/0003-read-write-separation.md) | 読み = Query Service / 書き = Repository、DTO制約 | 型定義・interface |
-| [0004](../adr/0004-neon-branch-dev-environment.md) | 開発環境を Neon ブランチへ統一 | 移行方針・Docker廃止 |
-| [0005](../adr/0005-write-atomicity-driver.md) | 読み=`neon-http` / 書き=`neon-serverless` | 親子insertの原子性 |
-
----
-
-## 適応的実行戦略（信頼度72%・中信頼度）
-
-`requirements.md` の信頼度評価により、PoC/MVPを優先する。
-
-**MVP範囲**: 1駅・1ホーム（新宿駅 3・4番線相当の複数パターンが存在するケースを選定）に対して、スキーマ変更 → Admin登録（停車位置パターン・設備） → Web表示（SVG viewBox描画）を通しで実装・検証する。
-
-**MVP成功基準**:
-1. 号車数が同じで停車位置・向きが異なる2つの列車パターンを、同一ホームに矛盾なく登録できる
-2. 1両の前方・後方に別々の設備（例: 階段A・階段B）を区別して登録・表示できる
-3. ホーム端（`x=0`）からの相対位置として、車両の停車範囲外（頭端式相当）に設備を登録・表示できる
-4. SVGのviewBoxにより、ブラウザの表示幅を変えても要素間の位置比率が崩れない
-5. 停車位置パターンを追加・削除しても、既存の設備・他パターンの描画位置が変化しない
-
-MVP検証後、他のAdmin画面（`TrainForm`等）・全駅データへの展開に進む。
+**ただし1点だけ先行検証する。** 35,000行規模の一括投入が
+`withTransaction`（neon-serverless / WebSocket・[ADR-0005](../adr/0005-write-atomicity-driver.md)）で
+成立するかは未確認である。ここだけ Phase 1 で計測し、駄目ならテーブル単位の
+分割コミットに倒す（整合性は冪等な再実行で担保する）。
 
 ---
 
-## アーキテクチャ構成
+## アーキテクチャ
 
-### レイヤーと依存ルール（[ADR-0001](../adr/0001-layer-structure.md)）
-
-```
-        app/  ──────►  features/  ──────►  shared/
-      (routing)      (ドメイン + UI)        (汎用)
-                          ▲
-                          │ implements（依存が逆転する）
-                          │
-                     external/  ──►  @furatora/database / 外部API
-```
-
-| 場所 | `next/*` | `drizzle-orm` / `@furatora/database` |
-|---|---|---|
-| `app/` | ✅ | ❌ |
-| `features/*/domain/`, `ports.ts`, `usecases/` | ❌ | ❌ |
-| `features/*/components/` | ✅ | ❌ |
-| `shared/` | ✅ | ❌ |
-| `external/` | ❌ | ✅ |
-
-- `shared/` は `features/` を import しない
-- `app/` にビジネスロジックを書かない（クエリ呼び出しとJSXの合成のみ）
-- feature間依存は `platform` を最下層とし、`station` → `platform`／`stop-pattern` → `platform` のみ許可
-- `@furatora/database/enums` は当面例外として全層で許可（[ADR-0001](../adr/0001-layer-structure.md)）
-
-**ESLint による強制**は `packages/eslint-config`（新規）に置き、各アプリに薄い
-`eslint.config.mjs` を配置する。flat config の `files` グロブは設定ファイルの位置を
-基準に解決されるため、ルート1箇所では適用されない（詳細と検証手順はADR-0001）。
-
-### 抽象の使い分け（[ADR-0003](../adr/0003-read-write-separation.md) / [ADR-0005](../adr/0005-write-atomicity-driver.md)）
+### 全体像
 
 ```
-              読み取り                    書き込み
-          ┌────────────────────┬──────────────────────────┐
-  抽象    │ Query Service       │ Repository               │
-  戻り値  │ DTO（画面単位）      │ ドメインエンティティ       │
-  DB      │ db（neon-http）      │ withTransaction（ws Pool）│
-          └────────────────────┴──────────────────────────┘
+[管理者] --4ファイル--> POST /api/master-import  (Route Handler)
+                              |
+                              v
+                    features/master-import/
+                      domain/    CSV解析・検証・差分計画     (純粋関数)
+                      usecases/  計画の算出と適用の調停
+                      ports.ts   MasterImportRepository
+                              |  implements（依存が逆転する）
+                              v
+                    external/repository/masterImportRepository.ts
+                              |
+                              v
+                    @furatora/database  (withTransaction)
 ```
 
-判断基準: **そのメソッドがDBの状態を変えるなら Repository、変えないなら Query Service。**
+### なぜ Route Handler か（Server Action ではなく）
 
-### 変更対象（#29の適用範囲）
+`station` CSV は **1.4MB** あり、Server Action の既定ボディ上限 1MB を超える。
+`next.config.ts` の `serverActions.bodySizeLimit` を引き上げる手もあるが、
+これは**アプリ全体の設定**であり、1画面の都合でグローバルな上限を緩めることになる。
+Route Handler にこの制限は無く、`apps/admin` に既に多数存在する形式であるため、
+新しい規約を持ち込まない。
 
-Issue #29 では `platform` / `station` / `stop-pattern` の3feature に限定する。
+### ファイル配置（[ADR-0001](../adr/0001-layer-structure.md) の4層に従う）
 
 ```
-packages/database/
-  ├── src/schema.ts              ← スキーマ変更（主要）
-  ├── src/client.ts              ← USE_LOCAL_DB分岐を削除（ADR-0004）
-  └── src/tx.ts                  ← 新規: withTransaction（ADR-0005）
-
-packages/eslint-config/          ← 新規: 4層の依存ルール（ADR-0001）
-
-apps/web/
-  ├── src/app/stations/[slug]/page.tsx      ← 485行 → 約90行（合成とJSXのみ）
-  ├── src/di.ts                             ← 新規: コンポジションルート
-  ├── src/features/platform/
-  │   ├── domain/types.ts                   ← PlatformDTO 等
-  │   ├── domain/geometry.ts                ← computeBounds() / layoutRows() / xFraction()
-  │   ├── domain/doorOrder.ts               ← isDoorOrderReversed()（純関数）
-  │   ├── domain/consist.ts                 ← doorCenterX()（純関数）
-  │   ├── domain/concourse.ts               ← 出口・乗換のラベル生成（純関数）
-  │   ├── domain/concourseLayout.ts         ← プレートと対面乗換バナーの配置（純関数）
-  │   ├── domain/lanes.ts                   ← assignLanes()（純関数）
-  │   └── components/
-  │       ├── PlatformDiagram.tsx           ← SVG + HTMLオーバーレイの合成
-  │       ├── diagram/DiagramSvg.tsx        ← 図の幾何のみ
-  │       ├── overlay/ConcoursePlateRow.tsx ← 出口（黄）・乗換（白＋黒枠）プレート
-  │       ├── overlay/FacingTransferBannerRow.tsx ← 対面乗換バナー
-  │       ├── PlatformDisplay.tsx           ← DTO受け取りに変更
-  │       └── PlatformTabs.tsx              ← Drizzle型importを排除
-  ├── src/features/station/
-  │   ├── domain/types.ts / domain/tabs.ts / ports.ts
-  │   └── usecases/getStationDetail.ts
-  └── src/external/query/
-      └── stationDetailQuery.ts             ← 既存 fetchStationDetails() の移設先
-
-apps/admin/
-  ├── src/di.ts                             ← 新規
-  ├── src/features/platform/
-  │   ├── schema.ts                         ← 旧 lib/validations.ts から分割
-  │   ├── ports.ts
-  │   └── components/PlatformForm.tsx       ← physicalLength入力に変更
-  ├── src/features/stop-pattern/            ← 新規feature
-  │   ├── domain/{carSegments.ts,types.ts}  ← buildCarSegments()（純関数）+ DTO
-  │   ├── schema.ts / ports.ts
-  │   └── components/TrainStopPatternForm.tsx
-  ├── src/features/train/components/TrainForm.tsx      ← limitedToPlatformIds削除、carLength追加
-  ├── src/features/facility/components/FacilityForm.tsx ← 枠番号→メートル入力に変更
-  ├── src/external/repository/
-  │   ├── stopPatternRepository.ts          ← 親子insert（withTransaction必須）+ update
-  │   └── platformRepository.ts
-  ├── src/external/query/
-  │   └── stopPatternPageQuery.ts           ← 新規（Phase 4実施結果。一覧・編集ページ用）
-  └── src/app/
-      ├── stations/[stationId]/platforms/[platformId]/stop-patterns/
-      │   ├── page.tsx                      ← 新規（一覧）
-      │   ├── new/page.tsx                  ← 新規
-      │   └── [patternId]/edit/page.tsx     ← 新規
-      └── api/stations/[stationId]/
-          ├── platform-locations/...        ← 薄くする + 原子化（ADR-0005）
-          └── train-stop-patterns/...       ← 新規（[patternId]/route.ts に PUT を追加）
-
-apps/scripts/
-  ├── package.json                          ← tsx に --env-file-if-exists を付与（ADR-0004）
-  ├── src/migrate-platform-locations.ts     ← 削除（リセット方針のため不要）
-  └── src/update-odpt.ts                    ← db.transaction() → withTransaction()（ADR-0005）
-
-docker/                                     ← 削除（ADR-0004）
-docker-compose.yml                          ← 削除（ADR-0004）
+apps/admin/src/
+├── app/
+│   ├── api/master-import/route.ts        # multipart 受け口・2段階（plan / apply）
+│   └── master-import/page.tsx            # アップロードUI
+├── features/master-import/
+│   ├── domain/
+│   │   ├── ekidataCsv.ts                 # 4種CSVの型・パース・検証
+│   │   ├── normalize.ts                  # 駅名正規化（突合と共用）
+│   │   ├── romaji.ts                     # カナ→修正ヘボン式。slug の導出に使う
+│   │   └── plan.ts                       # 差分計画の算出
+│   ├── ports.ts                          # MasterImportRepository
+│   ├── usecases/
+│   │   ├── planImport.ts
+│   │   └── applyImport.ts
+│   └── components/MasterImportForm.tsx
+├── external/repository/masterImportRepository.ts
+└── di.ts                                 # 配線を追加
 ```
 
-> **Phase 5 実施結果（2026-08-20）**: `features/platform/ports.ts`（`PlatformQuery`）は
-> 作成しなかった。それを呼ぶ画面・ユースケースが存在せず、駅詳細画面は
-> `features/station/ports.ts`（`StationDetailQuery`）1本で足りるため
-> （[ADR-0002](../adr/0002-dependency-inversion-ports.md)「port は実在する画面・
-> ユースケースに対してのみ定義する」に従う。開発者承認済み）。
-> 代わりに `features/platform/domain/doorOrder.ts`（`isDoorOrderReversed()`）と
-> `features/station/domain/tabs.ts`（`buildDirectionTabs()`）を追加した。
-> 前者はドア番号反転・先頭車の向きの導出、後者は方面タブの構築（旧 `page.tsx` の
-> インラインロジック）を純関数として切り出したもの。
-
-#### カラム削除への追随のみ行う範囲（層移行はしない）
-
-上記とは別に、**削除するカラムを参照しているため #29 で必ず修正が要る**ファイルがある。
-これらは `features/` へ移さず、現在の位置のまま型・クエリだけを追随させる。
-
-| ファイル | 参照している削除対象 |
-|---|---|
-| `apps/admin/src/app/stations/[stationId]/platforms/[platformId]/edit/page.tsx` | `platformCarStopPositions`, `maxCarCount` |
-| `apps/admin/src/app/stations/[stationId]/facilities/page.tsx` | `maxCarCount`, `nearPlatformCell`（`orderBy` と表示） |
-| `apps/admin/src/app/stations/[stationId]/facilities/[locationId]/edit/page.tsx` | `nearPlatformCell` |
-| `apps/admin/src/app/trains/[trainId]/edit/page.tsx` | `limitedToPlatformIds` |
-| `apps/admin/src/lib/validations.test.ts` | `maxCarCount` のフィクスチャ |
-
-加えて、`PlatformForm` / `TrainForm` / `FacilityForm` を `features/*/components/` へ
-移動するため、これらを import している**6ページ**の import パス更新が発生する
-（上記4ページ + `platforms/new` / `facilities/new` / `trains/new`）。
-
-`search` / `line` / `transfer` および admin の一覧・編集ページの**層移行**は後続Issueとする。
-**層移行の先送りとカラム削除への追随は別物であり、後者は #29 の必須範囲である。**
-移行完了までは ESLint の除外設定を各アプリ側に置き、段階的に削る。
+`domain/` は `next/*` も `drizzle-orm` も import しない。
+CSV文字列を受け取り構造体を返す純粋関数に閉じるため、ここがテストの主戦場になる。
 
 ---
 
 ## データモデル
 
-### 現行スキーマ（変更前・#29時点）
+### 粒度の対応
 
-```
-platforms
-  ├── maxCarCount: integer
-  └── platformCarStopPositions (FK: platformId, unique on [platformId, carCount])
-        ├── referenceCarNumber / referencePlatformCell / direction
+| ekidata | furatora | 粒度 |
+|---|---|---|
+| `company_cd` | `operators` | 事業者 |
+| `line_cd` | `lines` | 路線（線路名称ベース。一部は運行系統） |
+| `station_cd` | `stations` | **路線×駅** |
+| `station_g_cd` | `stationGroups`（新設） | **乗換単位の「駅」** |
+| `join` | `stationAdjacencies`（新設） | 路線内の隣接関係 |
+| （供給なし） | `serviceRoutes` / `serviceRouteSegments`（新設） | 運行系統・直通運転 |
 
-platformLocations (コンコース)
-  └── platformLocationCells
-        ├── nearPlatformCell: integer nullable
-        └── stationFacilities
+`stations` は現行の路線×駅粒度を維持する。ekidata `station_cd` と 1:1 で対応するため
+既存行を UPDATE で移行でき、`platforms`（14件・7駅）と `lineDirections`（52件）からの
+参照を切らずに済む。
 
-facilityConnections
-  ├── connectedStationId / connectedPlatformId / directionId
-  └── exitLabel
+### 新設テーブル
 
-trains
-  └── limitedToPlatformIds: uuid[] nullable
-```
-
-### 新スキーマ（変更後）
-
-```
-platforms
-  ├── maxCarCount 削除
-  └── physicalLength: decimal notNull default '0'  ← 新規（メートル、管理者手入力。'0'=未入力）
-
-trainStopPatterns (NEW, platformCarStopPositionsを置き換え)
-  ├── platformId, trainId
-  ├── unique(platformId, trainId)
-  └── trainStopPatternCars (NEW, FK: trainStopPatternId CASCADE)
-        ├── carNumber: integer
-        ├── startMeters: decimal
-        └── endMeters: decimal
-
-trainCarStructures
-  └── carLength: decimal nullable          ← 新規（未指定時は標準値を使用）
-
-trains
-  └── limitedToPlatformIds 削除            ← trainStopPatternsの存在で判定
-
-platformLocations (コンコース)             ← 構造は維持
-  └── platformLocationCells
-        ├── nearPlatformCell 削除
-        └── xPositionMeters: decimal nullable  ← 新規（null=コンコース全体）
-
-facilityConnections
-  ├── 既存カラムは維持
-  ├── xRangeStart: decimal nullable        ← 新規（対面乗り換え帯用）
-  └── xRangeEnd: decimal nullable          ← 新規（対面乗り換え帯用）
-```
-
-### テーブル定義
-
-#### 変更: `platforms`
-
-```typescript
-export const platforms = pgTable('platforms', {
+```ts
+// 乗換単位の「駅」。ekidata station_g_cd に対応
+export const stationGroups = pgTable('station_groups', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  stationId: uuid('station_id').references(() => stations.id).notNull(),
-  platformNumber: varchar('platform_number', { length: 10 }).notNull(),
+  ekidataStationGroupCd: integer('ekidata_station_group_cd').notNull().unique(),
+  name: varchar('name', { length: 100 }).notNull(),
+  nameKana: varchar('name_kana', { length: 100 }),
+  prefCode: integer('pref_code'),
+  lat: decimal('lat', { precision: 9, scale: 6 }),
+  lon: decimal('lon', { precision: 9, scale: 6 }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+// 路線内の隣接駅。ekidata join に対応。無向グラフ
+export const stationAdjacencies = pgTable('station_adjacencies', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
-  inboundDirectionId: uuid('inbound_direction_id').references(() => lineDirections.id),
-  outboundDirectionId: uuid('outbound_direction_id').references(() => lineDirections.id),
-  // メートル。既存行があるため default('0') 付きで追加する（'0' = 未入力の暫定値）。
-  // default を外す作業は後続Issue。詳細は「移行方針」参照
-  physicalLength: decimal('physical_length', { precision: 6, scale: 2 }).notNull().default('0'),
-  platformSide: varchar('platform_side', { length: 10 }).$type<PlatformSide>(),
+  stationAId: uuid('station_a_id').references(() => stations.id).notNull(),
+  stationBId: uuid('station_b_id').references(() => stations.id).notNull(),
+}, (t) => [
+  unique('unique_station_adjacency').on(t.lineId, t.stationAId, t.stationBId),
+]);
+
+// 運行系統。ekidata は供給しないため手入力。直通運転をここで表現する
+export const serviceRoutes = pgTable('service_routes', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  slug: varchar('slug', { length: 100 }).unique(),
+  name: varchar('name', { length: 100 }).notNull(),
+  nameKana: varchar('name_kana', { length: 100 }),
+  nameEn: varchar('name_en', { length: 100 }),
+  color: varchar('color', { length: 7 }),
+  displayOrder: integer('display_order').default(0),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
-// maxCarCount を削除
-```
 
-#### 新テーブル: `trainStopPatterns`
-
-```typescript
-export const trainStopPatterns = pgTable('train_stop_patterns', {
+// 運行系統を構成する区間。fromStationId/toStationId が null なら路線の全区間
+export const serviceRouteSegments = pgTable('service_route_segments', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  platformId: uuid('platform_id').references(() => platforms.id, { onDelete: 'cascade' }).notNull(),
-  trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+  serviceRouteId: uuid('service_route_id')
+    .references(() => serviceRoutes.id, { onDelete: 'cascade' }).notNull(),
+  sequence: integer('sequence').notNull(),
+  lineId: uuid('line_id').references(() => lines.id).notNull(),
+  fromStationId: uuid('from_station_id').references(() => stations.id),
+  toStationId: uuid('to_station_id').references(() => stations.id),
 }, (t) => [
-  unique('unique_train_stop_pattern').on(t.platformId, t.trainId),
+  unique('unique_service_route_segment').on(t.serviceRouteId, t.sequence),
 ]);
 ```
 
-#### 新テーブル: `trainStopPatternCars`
+#### 区間指定が必要な理由
 
-```typescript
-export const trainStopPatternCars = pgTable('train_stop_pattern_cars', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  trainStopPatternId: uuid('train_stop_pattern_id')
-    .references(() => trainStopPatterns.id, { onDelete: 'cascade' })
-    .notNull(),
-  carNumber: integer('car_number').notNull(),
-  startMeters: decimal('start_meters', { precision: 6, scale: 2 }).notNull(),
-  endMeters: decimal('end_meters', { precision: 6, scale: 2 }).notNull(),
-}, (t) => [
-  unique('unique_train_stop_pattern_car').on(t.trainStopPatternId, t.carNumber),
-]);
-```
-
-#### 変更: `trainCarStructures`（カラム追加）
-
-```typescript
-export const trainCarStructures = pgTable('train_car_structures', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
-  carNumber: integer('car_number').notNull(),
-  doorCount: integer('door_count').notNull(),
-  carLength: decimal('car_length', { precision: 5, scale: 2 }), // メートル、未指定=標準値（20.0m）
-}, (t) => [
-  unique('unique_train_car_structure').on(t.trainId, t.carNumber),
-]);
-```
-
-#### 変更: `trains`（カラム削除）
-
-```typescript
-// 削除
-limitedToPlatformIds: uuid('limited_to_platform_ids').array(),
-```
-
-#### 変更: `platformLocationCells`
-
-```typescript
-export const platformLocationCells = pgTable('platform_location_cells', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  platformLocationId: uuid('platform_location_id')
-    .references(() => platformLocations.id, { onDelete: 'cascade' })
-    .notNull(),
-  xPositionMeters: decimal('x_position_meters', { precision: 6, scale: 2 }), // null = コンコース全体
-});
-// nearPlatformCell を削除
-```
-
-#### 変更: `facilityConnections`（カラム追加）
-
-```typescript
-// 追加（対面乗り換え帯: connectedPlatformIdが設定されている行のみ使用）
-xRangeStart: decimal('x_range_start', { precision: 6, scale: 2 }), // nullable
-xRangeEnd: decimal('x_range_end', { precision: 6, scale: 2 }),     // nullable
-```
-
-#### 削除: `platformCarStopPositions`
-
-`trainStopPatterns` / `trainStopPatternCars` に置き換えるため削除する。
-
----
-
-## 座標系のルール
-
-1. **`x=0` はホームの物理的な一端とする。** ホームの実体は `[0, physicalLength]` の区間である
-2. **原点は列車のデータから導出しない。** どの停車位置パターンが登録・削除されても原点は動かない
-3. 停車位置パターンは、ホーム端からのオフセットとして各号車の `startMeters` / `endMeters` を持つ。
-   パターン同士は互いに独立しており、他のパターンの登録・削除に影響されない
-4. `[0, physicalLength]` の外（頭端式ホームの外側、負座標を含む）にも設備・アクセス点・
-   停車位置を配置できる
-5. SVGのviewBoxは `physicalLength` と全設備・全停車位置パターンの座標の最小値・最大値から
-   マージンを加えて動的に算出する（デモ実装の `computeBounds` と同等のロジック）
-
-### どちらの端を `x=0` にするか
-
-**規約で固定しない。** ホームごとに管理者が一方の端を選び、以後変えない。
-
-現行実装にも「枠番号1がホームのどちら側か」を決めるデータは存在せず
-（`TrainVisualization.tsx:690` の枠番号昇順がそのまま左→右になるだけで、
-`platformCarStopPositions.direction` は列車の向きしか決めていない）、
-方面（`inbound` / `outbound`）もヘッダーに文字列連結して出すのみで
-ホームの左右端に紐付いていない（`PlatformDisplay.tsx:83-88`）。
-本ルールはこの現状を形式化したものであり、表示上の情報は失われない。
-
-- Web側は **x昇順で左→右**に描画する
-- **ホーム端に方面ラベルを出さない**（現状も出していない）
-
-将来「← 渋谷方面」を端に表示したくなった場合は、`platforms` に
-「`x=0` 側がどの方面か」を持つカラムを1つ足せばよい。
-**原点が動かないため、後から追加しても既存座標は一切壊れない**（これが本方式の主要な利点）。
-
-### `direction`（ascending / descending）は廃止する
-
-旧 `platformCarStopPositions.direction` に相当する概念は持たない。
-列車の向きは**号車座標そのものが表現する**（1号車が x の小さい側にあるか大きい側にあるか）。
-
-ドア番号の反転表示（`TrainVisualization.tsx:77`, `:152` の `reversed`）は、
-`cars` を `carNumber` 昇順に並べたときの `startMeters` が減少していれば反転、として導出する。
-
-> **Phase 5 実施結果（2026-08-20）**: 旧 `TrainVisualization.tsx` が持っていた
-> 「モバイル=縦レイアウト（車両を上下に積む）／デスクトップ=横レイアウト」の2系統は廃止し、
-> **横SVG1本＋横スクロール**に統一した（開発者承認済み）。狭い画面では
-> `overflow-x-auto` のラッパで横スクロールになる。また、旧 `typeCode === 'sameFloor'` による
-> 対面乗り換えの特別扱い（`isSameFloorLocation`・専用ラベル列）も全廃し、
-> `facilityConnections.xRangeStart`/`xRangeEnd` が両方非nullの接続のみを
-> SVG上の帯として描画する形に一本化した（開発者承認済み）。`sameFloor` 設備自体は
-> 通常のアクセス点として扱う。
->
-> **TASK-5.9 追加（2026-08-21）**: SVGの縦方向に**コンコースラベル段**を追加した。
-> 同一コンコースのアクセス点を束ね線で結び、その先に出口名と乗り換え先を置く。
-> これにより `VIEW_HEIGHT` は定数ではなくなり、SVGの高さは
-> `layoutRows(platformSide, labelRowCount).viewHeight` で決まる。
-> 恒久的な内容は [`docs/domain/platform-coordinate-system.md`](../domain/platform-coordinate-system.md)
-> 「描画」節に移してある。
-
-### 方面別の停車位置パターンは持たない（当面）
-
-`trainStopPatterns` の一意キーは `(platformId, trainId)` であり、
-**同一ホーム・同一列車に対して停車位置パターンは1件しか持てない。**
-
-この制約は、対象事業者に上下共用のホームが存在しないことに依存している。
-2026-08-15 時点で `inbound_direction_id` と `outbound_direction_id` の両方が
-設定された `platforms` レコードは0件（開発者確認済み）。
-
-折返しホーム（終端駅・支線）は両方向を持ちうるが、
-**編成が物理的に反転しないため停車位置は1通り**であり、1件で正しく表現できる。
-
-破綻するのは**上下共用の中線**（JRの国鉄型2面3線等）である。
-同一ホーム・同一列車が逆向きで停車するため号車座標が2通り必要になるが、
-一意制約により1件しか登録できない。結果として片方の方面で号車番号が左右反転し、
-「2号車付近のエレベーター」が実際には7号車付近を指す誤案内になる。
-
-**回避策として `platforms` を番線ごとに分けることはできない。**
-設備は `platformId` にぶら下がるため（`platformLocations` → `platformLocationCells`
-→ `stationFacilities` / `facilityConnections`）、同一の物理ホームを2レコードに分けると
-設備・コンコースが二重登録になり、#29 の中核であるコンコース単位グルーピングが
-同じ階段を別物として扱い始める。
-
-本Issueで対応しない理由は、JR追加時点で必要なキーが本当に「方面」なのかが
-未確定なためである（中線は方面ではなく運用（待避・折返し）で停車位置が分かれる可能性があり、
-また号車数が10両/15両で大きく変わるため `trains` の粒度自体の見直しが入りうる）。
-実データが1件も無い状態で解決ロジックを設計すると作り直しになる
-（[ADR-0002](../adr/0002-dependency-inversion-ports.md) の「推測で設計しない」と同じ判断）。
-
-制約の詳細と、対応が必要になったときの移行手順は
-[`docs/domain/train-stop-patterns.md`](../domain/train-stop-patterns.md) に記載する。
-
-### 号車位置の自動算出ロジック（`trainStopPatternCars` 生成時）
-
-1. 管理者が対象の `platformId` ・ `trainId` を選択
-2. **編成の `x=0` に近い側の端が、ホーム端（`x=0`）から何メートルの位置に来るか**を入力する
-3. **`x=0` に近い側が1号車か最終号車か**を選択する
-4. `trainCarStructures.carLength`（未指定時は標準値 20.0m）を、`x=0` に近い側から順に積算し、
-   各号車の `startMeters` / `endMeters` を算出する
-5. 算出結果をプレビュー表示し、管理者が個別の号車境界を上書き可能な状態で保存
-
-**基準を「先頭車」ではなく「`x=0` に近い側の端」とする。** 「先頭車」を基準にすると、
-その先頭が x の小さい側にあるのか大きい側にあるのかが別途必要になり、
-入力が2つの独立した二択に分かれて曖昧になる。上記の形なら
-「位置1つ + 号車番号の向き1つ」で一意に定まる。
-
-手順2は**駅の平面図や実測から直接読み取れる量**である。
-旧設計の「1号車先端を x=0 に揃える」は、登録する列車が最長編成でない限り
-ルール1に違反し、複数パターンが同一座標に重なる原因になるため採用しない。
-
----
-
-## データフロー
-
-### Admin側（停車位置パターン登録）
-
-**号車位置の算出はクライアント側で行い、APIは保存に徹する。**
-管理者がプレビューを見ながら個別の号車位置を上書きできる必要があるため、
-算出結果ではなく**確定した座標**を送る。
+実データで2つの形が確認されている。「路線ペア」では後者を表現できない。
 
 ```
-[管理者ブラウザ] features/stop-pattern/components/TrainStopPatternForm.tsx
-     │
-     ├── trainCarStructures から各号車の carLength を取得（未指定は標準値20.0m）
-     ├── domain/carSegments.ts の
-     │     buildCarSegments(carStructure, startMeters, carNumberOrder) で算出
-     │     （startMeters = ホーム端から、編成の x=0 側の端までの距離）
-     ├── プレビュー表示 → 管理者が個別の startMeters/endMeters を上書き可能
-     │
-     │ payload: { platformId, trainId, cars: [{ carNumber, startMeters, endMeters }] }
-     ▼
-[POST /api/stations/:stationId/train-stop-patterns]  ← 薄いハンドラ
-     │ features/stop-pattern/schema.ts の Zod で検証
-     ▼
-[external/repository/stopPatternRepository.ts] save()
-     │ withTransaction（ADR-0005。親の採番IDを子に渡すため必須）
-     ├── INSERT INTO train_stop_patterns (platformId, trainId) RETURNING id
-     └── INSERT INTO train_stop_pattern_cars (trainStopPatternId, carNumber, startMeters, endMeters) × 号車数
+京浜東北線(11332 大宮〜横浜) + 根岸線(11307 横浜〜大船)
+  → seg1 = (11332, null, null), seg2 = (11307, null, null)
+
+横須賀線(11308 東京〜久里浜) + 総武本線(11314 東京〜銚子)
+  → seg1 = (11308, null, null), seg2 = (11314, 東京, 千葉)   ← 部分区間
 ```
 
-### Admin側（設備登録、#29から座標型のみ変更）
+### 既存テーブルの変更
 
-```
-[管理者ブラウザ] FacilityForm.tsx
-     │ payload: { platformId, exits, notes,
-     │   cells: [{ xPositionMeters, facilities: [...] }],
-     │   connections: [{ stationId, connectedPlatformId?, directionId?, xRangeStart?, xRangeEnd?, exitLabel }]
-     │ }
-     ▼
-[POST/PUT /api/stations/:stationId/platform-locations]
-     （テーブル構成は#29と同様、カラムの型のみ変更）
-```
-
-### Web側（表示）
-
-```
-[app/stations/[slug]/page.tsx]  (Server Component・約70行)
-     │ import { getStationDetail } from '@/di'
-     ▼
-[features/station/usecases/getStationDetail.ts]
-     │ StationDetailQuery（port）のみに依存
-     ▼
-[external/query/stationDetailQuery.ts]   ← ここだけが Drizzle を知る
-     ├── SELECT physicalLength FROM platforms
-     ├── SELECT * FROM train_stop_patterns JOIN train_stop_pattern_cars
-     │     WHERE platformId IN (...)
-     ├── SELECT * FROM platform_location_cells (xPositionMeters) ...
-     └── SELECT facilityConnections（xRangeStart/xRangeEnd含む）...
-     │ JOIN・Promise.all は自由。decimal → number 変換もここで行う
-     ▼
-[DTO] PlatformDTO { physicalLength, stopPatterns[], concourses[] }
-     ▼
-[features/platform/components/PlatformDiagram.tsx]
-     │ features/platform/domain/geometry.ts の computeBounds() で viewBox 算出
-     │ SVG と HTML オーバーレイが xFraction() で同じ x スケールを共有する（ADR-0006）
-     ▼
-[ユーザー]
-```
-
-クエリ本数は現状（10本）から増やさない。層を分けることが目的であり、
-集約単位に分解して N+1 を作らないこと（[ADR-0003](../adr/0003-read-write-separation.md)）。
-
----
-
-## インターフェース定義
-
-### Admin APIリクエスト/レスポンス
-
-```typescript
-// 停車位置パターン
-type TrainStopPatternRequest = {
-  platformId: string;
-  trainId: string;
-  cars: { carNumber: number; startMeters: number; endMeters: number }[];
-};
-
-// コンコース（#29から型変更のみ）
-type PlatformLocationRequest = {
-  platformId: string;
-  exits: string | null;
-  notes: string | null;
-  cells: CellRequest[];
-  connections?: ConnectionRequest[];
-};
-
-type CellRequest = {
-  xPositionMeters: number | null; // null = コンコース全体
-  facilities: FacilityRequest[];
-};
-
-type ConnectionRequest = {
-  stationId: string;
-  connectedPlatformId?: string | null;
-  directionId?: string | null;
-  xRangeStart?: number | null; // 対面乗り換え帯（connectedPlatformId指定時のみ意味を持つ）
-  xRangeEnd?: number | null;
-  exitLabel?: string | null;
-};
-```
-
-### Web表示用DTO定義
-
-配置先は `apps/web/src/features/platform/domain/types.ts`。
-**`ViewModel` ではなく `DTO` と呼ぶ**（[ADR-0003](../adr/0003-read-write-separation.md)）。
-
-DTOの制約（[ADR-0003](../adr/0003-read-write-separation.md)）:
-
-- ✅ プリミティブ・配列・プレーンオブジェクトのみ。JSONシリアライズ可能であること
-- ❌ 色コード・Tailwindクラス名・JSX・Mantineのprops等、UI固有の値を含めない
-- ❌ メソッドを持つクラスインスタンスにしない
-
-`decimal` は Drizzle が `string` で返すため、**`external/query/` の中で `number` へ変換する**。
-DTOより上の層に `string` のまま渡さない（SVG描画側に `Number()` が散らばるため）。
-
-```typescript
-export type PlatformDTO = {
-  id: string;
-  platformNumber: string;
-  lineId: string;
-  lineName: string;
-  lineColor: string | null;
-  inboundDirectionId: string | null;
-  inboundDirectionName: string | null;
-  outboundDirectionId: string | null;
-  outboundDirectionName: string | null;
-  platformSide: 'top' | 'bottom' | null;
-  notes: string | null;
-  physicalLength: number;        // decimal → number 変換済み。0 = 未入力
-  stopPatterns: TrainStopPatternDTO[];
-  concourses: ConcourseDTO[];
-};
-
-export type TrainStopPatternDTO = {
-  trainId: string;
-  trainLabel: string;
-  carCount: number;
-  cars: StopPatternCarDTO[];     // carNumber 昇順
-};
-
-export type StopPatternCarDTO = {
-  carNumber: number;
-  startMeters: number;
-  endMeters: number;
-  doorCount: number;             // trainCarStructures 由来。未登録は4で補う
-  freeSpaceDoors: { nearDoor: number; isStandard: boolean }[];
-  prioritySeatDoors: { nearDoor: number; isStandard: boolean }[];
-};
-
-export type ConcourseDTO = {
-  id: string;
-  exits: string | null;
-  cells: { xPositionMeters: number | null; facilities: FacilityDTO[] }[];
-  connections: FacilityConnectionDTO[];
-};
-
-export type FacilityConnectionDTO = {
-  stationName: string;
-  lineNames: string[];
-  lineColors: (string | null)[];
-  directionName: string | null;
-  exitLabel: string | null;
-  xRangeStart: number | null;    // 両方非nullのときのみ対面乗換帯
-  xRangeEnd: number | null;
-};
-
-export type DirectionTabDTO = {
-  directionId: string | null;
-  directionName: string;
-  platforms: PlatformDTO[];
-};
-```
-
-> **Phase 5 実施結果（2026-08-20）**: 上記は実装結果に合わせて更新した。当初の
-> `PlatformDTO`（`id`/`physicalLength`/`stopPatterns`/`concourses`のみ）では
-> `PlatformDisplay`（番線・路線名・色・方面名・`platformSide`・`notes`）や
-> `TrainVisualization`（`doorCount`・フリースペース・優先席）が必要とする情報を
-> 表現できなかったため拡張した（開発者承認済み）。`DirectionTabDTO` は
-> 方面タブ構築用として新規追加（`features/station/domain/tabs.ts` の
-> `buildDirectionTabs()` が返す型）。
-
-先例として `apps/web/src/types/index.ts` の `StationSearchApiResponse` 等が
-既に Drizzle 非依存のDTOとして `/api/v1/*` のレスポンス契約になっている。
-新規DTOは配置先が異なるだけで**性質は同じもの**とする。
-
-### ports 定義
-
-`features/*/ports.ts` に置く。Drizzle も Next.js も import しない
-（[ADR-0002](../adr/0002-dependency-inversion-ports.md)）。
-
-```typescript
-// apps/web/src/features/station/ports.ts
-export interface StationDetailQuery {
-  getBySlug(slug: string): Promise<StationDetailDTO | null>;
+```ts
+operators += {
+  ekidataCompanyCd: integer('ekidata_company_cd').unique(),
 }
-```
+// odptOperatorId は残す（ADR-0007 決定3）。一意制約は付けない
+// displayPriority を NOT NULL DEFAULT 0 に変更（既存2行はどちらも値ありのため
+// バックフィル不要）。「null=非表示」の意味を外し、表示順専用の列にする
+// （理由は次項）
 
-```typescript
-// apps/admin/src/features/stop-pattern/ports.ts
-export interface StopPatternRepository {
-  save(pattern: StopPatternInput): Promise<void>;
-  update(id: string, pattern: StopPatternInput): Promise<boolean>;
-  delete(id: string): Promise<boolean>;
+lines += {
+  ekidataLineCd: integer('ekidata_line_cd').unique(),
+  abolishedAt: date('abolished_at'),
 }
+// 削除: unique('uniqueRailwayPerOperator')
 
-// 読み取り（一覧・編集ページ用）。stop-pattern の新規ページは src/app/** に置かれ、
-// ESLint の依存ルールにより @furatora/database を直接 import できないため必要になる
-export interface StopPatternPageQuery {
-  getListByPlatform(stationId: string, platformId: string): Promise<StopPatternListDTO | null>;
-  getEditContext(stationId: string, platformId: string, patternId?: string): Promise<StopPatternEditContextDTO | null>;
+stations += {
+  ekidataStationCd: integer('ekidata_station_cd').unique(),
+  stationGroupId: uuid('station_group_id').references(() => stationGroups.id),
+  prefCode: integer('pref_code'),
+  abolishedAt: date('abolished_at'),
+  publishedAt: timestamp('published_at'), // 管理者が明示的に設定。null = 非公開
 }
+// 削除: unique('uniqueStationPerOperator')
+// 追加: check('published_requires_slug', sql`published_at IS NULL OR slug IS NOT NULL`)
+//       公開されている駅は必ず slug を持つ（理由は後項）
+
+stationLines += unique('unique_station_line_station').on(t.stationId)
+// 実測で複数路線を持つ駅は0件。路線×駅粒度では 1:1 が不変条件なので制約で固定する
+
+stationConnections:
+  削除 → odptStationId, odptRailwayId, connectedRailwayId
+  変更 → connectedStationId を notNull 化
+  追加 → source varchar(20), unique(stationId, connectedStationId)
+
+削除 → odptMetadata テーブルごと
 ```
 
-> **Phase 4 実施結果（2026-08-20）**: `update()` と `StopPatternPageQuery` は当初の定義に
-> 無かったが、TASK-4.5（一覧・編集ページ）の実装過程で追加した（開発者承認済み）。
-> `update()` は「編集」導線に必要で、`save`/`update` はいずれも一意制約違反
-> （`platformId`, `trainId`）を `DuplicateStopPatternError` として throw し、
-> route.ts 側で409に変換する。`StopPatternPageQuery` は
-> [ADR-0003](../adr/0003-read-write-separation.md) が admin の一覧・編集ページの
-> Query Service 化を後続Issue（#48）としている対象範囲を超える追加だが、
-> 本件は既存ページの改修ではなく新規ページの必須要件であるため、この2画面分のみ
-> 本Issueで先行導入した（開発者承認済み）。
+#### `connectedRailwayId` を削除する理由
 
-**port は実在する画面・ユースケースに対してのみ定義する。**
-乗換案内など未実装機能のための port を先回りして作らないこと（ADR-0002）。
+`stations` が路線×駅粒度であり `stationLines` が 1:1 に固定されるため、
+`connectedStationId` から路線が一意に定まる。冗長な列になる。
 
-### 書き込みの原子性（[ADR-0005](../adr/0005-write-atomicity-driver.md)）
+#### ODPT ID 列に一意制約が無い理由をコメントに残す
 
-`trainStopPatterns` の `id` はDB側で採番されるため、
-**親を insert → 返却された id で子を insert** という順序が必須になる。
-この形は `db.batch()` では表現できず、既定の `neon-http` は
-`db.transaction()` が実行時例外になる。
+[ADR-0007](../adr/0007-station-master-data-source.md) の「影響」に従い、
+`odptStationId` / `odptRailwayId` / `odptOperatorId` の各定義に
+**なぜ一意でないか**をコメントで書く。残さなければ、次にスキーマへ触れる者が
+制約の欠落をバグと判断して再付与し、ODPT 非同期の前提を壊す。
 
-したがって `StopPatternRepository.save()` は `withTransaction` を使う。
+#### 表示順（`displayPriority`）と公開状態（`publishedAt`）を分離する理由
 
-```typescript
-// apps/admin/src/external/repository/stopPatternRepository.ts
-import { withTransaction } from '@furatora/database/tx';
+現行の `operators.displayPriority`（`数字=表示順、null=非表示`）は、
+17事業者（メトロ・都営 + 未解決接続由来）を前提に成立していた。
+ekidata 移行で 175事業者・10,465駅に増えると、この列は使えなくなる。
 
-export const dbStopPatternRepository: StopPatternRepository = {
-  async save(pattern) {
-    await withTransaction(async (tx) => {
-      const [row] = await tx.insert(trainStopPatterns)
-        .values({ platformId: pattern.platformId, trainId: pattern.trainId })
-        .returning();
-      await tx.insert(trainStopPatternCars).values(
-        pattern.cars.map((c) => ({ trainStopPatternId: row!.id, ...c })),
-      );
-    });
-  },
-};
+- **1列に2つの関心が同居している。** 「非表示にしたい」と思うたびに順序を失う。
+  `NOT NULL` にもできない（非表示のために null 枠を空けておく必要がある）
+- **可視性の粒度が事業者単位では粗すぎる。** JR東日本を「表示」にした瞬間、
+  山手線も地方の1路線も一斉に出る。furatora の価値はホーム設備データにあり、
+  **整備が進むのは駅単位**である。事業者単位のON/OFFとは合わない
+
+そこで役割を分離する。
+
+- **`operators.displayPriority`**: 表示順専用に純化する。`NOT NULL DEFAULT 0`。
+  可視性の意味を持たない
+- **`stations.publishedAt`**: 可視性を担う。ekidata 由来の新規駅は
+  `NULL`（非公開）で作成され、**管理者が明示的に設定するまで一覧・検索・詳細ページに出ない**
+
+**充足度から自動導出しない。** 「ホーム設備が4件中1件しか入っていない駅は
+自動的に非公開」という設計は採らない。編集は途中状態を持つ行為であり、
+条件を満たした瞬間に無言で公開されると、公開の可否が編集者の意図から外れる。
+`publishedAt` は常に人が設定する。データの充足度は、Admin が公開操作をする際の
+**確認材料**（「設備が1/4件しか入力されていません」等）に留め、
+公開条件そのものにはしない。この確認UIの実装は本設計のスコープ外とする
+（Admin側のバリデーションとして後続Issueで扱う）。
+
+**粒度は `stations`（路線×駅）単位とする。** `stationGroups` 単位にはしない。
+利用者が見るページ（駅詳細・検索結果）は `stations` の単位で存在するため、
+公開・非公開もその単位で判断できる必要がある。乗換駅グループの一部路線だけ
+整備が進んでいる状態（新宿の丸ノ内線は公開・都営新宿線は未整備、等）も
+この粒度なら自然に表現できる。
+
+`lines` / `operators` 自体には公開フラグを追加しない。
+「所属する `stations` が1件も公開されていない路線・事業者を一覧から隠す」は
+`EXISTS` 述語で導出でき、専用の列を持つ必要はない（YAGNI）。
+
+#### 公開されている駅は `slug` を必ず持つ（CHECK 制約）
+
+`getBySlug` は `stations.slug` の一致しか見ない
+（`apps/web/src/external/query/stationDetailQuery.ts:79`）。一方
+`StationCard.tsx:15` と `StationSearch.tsx:112` は `station.slug ?? station.id` へ
+リンクする。**slug が NULL の駅はリンク先が UUID になり、`getBySlug(uuid)` が
+何も引かずに 404 する。** この誘導は REQ-6.2 が定めていたが未実装であり、
+本制約により状況そのものが発生しなくなるため、**REQ-6.2 は削除した。**
+`station.slug ?? station.id` はデッドコードとして整理する。
+
+したがって「公開されているのに開けない駅」を表現不可能にする。
+
+```ts
+check('published_requires_slug', sql`${t.publishedAt} IS NULL OR ${t.slug} IS NOT NULL`)
 ```
 
-`platform-locations` 系の既存ルート（3テーブルの delete → insert が非原子）も
-#29 で同じ箇所を触るため、あわせて `withTransaction` 化する。
+これは規約ではなく不変条件であるため、Admin のバリデーションだけに委ねず
+DB に置く。既存481行は slug が全件生成済みであるため、
+後述の `publishedAt` バックフィルはこの制約に触れない。
 
-単一テーブルの単純な書き込みは `db` のままでよい。
+**`nameEn` はこの制約に含めない。** 表示側は全箇所
+`{station.nameEn && ...}` でガードしており（`StationCard.tsx:22` ほか）、
+欠損しても壊れない。slug と違って不変条件ではない。
+加えて `nameEn` は事業者公式の表記であり開発者が決められないため、
+これを公開のブロッカーにすると **「とりあえず機械ローマ字を貼る」圧力が生じる**。
+ekidata の `station_name_r` を採用しないという判断を、制約が逆向きに崩すことになる。
+Admin 側の警告表示（「英語名が未設定です」）に留め、公開条件にはしない。
+設備充足度を公開条件にしない判断（前項）と同じ扱いである。
+
+#### 現行の可視性ガードは一覧にしか無い（実バグ）
+
+`operators.displayPriority` による可視性判定は、`apps/web` の**8つの読み取り経路の
+うち2つにしか存在しない。**
+
+| 経路 | 判定 |
+|---|---|
+| `app/page.tsx:16` | あり `isNotNull(operators.displayPriority)` |
+| `app/api/v1/stations/route.ts:39` | あり（検索もここを通る） |
+| `app/stations/[slug]/page.tsx` → `stationDetailQuery.getBySlug` | **無し** |
+| `app/lines/[slug]/stations/page.tsx` | **無し** |
+| `app/lines/[slug]/page.tsx` | **無し**（上へリダイレクト） |
+| `app/api/v1/lines/[slug]/stations/route.ts` | **無し** |
+| `app/api/v1/stations/[id]/route.ts` | **無し**（`eq(stations.id, id)` のみ） |
+| `app/api/v1/operators/route.ts` | **無し**（`.select().from(operators)` 無条件） |
+
+**最も重いのは `/api/v1/operators` である。** 非表示事業者とその全路線を
+無条件に列挙して返すため、URLを推測する必要すらない。
+URL直打ちで露出する `/lines/...` `/stations/...`（実証済みの2件）より
+到達が容易である。
+
+原因は構造にある。**可視性が「一覧を組み立てる側」の責務として書かれ、
+「行を1件引く側」には無い。** `publishedAt` へ移行しても、判定を
+経路ごとに書く限り同じ漏れが再発する。
+
+そこで可視性述語を1箇所に閉じる。
+
+```ts
+// features/station/domain/visibility.ts
+export const publishedStation = () => isNotNull(stations.publishedAt);
+```
+
+- **駅の詳細**: `getBySlug` の `where` に上記を足す。該当なしは 404
+- **路線のページ**: 公開駅を1件も持たない路線は 404
+  （`EXISTS` 述語。前項「`lines` に公開フラグを追加しない」の帰結）
+- **公開API**: 同じ述語を通す。`/api/v1/operators` も同様に
+  公開駅を持つ事業者だけを返す
+- **乗換接続**: `stationDetailQuery` の `getStationConnectionRows` にも足す。
+  未公開駅への接続をリンクとして出すと、そこから未公開ページへ到達できる
+
+`displayPriority` は表示順専用に純化されるため（前項）、
+**移行後に可視性を判定する述語は `publishedAt` の1つだけになる。**
+現行の `isNotNull(operators.displayPriority)` は2箇所とも置き換える。
+
+#### 規模とパフォーマンス
+
+移行後の行数は `operators` 176 / `lines` 602 / `stations` 10,465 /
+`stationLines` 10,465 である。**この規模では専用のインデックスを先に置かない。**
+
+| 経路 | 変化 | 評価 |
+|---|---|---|
+| 駅詳細 | `slug` の一意インデックスで1行に絞った後 `publishedAt` を見るだけ | 影響なし |
+| トップページ | 全事業者・全路線を引いてJSで組む現行実装に `EXISTS` が加わる。路線 62→602 | ハッシュ結合で完結する規模 |
+| 駅検索 `/api/v1/stations` | 部分一致のため btree が効かず全走査。481→10,465行 | 1万行の走査は問題にならない |
+
+いずれも Neon の接続確立コストの方が支配的である。
+**現時点で計測せずにインデックスを足さない。**
+必要になるとすればトップページの `EXISTS` であり、その場合は
+`stations` への部分インデックス（`WHERE published_at IS NOT NULL`）が候補になる。
+公開駅は当面ごく少数であるため、部分インデックスは小さく選択性が高い。
+
+なお、トップページの「全件引いてJSで絞る」形（`app/page.tsx:20`）は
+**バグの温床そのもの**である。可視性が SQL ではなく組み立てコードに
+書かれていたことが、詳細ページで抜けた原因であった。
+TASK-5.0 では述語を `where` へ移す。
+
+### `slug` の導出
+
+現行の slug は ODPT ID からの完全自動生成である（`apps/scripts/src/update-odpt.ts:96`）。
+
+```
+odpt.Station:TokyoMetro.Ginza.Shibuya → tokyometro-ginza-shibuya
+```
+
+ODPT ID が `事業者.路線.駅` の三つ組をローマ字で持っていたために成立していた。
+**ekidata 移行で失われるのはこの入力である。** `line` CSV にローマ字列は
+1つも存在せず、`station_name_r` は `station_name_k` の機械転写に過ぎない（後述）。
+
+#### 一意性: 路線を前置すれば全国で衝突しない
+
+現役10,625行での実測。
+
+| 案 | 衝突 |
+|---|---|
+| 駅名ヘボンのみ（`shinjuku`） | 3,773行 / 10,625（35.5%） |
+| 乗換グループ単位 + 都道府県 | 104グループ |
+| **`(line_cd, ヘボン駅名)`** | **0行。衝突ゼロ** |
+
+駅名だけでは全く足りない（`tokyo` 18行、`shinjuku` 13行、`shiyakushomae` 17行）。
+路線を前置すれば全国で完全に一意になる。現行の `tokyometro-ginza-shibuya` と
+同じ構造である。
+
+```
+stations.slug = `${lines.slug}-${hepburn(normalize(stations.nameKana))}`
+```
+
+手入力が必要なのは **602路線の `lines.slug`** であり、10,465駅ではない。
+しかも公開する路線の分だけで足りる。`lines.nameEn` も ekidata から
+供給されないため、どのみち手で書くことになる。
+
+#### `nameEn` と分離する
+
+slug は URL 識別子であって公式英語名ではない。`Kita-senju` のハイフン位置や
+大文字は公式表記の問題であり、slug には影響しない（`kitasenju` で機能上も
+可読性上も足りる）。**公式表記の正しさが要るのは `nameEn` だけである。**
+ここを混同すると、`nameEn` を機械生成しないという判断
+（[requirements.md](./requirements.md)）が崩れる。
+
+#### ローマ字変換規則（`domain/romaji.ts`）
+
+**変換元は `station_name_r` ではなく `station_name_k`。**
+`station_name_r` を後から修正する方式は採らない。`shinnjukusannchoume` を
+直そうとすると「`nn` は撥音か、`n` で終わる語＋ナ行か」の判別が要るが、
+カナにその曖昧さは存在しない。CSV の誤字（`echigouuzawa`＝エチゴユザワ、
+`ohanadyaya`＝オハナヂャヤ）も、変換元を替えるだけで消える。
+
+実測: CSV に混在する手入力ヘボン式186件との突合で、純粋なローマ字化としての
+正解率 **116/135 = 85.9%**（英訳48件・カナ欠陥3件を対象外とした後）。
+下記の置換辞書と撥音の方針を含めると約90%。
+
+**決定的（カナから一意に決まる）**
+
+| 規則 | 例 |
+|---|---|
+| `ヂ`/`ヅ` → `ji`/`zu` | オハナヂャヤ→`ohanajaya`、コウヅ→`kozu` |
+| `シ`/`チ`/`ツ`/`フ`/`ジ` → `shi`/`chi`/`tsu`/`fu`/`ji` | ワープロ式の `si`/`ti`/`tu`/`hu` を排除 |
+| 促音 `ッ` → 次の子音を重ねる（`ch` の前は `t`） | クッチャン→`kutchan` |
+| 拗音・外来音 | シンジュクサンチョウメ→`shinjukusanchome` |
+| `ー` → 削除 | ガーラ→`gara` |
+| `ジェイアール` → `jr`（置換辞書。該当13駅） | ジェイアールソウジジ→`jr-sojiji` |
+
+**方針として決めるもの（正誤ではなく選択）**
+
+| 論点 | 決定 |
+|---|---|
+| 長音の縮約 | **縮約する**。トウキョウ→`tokyo` |
+| 撥音の `n`→`m` 化（b/p/m の前） | **しない**。コウエンマエ→`koenmae` |
+| `ン`＋母音のアポストロフィ | **入れない**。シンオオサカ→`shinosaka` |
+
+`n`→`m` は修正ヘボン式としては正しいが、slug はハイフンを入れないため
+`mm` が出る（実測221件が該当。`koemmae` / `byoimmae` / `kumamotokosemmae`）。
+公式表記が `Koen-mae` と切るのはこの読みにくさを避けるためであり、
+ハイフンの無い slug では `n` のままが素直である。
+一意性は `n`→`m` の有無に関わらず衝突ゼロを確認済み。
+
+**原理的に決まらないもの**
+
+母音の連続が長音なのか、形態素境界をまたぐ別々の母音なのかは、
+カナから判別できない。
+
+```
+タケオオンセン  武雄温泉    タケオ + オンセン  → takeonsen      (正: takeo-onsen)
+テダコウラニシ  てだこ浦西  テダコ + ウラニシ  → tedakoranishi  (正: tedako-uranishi)
+コウミ          小海        長音               → komi           (正: koumi)
+```
+
+露出は長音縮約が発火する2,680行（25.2%）、実測誤り率は約3%。
+**形態素解析器は導入しない。** 得られる3%に対して依存が重い。
+この3%は次項の公開ゲートで回収する。
+
+#### 生成タイミング: インポートではなく公開時
+
+**インポートは `slug` を書かない**（上書きルール表の通り「触らない列」のまま）。
+`slug` は公開操作の時点で Admin が生成値を提示し、管理者が確認して確定する。
+
+インポート時に全10,465駅へ自動投入すると、CHECK 制約が無条件に充足されてしまい、
+**人の目を通す機会が消える。** 誤変換の約3%は「公開する駅だけ、公開時に1回」
+見れば捕まる。全駅をレビューする必要はない。未公開駅の誤変換は表出しないが、
+到達不能であるため害が無い。この非対称性が、精度を追わずに済む根拠である。
+
+変換器そのものは使い捨てではない。インポートは ekidata の更新のたびに
+繰り返し実行され、新線開業・新駅設置のたびに slug を持たない駅が入ってくる。
+`domain/romaji.ts` は恒久コードであり、テスト対象である。
+
+#### カナ側の欠陥（要確認9駅）
+
+漢字名に無い「駅」「停留場」がカナにだけ付いている行がある。
+
+```
+天童南        テンドウミナミエキ
+羽沢横浜国大   ハザワヨコハマコクダイエキ
+東宿郷        ヒガシシュクゴウテイリュウジョウ
+阿蘇下田城     アソシモダジョウエキ
+```
+
+**末尾の `エキ` を機械的に落としてはならない。** 同じ検出に
+`家城（イエキ）` `植木（ウエキ）` が引っかかる。これらは正当な駅名である。
+9駅のみのため自動除去せず、公開ゲートの要確認リストに載せる。
+
+#### `lines.slug` の欠落は駅より先に踏む
+
+`apps/web/src/components/LineAccordion.tsx:11` は
+`/lines/${line.slug}/stations` へフォールバック無しでリンクしている。
+ekidata 由来の602路線は slug が NULL で入ってくるため、`/lines/null/stations`
+が生成される。駅の slug より先にここを踏む。
+
+**前項の可視性ガードで塞ぐ**（別Issueに切り出さない）。
+
+ここで「公開駅を持つ路線は必ず slug を持つ」という不変条件を立てて
+それを担保する方針は**採らない。** その不変条件は暗黙の連鎖に乗っており、
+
+```
+駅が公開されている → CHECK により slug を持つ
+                  → その slug は `lines.slug` から生成された
+                  → ゆえに `lines.slug` は非 NULL
+```
+
+連鎖の途中（例: 路線の slug を後から空にする）が切れると復活する。
+そして Postgres の CHECK は他テーブルを参照できないため、
+DB制約で押さえるにはトリガか非正規化フラグが要る。問題に対して重い。
+
+**不変条件を守るのではなく、不要にする。** 路線の可視性述語に
+`slug IS NOT NULL` を含める。
+
+```ts
+// features/station/domain/visibility.ts
+export const publishedStation = () => isNotNull(stations.publishedAt);
+
+// 路線が見えるのは「公開駅を1件以上持ち、かつ slug を持つ」とき
+export const visibleLine = () => and(
+  isNotNull(lines.slug),
+  exists(/* stationLines → stations で publishedStation() */),
+);
+```
+
+こうすると slug が NULL の路線はそもそも描画されないため、
+連鎖が切れても `/lines/null/stations` は生成されない。
+`LineAccordion` 側にガードを足す必要もない。
+
+書き込み側でも同じ状態を作らせない。Admin の公開操作は、
+路線の slug が未設定なら駅を公開させない（TASK-5.2）。
+加えて「公開駅を持つのに slug が無い路線」は
+**データ健全性の警告**として Admin に一覧表示する。
+これは正しさを担保するためではなく、
+`lines.slug` の付け忘れを検知するためである。
 
 ---
 
-## Admin UI変更
+## インポートのデータフロー
 
-### 新規: 停車位置パターン編集（`TrainStopPatternForm.tsx`）
+### 2段階（plan → apply）
 
 ```
-ホーム: 3番線（ホーム長: 210.00 m）   ← 固定表示（URLのplatformIdで確定するため）
-列車:   [ドロップダウン]
-
-編成の端の位置: [数値入力] m   ← x=0 に近い側の端の、ホーム端(x=0)からの距離
-号車番号の向き:
-  ( ) x=0 に近い側が 1号車     （号車番号が増えるほど x が大きくなる）
-  ( ) x=0 に近い側が 最終号車   （号車番号が増えるほど x が小さくなる）
-
-[自動計算して プレビュー表示]
-
-号車ごとの位置（上書き可）:
-  1号車: [start] 〜 [end] m
-  2号車: [start] 〜 [end] m
-  ...
+POST /api/master-import  { mode: 'plan' }
+   4ファイルを解析 → 検証 → 差分計画を返す（DBは変更しない）
+      ↓ 管理者が確認
+POST /api/master-import  { mode: 'apply', planToken }
+   withTransaction 内で適用
 ```
 
-ホーム長を併記するのは、入力値が `[0, physicalLength]` に対してどこに来るかを
-管理者が確認できるようにするため。範囲外の入力自体は許容する（ルール4）。
+1万行超を無確認で流す操作にはしない。`plan` の結果は
+新規 / 更新 / 廃止 / 突合失敗 をテーブルごとに提示する。
 
-> **Phase 4 実施結果（2026-08-20）**: ホームの選択は当初「ドロップダウン」としていたが、
-> このフォームは `platforms/[platformId]/stop-patterns/...` 配下のページにのみ置かれ、
-> ホームは常にURLの `platformId` で一意に決まるため、固定表示（読み取り専用テキスト）に
-> 変更した（開発者承認済み）。それ以外の要素はモック通り実装した。
+### 上書きルール
 
-### `FacilityForm.tsx`（#29から座標入力欄のみ変更）
+インポートが触る列と触らない列を分離する。これが手編集保護の主機構である
+（列単位のロックは今回のスコープ外。[requirements.md](./requirements.md) スコープ外表）。
 
-枠番号の数値入力を「**ホーム端（x=0）からのメートル位置**」入力に置き換える。コンコース＋アクセス点のUI構造自体は維持する。対面乗り換え接続には帯の範囲（開始・終了メートル）入力欄を追加する。
+| テーブル | ekidata が上書きする列 | 触らない列（furatora 固有） |
+|---|---|---|
+| `operators` | `name` | `displayPriority`, `odptOperatorId` |
+| `lines` | `name`, `nameKana`, `color` | `slug`, `nameEn`, `lineCode`, `displayOrder` |
+| `stations` | `name`, `nameKana`, `lat`, `lon`, `prefCode`, `stationGroupId` | `slug`, `nameEn`, `code`, `notes`, `publishedAt` |
+| `stationGroups` | `name`, `nameKana`, `prefCode`, `lat`, `lon` | — |
 
-入力欄の `description` には、原点が停車位置ではなくホーム端であることが分かる文言を置く
-（例:「ホーム端からの距離。ホーム長: 210.00 m。範囲外（負値・ホーム長超）も入力可」）。
-**「原点」という語を単独で使わない。** 旧設計では原点が列車データからの導出値だったため、
-管理者がどこを基準に測ればよいか分からなくなる問題があった。
+#### `nameEn` を ekidata が触らない理由
+
+**そもそも `lines` には供給元が無い。** `line` CSV の列は
+`line_cd, company_cd, line_name, line_name_k, line_name_h, line_color_c,
+line_color_t, line_type, lon, lat, zoom, e_status, e_sort` であり、
+ローマ字列が存在しない（`line_name_h` は135件を除き `line_name` と同一の日本語）。
+
+`stations` については `station_name_r` が存在するが、**採用しない。**
+現役10,625行を `station_name_k` から機械変換して突合したところ、
+**97.9% が再現でき**、内訳はワープロ式31.3% / 修正ヘボン式3.7% /
+両者で同一63.0%であった。つまりこの列は `station_name_k` が既に持つ情報しか
+持っておらず、残り2.1%も大半はノイズである（`Nayoro High School` などの英訳混入、
+`echigouuzawa`＝エチゴユザワの誤字、`ohanadyaya`＝ヂャの処理揺れ）。
+
+一方、現行DBの `nameEn` は `odpt:stationTitle.en`、すなわち**事業者公式の英語名**である
+（`apps/scripts/src/update-odpt.ts:195`）。`Kita-senju` / `Shinjuku-sanchome` /
+`Jimbocho` / `Kozu` が正しく入っている側であり、ekidata で上書きすると
+メトロ・都営335駅＋未解決由来146駅の公式英語名が
+`shinnjukusannchoume` 等で潰れる。後述「未突合行の扱い」と矛盾する。
+
+ハイフン位置と大文字は**原理的に導出できない**。CSV でハイフンを持つのは
+250/10,625行、大文字は217行のみで、いずれも新幹線路線に偏った手入力である。
+`Kita-senju` の切れ目は形態素境界の知識であり、カナにもローマ字にも入っていない。
+
+全国展開分の `nameEn` は **NULL のまま運用する。** 表示側は全箇所
+`{station.nameEn && ...}` でガードしており（`StationCard.tsx:22`、
+`StationSearch.tsx:104`、`stations/[slug]/page.tsx:38`）、NULL は安全に握り潰される。
+「英語名を持っていない」と正直に表現する方が、漢字の下に
+`shinnjukusannchoume` を出すより良い状態である。
+駅ナンバリングの欠落（[requirements.md](./requirements.md) C-2）と同じ扱いになる。
+
+**空値では上書きしない。**
+
+```sql
+name_kana = COALESCE(NULLIF(EXCLUDED.name_kana, ''), stations.name_kana)
+```
+
+無料版CSVはカナ・ローマ字が全件空、路線色が 576/624 空である。
+素朴な `EXCLUDED` 上書きだと、現行DBのメトロ・都営335駅のカナと
+東京メトロ9路線の色がインポートの瞬間に消える。会員版に切り替えた後も、
+ekidata 側が一時的に値を落とした版を配布した場合に同じ事故が起きる。
+
+代償として、値を「消す」方向の更新が CSV からできなくなる。
+消す操作は Admin の編集画面から行う。
+
+### 廃止データの扱い
+
+`e_status = 2` の行は**取り込まない**（現役の 駅10,465 / 路線602 のみ）。
+既にDBに存在する行が CSV から消えた、または `e_status = 2` になった場合は
+`abolishedAt` を設定して**行は残す**。`platforms` 等からの参照を切らないため。
+
+### 乗換接続の生成
+
+同一 `station_g_cd` に属する現役駅の全順序対（**5,876行**）を
+`source = 'ekidata_group'` として生成する。
+
+- `source = 'manual'` の行には触れない
+- 難易度が入力済みの行は `onConflictDoNothing` で保持する
+
+`station_g_cd` は乗換関係を正しく捉えている。実データで確認した例:
+
+```
+浅草:  東武2100201 / 銀座線2800101 / 浅草線9930218 → g_cd=2100201 で同一
+       つくばEX 9930903                            → g_cd=9930903 で独立
+野田:  阪神3500103 → g_cd=1162506 (JR東西線 海老江)
+       大阪環状線1162308 → 独立
+```
+
+駅名が異なってもグループ化される（255件。北新地⇔大阪、朝霞台⇔北朝霞 など）。
+
+**ただし完全ではない。** 新宿(g_cd=1130208) と 新宿西口(都営大江戸線 9930102) は
+別グループだが実際には乗り換えできる。`source = 'manual'` での追加が前提となる。
+
+---
+
+## 移行アルゴリズム（一度きり）
+
+`apps/scripts/src/migrate-to-ekidata.ts`。
+**`stations.id` / `lines.id` は変更しない。** UPDATE で `ekidata*Cd` を埋める。
+
+### 順序: 事業者 → 路線 → 駅
+
+路線を主役にすると n:m を解くことになる。ODPT の路線は運行系統粒度で作られており、
+ekidata の線路名称粒度と対応しないためである（例: ODPT「京浜東北線・根岸線」1件 ↔
+ekidata 11332 + 11307 の2件）。**駅名から引けば `line_cd` は自動的に確定する。**
+
+#### 1. 事業者（17件）
+
+`odptOperatorId` が全17件に入っていることを実測済み。手動対応表で解決する。
+
+```
+JR-East→2  JR-Central→3  TokyoMetro→18  Toei→119  Tobu→11  Seibu→12
+Keisei→13  Keio→14  Odakyu→15  Tokyu→16  Keikyu→17  SaitamaRailway→121
+MIR→123  Yurikamome→125  TokyoMonorail→148  TWR→149  ToyoRapid→150
+```
+
+#### 2. 路線（62件）
+
+事業者を確定した上で、路線名の正規化一致 → 全駅包含判定 の順に試みる。
+実測で **46件中42件が自動決定**、要手動4件。
+
+要手動: `常磐線快速` / `東海道線` / `豊島線` / `東武スカイツリーライン(支線)`。
+対応表に直接書き下す。
+
+#### 3. 駅（481件）
+
+路線が確定していれば、その路線の ekidata 駅から正規化した駅名の完全一致で引く。
+
+**正規化ルール**（`domain/normalize.ts`。実データで踏んだもの）
+
+- **括弧は中身ごと除去**: `押上〈スカイツリー前〉` / `押上（スカイツリー前）` → `押上`
+  （ekidata 内部でも山括弧と丸括弧が混在している）
+- `ヶ` → `ケ`（市ケ谷など）
+
+未解決由来146件での実測: **131件が自動解決、15件が要手動**。
+
+| 件数 | 内容 | 対応 |
+|---|---|---|
+| 11 | 新幹線の東京・上野 | 会員版CSVに駅があれば解決。無ければ NULL のまま残す |
+| 3 | 常磐線快速の新橋・東京、高崎線の東京 | 上野東京ライン経由。手動で対応表に書く |
+| 1 | 京王新線「新宿」 | ekidata 側の駅名が「**新線新宿**」。手動 |
+
+#### 4. 未突合行の扱い
+
+**削除しない。** `ekidata*Cd` を NULL のまま残し、Admin の解決UIに一覧表示する。
+未解決由来の146駅は `code`（駅ナンバリング）と `nameEn` を全件持っており、
+突合できれば全部保持される。
+
+#### 5. 既存行の `publishedAt` バックフィル
+
+`publishedAt` は新規行で `NULL`（非公開）が既定になる（前述）。
+**そのままでは移行実行時に既存481駅が一斉に非公開へ落ち、本番サイトが空になる。**
+
+移行スクリプトは、突合の成否に関わらず既存481行のうち
+`publishedAt` が未設定のものへ移行実行時刻を設定する。
+既に管理者が値を設定していた場合は上書きしない
+（本スクリプトは一度きりの初期化であり、上書きルールの対象外だが同じ方針を踏襲する）。
+
+**ただし全件ではない。移行前の可視性をそのまま引き継ぐ。**
+
+```sql
+UPDATE stations SET published_at = now()
+FROM operators
+WHERE stations.operator_id = operators.id
+  AND stations.published_at IS NULL
+  AND operators.display_priority IS NOT NULL   -- 移行前に非表示だった事業者を除く
+```
+
+`displayPriority` が NULL の事業者に属する駅を一律に公開すると、
+**前項の実バグ（URL直打ちで非表示事業者の駅が見える）を、
+仕様として恒久化することになる。** ゆりかもめ等が該当する。
+これらは `publishedAt` を NULL のまま残し、整備が済んだ時点で
+管理者が個別に公開する。
+
+`displayPriority` を `NOT NULL DEFAULT 0` へ変更する前に本バックフィルを
+実行すること。順序を逆にすると、可視性の情報が失われて判定できなくなる。
+
+### `stationConnections` は全置換
+
+実測で 546件すべて難易度未入力（`stroller_difficulty` / `wheelchair_difficulty` が
+全件 NULL）であるため、保護せず削除して `station_g_cd` から作り直す。
+
+### `unresolved-connections` ページの転生
+
+`apps/admin/src/app/unresolved-connections/`（556行）は ODPT の未解決接続を
+人が解消するUIだった。役割は同じまま、**キーを ODPT ID から ekidata コードへ
+差し替えて「ekidata 未突合マスタの解決UI」にする。** 上記の未突合15件が最初の対象になる。
 
 ---
 
 ## エラーハンドリング
 
-| シナリオ | 対応 |
-|---------|------|
-| 同一ホーム・列車の組み合わせで停車位置パターンを重複登録 | ユニーク制約違反として409エラー |
-| 号車の開始位置が終了位置以上 | バリデーションエラー：「開始位置は終了位置より小さい値にしてください」 |
-| 停車位置パターン未登録の列車 | Web側では表示対象から除外（エラーではなく正常系） |
-| アクセス点が0件で送信 | バリデーションエラー：「アクセス点を1つ以上追加してください」 |
-| 接続先駅が未選択で接続追加 | 送信時に空の接続を除外 |
-| `xRangeStart` > `xRangeEnd` | バリデーションエラー |
+| 状況 | 検出箇所 | 応答 |
+|---|---|---|
+| CSVの必須列が欠落 | `domain/ekidataCsv.ts` | 適用せず、ファイル名と欠落列名を返す |
+| `line_cd` が `line` CSV に存在しない駅行 | `domain/plan.ts` | 当該駅をスキップし、計画に警告として計上 |
+| `station_g_cd` がダングリング（13件） | `domain/plan.ts` | グループを破棄せず、所属駅の最小 `station_cd` から代表値を決定 |
+| 適用中の SQL エラー | `external/` | トランザクションをロールバックし、失敗テーブルと件数を返す |
+| 突合失敗（移行スクリプト） | `migrate-to-ekidata.ts` | NULL のまま残し、一覧を標準出力に出す。処理は継続 |
+| トランザクションのサイズ超過 | Phase 1 の計測 | テーブル単位の分割コミットへ切り替え |
 
 ---
 
 ## テスト戦略
 
-### 自動テスト（[ADR-0002](../adr/0002-dependency-inversion-ports.md) の前提条件）
+**`domain/` が主戦場。** CSV文字列 → 構造体 → 差分計画 までが純粋関数のため、
+DBを起動せずに振る舞いを固定できる（[ADR-0002](../adr/0002-dependency-inversion-ports.md)）。
 
-**ADR-0002 は「テスタビリティ」のみを根拠に ports を採用している。**
-以下が満たされないまま #29 がマージされた場合、ADR-0002 は
-Level 1（マッピング層のみ）へ差し戻される。抽象だけを残す選択はしない。
-
-現状のテスト基盤は以下の通りで、**`apps/web` には実行環境自体が無い**。
-
-| | vitest設定 | `test` script | 既存テスト |
-|---|---|---|---|
-| `apps/admin` | ✅ | ✅ | 4ファイル |
-| `apps/web` | ❌ **無し** | ❌ **無し** | **0** |
-
-必須項目:
-
-1. **`apps/web` にテスト実行環境を構築する**
-   （`vitest.config.ts` + `test` script。`apps/admin` の既存設定を踏襲）
-2. **port に Fake を注入した usecase テストを最低1つ書く**
-   ```ts
-   const fake: StationDetailQuery = { getBySlug: async () => fixture };
-   const getStationDetail = makeGetStationDetail({ query: fake });
-   ```
-   Drizzle のチェーンモックを書かないこと（それが Level 2 を却下した理由）
-3. **純関数の単体テスト**
-   - `features/platform/domain/geometry.ts` の `computeBounds()`
-     — 車両範囲外・負座標・`physicalLength` 超過の各ケース
-   - `features/stop-pattern/domain/carSegments.ts` の `buildCarSegments()`
-     — `carLength` 指定あり／未指定（標準値20.0m）の両方、
-       および号車の並び（1号車が先頭／最後尾）の両方
-4. **ESLint ルールが発火することの検証**（[ADR-0001](../adr/0001-layer-structure.md)）
-   `apps/web/src/app/` 配下に `import { db } from '@furatora/database/client';` を
-   含む一時ファイルを置き、`pnpm run lint` がエラーになることを確認して削除する。
-   `apps/admin` でも同様。**「違反ゼロで通った」と「ルールが未適用」は
-   lint の出力上区別がつかないため、この検証を省略しない。**
-
-> **Phase 5 実施結果（2026-08-20）**: 上記1〜4をすべて満たした。`apps/web` は
-> 24件のテスト（`computeBounds()` 10 / `isDoorOrderReversed()` 4 /
-> `buildDirectionTabs()` 6 / `getStationDetail` 4）を持つに至り、
-> [ADR-0002](../adr/0002-dependency-inversion-ports.md) の前提条件を満たした。
-> ESLintルール発火の検証は `features/platform/components/` 配下で実施した
-> （TASK-2.5.3当時は `src/app/` 配下だったが、`features/*/components/**` にも
-> 同じ `no-restricted-imports` が適用されるため対象を変更。エラーになることを確認後、
-> 一時ファイルは削除した）。
-
-### ビルド確認
-
-- `pnpm run build` で型エラー・コンパイルエラーがないこと
-
-### 手動検証
-
-- **MVP検証**: 選定した1駅1ホームで、要件定義のMVP成功基準4項目を確認
-- **Admin**:
-  - 号車数が同じで向きが異なる2パターンの登録
-  - 号車の自動算出結果の上書き
-  - 対面乗り換え帯（`xRangeStart`/`xRangeEnd`）の登録
-  - **停車位置パターン保存の原子性**: 子の insert が失敗した場合に
-    親（`trainStopPatterns`）が残らないこと（[ADR-0005](../adr/0005-write-atomicity-driver.md)）
-- **Web**:
-  - SVG viewBoxが画面幅に応じて崩れずスケールすること
-  - 頭端式ホーム相当のケースで、車両範囲外の設備が正しい位置に描画されること
-- **`update-odpt` の疎通確認**（[ADR-0005](../adr/0005-write-atomicity-driver.md)）:
-  `USE_LOCAL_DB` 廃止後に、**ローカル実行とGitHub Actions の `workflow_dispatch` の両方**で
-  成功を確認する。日次cronのため壊れていても翌日まで気づけず、かつCIは環境変数を直接
-  注入するため `.env` の読み込み欠落はCIでは検出できない。どちらも省略しないこと。
-- **既存データ**: 開発中データのためリセットする。
-  回帰確認の対象は **Admin で再入力し終えたホームに限られる**（`update-odpt` はホーム以下を
-  再構築しない。「移行方針」参照）。#29 の検証範囲は MVP対象駅 + 対面乗り換えの確認用に
-  赤坂見附相当を1駅追加入力した範囲とし、全駅の目視確認は行わない
+| 対象 | 種別 | 主なケース |
+|---|---|---|
+| `domain/ekidataCsv.ts` | 単体 | 必須列欠落、`e_status` の分岐、`line_cd` と `station_cd` 上位桁の不一致 |
+| `domain/normalize.ts` | 単体 | 山括弧・丸括弧の除去、`ヶ`/`ケ`、正規化しても衝突しないこと |
+| `domain/romaji.ts` | 単体 | `ヂ`/`ヅ`、促音（`ch` の前は `t`）、拗音・外来音、長音縮約、撥音を `m` 化しないこと、置換辞書（`ジェイアール`）。CSV の手入力ヘボン式186件を回帰用の固定データにする |
+| `domain/plan.ts` | 単体 | 新規/更新/廃止の判定、空値で上書きしないこと、冪等性（同一入力で差分0） |
+| `usecases/` | 単体 | ports をスタブして計画と適用の調停を検証 |
+| `route.ts` | 結合 | 1.4MB のアップロードが通ること、plan→apply の順序 |
+| 移行スクリプト | 手動 | ドライランで突合結果を確認してから適用 |
 
 ---
 
-## 移行方針
+## 恒久知識の振り分け（フェーズ5で反映）
 
-### データ
+本設計で確定した内容のうち、次のIssue以降も有効であり続けるもの。
+**実装完了後に `docs/domain/` へ反映する**（[運用ルール](../domain/README.md)）。
 
-開発中データのため、`platform_locations` 系・`platform_car_stop_positions` のデータはマイグレーション後にリセットする。`apps/scripts/src/migrate-platform-locations.ts` は不要になるため削除する。
-
-適用先は Neon の `development` ブランチになる（[ADR-0004](../adr/0004-neon-branch-dev-environment.md)）。
-データを壊した場合は、`docker compose down -v` に相当する操作として
-**`main` ブランチから `development` を作り直す**。
-
-#### `update-odpt` が再構築する範囲は駅・路線までである
-
-`apps/scripts/src/update-odpt.ts` が書き込むテーブルは
-`stations` / `lines` / `stationLines` / `stationConnections` / `operators` / `odptMetadata` に限られ、
-**`platforms` 以下（ホーム・列車・停車位置・設備）は一切作らない。** これらは元々 Admin での手入力データである。
-
-したがってリセット後の復旧は次の2段階になり、2段目は手作業である。
-
-| | 手段 | 対象 |
-|---|---|---|
-| 1 | `pnpm run update-odpt` | 駅・路線・駅間接続 |
-| 2 | **Admin で手入力** | ホーム（`physicalLength` を含む）・停車位置パターン・コンコース・設備・接続 |
-
-さらに REQ-6.1 により、列車の表示判定は「そのホーム・列車の組み合わせに停車位置パターンが
-登録されているか」のみになる。**停車位置パターンを入力するまで、Web側ではどのホームにも
-列車が1本も表示されない。** これは不具合ではなく仕様だが、リセットの実コストとして
-計画に織り込む必要がある。全駅への展開ではなく、MVP対象駅から順に入力する。
-
-#### `platforms.physicalLength` を `notNull` にする手順
-
-`platforms` には既存行があり、`maxCarCount`（号車数）から `physicalLength`（メートル）への
-機械的な変換はできない（1両あたりの長さが列車ごとに異なるため）。
-`notNull` かつ default 無しのカラムを既存行のあるテーブルへ直接追加することはできないため、
-以下の順で適用する。
-
-1. `physicalLength` を **`.notNull().default('0')` として追加**し、`db:push` を適用する
-2. Admin で対象ホームの実際の長さを入力する
-3. 全ホームの入力が済んだ時点で `default` を外すマイグレーションを当てる（**後続Issue**。
-   #29 は MVP対象駅しか入力しないため、この段階では到達しない）
-
-**`0` は「未入力」を意味する暫定値である。** Web側は `physicalLength === 0` のホームを
-描画対象から除外する（`computeBounds()` の呼び出し前にガードする）。
-Admin のバリデーションは `z.number().positive()` のままとし、`0` を新規入力できないようにする
-（既存行の暫定値としてのみ存在を許す）。
-
-### 開発環境（[ADR-0004](../adr/0004-neon-branch-dev-environment.md)）
-
-| 削除 | 理由 |
+| 内容 | 行き先 |
 |---|---|
-| `docker/Dockerfile.postgres` / `docker/init.sql` / `docker-compose.yml` | `pg_uuidv7` は Neon が標準サポート（v1.6, PG14〜17） |
-| `packages/database` の `postgres` 依存（devDependencies） | ドライバを Neon に統一 |
-| `client.ts` の `USE_LOCAL_DB` 分岐 | 実態は「postgres-js を使う」フラグ |
-| `.github/workflows/update-odpt.yml` の `USE_LOCAL_DB: 'true'` | 同上 |
+| ekidata のコード体系（`station_cd` / `station_g_cd` / `line_cd` の意味と粒度）、`station_cd` 上位桁が `line_cd` と一致しない件、ダングリング13件 | `docs/domain/station-master-model.md`（新規） |
+| 「1駅 = 1路線」が `stationLines` の不変条件であること | 同上 |
+| 乗換接続の由来区分（`ekidata_group` / `manual`）と、g_cd が捉えない乗換の存在 | 同上 |
+| 運行系統による直通運転の表現方法と区間指定の必要性 | `docs/domain/service-routes.md`（新規。データ投入は後続Issue のため**適用状況**を明記する） |
+| 駅名正規化ルール | `docs/domain/station-master-model.md` |
+| `slug` の導出規則（`lines.slug` + カナ由来の修正ヘボン式、`(line_cd, ヘボン駅名)` が全国で一意であること、撥音を `m` 化しない方針、形態素境界の母音連続は判別不能であること） | 同上 |
+| `nameEn` は事業者公式表記のみを入れ、機械生成しないこと。ekidata は供給元にならないこと | 同上 |
+| ekidata 規約に由来する制約（非加工データの第三者提供は無償に限る） | 同上 |
+| 公開状態のモデル（`operators.displayPriority` は表示順専用、可視性は `stations.publishedAt` が単独で担う。粒度は `stations` 単位で `stationGroups`/`lines`/`operators` には持たせない） | `docs/domain/station-master-model.md` |
 
-`README.md` の `docker compose up -d` の手順を Neon ブランチの接続手順へ差し替える
-（日本語・英語の両セクション）。
+---
 
-#### `.env` は3箇所にある
+## 規約に由来する設計上の注記
 
-`DATABASE_URL` を持つ `.env` は **ルート / `apps/scripts` / `packages/database` の3箇所**に存在する
-（それぞれ `.env.local` も同様）。`development` ブランチへの切り替えでは3ファイルすべてを
-更新する。1つでも取り残すと、`db:push` は `development`・`update-odpt` は `main` といった
-食い違いが起きる。
+[利用規約](https://ekidata.jp/agreement.php) 第6条は、
+**非加工のデータを第三者へ提供する場合は無償でなくてはならない**と定める。
 
-#### `client.ts` の `import 'dotenv/config'` の扱い
+公開API `/api/v1/stations` / `/api/v1/lines/[slug]/stations` は
+駅マスタを素に近い形で返しており、この条項の射程に入りうる。
+現在 furatora は無償であるため問題は生じない。**有償プランを設ける場合、
+公開APIが返す駅データが「加工」に当たるかの評価が必要になる。**
+設備情報を結合した応答は加工と解しうるが、判断は有償化の設計時に行う。
 
-`USE_LOCAL_DB` 分岐の削除にあわせて `client.ts:1` の `import 'dotenv/config'` も落とすが、
-**この import に実際に依存しているのは `apps/scripts` だけである**点に注意する。
-
-| 利用者 | `.env` の読み込み手段 |
-|---|---|
-| `apps/web` / `apps/admin` | Next.js が自前で読む。dotenv は元から不要 |
-| `packages/database/drizzle.config.ts` | **自分で `import 'dotenv/config'` している**。client.ts に依存しない |
-| `apps/scripts` | 自前の dotenv 依存を持たず、`@furatora/database/client` の副作用に乗っている |
-
-したがって `apps/scripts` に受け皿が要る。Node の `--env-file` を使い、
-`package.json` のスクリプトを次の形にする（`tsx` は Node のフラグをそのまま転送する。
-Node v24.18.0 / リポジトリ同梱の `tsx` で動作確認済み・2026-08-15）。
-
-```json
-"update-odpt": "tsx --env-file-if-exists=.env src/update-odpt.ts"
-```
-
-**`--env-file`（`-if-exists` 無し）を使ってはならない。** `.env` が存在しない場合に
-`exit 9` で即座に失敗する。GitHub Actions には `.env` が無く環境変数で直接注入するため、
-`--env-file` にすると `update-odpt` がCIで落ちる。
-`--env-file-if-exists` はファイルが無ければ警告を出して継続する
-（CI の `node-version: 20` は 20.18.0 以降に解決されるため利用可能）。
-
-`packages/database` の `dotenv` は **`devDependencies` へ移す。削除はしない**
-（`drizzle.config.ts` が `db:generate` / `db:push` / `db:studio` で使う）。
-
-### `USE_LOCAL_DB` の削除順序（厳守）
-
-**このフラグは現在 load-bearing であり、単独で消すと本番の日次ODPT更新が壊れる。**
-[ADR-0005](../adr/0005-write-atomicity-driver.md) のドライバ変更と**同一PRで**、以下の順に行う。
-
-1. `packages/database/src/tx.ts`（`withTransaction`）を追加する
-2. `apps/scripts/src/update-odpt.ts:151` の `db.transaction()` を `withTransaction()` に置き換える
-3. `.github/workflows/update-odpt.yml` から `USE_LOCAL_DB: 'true'` を削除する
-4. `apps/scripts/package.json` の各スクリプトに `--env-file-if-exists=.env` を付ける
-   （`client.ts` から dotenv を落とす前に行う）
-5. `client.ts` の `USE_LOCAL_DB` 分岐・`postgres` 依存・`import 'dotenv/config'` を削除し、
-   `packages/database` の `dotenv` を `devDependencies` へ移す
-6. **ローカルで `pnpm run update-odpt` が動くことを確認する**
-7. **`workflow_dispatch` を手動実行し、成功を確認する**
-
-手順6を省略しないこと。**CIは環境変数を直接注入するため、`.env` の読み込みが壊れていても
-手順7は成功する。** ローカルだけが壊れ、次に誰かが手元でスクリプトを回すまで露見しない。
-
-### アーキテクチャ移行
-
-既存58ファイルを一度に移行しない。#29 の対象3feature（`platform` / `station` /
-`stop-pattern`）のみを新構成へ移し、それ以外は ESLint の除外設定で当面許容する。
-除外設定は共有パッケージではなく**各アプリの `eslint.config.mjs` に置く**
-（アプリごとに異なる速度で減っていくため。[ADR-0001](../adr/0001-layer-structure.md)）。
+出典表示は義務ではない（第4条）。任意表記は歓迎されている。
