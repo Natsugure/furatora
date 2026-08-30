@@ -27,11 +27,12 @@ PoC フェーズを設けず段階的実装に進む。
                               |
                               v
                     features/master-import/
-                      domain/    CSV解析・検証・差分計画     (純粋関数)
+                      domain/    正規化・差分計画            (純粋関数)
                       usecases/  計画の算出と適用の調停
-                      ports.ts   MasterImportRepository
+                      ports.ts   EkidataCsvSource / MasterImportRepository
                               |  implements（依存が逆転する）
                               v
+                    external/ekidata/ekidataCsvParser.ts     (CSV形式の知識)
                     external/repository/masterImportRepository.ts
                               |
                               v
@@ -55,21 +56,58 @@ apps/admin/src/
 │   └── master-import/page.tsx            # アップロードUI
 ├── features/master-import/
 │   ├── domain/
-│   │   ├── ekidataCsv.ts                 # 4種CSVの型・パース・検証
+│   │   ├── importedRecords.ts            # furatora 側の型。ekidata の列名を持たない
 │   │   ├── normalize.ts                  # 駅名正規化（突合と共用）
-│   │   ├── romaji.ts                     # カナ→修正ヘボン式。slug の導出に使う
 │   │   └── plan.ts                       # 差分計画の算出
-│   ├── ports.ts                          # MasterImportRepository
+│   ├── ports.ts                          # MasterImportRepository / EkidataCsvSource
 │   ├── usecases/
 │   │   ├── planImport.ts
 │   │   └── applyImport.ts
 │   └── components/MasterImportForm.tsx
-├── external/repository/masterImportRepository.ts
+├── features/station-publishing/          # 駅の公開操作（TASK-5.2）
+│   ├── domain/
+│   │   └── romaji.ts                     # カナ→修正ヘボン式。slug 候補の生成
+│   ├── ports.ts
+│   └── components/
+├── external/
+│   ├── ekidata/ekidataCsvParser.ts       # CSV形式の知識はここだけ
+│   └── repository/masterImportRepository.ts
 └── di.ts                                 # 配線を追加
 ```
 
-`domain/` は `next/*` も `drizzle-orm` も import しない。
-CSV文字列を受け取り構造体を返す純粋関数に閉じるため、ここがテストの主戦場になる。
+#### `domain/` に何を置くかの基準
+
+**判定は「純粋関数かどうか」ではない。** 純粋性は
+[ADR-0001](../adr/0001-layer-structure.md) の依存ルールから来る結果であって、
+そこに置く理由ではない。基準は次の1つとする。
+
+> **ekidata が消えても残る知識か。**
+
+| ファイル | 判定 |
+|---|---|
+| `normalize.ts`（括弧除去・`ヶ`/`ケ`） | **domain。** 実体は「駅名の同一性」であり、ODPT↔ekidata の突合でも使う |
+| `plan.ts`（空値で上書きしない・触らない列） | **domain。** furatora のポリシーであり、供給元と無関係に生き残る |
+| `importedRecords.ts` | **domain。** furatora が取り込みたい形。`ekidata*Cd` は furatora のスキーマの一部 |
+| `ekidataCsvParser.ts` | **domain ではない。** ekidata の CSV 列名・`e_status` の意味という外部仕様の知識で、供給元を替えれば丸ごと消える |
+| `romaji.ts` | **domain。ただし置き場が違う**（次項） |
+
+`ekidataCsvParser.ts` は `external/` に置く。ADR-0001 の
+「外部世界との接続」に該当する（現在 `external/` の中身が DB だけなのは偶然であり、
+DB 専用の層ではない）。`usecases/ → external/` の直接 import は依存の向きに反するため、
+**`ports.ts` に `EkidataCsvSource` を定義して `di.ts` で配線する**
+（[ADR-0002](../adr/0002-dependency-inversion-ports.md) の既存パターン）。
+DB に触れないので、テストは従来どおり DB を起動せずに書ける。
+
+#### `romaji.ts` は master-import に置かない
+
+**`master-import` は `romaji.ts` を一度も呼ばない。** slug の生成は
+インポート時ではなく公開操作の時点で行うため（後述「生成タイミング」）、
+利用者は Admin の公開UI だけである。
+
+`shared/` にも置かない。カナ→ローマ字の変換表自体は汎用だが、
+**採用している規則（長音を縮約する / 撥音を `m` 化しない / `ジェイアール`→`jr`）は
+slug の形を決める furatora の方針**であり、汎用ユーティリティではない。
+公開操作の feature に閉じる。
 
 ---
 
@@ -414,7 +452,7 @@ slug は URL 識別子であって公式英語名ではない。`Kita-senju` の
 ここを混同すると、`nameEn` を機械生成しないという判断
 （[requirements.md](./requirements.md)）が崩れる。
 
-#### ローマ字変換規則（`domain/romaji.ts`）
+#### ローマ字変換規則（`features/station-publishing/domain/romaji.ts`）
 
 **変換元は `station_name_r` ではなく `station_name_k`。**
 `station_name_r` を後から修正する方式は採らない。`shinnjukusannchoume` を
@@ -478,7 +516,7 @@ slug は URL 識別子であって公式英語名ではない。`Kita-senju` の
 
 変換器そのものは使い捨てではない。インポートは ekidata の更新のたびに
 繰り返し実行され、新線開業・新駅設置のたびに slug を持たない駅が入ってくる。
-`domain/romaji.ts` は恒久コードであり、テスト対象である。
+`romaji.ts` は恒久コードであり、テスト対象である。
 
 #### カナ側の欠陥（要確認9駅）
 
@@ -745,7 +783,7 @@ WHERE stations.operator_id = operators.id
 
 | 状況 | 検出箇所 | 応答 |
 |---|---|---|
-| CSVの必須列が欠落 | `domain/ekidataCsv.ts` | 適用せず、ファイル名と欠落列名を返す |
+| CSVの必須列が欠落 | `external/ekidata/ekidataCsvParser.ts` | 適用せず、ファイル名と欠落列名を返す |
 | `line_cd` が `line` CSV に存在しない駅行 | `domain/plan.ts` | 当該駅をスキップし、計画に警告として計上 |
 | `station_g_cd` がダングリング（13件） | `domain/plan.ts` | グループを破棄せず、所属駅の最小 `station_cd` から代表値を決定 |
 | 適用中の SQL エラー | `external/` | トランザクションをロールバックし、失敗テーブルと件数を返す |
@@ -756,15 +794,16 @@ WHERE stations.operator_id = operators.id
 
 ## テスト戦略
 
-**`domain/` が主戦場。** CSV文字列 → 構造体 → 差分計画 までが純粋関数のため、
-DBを起動せずに振る舞いを固定できる（[ADR-0002](../adr/0002-dependency-inversion-ports.md)）。
+**DBを起動せずに書けるものが主戦場。** CSV文字列 → 構造体 → 差分計画 までが
+純粋関数であり、ここで振る舞いを固定できる（[ADR-0002](../adr/0002-dependency-inversion-ports.md)）。
+`ekidataCsvParser.ts` は `external/` にあるが DB に触れないため、同じ扱いにする。
 
 | 対象 | 種別 | 主なケース |
 |---|---|---|
-| `domain/ekidataCsv.ts` | 単体 | 必須列欠落、`e_status` の分岐、`line_cd` と `station_cd` 上位桁の不一致 |
-| `domain/normalize.ts` | 単体 | 山括弧・丸括弧の除去、`ヶ`/`ケ`、正規化しても衝突しないこと |
-| `domain/romaji.ts` | 単体 | `ヂ`/`ヅ`、促音（`ch` の前は `t`）、拗音・外来音、長音縮約、撥音を `m` 化しないこと、置換辞書（`ジェイアール`）。CSV の手入力ヘボン式186件を回帰用の固定データにする |
-| `domain/plan.ts` | 単体 | 新規/更新/廃止の判定、空値で上書きしないこと、冪等性（同一入力で差分0） |
+| `external/ekidata/ekidataCsvParser.ts` | 単体 | 必須列欠落、`e_status` の分岐、`line_cd` と `station_cd` 上位桁の不一致。**DBに触れないため domain と同様に単体で書ける** |
+| `master-import/domain/normalize.ts` | 単体 | 山括弧・丸括弧の除去、`ヶ`/`ケ`、正規化しても衝突しないこと |
+| `station-publishing/domain/romaji.ts` | 単体 | `ヂ`/`ヅ`、促音（`ch` の前は `t`）、拗音・外来音、長音縮約、撥音を `m` 化しないこと、置換辞書（`ジェイアール`）。CSV の手入力ヘボン式186件を回帰用の固定データにする |
+| `master-import/domain/plan.ts` | 単体 | 新規/更新/廃止の判定、空値で上書きしないこと、冪等性（同一入力で差分0） |
 | `usecases/` | 単体 | ports をスタブして計画と適用の調停を検証 |
 | `route.ts` | 結合 | 1.4MB のアップロードが通ること、plan→apply の順序 |
 | 移行スクリプト | 手動 | ドライランで突合結果を確認してから適用 |

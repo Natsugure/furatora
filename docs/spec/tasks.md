@@ -113,7 +113,8 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 
 ### TASK-2.1: CSV パーサと型定義
 - **依存**: Phase 1
-- **成果物**: `apps/admin/src/features/master-import/domain/ekidataCsv.ts`
+- **成果物**: `apps/admin/src/external/ekidata/ekidataCsvParser.ts` と
+  `features/master-import/domain/importedRecords.ts`、`ports.ts` の `EkidataCsvSource`
 - **内容**: company / line / station / join の4種の行型とパース関数。
   `e_status` による現役判定。必須列の検証
 - **注意**: `station_cd` の上位桁から `line_cd` を導出しない（137件の例外がある）
@@ -125,19 +126,6 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **内容**: 括弧を**中身ごと**除去（`〈〉` と `（）` の両方）、`ヶ` → `ケ`
 - **テスト**: `押上〈スカイツリー前〉` / `押上（スカイツリー前）` → `押上`、
   `市ケ谷` / `市ヶ谷` の一致、正規化後に別駅が衝突しないこと
-
-### TASK-2.2b: カナ→修正ヘボン式の変換器
-- **依存**: なし
-- **成果物**: `apps/admin/src/features/master-import/domain/romaji.ts`
-- **内容**: design.md「ローマ字変換規則」の表に従う。
-  決定的規則（`ヂ`/`ヅ`、促音、拗音・外来音、`ー` 削除、`ジェイアール`→`jr`）と、
-  方針（長音は縮約する / 撥音は `m` 化**しない** / アポストロフィを入れない）
-- **注意**: **変換元は `station_name_k`。`station_name_r` を修理する実装にしない**
-- **テスト**: 上記各規則の単体ケースに加え、
-  **CSV の手入力ヘボン式186件を回帰用の固定データとして持つ**。
-  design.md が「原理的に決まらない」と記した形態素境界の4件
-  （武雄温泉 / 嬉野温泉 / えちご押上ひすい海岸 / てだこ浦西）は
-  **既知の不一致として明示的に許容する**（期待値に誤変換side を書く）
 
 ### TASK-2.3: 差分計画の算出
 - **依存**: TASK-2.1, TASK-2.2
@@ -152,6 +140,9 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
   `external/repository/masterImportRepository.ts`, `di.ts` への配線
 - **内容**: `withTransaction` での適用。TASK-1.1 の結果に応じて一括／分割を選ぶ。
   conflict target は `ekidata*Cd`
+- **あわせて**: TASK-2.1 の `EkidataCsvSource` も `di.ts` で配線する。
+  `usecases/ → external/` の直接 import は依存の向きに反するため
+  （[ADR-0001](../adr/0001-layer-structure.md) / [ADR-0002](../adr/0002-dependency-inversion-ports.md)）
 
 ### TASK-2.5: usecases
 - **依存**: TASK-2.4
@@ -316,10 +307,24 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
   `station.slug ?? station.id` はデッドコードになる。型と併せて整理する
 - **理由**: REQ-6.2 の削除に伴う後始末
 
+### TASK-5.1b: カナ→修正ヘボン式の変換器
+- **依存**: なし（Phase 1〜4 と並行可）
+- **成果物**: `apps/admin/src/features/station-publishing/domain/romaji.ts`
+- **内容**: design.md「ローマ字変換規則」の表に従う。
+  決定的規則（`ヂ`/`ヅ`、促音、拗音・外来音、`ー` 削除、`ジェイアール`→`jr`）と、
+  方針（長音は縮約する / 撥音は `m` 化**しない** / アポストロフィを入れない）
+- **注意**: **変換元は `station_name_k`。`station_name_r` を修理する実装にしない**
+- **テスト**: 上記各規則の単体ケースに加え、
+  **CSV の手入力ヘボン式186件を回帰用の固定データとして持つ**。
+  design.md が「原理的に決まらない」と記した形態素境界の4件
+  （武雄温泉 / 嬉野温泉 / えちご押上ひすい海岸 / てだこ浦西）は
+  **既知の不一致として明示的に許容する**（期待値に誤変換side を書く）
+
 ### TASK-5.2: Admin の公開操作UI（slug の確定を含む）
-- **依存**: TASK-2.2b, TASK-5.0
-- **対象**: `apps/admin`
-- **内容**: 駅の公開・非公開を切り替えるUI。公開時に以下を行う
+- **依存**: TASK-5.1b, TASK-5.0
+- **対象**: `apps/admin/src/features/station-publishing/`
+- **内容**: 駅の公開・非公開を切り替えるUI。TASK-5.1b の `romaji.ts` は
+  この feature の `domain/` に属する（master-import からは呼ばれない）。公開時に以下を行う
   - `lines.slug` + `hepburn(normalize(nameKana))` から slug の**候補を提示**し、
     管理者が確認・編集して確定する（**インポートでは slug を書かない**）
   - `lines.slug` が未設定の場合は、先に路線の slug を求める
