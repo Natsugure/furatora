@@ -11,10 +11,10 @@
 信頼度 88%（高）。移行対象の実測と突合の解決率確認が完了しているため、
 PoC フェーズを設けず段階的実装に進む。
 
-**ただし1点だけ先行検証する。** 35,000行規模の一括投入が
+**ただし1点だけ先行検証した（TASK-1.1・2026-08-31 完了）。** 約46,500行の一括投入が
 `withTransaction`（neon-serverless / WebSocket・[ADR-0005](../adr/0005-write-atomicity-driver.md)）で
-成立するかは未確認である。ここだけ Phase 1 で計測し、駄目ならテーブル単位の
-分割コミットに倒す（整合性は冪等な再実行で担保する）。
+成立するかは未確認だった。**成立する。** 分割コミットは採らない。
+詳細は下記「トランザクション規模（実測）」。
 
 ---
 
@@ -211,9 +211,11 @@ operators += {
   ekidataCompanyCd: integer('ekidata_company_cd').unique(),
 }
 // odptOperatorId は残す（ADR-0007 決定3）。一意制約は付けない
-// displayPriority を NOT NULL DEFAULT 0 に変更（既存2行はどちらも値ありのため
-// バックフィル不要）。「null=非表示」の意味を外し、表示順専用の列にする
-// （理由は次項）
+// displayPriority を NOT NULL DEFAULT 0 に変更し、「null=非表示」の意味を外して
+// 表示順専用の列にする（理由は次項）。
+// 【実測 2026-08-30】17事業者中 15行が NULL である。バックフィルは必要であり、
+// かつ TASK-3.7（publishedAt バックフィル）がこの NULL を読み終えるまで
+// 実行してはならない。先に埋めると「移行前に非表示だった事業者」が判別できなくなる
 
 lines += {
   ekidataLineCd: integer('ekidata_line_cd').unique(),
@@ -241,6 +243,9 @@ stationConnections:
   削除 → odptStationId, odptRailwayId, connectedRailwayId
   変更 → connectedStationId を notNull 化
   追加 → source varchar(20), unique(stationId, connectedStationId)
+  // unique は Phase 1 で付与する（Phase 4 ではない）。TASK-2.8 の
+  // onConflictDoNothing がこれを衝突対象にするため、Phase 2 より前に必要である。
+  // 【実測 2026-08-30】既存546行に重複ペア0件・connectedStationId の NULL 0件のため付与可能
 
 削除 → odptMetadata テーブルごと
 ```
@@ -591,8 +596,46 @@ POST /api/master-import  { mode: 'plan' }
    4ファイルを解析 → 検証 → 差分計画を返す（DBは変更しない）
       ↓ 管理者が確認
 POST /api/master-import  { mode: 'apply', planToken }
-   withTransaction 内で適用
+   withTransaction 内で適用（全テーブルを単一トランザクションで）
 ```
+
+### トランザクション規模（実測）
+
+Neon `furatora-db` の使い捨てブランチ（PG17 / 0.25 CU / ap-southeast-1）に対し、
+実データと同じ行数・同じ upsert 文の合成データを投入した結果（`BATCH_SIZE = 1000`）。
+
+| | 全体 | コールバック内 | 接続+BEGIN+COMMIT | 1文あたり平均 |
+|---|---|---|---|---|
+| 1周目（全件 INSERT） | **7,960 ms** | 7,564 ms | 396 ms | 151.3 ms |
+| 2周目（全件 UPDATE・定常状態） | **7,293 ms** | 6,871 ms | 422 ms | 137.4 ms |
+
+46,538行 / 50文。**単一トランザクションで成立する。**
+
+サーバ側の制限値は `statement_timeout = 0`（無制限）、
+`idle_in_transaction_session_timeout = 300,000 ms`、`idle_session_timeout = 0`。
+**トランザクション全体の時間制限は存在しない。**
+
+#### 決定: 単一 `withTransaction` で適用する
+
+判定基準（実測前に確定させたもの）は「全体時間が制限値の 1/3 未満なら一括」であった。
+実測は **1/37** であり、境界に近づいてすらいない。テーブル単位の分割コミットは採らない。
+`BATCH_SIZE` は **1000** を採用する。
+
+#### パースは必ずトランザクションの外で行う
+
+`idle_in_transaction_session_timeout = 300,000 ms` は**文と文の「間」にのみ効く**。
+バッチを連続投入している限りアイドルはネットワーク往復1回分であり、この8秒は
+制限に当たっていない。**トランザクション内でCSVを解析すると、そこで初めて
+この5分がリスクになる。** `plan` 段階で解析を終え、`apply` は投入だけを行う。
+
+#### `BATCH_SIZE` を詰める最適化はしない
+
+1文あたり137〜151msに対し、`operators` は175行1文で207ms、`lines` は602行1文で382ms
+かかっている。行数を1/6にしても時間は半分にしかならないため、固定費（往復遅延）が
+支配的である。`BATCH_SIZE` を上げれば全体時間は縮むが、
+**8秒を4秒にする最適化に意味はない**ため行わない。
+なお PostgreSQL の bind パラメータ上限は1文あたり65535であり、
+`stations` の約14列では約4,600行/文が上限である。1000はその範囲に収まる。
 
 1万行超を無確認で流す操作にはしない。`plan` の結果は
 新規 / 更新 / 廃止 / 突合失敗 をテーブルごとに提示する。
@@ -788,7 +831,7 @@ WHERE stations.operator_id = operators.id
 | `station_g_cd` がダングリング（13件） | `domain/plan.ts` | グループを破棄せず、所属駅の最小 `station_cd` から代表値を決定 |
 | 適用中の SQL エラー | `external/` | トランザクションをロールバックし、失敗テーブルと件数を返す |
 | 突合失敗（移行スクリプト） | `migrate-to-ekidata.ts` | NULL のまま残し、一覧を標準出力に出す。処理は継続 |
-| トランザクションのサイズ超過 | Phase 1 の計測 | テーブル単位の分割コミットへ切り替え |
+| トランザクションのサイズ超過 | — | **起きない。** TASK-1.1 で全体7.3〜8.0秒／制限の1/37と実測済み（上記「トランザクション規模（実測）」） |
 
 ---
 
