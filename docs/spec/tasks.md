@@ -66,9 +66,12 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 
 ### TASK-1.2: 新設テーブルのスキーマ定義
 - **依存**: なし（TASK-1.1 と並行可）
-- **内容**: `stationGroups` / `stationAdjacencies` / `serviceRoutes` /
-  `serviceRouteSegments` を `packages/database/src/schema.ts` に追加
-- **期待結果**: 4テーブルが定義され、型が通る
+- **内容**: `stationGroups` / `stationAdjacencies` を
+  `packages/database/src/schema.ts` に追加
+- **注意**: `serviceRoutes` / `serviceRouteSegments` は**作らない**。
+  路線概念が3種類に割れており、今回データも投入しないため
+  （[design.md](../spec/design.md)「`serviceRoutes` を今回は作らない」）
+- **期待結果**: 2テーブルが定義され、型が通る
 
 ### TASK-1.3: 既存テーブルの列追加
 - **依存**: TASK-1.2
@@ -89,11 +92,15 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
   TASK-3.7 のバックフィルが失敗しないことを保証するため実測する
 - **期待結果**: 制約が付与される。この時点で `publishedAt` は全行 NULL のため違反は出ない
 
-### TASK-1.4: ODPT ID 列にコメントを付与
+### TASK-1.4: 制約が無い理由をスキーマのコメントに残す
 - **依存**: TASK-1.3
-- **内容**: `odptStationId` / `odptRailwayId` / `odptOperatorId` の定義に、
-  **なぜ一意制約が無いか**をコメントで記述する（ADR-0007 の「影響」）
-- **期待結果**: 次にスキーマへ触れる者が制約の欠落をバグと誤認しない
+- **内容**: 2箇所に記述する
+  1. `odptStationId` / `odptRailwayId` / `odptOperatorId` の定義に、
+     **なぜ一意制約が無いか**（ADR-0007 の「影響」）
+  2. `stationLines` に、**なぜ `unique(stationId)` が無いか**。
+     実測0件は ekidata が路線ごとに駅を割った結果であり、ドメインの不変条件ではないこと。
+     粒度が暫定であること（design.md「粒度は暫定である」）
+- **期待結果**: 次にスキーマへ触れる者が制約の欠落をバグと誤認して付与しない
 
 ### TASK-1.5: マイグレーション生成と適用
 - **依存**: TASK-1.3, TASK-1.4
@@ -206,10 +213,11 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **前提の再確認**: 適用直前に「難易度入力済みの行が0件であること」を
   スクリプト内で検証する。0件でなければ停止する
 
-### TASK-3.6: `stationLines` の 1:1 制約を付与
-- **依存**: TASK-3.3
-- **内容**: `unique(stationId)` を追加
-- **前提の再確認**: 付与直前に複数路線を持つ駅が0件であることを確認する
+> **TASK-3.6（`stationLines` の 1:1 制約を付与）は削除した。** 実測0件は
+> ekidata が路線ごとに駅を割った結果であり、ドメインの不変条件ではないため。
+> 制約を前提としたコードが書かれると粒度の変更コストが跳ね上がる。
+> 番号は欠番のまま残す（[design.md](./design.md)「`stationLines` に
+> `unique(stationId)` を付けない理由」）。
 
 ### TASK-3.7: 既存481行の `publishedAt` バックフィル
 - **依存**: TASK-1.3b, TASK-3.3
@@ -346,12 +354,11 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **内容**: design.md「恒久知識の振り分け」の表に従って以下を作成・更新する
   - `docs/domain/station-master-model.md`（新規）:
     ekidata のコード体系と粒度、`station_cd` 上位桁の例外、ダングリング13件、
-    「1駅 = 1路線」の不変条件、乗換接続の由来区分、駅名正規化ルール、
+    **現在の粒度が暫定であること**と `unique(stationId)` を付けない理由、
+    乗換接続の由来区分、駅名正規化ルール、
     ekidata 規約に由来する制約、**`slug` の導出規則**、
     **`nameEn` は公式表記のみで機械生成しないこと**、
     **可視性は `stations.publishedAt` が単独で担い、判定は単一の述語を通すこと**
-  - `docs/domain/service-routes.md`（新規）:
-    運行系統による直通運転の表現。**データ投入は後続Issue のため冒頭に適用状況を明記する**
   - `docs/domain/README.md` の一覧に2件を追加
 - **確認**: 既存の `platform-coordinate-system.md` / `train-stop-patterns.md` に
   変更が要るかを確認し、**不要ならその旨を記録する**
@@ -361,6 +368,10 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **注意**: ステータス変更は**開発者の承認を得てから**行う（[ADR運用ルール](../../.claude/rules/adr.md)）
 
 ### TASK-6.4: 後続Issue の起票
+- **必ず含めるもの**: **駅・路線の粒度の確定**。
+  本Issueでは暫定とし不変条件を課さなかったため、実データ投入後に判断する。
+  調査資料は Obsidian `Projects/furatora/駅・路線の粒度 — 設計のための調査メモ`。
+  期限の目安は「ホーム設備の入力が共用ホーム駅（目黒等）に到達したとき」
 - **内容**: 以下を GitHub Issue として起票する
   - 運行系統のデータ投入と Admin 管理UI（ODPT路線46件が種として使える）
   - 列単位の上書きロック（`lockedFields`）

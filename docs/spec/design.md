@@ -84,11 +84,30 @@ CSV文字列を受け取り構造体を返す純粋関数に閉じるため、�
 | `station_cd` | `stations` | **路線×駅** |
 | `station_g_cd` | `stationGroups`（新設） | **乗換単位の「駅」** |
 | `join` | `stationAdjacencies`（新設） | 路線内の隣接関係 |
-| （供給なし） | `serviceRoutes` / `serviceRouteSegments`（新設） | 運行系統・直通運転 |
 
 `stations` は現行の路線×駅粒度を維持する。ekidata `station_cd` と 1:1 で対応するため
 既存行を UPDATE で移行でき、`platforms`（14件・7駅）と `lineDirections`（52件）からの
 参照を切らずに済む。
+
+#### 粒度は暫定である
+
+**この粒度は「移行を通すための選択」であり、furatora のドメインとして正しいものではない。**
+
+ekidata の粒度は furatora が必要とするものと一致しない。同一事業者・同一駅で
+**2,020行 / 10,625（19%）** が複数行に割れる（JR東493 / JR西236 / メトロ86）。
+東京駅は18行、新宿は13行になる。東京駅の `JR東海道本線` `上野東京ライン` `宇都宮線` は
+**同じ7〜10番線**であり、3つの駅行がそれぞれホーム設備を持つことになる。
+新幹線はさらに極端で、**東京〜大宮を5路線（東北・上越・北陸・山形・秋田）が主張する。**
+
+では事業者×物理駅（`station_g_cd` × `company_cd` = 9,441）にすればよいかというと、
+ホームを事業者跨ぎで共用する駅（目黒・赤羽岩淵・渋谷・小竹向原）で逆向きに割れる。
+
+**どの粒度も正しくない。** したがって本Issueでは粒度を確定させず、
+**暫定の粒度に依存する不変条件を課さない**方針を採る（次項以降）。
+確定は実データ投入後に別Issueで行う。
+
+調査の詳細（実測値・検討した案・新幹線と直通運転の問題）は
+Obsidian `Projects/furatora/駅・路線の粒度 — 設計のための調査メモ` にある。
 
 ### 新設テーブル
 
@@ -116,45 +135,36 @@ export const stationAdjacencies = pgTable('station_adjacencies', {
   unique('unique_station_adjacency').on(t.lineId, t.stationAId, t.stationBId),
 ]);
 
-// 運行系統。ekidata は供給しないため手入力。直通運転をここで表現する
-export const serviceRoutes = pgTable('service_routes', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  slug: varchar('slug', { length: 100 }).unique(),
-  name: varchar('name', { length: 100 }).notNull(),
-  nameKana: varchar('name_kana', { length: 100 }),
-  nameEn: varchar('name_en', { length: 100 }),
-  color: varchar('color', { length: 7 }),
-  displayOrder: integer('display_order').default(0),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-});
-
-// 運行系統を構成する区間。fromStationId/toStationId が null なら路線の全区間
-export const serviceRouteSegments = pgTable('service_route_segments', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  serviceRouteId: uuid('service_route_id')
-    .references(() => serviceRoutes.id, { onDelete: 'cascade' }).notNull(),
-  sequence: integer('sequence').notNull(),
-  lineId: uuid('line_id').references(() => lines.id).notNull(),
-  fromStationId: uuid('from_station_id').references(() => stations.id),
-  toStationId: uuid('to_station_id').references(() => stations.id),
-}, (t) => [
-  unique('unique_service_route_segment').on(t.serviceRouteId, t.sequence),
-]);
 ```
 
-#### 区間指定が必要な理由
+#### `serviceRoutes` を今回は作らない
 
-実データで2つの形が確認されている。「路線ペア」では後者を表現できない。
+当初は `serviceRoutes` / `serviceRouteSegments`（順序付き区間の並び）を
+新設する設計だった。**取りやめる。**
 
-```
-京浜東北線(11332 大宮〜横浜) + 根岸線(11307 横浜〜大船)
-  → seg1 = (11332, null, null), seg2 = (11307, null, null)
+理由は、この1つのテーブルに**性質の異なる3種類**が混ざるためである。
 
-横須賀線(11308 東京〜久里浜) + 総武本線(11314 東京〜銚子)
-  → seg1 = (11308, null, null), seg2 = (11314, 東京, 千葉)   ← 部分区間
-```
+| 種別 | 例 | 実体 |
+|---|---|---|
+| 1. 通しで1路線と認知される | 横須賀・総武快速線、京浜東北・根岸線、琵琶湖線/JR京都線/JR神戸線、京阪本線・鴨東線 | **案内路線**（表示単位） |
+| 2. 相互直通運転 | 東急東横線 ↔ 副都心線 ↔ 東武東上線 | **運行**（列車の走り方） |
+| 3. 分岐するが独立扱いしない | 京王線・京王新線、西武池袋線・西武有楽町線 | **案内路線**（表示単位） |
+
+**1 と 3 は同じ問題である。** どちらも「ekidata の `line_cd` が、
+利用者の認識する路線より細かい」。1が「複数を束ねる」、3が「本線に吸収する」
+という向きの違いにすぎない。**2 だけが別種**で、これは路線の粒度ではなく
+列車の運行の話である。
+
+構造上は「順序付き区間の並び」で1も2も表現できてしまう。だが表示のときに破綻する。
+路線一覧に 1・3 は出したいが 2 は出したくない（「東横線・副都心線・東武東上線直通」が
+路線一覧に並ぶのは誤りである）。判別する列が必要になり、それは
+`displayPriority` が「表示順」と「可視性」を1列に持って壊れたのと同じ構造になる。
+
+加えて**今回はデータを1件も投入しない。** 概念が未分化のまま空のテーブルを
+作ると、`docs/domain/` に検証されていないモデルが恒久ドキュメントとして固定される。
+`stationAdjacencies` は今回 10,189 行を実際に投入するため事情が異なる。
+
+後続Issueで、**案内路線**と**運行系統**を別概念として設計する。
 
 ### 既存テーブルの変更
 
@@ -184,8 +194,10 @@ stations += {
 // 追加: check('published_requires_slug', sql`published_at IS NULL OR slug IS NOT NULL`)
 //       公開されている駅は必ず slug を持つ（理由は後項）
 
-stationLines += unique('unique_station_line_station').on(t.stationId)
-// 実測で複数路線を持つ駅は0件。路線×駅粒度では 1:1 が不変条件なので制約で固定する
+stationLines: 変更しない
+// 実測で複数路線を持つ駅は0件だが、unique(stationId) は付けない。
+// 0件なのは ekidata が路線ごとに駅を割っているからであり、ドメインの不変条件ではない
+// （理由は後項。コメントとしてスキーマにも残す）
 
 stationConnections:
   削除 → odptStationId, odptRailwayId, connectedRailwayId
@@ -195,10 +207,31 @@ stationConnections:
 削除 → odptMetadata テーブルごと
 ```
 
+#### `stationLines` に `unique(stationId)` を付けない理由
+
+実測で複数路線を持つ駅は0件であり、制約は今すぐ付けられる。**付けない。**
+
+**0件なのは ekidata が路線ごとに駅を割っているからであって、
+furatora のドメインの不変条件ではない。** ekidata の粒度は暫定であり
+（前項「粒度は暫定である」）、確定したものとして扱ってはならない。
+
+そして**コストはマイグレーションではない。制約を前提としたコードが書かれることである。**
+制約の削除は安いが、「1駅は1路線」を仮定したクエリと表示ロジックが増えた後では、
+粒度の変更が制約の削除では済まなくなる。
+
+`odptStationId` の一意制約と同じ扱いをする。**なぜ制約が無いかをスキーマの
+コメントに残す。** 残さなければ、次にスキーマへ触れる者が「実測0件なのに制約が無い」
+のを見て付与し、前提を壊す。
+
 #### `connectedRailwayId` を削除する理由
 
-`stations` が路線×駅粒度であり `stationLines` が 1:1 に固定されるため、
-`connectedStationId` から路線が一意に定まる。冗長な列になる。
+`stationConnections` は**難易度が全546件 NULL** であり、`station_g_cd` から
+全置換で再生成される（後述「`stationConnections` は全置換」）。
+粒度が将来変わってもデータを作り直せるため、路線を指す列を保持しておく必要がない。
+
+当初は「`stationLines` が 1:1 に固定されるため `connectedStationId` から
+路線が一意に定まる」を根拠にしていたが、上記の通り 1:1 は固定しないため
+この根拠は使わない。**再生成可能であることが根拠である。**
 
 #### ODPT ID 列に一意制約が無い理由をコメントに残す
 
@@ -746,9 +779,9 @@ DBを起動せずに振る舞いを固定できる（[ADR-0002](../adr/0002-depe
 | 内容 | 行き先 |
 |---|---|
 | ekidata のコード体系（`station_cd` / `station_g_cd` / `line_cd` の意味と粒度）、`station_cd` 上位桁が `line_cd` と一致しない件、ダングリング13件 | `docs/domain/station-master-model.md`（新規） |
-| 「1駅 = 1路線」が `stationLines` の不変条件であること | 同上 |
+| **現在の粒度が暫定であること**（ekidata 粒度は 19% 重複し、事業者×物理駅はホーム共用駅で割れる）。`stationLines` に `unique(stationId)` を付けない理由 | 同上 |
 | 乗換接続の由来区分（`ekidata_group` / `manual`）と、g_cd が捉えない乗換の存在 | 同上 |
-| 運行系統による直通運転の表現方法と区間指定の必要性 | `docs/domain/service-routes.md`（新規。データ投入は後続Issue のため**適用状況**を明記する） |
+| 路線概念の3分類（案内路線 / 運行 / 支線の吸収）と、ekidata `line_cd` がそれらを混在させていること | `docs/domain/station-master-model.md` |
 | 駅名正規化ルール | `docs/domain/station-master-model.md` |
 | `slug` の導出規則（`lines.slug` + カナ由来の修正ヘボン式、`(line_cd, ヘボン駅名)` が全国で一意であること、撥音を `m` 化しない方針、形態素境界の母音連続は判別不能であること） | 同上 |
 | `nameEn` は事業者公式表記のみを入れ、機械生成しないこと。ekidata は供給元にならないこと | 同上 |
