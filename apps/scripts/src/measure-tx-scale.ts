@@ -41,7 +41,12 @@ const COUNTS = {
 const TOTAL_ROWS = Object.values(COUNTS).reduce((a, b) => a + b, 0);
 
 // PostgreSQL の bind パラメータ上限は 1文あたり 65535。
-// 最も列数の多い stations が約14列のため、4000行/文で 56,000 パラメータとなり上限に迫る
+//
+// 【この上限は本スクリプト専用であり、インポートの安全上限ではない】
+// ここで stations に渡すのは12列だけなので、4000行/文でも 48,000 パラメータに収まる。
+// しかし stations の実体は20列あり、全列を書く applyImport（TASK-2.4）では
+// 3,276行/文が上限になる。この定数を流用すると上限を超える。
+// 採用値の BATCH_SIZE = 1000 は20列でも 20,000 パラメータであり、どちらの経路でも安全である
 const MAX_SAFE_BATCH = 4000;
 
 const connectionString = process.env.MEASURE_DATABASE_URL;

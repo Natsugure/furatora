@@ -188,7 +188,7 @@ Neon `furatora-db`（project `patient-meadow-13439419` / PG17 / 0.25 CU 固定�
 | 2 | `idle_in_transaction_session_timeout` | **300,000ms（5分）** | 文と文の**間**にのみ効く。全体時間には効かない |
 | 2' | `idle_session_timeout` | 0（無制限） | 効かない |
 | 3 | WebSocket の寿命 / Neon proxy の切断 | 未知 | **これだけが実測対象** |
-| 4 | bind パラメータ上限 65535/文 | 既知定数 | `stations` 約19列 → 上限 約3,400行/文 |
+| 4 | bind パラメータ上限 65535/文 | 既知定数 | `stations` は20列 → 全列を書くなら上限 3,276行/文 |
 
 **2 はトランザクション全体の制限ではない。** 「文を実行していない状態」が5分続くと
 切られる制限であり、バッチを連続で投げる限りアイドルはネットワーク往復1回分でしかない。
@@ -314,6 +314,9 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
   `external/repository/masterImportRepository.ts`, `di.ts` への配線
 - **内容**: 全テーブルを**単一の** `withTransaction` で適用する（TASK-1.1 で確定。
   分割コミットは採らない）。`BATCH_SIZE = 1000`。conflict target は `ekidata*Cd`
+- **注意**: `measure-tx-scale.ts` の `MAX_SAFE_BATCH = 4000` を**安全上限として流用しない**。
+  あれは計測スクリプトが stations に12列しか渡さないことを前提とした値である。
+  全列を書く本経路の上限は 3,276行/文であり、`BATCH_SIZE = 1000` はその内側にある
 - **必須条件**: **CSVのパースをトランザクションの外で終えていること。**
   `idle_in_transaction_session_timeout = 300,000ms` は文と文の間にのみ効くため、
   トランザクション内で解析すると、そこで初めてこの制限がリスクになる
