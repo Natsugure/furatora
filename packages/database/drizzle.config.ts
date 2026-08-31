@@ -1,11 +1,13 @@
 import 'dotenv/config';
 import { defineConfig } from 'drizzle-kit';
 
-// マイグレーション（DDL）は直結エンドポイントで流す。
-// Vercel が注入する DATABASE_URL は PgBouncer 経由のプール接続であり、
-// トランザクションモードのプーラを介した DDL は避ける。
+// Drizzle Kit のマイグレーションは直結（非プール）エンドポイントで流す。
+// Neon のプーラは PgBouncer のトランザクションモード固定であり、SET や
+// セッションレベルのアドバイザリロックが使えない。DDL 文そのものではなく、
+// それらに依存しうるマイグレーションツール側が理由である。
+// Vercel が注入する DATABASE_URL はプール接続である。
 // ローカルには DATABASE_URL しか無い場合があるためフォールバックさせる。
-// 参照: docs/domain/environments-and-migrations.md
+// 参照: docs/adr/0008-environment-database-branch-mapping.md
 const connectionString =
   process.env.MIGRATION_DATABASE_URL ??
   process.env.DATABASE_URL_UNPOOLED ??
