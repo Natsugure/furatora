@@ -99,8 +99,13 @@ export const stationConnections = pgTable('station_connections', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-  // インポートの冪等性を担保する。TASK-2.8 の onConflictDoNothing はこの制約を
-  // 衝突対象にするため、無いと再実行のたびに重複行が積み上がる
+  // TASK-2.8 のインポートを冪等にする。onConflictDoNothing がこの制約を衝突対象に
+  // するため、無いと再実行のたびに重複行が積み上がる。
+  // 【NULL 行は守られない】PostgreSQL の UNIQUE は既定で NULL どうしを異なる値として
+  // 扱うため、connectedStationId IS NULL の行（ODPT 未突合）は重複を防げない。
+  // nullsNotDistinct を付けないのは意図的である。TASK-2.8 が生成するのは同一
+  // station_g_cd の実在駅どうしの順序対で常に非 NULL であり、NULL 行は TASK-4.2 の
+  // notNull 化で消えるためである
   unique('unique_station_connection').on(t.stationId, t.connectedStationId),
 ]);
 
