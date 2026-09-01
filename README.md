@@ -161,12 +161,17 @@ Preview デプロイは PR ごとに Neon の `preview/<git-branch>` ブラン�
 
 #### 必要な設定
 
-| 場所 | 設定 |
-|---|---|
-| Vercel: Storage → Connect Project → Advanced Options | Preview Branching を有効化 |
-| Vercel: Settings → Build and Deployment | Build Command を `pnpm run db:migrate && turbo run build` に上書き |
-| GitHub: リポジトリ変数 `NEON_PROJECT_ID` | Neon のプロジェクトID |
-| GitHub: シークレット `NEON_API_KEY` | Neon の API キー |
+`apps/web` と `apps/admin` は別々の Vercel プロジェクトである。
+
+| 場所 | 対象 | 設定 |
+|---|---|---|
+| Vercel: Storage → Connect Project → Advanced Options | **web / admin の両方** | Preview Branching を有効化 |
+| Vercel: Settings → Build and Deployment | **web のみ** | Build Command を `pnpm run db:migrate && turbo run build` に上書き |
+| GitHub: リポジトリ変数 `NEON_PROJECT_ID` | — | Neon のプロジェクトID |
+| GitHub: シークレット `NEON_API_KEY` | — | Neon の API キー |
+
+**`db:migrate` を admin 側にも入れてはならない。** 両プロジェクトが同じ preview
+ブランチを共有するため、1回の push で同じマイグレーションが同時に流れて衝突する。
 
 GitHub 側の2つは、PR クローズ時に preview ブランチを削除する
 `.github/workflows/cleanup-neon-preview.yml` が使用する。
@@ -333,12 +338,17 @@ For the rationale and the rejected alternatives, see
 
 #### Required configuration
 
-| Where | Setting |
-|---|---|
-| Vercel: Storage → Connect Project → Advanced Options | Enable Preview Branching |
-| Vercel: Settings → Build and Deployment | Override Build Command with `pnpm run db:migrate && turbo run build` |
-| GitHub repository variable `NEON_PROJECT_ID` | Neon project ID |
-| GitHub secret `NEON_API_KEY` | Neon API key |
+`apps/web` and `apps/admin` are separate Vercel projects.
+
+| Where | Applies to | Setting |
+|---|---|---|
+| Vercel: Storage → Connect Project → Advanced Options | **both web and admin** | Enable Preview Branching |
+| Vercel: Settings → Build and Deployment | **web only** | Override Build Command with `pnpm run db:migrate && turbo run build` |
+| GitHub repository variable `NEON_PROJECT_ID` | — | Neon project ID |
+| GitHub secret `NEON_API_KEY` | — | Neon API key |
+
+**Do not add `db:migrate` to the admin project.** Both projects share the same preview
+branch, so a single push would run the same migration twice, concurrently.
 
 The two GitHub entries are used by `.github/workflows/cleanup-neon-preview.yml`, which
 deletes the preview branch when a PR is closed.
