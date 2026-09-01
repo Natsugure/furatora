@@ -1,0 +1,21 @@
+# Vercel-Managed Integration の preview ブランチ削除は、Git ブランチの削除ではなく
+# Vercel のデプロイ保持期間（既定180日）に連動する。Neon 無料プランのブランチ上限は
+# 10 のため、PR クローズ時にこちらから明示的に削除する。
+# 参照: docs/adr/0008-environment-database-branch-mapping.md
+name: Cleanup Neon preview branch
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  delete-branch:
+    runs-on: ubuntu-latest
+    steps:
+      # Vercel の統合が作るブランチ名は preview/<git-branch> で固定されている。
+      # 対象が既に無い場合もこのアクションは正常終了する。
+      - uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: preview/${{ github.head_ref }}
+          api_key: ${{ secrets.NEON_API_KEY }}

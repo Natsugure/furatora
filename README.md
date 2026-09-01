@@ -142,6 +142,40 @@ pnpm run db:studio  # Drizzle Studio（DB GUI）を起動
 pnpm run update-odpt # ODPTから駅・路線データを取得・更新
 ```
 
+### デプロイとマイグレーション
+
+マイグレーションは Vercel のビルド時に、そのデプロイの接続先へ自動的に適用される。
+`pnpm run db:migrate` を手で本番に流す運用は取らない。
+
+Preview デプロイは PR ごとに Neon の `preview/<git-branch>` ブランチを持つ。
+本番データのコピーに、その PR のスキーマを適用した状態で動作を確認できる。
+
+**破壊的なマイグレーション（`DROP COLUMN` 等）は二段階に分ける。**
+ビルド時にマイグレーションが走るため、稼働中の旧デプロイが新しいスキーマに直面する。
+
+1. その列を読まないコードをデプロイする
+2. 次のデプロイでマイグレーションが列を落とす
+
+設計の根拠と却下した選択肢は
+[ADR-0008](./docs/adr/0008-environment-database-branch-mapping.md) を参照。
+
+#### 必要な設定
+
+`apps/web` と `apps/admin` は別々の Vercel プロジェクトである。
+
+| 場所 | 対象 | 設定 |
+|---|---|---|
+| Vercel: Storage → Connect Project → Advanced Options | **web / admin の両方** | Preview Branching を有効化 |
+| Vercel: Settings → Build and Deployment | **web のみ** | Build Command を `pnpm run db:migrate && turbo run build` に上書き |
+| GitHub: リポジトリ変数 `NEON_PROJECT_ID` | — | Neon のプロジェクトID |
+| GitHub: シークレット `NEON_API_KEY` | — | Neon の API キー |
+
+**`db:migrate` を admin 側にも入れてはならない。** 両プロジェクトが同じ preview
+ブランチを共有するため、1回の push で同じマイグレーションが同時に流れて衝突する。
+
+GitHub 側の2つは、PR クローズ時に preview ブランチを削除する
+`.github/workflows/cleanup-neon-preview.yml` が使用する。
+
 ---
 
 ## English
@@ -283,3 +317,38 @@ pnpm run db:push     # Apply DB schema
 pnpm run db:studio   # Launch Drizzle Studio (DB GUI)
 pnpm run update-odpt # Fetch & update station/line data from ODPT
 ```
+
+### Deployment and migrations
+
+Migrations are applied automatically during the Vercel build, against whichever branch
+that deployment connects to. Never run `pnpm run db:migrate` against production by hand.
+
+Each PR gets its own Neon `preview/<git-branch>` branch, so a preview deployment runs
+the PR's schema against a copy of production data.
+
+**Split destructive migrations (`DROP COLUMN` and the like) across two deploys.**
+Migrations run during the build, so the still-running previous deployment faces the new
+schema:
+
+1. Deploy code that no longer reads the column.
+2. Let the next deployment's migration drop it.
+
+For the rationale and the rejected alternatives, see
+[ADR-0008](./docs/adr/0008-environment-database-branch-mapping.md) (Japanese).
+
+#### Required configuration
+
+`apps/web` and `apps/admin` are separate Vercel projects.
+
+| Where | Applies to | Setting |
+|---|---|---|
+| Vercel: Storage → Connect Project → Advanced Options | **both web and admin** | Enable Preview Branching |
+| Vercel: Settings → Build and Deployment | **web only** | Override Build Command with `pnpm run db:migrate && turbo run build` |
+| GitHub repository variable `NEON_PROJECT_ID` | — | Neon project ID |
+| GitHub secret `NEON_API_KEY` | — | Neon API key |
+
+**Do not add `db:migrate` to the admin project.** Both projects share the same preview
+branch, so a single push would run the same migration twice, concurrently.
+
+The two GitHub entries are used by `.github/workflows/cleanup-neon-preview.yml`, which
+deletes the preview branch when a PR is closed.
