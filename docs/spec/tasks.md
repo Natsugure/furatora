@@ -11,7 +11,7 @@
 
 ```
 Phase 0: docs/spec・ADR更新                      (完了)
-Phase 1: スキーマ変更 + トランザクション規模の計測  (基盤・唯一の未知)
+Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
 Phase 2: インポート機構                           (P0)
 Phase 3: 移行スクリプト（突合）                    (P0・Phase 2 に依存)
 Phase 4: ODPT 後始末                             (Phase 3 完了後)
@@ -21,9 +21,11 @@ Phase 6: 検証・振り返り                            (必須)
 
 ### 実行順序の根拠
 
-Phase 1 に**唯一の未知**（35,000行の一括投入が `withTransaction` で成立するか）がある。
+Phase 1 に**唯一の未知**（約46,500行の一括投入が `withTransaction` で成立するか）がある。
 ここで分割コミットが必要と判明すると Phase 2 の `applyImport` の構造が変わるため、
-先に片付ける。
+Phase 2 に入る前に片付ける。ただし Phase 1 の**内部では計測を末尾に置く**。
+投入コストを決めるのはインデックスと制約の数であり、
+移行後スキーマの適用（TASK-1.5）を待たなければ数値が使えないためである。
 
 Phase 4（ODPT 後始末）は Phase 3 の後にしか置けない。突合が
 `odptStationId` / `odptRailwayId` に依存しており、先に消すと移行できなくなる。
@@ -53,27 +55,32 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 
 ---
 
-## Phase 1: スキーマ変更 + 規模計測
+## Phase 1: スキーマ変更 + 規模計測（完了 2026-08-31）
 
-### TASK-1.1: トランザクション規模の計測
-- **依存**: なし
-- **内容**: `stations` 10,465 + `stationAdjacencies` 10,189 + `stationConnections` 5,876 +
-  `stationGroups` 8,766 ≒ 35,000行を `withTransaction` で投入し、
-  Neon の接続時間制限に収まるか計測する。捨てスクリプトで可
-- **期待結果**: 所要時間と成否。失敗する場合はテーブル単位の分割コミットへ方針変更し、
-  design.md の該当箇所を更新する
-- **完了条件**: 数値が記録され、Phase 2 の `applyImport` の構造が確定している
+**結果**: スキーマは `development` ブランチに適用済み。
+本Issue唯一の未知だった「約46,500行の一括投入が `withTransaction` で成立するか」は
+**成立する**（全体7.3〜8.0秒 / 制限の1/37）。Phase 2 の `applyImport` は
+単一トランザクション・`BATCH_SIZE = 1000` で確定した。
+
+**実行順序**: TASK-1.2 → 1.3 → 1.3b → 1.4 → 1.5 → **1.1（計測）**。
+計測を Phase 1 の末尾に置くのは、投入コストを決めるのが行数ではなく
+**インデックスと制約の数**であるためである。移行後スキーマが適用された状態で
+測らなければ、得た数値が Phase 2 の判断材料にならない。
+Phase 2 より前であることは変わらないため、「唯一の未知を先に潰す」という
+[実行順序の根拠](#実行順序の根拠)は保たれる。
 
 ### TASK-1.2: 新設テーブルのスキーマ定義
-- **依存**: なし（TASK-1.1 と並行可）
+- **状態**: ✅ 完了 (2026-08-30)
+- **依存**: なし
 - **内容**: `stationGroups` / `stationAdjacencies` を
   `packages/database/src/schema.ts` に追加
 - **注意**: `serviceRoutes` / `serviceRouteSegments` は**作らない**。
   路線概念が3種類に割れており、今回データも投入しないため
-  （[design.md](../spec/design.md)「`serviceRoutes` を今回は作らない」）
+  （[design.md](./design.md)「`serviceRoutes` を今回は作らない」）
 - **期待結果**: 2テーブルが定義され、型が通る
 
 ### TASK-1.3: 既存テーブルの列追加
+- **状態**: ✅ 完了 (2026-08-30)
 - **依存**: TASK-1.2
 - **内容**: `operators.ekidataCompanyCd` / `lines.ekidataLineCd` / `lines.abolishedAt` /
   `stations.ekidataStationCd` / `stations.stationGroupId` / `stations.prefCode` /
@@ -85,14 +92,30 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **期待結果**: 列が追加され、既存の読み書きが壊れない
 
 ### TASK-1.3b: `published_requires_slug` の CHECK 制約を付与
+- **状態**: ✅ 完了 (2026-08-30)
 - **依存**: TASK-1.3
 - **内容**: `check('published_requires_slug', sql\`published_at IS NULL OR slug IS NOT NULL\`)`
 - **事前確認**: **既存481行の `slug` に NULL が無いことを SQL で確認する。**
   design.md は「`update-odpt.ts` が全件生成済み」を前提にしているが、
   TASK-3.7 のバックフィルが失敗しないことを保証するため実測する
+- **事前確認の結果（2026-08-30 実測）**: `stations.slug` の NULL は **0件 / 481行**、
+  `lines.slug` の NULL も **0件 / 62行**。制約違反なしで付与できることを確認済み
 - **期待結果**: 制約が付与される。この時点で `publishedAt` は全行 NULL のため違反は出ない
 
+### TASK-1.3c: `stationConnections` に `unique(stationId, connectedStationId)` を付与
+- **状態**: ✅ 完了 (2026-08-30)
+- **依存**: TASK-1.3
+- **内容**: `unique('unique_station_connection').on(t.stationId, t.connectedStationId)`
+- **なぜ Phase 4 ではなく Phase 1 か**: TASK-2.8 の `onConflictDoNothing` が
+  この制約を衝突対象にする。無い場合は衝突が起きず、再実行のたびに重複行が積み上がる。
+  **Phase 2 より前に必要である**（design.md は Phase 4 側に書いていたが誤り）
+- **事前確認の結果（2026-08-30 実測）**: 既存546行のうち
+  `(station_id, connected_station_id)` の重複ペア **0件**、
+  `connectedStationId` の NULL **0件**。付与可能
+- **期待結果**: インポートが冪等になる
+
 ### TASK-1.4: 制約が無い理由をスキーマのコメントに残す
+- **状態**: ✅ 完了 (2026-08-30)
 - **依存**: TASK-1.3
 - **内容**: 2箇所に記述する
   1. `odptStationId` / `odptRailwayId` / `odptOperatorId` の定義に、
@@ -103,9 +126,160 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **期待結果**: 次にスキーマへ触れる者が制約の欠落をバグと誤認して付与しない
 
 ### TASK-1.5: マイグレーション生成と適用
-- **依存**: TASK-1.3, TASK-1.4
+- **状態**: ✅ 完了 (2026-08-30)
+- **依存**: TASK-1.3, TASK-1.3b, TASK-1.3c, TASK-1.4
 - **内容**: `pnpm run db:generate` → 開発DBで `db:push`
-- **注意**: 対話型ウィザードが出た場合は選択内容を開発者に提示して待機する
+- **成果物**: `packages/database/drizzle/0004_red_the_santerians.sql`
+  （`CREATE TABLE` 2件 / `ADD COLUMN` 9件 / `ADD CONSTRAINT` 9件。**制約の削除は含まない**）
+- **適用先**: Neon `furatora-db` の `development` ブランチ。
+  デフォルトブランチ（main）に新テーブル・新列・CHECK のいずれも入っていないことを
+  適用後に確認済み
+- **ウィザードの応答**: 4件すべて「truncate しない」を選択。
+  内訳と根拠は以下。いずれも制約違反は発生しない
+
+| 制約 | 対象 | 状況 |
+|---|---|---|
+| `stations_ekidata_station_cd_unique` | stations 481行 | 追加直後で全行 NULL。UNIQUE は NULL を重複と見なさない |
+| `lines_ekidata_line_cd_unique` | lines 62行 | 同上 |
+| `operators_ekidata_company_cd_unique` | operators 17行 | 同上 |
+| `unique_station_connection` | station_connections 546行 | **実データに対する唯一の制約**。重複ペア0件・NULL 0件を事前に SQL で確認済み |
+
+- **備考**: `identifier ... will be truncated` の NOTICE 4件は、既存の FK 名が
+  PostgreSQL の識別子上限63文字を超えていることによる従来からの警告であり、本変更とは無関係
+
+### TASK-1.1: トランザクション規模の計測
+- **状態**: ✅ 完了 (2026-08-31)。**判定 = 一括で確定**
+- **依存**: TASK-1.5（**「依存なし」ではない**。上記「実行順序」を参照）
+- **計測先**: **Neon のブランチを切る。** 開発DBには流さない。
+  失敗時の後始末が不要になり、同条件で何度でもやり直せる。
+  親は `furatora-db`（`patient-meadow-13439419`）。
+  compute は既定の **0.25 CU 固定**であり本番と同条件のため、数値をそのまま採用できる
+- **注意**: Neon MCP は read-only 設定のためブランチ作成に使えない。
+  Neon CLI（`neonctl branches create`）またはコンソールで作成し、
+  接続文字列を `MEASURE_DATABASE_URL` に渡す
+- **安全装置**: 計測スクリプトは `DATABASE_URL` を**読まない**。
+  専用の `MEASURE_DATABASE_URL` のみを見る。`.env` を書き換えて計測する運用は、
+  戻し忘れで開発DBに合成データを流し込む事故と紙一重である
+
+#### 対象行数（tasks.md 初版の 35,000 は過小である）
+
+| テーブル | 行数 |
+|---|---|
+| `stations` | 10,465 |
+| `stationLines` | 10,465 |
+| `stationAdjacencies` | 10,189 |
+| `stationGroups` | 8,766 |
+| `stationConnections` | 5,876 |
+| `lines` | 602 |
+| `operators` | 175 |
+| **計** | **約 46,500** |
+
+`stationLines` と `lines` が初版の見積もりから漏れていた。ekidata は路線ごとに
+駅を割るため `stationLines` は `stations` と同数になる（TASK-1.4 の「実測0件」の理由そのもの）。
+
+#### 「収まるか」は4つの別々の制限であり、3つは実測で解消済み
+
+Neon `furatora-db`（project `patient-meadow-13439419` / PG17 / 0.25 CU 固定）で
+`pg_settings` を読んだ結果（2026-08-30）:
+
+| # | 制限 | 実測値 | 判定 |
+|---|---|---|---|
+| 1 | `statement_timeout` | **0（無制限）** | **効かない** |
+| 2 | `idle_in_transaction_session_timeout` | **300,000ms（5分）** | 文と文の**間**にのみ効く。全体時間には効かない |
+| 2' | `idle_session_timeout` | 0（無制限） | 効かない |
+| 3 | WebSocket の寿命 / Neon proxy の切断 | 未知 | **これだけが実測対象** |
+| 4 | bind パラメータ上限 65535/文 | 既知定数 | `stations` は20列 → 全列を書くなら上限 3,276行/文 |
+
+**2 はトランザクション全体の制限ではない。** 「文を実行していない状態」が5分続くと
+切られる制限であり、バッチを連続で投げる限りアイドルはネットワーク往復1回分でしかない。
+したがって**CSVのパースをトランザクションの外に出すことが必須**である。
+中でパースすると、この5分に対して初めてリスクが生じる。
+
+**残る実測対象は 3 だけである。**
+
+#### BATCH_SIZE は 100 では小さすぎる可能性が高い
+
+DBリージョンは `ap-southeast-1`（シンガポール）であり、往復遅延が無視できない。
+`update-odpt.ts` 踏襲の `BATCH_SIZE = 100` では約46,500行を **465往復**に分割することになり、
+RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積算する。
+制限 4 から上限は約3,400行/文なので、1,000 まで上げれば47往復で済む。
+**計測で 100 / 500 / 1000 を比較し、往復回数が支配的かを確認する。**
+
+#### 投入データ
+
+**合成データでよい。** Phase 2 のパーサが未実装であり、かつ INSERT のコストは
+行数・行サイズ・インデックス数で決まり値の意味に依存しないため。ただし3点を本番に寄せる。
+
+- **本番と同じ upsert 文**（`onConflictDoUpdate`）を使う。plain insert では過小評価になる
+- **2周流す。** 1周目=全件新規、2周目=全件衝突更新。定常状態は2周目であり、こちらが重い
+- FK の依存順（`operators` → `lines` → `stationGroups` → `stations` →
+  `stationLines` / `stationAdjacencies` / `stationConnections`）
+- varchar は実データの平均長に寄せる（行サイズが投入時間に効くため）
+
+#### 記録する値
+
+- テーブルごとの経過ms / 行数 / rows/sec
+- `BEGIN` 〜 `COMMIT` の全体壁時計時間、および `COMMIT` 単体の時間
+- 成否。失敗時は**エラーコードまで**（タイムアウトなのか接続断なのかを区別する）
+- `SHOW statement_timeout` / `SHOW idle_in_transaction_session_timeout` の実値
+- BATCH_SIZE を 100 / 500 / 1000 で比較する。一括が不成立でも
+  「どこを詰めれば通るか」が同じ実行で分かる
+
+#### 判定基準（計測前に確定させたもの）
+
+| 結果 | 決定 |
+|---|---|
+| 成功 かつ 全体時間 < 制限値の 1/3 | **一括で確定。** `applyImport` は単一 `withTransaction` |
+| 成功 かつ 制限値の 1/3 〜 1/2 | 一括のまま。ただし「パースをトランザクション外に出す」を design.md の必須条件として明記 |
+| 失敗 または 制限値の 1/2 超 | **テーブル単位の分割コミットへ倒す。** design.md の該当箇所を更新 |
+
+#### 計測結果（2026-08-31 / `BATCH_SIZE = 1000` / 46,538行 / 50文）
+
+| テーブル | 行数 | 1周目 | 2周目 |
+|---|---|---|---|
+| `operators` | 175 | 207 ms (1文) | 175 ms |
+| `lines` | 602 | 382 ms (1文) | 344 ms |
+| `stationGroups` | 8,766 | 1,267 ms (9文) | 1,416 ms |
+| `stations` | 10,465 | 2,036 ms (11文) | 1,892 ms |
+| `stationLines` | 10,465 | 1,320 ms (11文) | 1,177 ms |
+| `stationAdjacencies` | 10,189 | 1,444 ms (11文) | 1,132 ms |
+| `stationConnections` | 5,876 | 907 ms (6文) | 735 ms |
+| **`withTransaction` 全体** | **46,538** | **7,960 ms** | **7,293 ms** |
+
+内訳: コールバック内 7,564 / 6,871 ms、接続+BEGIN+COMMIT 396 / 422 ms、
+1文あたり平均 151.3 / 137.4 ms。
+サーバ設定は事前調査と一致（`statement_timeout = 0`、
+`idle_in_transaction_session_timeout = 300,000 ms`、`idle_session_timeout = 0`）。
+
+#### 判定と、そこから確定したこと
+
+**成功。全体時間は制限値の 1/37（2.4〜2.7%）であり、判定表の第1行に該当する。**
+
+1. **`applyImport` は単一 `withTransaction`。** テーブル単位の分割コミットは採らない
+2. **`BATCH_SIZE = 1000` を採用値とする**
+3. **パースは必ずトランザクションの外で行う（必須条件）。**
+   300,000ms は文と文の「間」にのみ効く制限であり、この8秒は制限に当たっていない。
+   トランザクション内でCSVを解析すると、そこで初めてこの5分がリスクになる
+4. **BATCH_SIZE の追加計測（100 / 500）は行わない。**
+   1文あたり137〜151msに対し `operators` は175行1文で207ms、`lines` は602行1文で382ms。
+   行数を1/6にしても時間は半分にしかならず、固定費（往復遅延）が支配的である。
+   BATCH_SIZE を上げれば全体は縮むが、8秒を4秒にする最適化に判断が乗っていない
+
+- **完了条件**: ✅ 数値が記録され、Phase 2 の `applyImport` の構造が確定した
+- **後始末**: 計測用スクリプトと Neon 計測ブランチを削除する（TASK-6.5）
+
+#### 成果物
+
+- ✅ 制限値の実測（上表）
+- ✅ 事前確認（`slug` の NULL、重複ペア）
+- ✅ 計測スクリプト `apps/scripts/src/measure-tx-scale.ts`
+  - 接続先は `MEASURE_DATABASE_URL` でしか与えられない。未設定・`DATABASE_URL` と同一の
+    いずれでも起動しない。`.env` は書き換えないため戻し忘れの経路が存在しない
+  - 本番の書き込み経路そのものを測るため `withTransaction` を複製せず直接呼ぶ
+  - 実行: `MEASURE_DATABASE_URL='...' BATCH_SIZE=1000 RUN_INDEX=0 pnpm --filter scripts exec tsx src/measure-tx-scale.ts`
+  - `BATCH_SIZE` を変えて比較する際は `RUN_INDEX` も 0/1/2 と変える
+    （実行ごとに独立したコード範囲と UUID を使い、各回を「新規投入 → 全件更新」に揃えるため）
+- ✅ 計測の実行（Neon の使い捨てブランチ上）
 
 ---
 
@@ -138,8 +312,14 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **依存**: TASK-2.3
 - **成果物**: `features/master-import/ports.ts`,
   `external/repository/masterImportRepository.ts`, `di.ts` への配線
-- **内容**: `withTransaction` での適用。TASK-1.1 の結果に応じて一括／分割を選ぶ。
-  conflict target は `ekidata*Cd`
+- **内容**: 全テーブルを**単一の** `withTransaction` で適用する（TASK-1.1 で確定。
+  分割コミットは採らない）。`BATCH_SIZE = 1000`。conflict target は `ekidata*Cd`
+- **注意**: `measure-tx-scale.ts` の `MAX_SAFE_BATCH = 4000` を**安全上限として流用しない**。
+  あれは計測スクリプトが stations に12列しか渡さないことを前提とした値である。
+  全列を書く本経路の上限は 3,276行/文であり、`BATCH_SIZE = 1000` はその内側にある
+- **必須条件**: **CSVのパースをトランザクションの外で終えていること。**
+  `idle_in_transaction_session_timeout = 300,000ms` は文と文の間にのみ効くため、
+  トランザクション内で解析すると、そこで初めてこの制限がリスクになる
 - **あわせて**: TASK-2.1 の `EkidataCsvSource` も `di.ts` で配線する。
   `usecases/ → external/` の直接 import は依存の向きに反するため
   （[ADR-0001](../adr/0001-layer-structure.md) / [ADR-0002](../adr/0002-dependency-inversion-ports.md)）
@@ -191,6 +371,20 @@ TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` �
 - **期待結果**: 未解決由来146件のうち131件が自動解決。
   残り15件（新幹線11 + 手動4）は NULL のまま一覧に出る
 - **完了条件**: ドライランで突合結果を確認してから適用する
+- **注意（2026-08-31 実測）**: **`development` は `main` の正確なコピーではない。**
+  ドライランの結果をそのまま本番の期待値として扱わないこと
+
+  | | main | development |
+  |---|---|---|
+  | `stations` / `lines` / `operators` / `stationConnections` | 481 / 62 / 17 / 546 | 同じ |
+  | `platforms` | 14 | 18 |
+  | `lineDirections` | 52 | 34 |
+  | `trains` | 10 | 13 |
+  | `stationFacilities` | 0 | 14 |
+
+  本タスクの「`platforms` 14件・`lineDirections` 52件の参照維持」は **main の数字**である。
+  参照を切らないという要件自体は両ブランチで同じだが、件数での検証は
+  各ブランチの実数に対して行うこと
 
 ### TASK-3.4: 会員版CSVでの新幹線11駅の確認
 - **依存**: TASK-3.3

@@ -1,9 +1,18 @@
-import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, serial } from 'drizzle-orm/pg-core';
-import type { StrollerDifficulty, WheelchairDifficulty, DirectionType, PlatformSide } from './enums';
+import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, serial, date, check } from 'drizzle-orm/pg-core';
+import type { StrollerDifficulty, WheelchairDifficulty, DirectionType, PlatformSide, StationConnectionSource } from './enums';
 import { sql } from 'drizzle-orm';
 
+// 粒度は「路線×駅」。ekidata の station_cd と 1:1 で対応する。
+// 【この粒度は暫定である】ドメインとして正しい粒度ではなく、既存行を UPDATE で
+// 移行して platforms / lineDirections からの参照を切らないための選択である。
+// 同一事業者・同一駅が複数行に割れる（東京駅=18行、新宿=13行）。
+// 確定は実データ投入後の後続Issue。docs/domain/station-master-model.md 参照
 export const stations = pgTable('stations', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  // 【一意制約を付けないこと】ODPT との同期は ADR-0007 決定3 で停止しており、
+  // この列は移行済み481行の来歴を残すためだけに存在する。ekidata 由来の新規行では
+  // NULL であり、突合の手がかりとしても使われない。値の重複を防ぐ主体がもう居ないため、
+  // 一意制約は「欠落」ではなく意図的な不在である
   odptStationId: varchar('odpt_station_id', { length: 100 }), // ODPT API の owl:sameAs (例: odpt.Station:TokyoMetro.Marunouchi.Shinjuku)
   slug: varchar('slug', { length: 100 }).unique(), // URL用スラッグ (例: tokyo-metro-marunouchi-shinjuku)
   code: varchar('code', { length: 20 }), // 駅ナンバリング (例: M08)
@@ -13,15 +22,27 @@ export const stations = pgTable('stations', {
   lat: decimal('lat', { precision: 9, scale: 6 }),
   lon: decimal('lon', { precision: 9, scale: 6 }),
   operatorId: uuid('operator_id').references(() => operators.id).notNull(),
+  // ekidata station_cd。未突合の行が残るため nullable のまま（requirements.md C-3）
+  ekidataStationCd: integer('ekidata_station_cd').unique(),
+  stationGroupId: uuid('station_group_id').references(() => stationGroups.id),
+  prefCode: integer('pref_code'),
+  abolishedAt: date('abolished_at'),
+  // 【可視性はこの列が単独で担う】null = 非公開。ekidata 由来の新規駅は null で作られ、
+  // 管理者が明示的に設定するまで一覧・検索・詳細ページ・公開APIに出ない。
+  // operators.displayPriority は表示順専用であり可視性の意味を持たない
+  publishedAt: timestamp('published_at'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
     unique('uniqueStationPerOperator').on(t.odptStationId, t.operatorId),
+    // 公開されている駅は必ず slug を持つ。URL を持てない駅が公開状態になるのを防ぐ
+    check('published_requires_slug', sql`published_at IS NULL OR slug IS NOT NULL`),
 ]);
 
 export const lines = pgTable('lines', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  // 【一意制約を付けないこと】理由は stations.odptStationId と同じ（ADR-0007 決定3）
   odptRailwayId: varchar('odpt_railway_id', { length: 100 }), // ODPT API の owl:sameAs (例: odpt.Railway:TokyoMetro.Marunouchi)
   slug: varchar('slug', { length: 100 }).unique(),
   lineCode: varchar('line_code', { length: 10 }), // 路線コード (例: M)
@@ -31,12 +52,21 @@ export const lines = pgTable('lines', {
   color: varchar('color', { length: 7 }), // カラーコード (例: #F62E36)
   displayOrder: integer('display_order').default(0), // 表示順
   operatorId: uuid('operator_id').references(() => operators.id).notNull(),
+  // ekidata line_cd。未突合の行が残るため nullable のまま（requirements.md C-3）
+  ekidataLineCd: integer('ekidata_line_cd').unique(),
+  abolishedAt: date('abolished_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
   unique('uniqueRailwayPerOperator').on(t.odptRailwayId, t.operatorId),
 ]);
 
+// 【unique(stationId) を付けないこと】実測で複数路線を持つ駅は0件だが、これは
+// ekidata が路線ごとに駅を割っている（stations が路線×駅粒度である）結果であって、
+// furatora のドメインの不変条件ではない。粒度は暫定であり確定していない
+// （stations の冒頭コメント参照）。
+// コストはマイグレーションではなく「1駅は1路線」を仮定したクエリと表示ロジックが
+// 増えることであり、そうなると粒度の変更が制約の削除では済まなくなる
 export const stationLines = pgTable('station_lines', {
   stationId: uuid('station_id').references(() => stations.id).notNull(),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
@@ -63,9 +93,21 @@ export const stationConnections = pgTable('station_connections', {
   notesAboutStroller: text('notes_about_stroller'),
   notesAboutWheelchair: text('notes_about_wheelchair'),
 
+  // 由来。'ekidata_group' はインポートが再生成してよい行、'manual' は触れてはならない行
+  source: varchar('source', { length: 20 }).$type<StationConnectionSource>(),
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  // TASK-2.8 のインポートを冪等にする。onConflictDoNothing がこの制約を衝突対象に
+  // するため、無いと再実行のたびに重複行が積み上がる。
+  // 【NULL 行は守られない】PostgreSQL の UNIQUE は既定で NULL どうしを異なる値として
+  // 扱うため、connectedStationId IS NULL の行（ODPT 未突合）は重複を防げない。
+  // nullsNotDistinct を付けないのは意図的である。TASK-2.8 が生成するのは同一
+  // station_g_cd の実在駅どうしの順序対で常に非 NULL であり、NULL 行は TASK-4.2 の
+  // notNull 化で消えるためである
+  unique('unique_station_connection').on(t.stationId, t.connectedStationId),
+]);
 
 export const trains = pgTable('trains', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
@@ -225,10 +267,39 @@ export const facilityTypes = pgTable('facility_types', {
 export const operators = pgTable('operators', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   name: varchar('name', { length: 100 }).notNull().unique('operators_name_unique'),
+  // 【一意制約を付けないこと】理由は stations.odptStationId と同じ（ADR-0007 決定3）
   odptOperatorId: varchar('odpt_operator_id', { length: 100 }), // ODPT API の odpt:operator (例: odpt.Operator:TokyoMetro)
+  // TODO(TASK-3.8): NOT NULL DEFAULT 0 にして表示順専用に純化する。
+  // それまでは「null=非表示」の旧仕様が残る。TASK-3.7 のバックフィルが
+  // 「移行前に非表示だった事業者」をこの null で判別するため、先に埋めてはならない
   displayPriority: integer('display_priority'), // 数字=表示順、null=非表示
+  ekidataCompanyCd: integer('ekidata_company_cd').unique(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// 乗換単位の「駅」。ekidata station_g_cd に対応する。
+// stations（路線×駅）が複数行に割れても、乗り換えはこの単位でまとまる
+export const stationGroups = pgTable('station_groups', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  ekidataStationGroupCd: integer('ekidata_station_group_cd').notNull().unique(),
+  name: varchar('name', { length: 100 }).notNull(),
+  nameKana: varchar('name_kana', { length: 100 }),
+  prefCode: integer('pref_code'),
+  lat: decimal('lat', { precision: 9, scale: 6 }),
+  lon: decimal('lon', { precision: 9, scale: 6 }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+});
+
+// 路線内の隣接駅。ekidata join に対応する。無向グラフを両方向の2行で持つ
+export const stationAdjacencies = pgTable('station_adjacencies', {
+  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
+  lineId: uuid('line_id').references(() => lines.id).notNull(),
+  stationAId: uuid('station_a_id').references(() => stations.id).notNull(),
+  stationBId: uuid('station_b_id').references(() => stations.id).notNull(),
+}, (t) => [
+  unique('unique_station_adjacency').on(t.lineId, t.stationAId, t.stationBId),
+]);
 
 export const odptMetadata = pgTable('odpt_metadata', {
   id: serial('id').primaryKey(),
