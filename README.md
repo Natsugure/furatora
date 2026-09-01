@@ -166,7 +166,7 @@ Preview デプロイは PR ごとに Neon の `preview/<git-branch>` ブラン�
 | 場所 | 対象 | 設定 |
 |---|---|---|
 | Vercel: Storage → Connect Project → Advanced Options | **web / admin の両方** | Preview Branching を有効化 |
-| Vercel: Settings → Build and Deployment | **web のみ** | Build Command を `pnpm run db:migrate && turbo run build` に上書き |
+| Vercel: Settings → Build and Deployment | **web のみ** | Build Command を `pnpm -w run db:migrate && turbo run build` に上書き |
 | GitHub: リポジトリ変数 `NEON_PROJECT_ID` | — | Neon のプロジェクトID |
 | GitHub: シークレット `NEON_API_KEY` | — | Neon の API キー |
 
@@ -343,7 +343,7 @@ For the rationale and the rejected alternatives, see
 | Where | Applies to | Setting |
 |---|---|---|
 | Vercel: Storage → Connect Project → Advanced Options | **both web and admin** | Enable Preview Branching |
-| Vercel: Settings → Build and Deployment | **web only** | Override Build Command with `pnpm run db:migrate && turbo run build` |
+| Vercel: Settings → Build and Deployment | **web only** | Override Build Command with `pnpm -w run db:migrate && turbo run build` |
 | GitHub repository variable `NEON_PROJECT_ID` | — | Neon project ID |
 | GitHub secret `NEON_API_KEY` | — | Neon API key |
 

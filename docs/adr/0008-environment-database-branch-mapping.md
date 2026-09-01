@@ -1,6 +1,6 @@
 # ADR-0008: 環境ごとに Neon ブランチを1対1で対応させ、マイグレーションをビルド時に適用する
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-09-01
 - **決定者**: @Natsugure
 - **関連**: [ADR-0004](./0004-neon-branch-dev-environment.md)（接続先の表を拡張する）, [ADR-0005](./0005-write-atomicity-driver.md)
@@ -98,9 +98,15 @@ Preview が本番DBを見ている限り、これは構造的に避けられな�
 Vercel の Build Command を上書きする。
 
 ```bash
-pnpm run db:migrate && turbo run build
+pnpm -w run db:migrate && turbo run build
 ```
 
+- **`-w` が必要である。** Vercel は Build Command を Root Directory
+  （web のプロジェクトでは `apps/web`）をカレントディレクトリとして実行する。
+  `db:migrate` はワークスペースルートの `package.json` にしか無いため、
+  `-w` で明示的にルートを指す。素の `turbo run build` が動くのは、
+  turbo が Root Directory からフィルタを自動推論するためであり、
+  これも cwd が `apps/web` であることと整合する
 - **`turbo run build` の外に置く。** 副作用のある操作を turbo のキャッシュ対象に入れない
 - Preview では preview ブランチに、Production では `main` に適用される。
   **環境ごとの分岐を書かずに適用先が正しくなる**のが、この配置の要点である
