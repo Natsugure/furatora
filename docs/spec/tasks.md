@@ -12,7 +12,7 @@
 ```
 Phase 0: docs/spec・ADR更新                      (完了)
 Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
-Phase 2: インポート機構                           (P0)
+Phase 2: インポート機構                           (完了)
 Phase 3: 移行スクリプト（突合）                    (P0・Phase 2 に依存)
 Phase 4: ODPT 後始末                             (Phase 3 完了後)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
@@ -177,6 +177,12 @@ Phase 2 より前であることは変わらないため、「唯一の未知を
 `stationLines` と `lines` が初版の見積もりから漏れていた。ekidata は路線ごとに
 駅を割るため `stationLines` は `stations` と同数になる（TASK-1.4 の「実測0件」の理由そのもの）。
 
+> **この表の行数は無料版CSV由来である**（Phase 2 で会員版を実測して判明。2026-09-03）。
+> 会員版では 駅10,625 / グループ8,782 / 隣接10,040 / 乗換接続6,946 となり、
+> 合計は約47,800行になる。計測に使った46,538行との差は2.7%であり、
+> 「制限値の1/37」という判定は変わらない。**この表と下の計測結果表は
+> 実際に測った条件の記録であるため書き換えない。**
+
 #### 「収まるか」は4つの別々の制限であり、3つは実測で解消済み
 
 Neon `furatora-db`（project `patient-meadow-13439419` / PG17 / 0.25 CU 固定）で
@@ -283,73 +289,147 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 
 ---
 
-## Phase 2: インポート機構
+## Phase 2: インポート機構（完了 2026-09-03）
+
+**結果**: 4種のCSVを受け取り、差分を提示し、承認後に単一トランザクションで適用する
+機構を実装した。実CSV（会員版・2026-08 配布分）と開発DBに対して `plan` を実行し、
+件数と適用不能の検出まで確認済み。**`apply` の実DB実行は Phase 3 の突合後**である
+（下記 TASK-2.3 の「適用不能」を参照）。
+
+### 会員版CSVの実測で判明したこと
+
+初版の行数は**無料版CSV由来**であり、会員版とは一致しなかった。
+
+| | 初版（無料版） | 会員版 実測 |
+|---|---|---|
+| 事業者（現役） | 175 | **162**（175は廃止13件を含む全行数） |
+| 路線（現役） | 602 | 602 |
+| 駅（現役） | 10,465 | **10,625** |
+| 乗換単位の駅 | 8,766 | **8,782** |
+| 隣接（投入可能） | 10,189 | **10,040**（149行はFKを張れず除外） |
+| 乗換接続（順序対） | 5,876 | **6,946** |
+| ダングリング `station_g_cd` | 13 | **59** |
+
+差は新幹線160駅の有無である。あわせて以下が確定した。
+
+- **会員版に新幹線の駅は含まれる。** requirements.md の C-1 と TASK-3.4 は解消
+- **`e_status` は3値**（0=現役 / 1=未開業 / 2=廃止）。初版は 0 と 2 しか想定していなかった
+- **CSVに引用符は1件も無い。** 全行の列数がヘッダと一致し、住所列（`address`）にも
+  カンマが無い。パーサは引用符を扱わないが、**列数不一致を例外にする**ことで
+  将来の形式変更が黙って通らないようにした
 
 ### TASK-2.1: CSV パーサと型定義
-- **依存**: Phase 1
-- **成果物**: `apps/admin/src/external/ekidata/ekidataCsvParser.ts` と
-  `features/master-import/domain/importedRecords.ts`、`ports.ts` の `EkidataCsvSource`
-- **内容**: company / line / station / join の4種の行型とパース関数。
-  `e_status` による現役判定。必須列の検証
-- **注意**: `station_cd` の上位桁から `line_cd` を導出しない（137件の例外がある）
-- **テスト**: 必須列欠落 / `e_status` 分岐 / 上位桁不一致の行
+- **状態**: ✅ 完了 (2026-09-03)
+- **成果物**: `apps/admin/src/external/ekidata/csv.ts`（汎用の分解と列検証）、
+  同 `ekidataCsvParser.ts`（`EkidataCsvSource` の実装）、
+  `features/master-import/domain/importedRecords.ts`（型）、
+  同 `domain/values.ts`（小数6桁・色・`0000-00-00` の正規化）
+- **実装した判断**:
+  - `station_cd` の上位桁から `line_cd` を導出しない（137件の例外）
+  - `0000-00-00` は date 列に入らないため null にする
+  - `line_color_c` に `#` を付けて大文字化する
+  - 警告は1件ずつ返さず、**コードごとに件数と最大5件の手がかりへ畳み込む**
+    （隣接の欠落だけで149件あり、全件を並べても読めない）
+  - 4ファイルすべてを検査してから返す（1つ目で打ち切ると管理者が4回やり直すことになる）
 
 ### TASK-2.2: 駅名正規化
-- **依存**: なし
-- **成果物**: `apps/admin/src/features/master-import/domain/normalize.ts`
-- **内容**: 括弧を**中身ごと**除去（`〈〉` と `（）` の両方）、`ヶ` → `ケ`
-- **テスト**: `押上〈スカイツリー前〉` / `押上（スカイツリー前）` → `押上`、
-  `市ケ谷` / `市ヶ谷` の一致、正規化後に別駅が衝突しないこと
+- **状態**: ✅ 完了 (2026-09-03)
+- **成果物**: `features/master-import/domain/normalize.ts`
+- **実データでの確認**: 括弧が現れるのは `〈〉` 5件と `（）` 32件のみ。
+  正規化で変化する駅名は127件で、**同一路線内での衝突は0件**
+- **追加した規則**: 除去した結果が空になる場合は原文を返す。
+  キーが空文字になると無関係な駅どうしが一致してしまうため
 
 ### TASK-2.3: 差分計画の算出
-- **依存**: TASK-2.1, TASK-2.2
-- **成果物**: `apps/admin/src/features/master-import/domain/plan.ts`
-- **内容**: 新規 / 更新 / 廃止 / 突合失敗 の判定。空値では上書きしない規則。
-  `station_g_cd` のダングリング13件は所属駅の最小 `station_cd` から代表値を決定
-- **テスト**: 冪等性（同一入力で差分0）、空値保護、ダングリング処理
+- **状態**: ✅ 完了 (2026-09-03)
+- **成果物**: `features/master-import/domain/plan.ts`
+- **設計から変わった点**:
+  - 差分を「新規／更新」に分けて UPDATE 文を投げる形を**採らなかった**。
+    Phase 3 の突合直後のように既存481行がまとめて変わる場面で481往復になり、
+    8秒で済む適用が1分を超える。**変更のある行を upsert し直す**形にした
+  - `lat` / `lon` は取り込み側・DB側の**双方を小数6桁へ揃えてから**比較する。
+    CSV は `139.74044`、DB から読み戻すと `139.740440` になり、
+    揃えないと値が同じでも毎回「更新あり」になって冪等性が成立しない
+  - 路線色は `#` の有無と大文字小文字を吸収して比較する
+  - 廃止済みの行が現役として再登場したら `abolishedAt` を NULL に戻す
+- **新設した概念「適用不能（blockers）」**:
+  現行DBの17事業者の `name` は ekidata の `company_name` と**全件完全一致する**。
+  Phase 3 の突合前にインポートを流すと17件が別行として INSERT され、
+  `operators_name_unique` の 23505 でトランザクション全体が落ちる。
+  これを実行時の500にせず、**`plan` の時点で提示して `apply` を拒否する**。
+  → **実運用の順序は「Phase 3 の突合 → インポート」で確定**
 
 ### TASK-2.4: ports とリポジトリ
-- **依存**: TASK-2.3
-- **成果物**: `features/master-import/ports.ts`,
-  `external/repository/masterImportRepository.ts`, `di.ts` への配線
-- **内容**: 全テーブルを**単一の** `withTransaction` で適用する（TASK-1.1 で確定。
-  分割コミットは採らない）。`BATCH_SIZE = 1000`。conflict target は `ekidata*Cd`
-- **注意**: `measure-tx-scale.ts` の `MAX_SAFE_BATCH = 4000` を**安全上限として流用しない**。
-  あれは計測スクリプトが stations に12列しか渡さないことを前提とした値である。
-  全列を書く本経路の上限は 3,276行/文であり、`BATCH_SIZE = 1000` はその内側にある
-- **必須条件**: **CSVのパースをトランザクションの外で終えていること。**
-  `idle_in_transaction_session_timeout = 300,000ms` は文と文の間にのみ効くため、
-  トランザクション内で解析すると、そこで初めてこの制限がリスクになる
-- **あわせて**: TASK-2.1 の `EkidataCsvSource` も `di.ts` で配線する。
-  `usecases/ → external/` の直接 import は依存の向きに反するため
-  （[ADR-0001](../adr/0001-layer-structure.md) / [ADR-0002](../adr/0002-dependency-inversion-ports.md)）
+- **状態**: ✅ 完了 (2026-09-03)
+- **成果物**: `features/master-import/ports.ts`、
+  `external/repository/masterImportRepository.ts`、`di.ts` への配線
+- **実装**: 単一 `withTransaction` / `BATCH_SIZE = 1000`。
+  FK 依存順に `operators` → `lines` → `stationGroups` → `stations` →
+  `stationLines` / `stationAdjacencies` → `stationConnections`
+- **空値保護は SET 句が担う**: `COALESCE(NULLIF(EXCLUDED.name_kana, ''), lines.name_kana)`。
+  生成SQLを `.toSQL()` で確認済み
+- **UUID の解決**: 既存行の id はスナップショットから、新規行の id は
+  upsert の `returning` から集める。往復を増やさない
+- **スナップショットはトランザクションの内側で取り直す**。
+  パースは外（実測40ms / 1.7MB）
 
 ### TASK-2.5: usecases
-- **依存**: TASK-2.4
+- **状態**: ✅ 完了 (2026-09-03)
 - **成果物**: `usecases/planImport.ts`, `usecases/applyImport.ts`
-- **テスト**: ports をスタブして調停ロジックを検証
+- **planToken はステートレス**: 4ファイルの SHA-256。サーバは計画を保持しない
+  （理由は design.md「計画はサーバに保持しない」）
 
 ### TASK-2.6: Route Handler
-- **依存**: TASK-2.5
+- **状態**: ✅ 完了 (2026-09-03)
 - **成果物**: `apps/admin/src/app/api/master-import/route.ts`
-- **内容**: multipart で4ファイルを受け、`mode: 'plan' | 'apply'` を切り替える
-- **完了条件**: **1.4MB の `station` CSV が通ること**（Server Action を使わない理由そのもの）
+- **完了条件**: ✅ 1.7MB の `station` CSV が欠けずに通ることをテストで確認
+  （`route.test.ts`。4ファイル合計 約2.05MB は Vercel の 4.5MB/request 以内）
+- **応答**: 400（列欠落・ファイル欠落・mode不正）/ 409（planToken 不一致）/
+  422（適用不能）/ 500。未認証は `middleware.ts` が 401 にする
+- **`maxDuration = 60`**: 適用は実測7.3〜8.0秒かかり、既定の上限では足りない
+- **ADR-0001 のルール発火を確認済み**: `route.ts` に
+  `@furatora/database/client` の import を一時的に置き、ESLint がエラーにすることを確認した
 
 ### TASK-2.7: アップロードUI
-- **依存**: TASK-2.6
+- **状態**: ✅ 完了 (2026-09-03)
 - **成果物**: `features/master-import/components/MasterImportForm.tsx`,
-  `app/master-import/page.tsx`
-- **内容**: 4ファイル選択 → 計画のプレビュー表示 → 承認して適用
+  `app/master-import/page.tsx`、`components/Sidebar.tsx` への導線
+- **CSVを選び直したら提示済みの差分を破棄する**（別の入力に対する差分になるため）
 
 ### TASK-2.8: 乗換接続の生成
-- **依存**: TASK-2.4
-- **内容**: 同一 `station_g_cd` の現役駅の全順序対（5,876行）を
-  `source = 'ekidata_group'` で生成。`source = 'manual'` には触れない。
-  難易度入力済みの行は `onConflictDoNothing`
+- **状態**: ✅ 完了 (2026-09-03)
+- **実装**: JS で6,946行を組み立てず、`stations` の自己結合による
+  **`INSERT ... SELECT` 1文**で生成する。`ON CONFLICT DO NOTHING` が
+  `source = 'manual'` の行と難易度入力済みの行を守る
+- **注意**: 実際の挿入数は適用してからでないと確定しない。
+  差分計画に出す 6,946 は CSV から見た**上限**である
+
+### 設計から変えた点（まとめ）
+
+| 論点 | 変更 |
+|---|---|
+| `stationAdjacencies` の向き | **無向辺 = 1行**。schema.ts の「両方向の2行で持つ」というコメントを実装に合わせて訂正した。plan.ts と masterImportRepository.ts が端点 UUID を昇順へ正規化し、供給元が辺を逆向きに配布し直しても `unique_station_adjacency` で弾く（2026-08 実測では逆向きの重複0件だが、それに依存しない） |
+| `stationLines.stationOrder` | **書かない（NULL のまま）。** ekidata に路線内順序を示す列が無く（`e_sort` は `station_cd` と同値）、ODPT 由来の既存値も壊さない。順序が要れば `stationAdjacencies` から導出する（後続Issue） |
+| 更新の表現 | 行ごとの UPDATE ではなく upsert（TASK-2.3 参照） |
+| CSVパーサ | 外部ライブラリを入れず自前。引用符が不要であることを実測で確認済み |
+| 未開業（`e_status = 1`） | 取り込まず、廃止扱いにもしない |
+| 廃止と見なす範囲 | **CSV に `e_status = 2` として載っていた行**と、**CSV のどのファイルにも現れなかった行**の2つだけ。CSV には載っているが取り込まなかった行（未開業・現役でない事業者/路線に紐づく）は廃止しない。パーサが `seen`（CSV に現れた `line_cd` / `station_cd` の全体）を返し、`markAbolished` が「消えた」と「取り込まなかった」を区別する。古い `company.csv` などで公開中の路線・駅が廃止されるのを防ぐ |
+
+### 残作業
+
+- **`apply` の実DB実行**は Phase 3 の突合後に行う。
+  それより前は事業者名の重複17件が適用不能として提示され、正しく拒否される
+- 疎通だけを先に見る場合は、Neon の使い捨てブランチに対して実行すること
+  （`neonctl branches create` → `DATABASE_URL` を差し替えて `pnpm --filter @furatora/admin dev`）
 
 ---
 
 ## Phase 3: 移行スクリプト（突合）
+
+> **実行順序は「突合 → インポート」である。** Phase 2 の実装で判明した通り、
+> 現行DBの17事業者の `name` は ekidata の `company_name` と全件一致する。
+> 突合前にインポートを流すと `operators_name_unique` に衝突し、
+> 差分計画が適用不能として拒否する（Phase 2「TASK-2.3」参照）。
 
 ### TASK-3.1: 事業者の突合
 - **依存**: Phase 2
@@ -386,15 +466,20 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
   参照を切らないという要件自体は両ブランチで同じだが、件数での検証は
   各ブランチの実数に対して行うこと
 
-### TASK-3.4: 会員版CSVでの新幹線11駅の確認
+### TASK-3.4: 新幹線11駅の突合
+- **状態**: 前提の確認は完了 (2026-09-03)。突合そのものは TASK-3.3 の一部として行う
 - **依存**: TASK-3.3
-- **内容**: 会員版 `station` CSV に新幹線の駅が含まれるか確認し、
-  含まれれば11駅を解決する
-- **期待結果**: 含まれない場合、NULL のまま残し requirements.md の C-1 を確定させる
+- **確認結果**: **会員版 `station` CSV に新幹線の駅は含まれる。**
+  東海道新幹線（`line_cd = 1002`）に東京 `100201` / 品川 `100202` / 新横浜 `100203` …
+  が存在する（会員版と無料版の現役駅数の差160件がこれにあたる）。
+  requirements.md の **C-1 は解消**した
+- **期待結果**: 11駅すべてに `ekidataStationCd` が入る
 
 ### TASK-3.5: `stationConnections` の全置換
 - **依存**: TASK-3.3
-- **内容**: 既存546行を削除し、TASK-2.8 の生成結果に置き換える
+- **内容**: 既存546行を削除し、インポート（TASK-2.8）の生成結果に置き換える。
+  生成は `stations` の自己結合による `INSERT ... SELECT` で行われるため、
+  削除後にインポートを再実行すれば埋め直される
 - **前提の再確認**: 適用直前に「難易度入力済みの行が0件であること」を
   スクリプト内で検証する。0件でなければ停止する
 
@@ -485,7 +570,7 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 - **実装形**: 可視性を `where` 句に置く。**JSでの絞り込みにしない。**
   現行 `app/page.tsx:20` が全路線を引いてJSで組んでいる形が
   詳細ページで判定が抜けた原因であるため、同じ形を残さない
-- **パフォーマンス**: この規模（路線602 / 駅10,465）では
+- **パフォーマンス**: この規模（路線602 / 駅10,625）では
   専用インデックスを先に置かない。design.md「規模とパフォーマンス」を参照
 - **テスト**: 未公開駅の詳細・路線ページ・各APIが 404 / 空応答になること。
   実証済みの `yurikamome-yurikamome-shiodome` と
@@ -552,7 +637,8 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 ### TASK-6.2: `docs/domain/` への反映（**省略しない**）
 - **内容**: design.md「恒久知識の振り分け」の表に従って以下を作成・更新する
   - `docs/domain/station-master-model.md`（新規）:
-    ekidata のコード体系と粒度、`station_cd` 上位桁の例外、ダングリング13件、
+    ekidata のコード体系と粒度、`station_cd` 上位桁の例外、ダングリング59件、
+    `e_status` が3値であること、`stationAdjacencies` を片方向1行で持つこと、
     **現在の粒度が暫定であること**と `unique(stationId)` を付けない理由、
     乗換接続の由来区分、駅名正規化ルール、
     ekidata 規約に由来する制約、**`slug` の導出規則**、

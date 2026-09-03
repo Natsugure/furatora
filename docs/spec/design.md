@@ -200,7 +200,7 @@ export const stationAdjacencies = pgTable('station_adjacencies', {
 
 加えて**今回はデータを1件も投入しない。** 概念が未分化のまま空のテーブルを
 作ると、`docs/domain/` に検証されていないモデルが恒久ドキュメントとして固定される。
-`stationAdjacencies` は今回 10,189 行を実際に投入するため事情が異なる。
+`stationAdjacencies` は今回 10,040 行を実際に投入するため事情が異なる。
 
 後続Issueで、**案内路線**と**運行系統**を別概念として設計する。
 
@@ -287,7 +287,7 @@ furatora のドメインの不変条件ではない。** ekidata の粒度は暫
 
 現行の `operators.displayPriority`（`数字=表示順、null=非表示`）は、
 17事業者（メトロ・都営 + 未解決接続由来）を前提に成立していた。
-ekidata 移行で 175事業者・10,465駅に増えると、この列は使えなくなる。
+ekidata 移行で 162事業者・10,625駅に増えると、この列は使えなくなる。
 
 - **1列に2つの関心が同居している。** 「非表示にしたい」と思うたびに順序を失う。
   `NOT NULL` にもできない（非表示のために null 枠を空けておく必要がある）
@@ -395,14 +395,15 @@ export const publishedStation = () => isNotNull(stations.publishedAt);
 
 #### 規模とパフォーマンス
 
-移行後の行数は `operators` 176 / `lines` 602 / `stations` 10,465 /
-`stationLines` 10,465 である。**この規模では専用のインデックスを先に置かない。**
+移行後の行数は `operators` 162 / `lines` 602 / `stations` 10,625 /
+`stationLines` 10,625 である（いずれも ekidata 由来の分。突合できなかった既存行が
+これに加わる）。**この規模では専用のインデックスを先に置かない。**
 
 | 経路 | 変化 | 評価 |
 |---|---|---|
 | 駅詳細 | `slug` の一意インデックスで1行に絞った後 `publishedAt` を見るだけ | 影響なし |
 | トップページ | 全事業者・全路線を引いてJSで組む現行実装に `EXISTS` が加わる。路線 62→602 | ハッシュ結合で完結する規模 |
-| 駅検索 `/api/v1/stations` | 部分一致のため btree が効かず全走査。481→10,465行 | 1万行の走査は問題にならない |
+| 駅検索 `/api/v1/stations` | 部分一致のため btree が効かず全走査。481→10,625行 | 1万行の走査は問題にならない |
 
 いずれも Neon の接続確立コストの方が支配的である。
 **現時点で計測せずにインデックスを足さない。**
@@ -445,7 +446,7 @@ ODPT ID が `事業者.路線.駅` の三つ組をローマ字で持っていた
 stations.slug = `${lines.slug}-${hepburn(normalize(stations.nameKana))}`
 ```
 
-手入力が必要なのは **602路線の `lines.slug`** であり、10,465駅ではない。
+手入力が必要なのは **602路線の `lines.slug`** であり、10,625駅ではない。
 しかも公開する路線の分だけで足りる。`lines.nameEn` も ekidata から
 供給されないため、どのみち手で書くことになる。
 
@@ -514,7 +515,7 @@ slug は URL 識別子であって公式英語名ではない。`Kita-senju` の
 **インポートは `slug` を書かない**（上書きルール表の通り「触らない列」のまま）。
 `slug` は公開操作の時点で Admin が生成値を提示し、管理者が確認して確定する。
 
-インポート時に全10,465駅へ自動投入すると、CHECK 制約が無条件に充足されてしまい、
+インポート時に全10,625駅へ自動投入すると、CHECK 制約が無条件に充足されてしまい、
 **人の目を通す機会が消える。** 誤変換の約3%は「公開する駅だけ、公開時に1回」
 見れば捕まる。全駅をレビューする必要はない。未公開駅の誤変換は表出しないが、
 到達不能であるため害が無い。この非対称性が、精度を追わずに済む根拠である。
@@ -592,12 +593,42 @@ export const visibleLine = () => and(
 ### 2段階（plan → apply）
 
 ```
-POST /api/master-import  { mode: 'plan' }
-   4ファイルを解析 → 検証 → 差分計画を返す（DBは変更しない）
+POST /api/master-import  { mode: 'plan', 4ファイル }
+   解析 → 検証 → 差分計画を返す（DBは変更しない）
+   ← { summary, warnings, blockers, planToken = sha256(4ファイル) }
       ↓ 管理者が確認
-POST /api/master-import  { mode: 'apply', planToken }
-   withTransaction 内で適用（全テーブルを単一トランザクションで）
+POST /api/master-import  { mode: 'apply', 4ファイル, planToken }
+   ダイジェストを照合 → withTransaction 内で適用
 ```
+
+#### 計画はサーバに保持しない
+
+`planToken` は**計画の格納場所を指す識別子ではなく、4ファイルのダイジェストである。**
+apply は同じ4ファイルの再送を受け、解析と差分算出をやり直す。
+
+サーバレス環境ではプロセス間でメモリを共有できないため、計画を保持するなら
+DB に置くことになる。しかし計画は最大47,800行分あり、そのために
+（`jsonb` の使用を含む）テーブルを増やすのは、1.7MB の再送とパース40msに対して重い。
+差分算出は純粋関数であり、再計算しても同じ結果になる。
+
+再算出には副次的な利点もある。**スナップショットを適用時のトランザクション内で
+取り直す**ため、提示から承認までの間に DB が変わっていても、
+書き込みが古い前提に基づかない。
+
+#### 適用不能な事象は plan の時点で提示する
+
+`operators.name` は一意制約付きである。そして現行DBの17事業者の `name` は
+**ekidata の `company_name` と全件完全に一致する**（JR東日本 / 東京メトロ / ゆりかもめ …）。
+移行スクリプト（Phase 3）で `ekidataCompanyCd` を突合する前にインポートを流すと、
+17件すべてが別行として INSERT され、`operators_name_unique` の 23505 で
+**トランザクション全体が失敗する。**
+
+これを実行時の 500 として表出させない。差分計画が「別の既存事業者が同じ name を
+持っている」組を検出し、**適用不能（blockers）として提示する。**
+`apply` はこれが残っている限り 422 を返して適用しない。
+
+したがって**実運用の順序は「Phase 3 の突合 → インポート」である。**
+逆順では blockers が消えない。
 
 ### トランザクション規模（実測）
 
@@ -699,14 +730,25 @@ ekidata 側が一時的に値を落とした版を配布した場合に同じ事
 
 ### 廃止データの扱い
 
-`e_status = 2` の行は**取り込まない**（現役の 駅10,465 / 路線602 のみ）。
+`e_status` は **0 = 現役 / 1 = 未開業 / 2 = 廃止** の3値である
+（初版は 0 と 2 しか想定していなかった）。取り込むのは 0 だけで、
+現役は 駅10,625 / 路線602 / 事業者162 である。
+
+`e_status = 1`（未開業。路線1件・駅5件）は**取り込まず、廃止扱いにもしない。**
+まだ存在しない駅であり、廃止日を立てるのは誤りだからである。件数だけ警告に出す。
 既にDBに存在する行が CSV から消えた、または `e_status = 2` になった場合は
 `abolishedAt` を設定して**行は残す**。`platforms` 等からの参照を切らないため。
 
 ### 乗換接続の生成
 
-同一 `station_g_cd` に属する現役駅の全順序対（**5,876行**）を
+同一 `station_g_cd` に属する現役駅の全順序対（**6,946行**）を
 `source = 'ekidata_group'` として生成する。
+
+生成は JS で行数を組み立てず、**`stations` の自己結合による `INSERT ... SELECT` 1文**で行う。
+`ON CONFLICT (station_id, connected_station_id) DO NOTHING` が
+`source = 'manual'` の行と難易度入力済みの行を守る。
+このため実際の挿入数は適用してからでないと確定しない。
+差分計画に出す 6,946 は CSV から見た**上限**である。
 
 - `source = 'manual'` の行には触れない
 - 難易度が入力済みの行は `onConflictDoNothing` で保持する
@@ -828,7 +870,9 @@ WHERE stations.operator_id = operators.id
 |---|---|---|
 | CSVの必須列が欠落 | `external/ekidata/ekidataCsvParser.ts` | 適用せず、ファイル名と欠落列名を返す |
 | `line_cd` が `line` CSV に存在しない駅行 | `domain/plan.ts` | 当該駅をスキップし、計画に警告として計上 |
-| `station_g_cd` がダングリング（13件） | `domain/plan.ts` | グループを破棄せず、所属駅の最小 `station_cd` から代表値を決定 |
+| `station_g_cd` がダングリング（59件） | `external/ekidata/ekidataCsvParser.ts` | グループを破棄せず、所属する現役駅の最小 `station_cd` から代表値を決定 |
+| `join` の端点が現役駅でない、または `line_cd` が現役路線でない（149行） | `external/ekidata/ekidataCsvParser.ts` | FK を張れないため取り込まず、警告に計上 |
+| ekidata の事業者名が既存の別事業者と重複する | `domain/plan.ts` | **適用不能**として `plan` の時点で提示し、`apply` を受け付けない（`operators.name` の一意制約） |
 | 適用中の SQL エラー | `external/` | トランザクションをロールバックし、失敗テーブルと件数を返す |
 | 突合失敗（移行スクリプト） | `migrate-to-ekidata.ts` | NULL のまま残し、一覧を標準出力に出す。処理は継続 |
 | トランザクションのサイズ超過 | — | **起きない。** TASK-1.1 で全体7.3〜8.0秒／制限の1/37と実測済み（上記「トランザクション規模（実測）」） |
@@ -860,9 +904,10 @@ WHERE stations.operator_id = operators.id
 
 | 内容 | 行き先 |
 |---|---|
-| ekidata のコード体系（`station_cd` / `station_g_cd` / `line_cd` の意味と粒度）、`station_cd` 上位桁が `line_cd` と一致しない件、ダングリング13件 | `docs/domain/station-master-model.md`（新規） |
+| ekidata のコード体系（`station_cd` / `station_g_cd` / `line_cd` の意味と粒度）、`station_cd` 上位桁が `line_cd` と一致しない件、ダングリング59件、`e_status` が3値（現役／未開業／廃止）であること | `docs/domain/station-master-model.md`（新規） |
 | **現在の粒度が暫定であること**（ekidata 粒度は 19% 重複し、事業者×物理駅はホーム共用駅で割れる）。`stationLines` に `unique(stationId)` を付けない理由 | 同上 |
 | 乗換接続の由来区分（`ekidata_group` / `manual`）と、g_cd が捉えない乗換の存在 | 同上 |
+| `stationAdjacencies` は無向辺を1行で持ち、書き込み時に端点 UUID を昇順へ正規化して逆向きの重複を防ぐこと。読み取り側は両方向を見る必要があること | 同上 |
 | 路線概念の3分類（案内路線 / 運行 / 支線の吸収）と、ekidata `line_cd` がそれらを混在させていること | `docs/domain/station-master-model.md` |
 | 駅名正規化ルール | `docs/domain/station-master-model.md` |
 | `slug` の導出規則（`lines.slug` + カナ由来の修正ヘボン式、`(line_cd, ヘボン駅名)` が全国で一意であること、撥音を `m` 化しない方針、形態素境界の母音連続は判別不能であること） | 同上 |
