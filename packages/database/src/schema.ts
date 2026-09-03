@@ -291,7 +291,13 @@ export const stationGroups = pgTable('station_groups', {
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-// 路線内の隣接駅。ekidata join に対応する。無向グラフを両方向の2行で持つ
+// 路線内の隣接駅。ekidata join に対応する。
+// 【1辺につき1行しか持たない】無向グラフだが両方向の2行は作らない。
+// 2行に増やすと片方だけが更新される状態を作れてしまうためである。
+// unique_station_adjacency は (lineId, stationAId, stationBId) の順序に依存するので、
+// 書き込み側（features/master-import）は端点 UUID を昇順へ正規化してから INSERT する。
+// これにより供給元が辺を逆向きに配布し直しても重複行にならない。
+// 隣接を引く側は (stationAId = X OR stationBId = X) の両方を見ること
 export const stationAdjacencies = pgTable('station_adjacencies', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
