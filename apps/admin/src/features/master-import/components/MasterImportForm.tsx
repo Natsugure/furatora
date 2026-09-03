@@ -53,7 +53,7 @@ const BLOCKER_LABELS: Record<ImportBlockerCode, string> = {
   operator_name_conflict:
     '事業者名が既存の別の事業者と重複している。' +
     'このまま適用すると operators.name の一意制約でトランザクション全体が失敗する。' +
-    '先に移行スクリプトで ekidata コードを突合すること',
+    '先に「マスタ突合」（/master-migration）で ekidata コードを対応づけること',
 };
 
 type PlanResponse = {

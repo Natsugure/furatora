@@ -13,9 +13,10 @@
 Phase 0: docs/spec・ADR更新                      (完了)
 Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
 Phase 2: インポート機構                           (完了)
-Phase 3: 移行スクリプト（突合）                    (P0・Phase 2 に依存)
+Phase 3: 突合と publishedAt バックフィル           (完了・Phase 2 に依存)
 Phase 4: ODPT 後始末                             (Phase 3 完了後)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
+Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
 Phase 6: 検証・振り返り                            (必須)
 ```
 
@@ -35,10 +36,28 @@ Phase 5 に**現行バージョンのバグ修正**（TASK-5.0）が入る。可
 （requirements.md US-7）。可視性が `publishedAt` へ移る本Issueと
 不可分であるため、別Issueに切り出さずここで塞ぐ。
 
-TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` の
-`NOT NULL` 化）の順序は**入れ替えられない**。バックフィルが
-「移行前に非表示だった事業者」を `displayPriority IS NULL` で判別するため、
-先に埋めると情報が失われ、非表示だった駅まで公開されてバグが恒久化する。
+### `displayPriority` の `NOT NULL` 化は Phase 5 の後に置く（初版から変更）
+
+初版は TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` の
+`NOT NULL` 化）を Phase 3 内に並べ、TASK-5.0 が TASK-3.8 に依存するとしていた。
+**依存が逆であり、この順序では稼働中のサイトが壊れる。**
+
+`apps/web` の2箇所は `isNotNull(operators.displayPriority)` で可視性を判定している。
+`NOT NULL DEFAULT 0` にすると**この述語が常に真になり、ゆりかもめ等の
+非公開事業者の駅が全公開される**。ルート `CLAUDE.md` の禁止事項
+「その列を読むコードが稼働したままの `NOT NULL` 化」に該当する。
+
+正しい順序は3つのデプロイに分かれる。
+
+| デプロイ | 内容 | その時点の `apps/web` |
+|---|---|---|
+| 1（Phase 3） | `0005` バックフィル + 突合UI | `displayPriority` で判定。**挙動は変わらない** |
+| 2（Phase 5） | TASK-5.0: 可視性を `publishedAt` の単一述語へ | `displayPriority` を読むコードが消える |
+| 3（Phase 5b） | `0006`: `NOT NULL DEFAULT 0` | 読み手がいないので安全 |
+
+バックフィルが「移行前に非表示だった事業者」を `displayPriority IS NULL` で
+判別する点は初版のまま変わらない。**先に埋めてはならない**という制約は、
+デプロイ1 と デプロイ3 の間隔として表現される。
 
 ---
 
@@ -86,8 +105,8 @@ Phase 2 より前であることは変わらないため、「唯一の未知を
   `stations.ekidataStationCd` / `stations.stationGroupId` / `stations.prefCode` /
   `stations.abolishedAt` / `stations.publishedAt` / `stationConnections.source` を追加
 - **注意**: `operators.displayPriority` の `NOT NULL DEFAULT 0` 化は**ここで行わない**。
-  TASK-3.7 のバックフィルが「移行前に非表示だった事業者」を判別するために
-  NULL を必要とする。TASK-3.8 で行う
+  バックフィル（`0005` / TASK-3.0）が「移行前に非表示だった事業者」を判別するために
+  NULL を必要とする。純化は TASK-5b.1 で行う
 - **注意**: この時点では**制約の削除を行わない**。既存データが移行前のため
 - **期待結果**: 列が追加され、既存の読み書きが壊れない
 
@@ -97,7 +116,7 @@ Phase 2 より前であることは変わらないため、「唯一の未知を
 - **内容**: `check('published_requires_slug', sql\`published_at IS NULL OR slug IS NOT NULL\`)`
 - **事前確認**: **既存481行の `slug` に NULL が無いことを SQL で確認する。**
   design.md は「`update-odpt.ts` が全件生成済み」を前提にしているが、
-  TASK-3.7 のバックフィルが失敗しないことを保証するため実測する
+  バックフィル（`0005` / TASK-3.0）が失敗しないことを保証するため実測する
 - **事前確認の結果（2026-08-30 実測）**: `stations.slug` の NULL は **0件 / 481行**、
   `lines.slug` の NULL も **0件 / 62行**。制約違反なしで付与できることを確認済み
 - **期待結果**: 制約が付与される。この時点で `publishedAt` は全行 NULL のため違反は出ない
@@ -424,64 +443,89 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 
 ---
 
-## Phase 3: 移行スクリプト（突合）
+## Phase 3: 突合と `publishedAt` バックフィル（完了 2026-09-04）
 
 > **実行順序は「突合 → インポート」である。** Phase 2 の実装で判明した通り、
 > 現行DBの17事業者の `name` は ekidata の `company_name` と全件一致する。
 > 突合前にインポートを流すと `operators_name_unique` に衝突し、
 > 差分計画が適用不能として拒否する（Phase 2「TASK-2.3」参照）。
 
-### TASK-3.1: 事業者の突合
-- **依存**: Phase 2
-- **成果物**: `apps/scripts/src/migrate-to-ekidata.ts`
-- **内容**: `odptOperatorId` → `company_cd` の対応表17件（design.md に記載済み）
-- **期待結果**: 17件すべてに `ekidataCompanyCd` が入る
+### 初版から変えた2点
 
-### TASK-3.2: 路線の突合
-- **依存**: TASK-3.1
-- **内容**: 事業者を確定した上で、路線名の正規化一致 → 全駅包含判定の順に試みる。
-  要手動4件（`常磐線快速` / `東海道線` / `豊島線` / `東武スカイツリーライン(支線)`）は
-  対応表に直接書く
-- **期待結果**: 62路線のうち自動42 + 手動4 が解決。残りは NULL のまま一覧化
+| # | 初版 | 変更 | 理由 |
+|---|---|---|---|
+| 1 | `apps/scripts/src/migrate-to-ekidata.ts` | **Admin の画面操作**（`/master-migration`） | `apps/scripts` の依存は `@furatora/database` だけであり、`@/` エイリアスを使う `ekidataCsvParser.ts` を持ち込めない。また ADR-0008 は「各環境のアプリが自分の Neon ブランチに書く」形であり、本番の接続文字列をローカルに置く経路を新設せずに済む |
+| 2 | TASK-3.7 をスクリプト内で実行 | **手書きSQLマイグレーション `0005`** | Vercel のビルドが development / preview / production のすべてに自動適用する。とくに Phase 5 の Preview で「公開駅0件の空サイト」を検証してしまう事故を防ぐ |
 
-### TASK-3.3: 駅の突合
-- **依存**: TASK-3.2
-- **内容**: 路線確定後、正規化した駅名の完全一致で `station_cd` を引く。
-  **`stations.id` は変更しない**（`platforms` 14件・`lineDirections` 52件の参照維持）
-- **期待結果**: 未解決由来146件のうち131件が自動解決。
-  残り15件（新幹線11 + 手動4）は NULL のまま一覧に出る
-- **完了条件**: ドライランで突合結果を確認してから適用する
-- **注意（2026-08-31 実測）**: **`development` は `main` の正確なコピーではない。**
-  ドライランの結果をそのまま本番の期待値として扱わないこと
+TASK-3.8 の移動については[実行順序の根拠](#displaypriority-の-not-null-化は-phase-5-の-後に置く初版から変更)を参照。
+
+### TASK-3.0: `publishedAt` バックフィル（旧 TASK-3.7）
+- **状態**: ✅ 完了 (2026-09-04)
+- **成果物**: `packages/database/drizzle/0005_backfill_published_at.sql`
+  （`drizzle-kit generate --custom` で作成）
+- **内容**: `display_priority IS NOT NULL` の事業者に属し、`published_at` が
+  未設定の駅へ `now()` を入れる。既に値がある行は上書きしない
+- **理由**: 新規行の既定は NULL（非公開）であるため、
+  **これを行わないと移行後に本番サイトが空になる**
+- **`display_priority IS NOT NULL` の条件を落とさないこと**。移行前に非表示だった
+  事業者の駅まで公開すると、requirements.md US-7 の実バグを仕様として恒久化する
+- **件数は環境ごとに違ってよい**（2026-09-04 実測）。この文は各環境の
+  「移行前の可視性」を写すためであり、一致しないことが正しい
 
   | | main | development |
   |---|---|---|
-  | `stations` / `lines` / `operators` / `stationConnections` | 481 / 62 / 17 / 546 | 同じ |
-  | `platforms` | 14 | 18 |
-  | `lineDirections` | 52 | 34 |
-  | `trains` | 10 | 13 |
-  | `stationFacilities` | 0 | 14 |
+  | `display_priority` が NULL の事業者 | 15 / 17 | 14 / 17（JR東日本に 3 が入っている） |
+  | 公開になる駅 | **335** | **438** |
+  | NULL のまま残る駅 | 146 | 43 |
 
-  本タスクの「`platforms` 14件・`lineDirections` 52件の参照維持」は **main の数字**である。
-  参照を切らないという要件自体は両ブランチで同じだが、件数での検証は
-  各ブランチの実数に対して行うこと
+- **前提の確認**: `stations.slug` の NULL は 0件 / 481行のため、
+  `published_requires_slug` の CHECK に触れない（TASK-1.3b で実測済み）
 
-### TASK-3.4: 新幹線11駅の突合
-- **状態**: 前提の確認は完了 (2026-09-03)。突合そのものは TASK-3.3 の一部として行う
-- **依存**: TASK-3.3
-- **確認結果**: **会員版 `station` CSV に新幹線の駅は含まれる。**
-  東海道新幹線（`line_cd = 1002`）に東京 `100201` / 品川 `100202` / 新横浜 `100203` …
-  が存在する（会員版と無料版の現役駅数の差160件がこれにあたる）。
-  requirements.md の **C-1 は解消**した
-- **期待結果**: 11駅すべてに `ekidataStationCd` が入る
+### TASK-3.1〜3.5: 突合（Admin の `/master-migration`）
+- **状態**: ✅ 完了 (2026-09-04)
+- **依存**: Phase 2
+- **成果物**:
+  - `apps/admin/src/features/master-migration/`
+    （`domain/{migrationPlan,manualMappings,match}.ts` / `ports.ts` /
+    `usecases/{planMigration,applyMigration}.ts` / `components/MasterMigrationForm.tsx`）
+  - `apps/admin/src/external/repository/masterMigrationRepository.ts`
+  - `apps/admin/src/app/{master-migration/page.tsx,api/master-migration/route.ts}`
+  - `di.ts` への配線、`Sidebar.tsx` への導線
+- **再利用したもの（新規に書いていない）**: `ekidataCsvSource`（`parse` / `digest`）、
+  `normalizeStationName`、`ImportedLine` / `ImportedStation`、`withTransaction`。
+  **feature 間の依存 `master-migration → master-import` が新しく生じる。**
+  一方向で循環しない（ADR-0001）
+- **突合の順序**: 事業者 → 路線 → 駅。手動対応表を**自動突合より先に**引く
+  （人が CSV を読んで確認した結果の方が、名前一致より確かな根拠であるため）
+  - **事業者（TASK-3.1）**: `odptOperatorId` → `company_cd` の対応表17件。
+    実DBの値は `odpt.Operator:TokyoMetro` 形式（2026-09-04 実測）。
+    照合は `:` の後ろで行い、接頭辞の有無どちらでも引ける
+  - **路線（TASK-3.2）**: 手動表 → 正規化名の完全一致 → 全駅包含判定
+  - **駅（TASK-3.3 / 3.4）**: 手動表 → 確定した路線の中で正規化名の完全一致
+- **`stations.id` / `lines.id` は変更しない**（`platforms` / `lineDirections`
+  からの参照維持。REQ-3.4）。UPDATE でコード列だけを埋める
+- **未突合行は削除しない**（REQ-3.2）。コードを NULL のまま残し、画面に一覧表示する。
+  **未突合一覧には「名前が近い ekidata の候補」を添える。**
+  手動対応表の値は docs に記録が無く CSV から人が特定するしかないため、
+  その作業を CSV の grep 無しで終わらせるための補助である
+- **適用不能（blockers）— `apply` を拒否する条件**:
 
-### TASK-3.5: `stationConnections` の全置換
-- **依存**: TASK-3.3
-- **内容**: 既存546行を削除し、インポート（TASK-2.8）の生成結果に置き換える。
-  生成は `stations` の自己結合による `INSERT ... SELECT` で行われるため、
-  削除後にインポートを再実行すれば埋め直される
-- **前提の再確認**: 適用直前に「難易度入力済みの行が0件であること」を
-  スクリプト内で検証する。0件でなければ停止する
+  | code | 内容 |
+  |---|---|
+  | `duplicate_ekidata_code` | 複数の既存行が同じコードに突合した。`ekidata*Cd` は unique であり 23505 で落ちる。ODPT の路線は運行系統粒度であり、実際に起こりうる |
+  | `code_taken_by_other_row` | 割り当て先のコードを既に別の行が持っている（再実行時） |
+  | `connection_has_input` | 難易度・メモが入力済みの乗換接続がある。TASK-3.5 の前提が崩れている |
+
+- **TASK-3.5（`stationConnections` の全置換）**: 削除は**由来で絞る**。
+  `source IS NULL` かつ難易度・メモがすべて NULL の行だけを消す。
+  `'manual'` と `'ekidata_group'` には触れない。
+  実測0件に依存せず、**守るべき行に構造的に触れない**形にした。
+  埋め直すのはインポート側の `INSERT ... SELECT`（TASK-2.8）である。
+  **削除から取り込みまでの間、公開サイトの乗換接続は空になる。** 続けて実行すること
+- **テスト**: `domain/match.test.ts`（19件）/ `usecases/*.test.ts`（7件）/
+  `route.test.ts`（9件）。突合・冪等性・適用不能の検出を DB 無しで固定した
+
+### TASK-3.6: 欠番
 
 > **TASK-3.6（`stationLines` の 1:1 制約を付与）は削除した。** 実測0件は
 > ekidata が路線ごとに駅を割った結果であり、ドメインの不変条件ではないため。
@@ -489,24 +533,56 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 > 番号は欠番のまま残す（[design.md](./design.md)「`stationLines` に
 > `unique(stationId)` を付けない理由」）。
 
-### TASK-3.7: 既存481行の `publishedAt` バックフィル
-- **依存**: TASK-1.3b, TASK-3.3
-- **内容**: 突合の成否に関わらず既存481行のうち `publishedAt` が
-  未設定のものへ移行実行時刻を設定する。既に値がある行は上書きしない
-- **理由**: 新規行の既定は NULL（非公開）であるため、
-  **これを行わないと移行実行時に本番サイトが空になる**
-- **注意**: 現行で `displayPriority` が NULL（非表示）の事業者に属する駅は
-  **公開してはならない**。移行前の可視性をそのまま引き継ぐこと。
-  ゆりかもめ等が該当する（requirements.md US-7 の実バグ対象）
-- **期待結果**: 移行前に表示されていた駅がすべて公開、
-  非表示だった事業者の駅は `publishedAt` が NULL のまま
+### 残作業（手動対応表の確定）
 
-### TASK-3.8: `operators.displayPriority` を表示順専用に純化
-- **依存**: TASK-3.7（**順序を逆にしない**）
-- **内容**: `NOT NULL DEFAULT 0` へ変更。既存の NULL 行を 0 で埋める
-- **理由**: 可視性の意味を外す。TASK-3.7 が NULL を読み終えた後でなければ、
-  移行前に非表示だった事業者を判別できなくなる
-- **期待結果**: 可視性を担う述語が `stations.publishedAt` の1つだけになる
+`manualMappings.ts` の `MANUAL_LINE_CD` / `MANUAL_STATION_CD` は**空のまま出している。**
+design.md は要手動を路線4件（`常磐線快速` / `東海道線` / `豊島線` /
+`東武スカイツリーライン(支線)`）と駅4件（常磐線快速の新橋・東京、高崎線の東京、
+京王新線「新宿」→ ekidata「新線新宿」）と特定しているが、
+**対応する `line_cd` / `station_cd` は docs のどこにも記録されていない。**
+値は CSV を読まないと決まらない。
+
+埋め方は `/master-migration` で試算 → 未突合一覧の「候補」欄を見る →
+CSV で確認して根拠コメント付きで書く、である。
+
+**期待件数も暫定である。** design.md の「46件中42件が自動決定」は
+未解決接続由来の46路線に対する実測であり、メトロ10 + 都営6 を含む62件全体の
+数字ではない。tasks.md 初版の「62路線のうち自動42 + 手動4」は数が合わない。
+リハーサルの実測で確定させる。
+
+### リハーサル手順（本番適用の前に必ず行う）
+
+`development` は `main` の正確なコピーではない（下表）。
+**試算の結果をそのまま本番の期待値として扱わないこと。**
+
+| | main | development |
+|---|---|---|
+| `stations` / `lines` / `operators` / `stationConnections` | 481 / 62 / 17 / 546 | 同じ |
+| `platforms` | 14 | 18 |
+| `lineDirections` | 52 | 34 |
+| `trains` | 10 | 13 |
+| `stationFacilities` | 0 | 14 |
+| `display_priority` が NULL の事業者 | 15 | 14 |
+
+`main` から使い捨ての Neon ブランチを切って通しで演習する。
+
+```bash
+neonctl branches create --project-id patient-meadow-13439419 --parent main --name rehearsal
+MIGRATION_DATABASE_URL='<rehearsal>' pnpm -w run db:migrate
+DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
+```
+
+1. `0005` 適用後、公開駅が **335**・NULL が **146** であること
+2. `/master-migration` で CSV 4件 → 試算。未突合一覧から手動対応表の値を特定する
+3. 適用 → コードの埋まり方と `stationConnections` の削除件数を確認
+4. `/master-import` に同じCSV → **blockers が0件**になっていること → 適用
+5. `platforms` / `lineDirections` / `trains` / `stationFacilities` の件数が
+   演習開始時と**変わっていない**こと（REQ-2.3 / REQ-3.4）
+6. `/master-migration` をもう一度適用して**差分0**になること（冪等性）
+7. ブランチを削除する
+
+本番は `develop` → `main` のマージで `0005` が適用された後、
+**本番の Admin にログインして** `/master-migration` → `/master-import` の順に実行する。
 
 ---
 
@@ -540,7 +616,10 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 ## Phase 5: 公開ガードと Admin UI
 
 ### TASK-5.0: 可視性述語の一元化（**現行バグの修正**）
-- **依存**: TASK-3.8
+- **依存**: TASK-3.0（`0005` バックフィル）。
+  **TASK-3.8 には依存しない**（初版は逆に書いていた。
+  [実行順序の根拠](#displaypriority-の-not-null-化は-phase-5-の-後に置く初版から変更)）。
+  バックフィル済みのDBでなければ、置き換えた瞬間に公開駅が0件になる
 - **対象**: `apps/web`
 - **成果物**: `apps/web/src/features/station/domain/visibility.ts`
 - **内容**: design.md「現行の可視性ガードは一覧にしか無い」の表に従い、
@@ -625,6 +704,23 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 - **期待結果**: Phase 3 で残った15件が画面から解決できる
 - **注意**: [ADR-0001](../adr/0001-layer-structure.md) の4層に沿って
   `features/` へ移す（現在は `app/` に556行が直書きされている）
+
+---
+
+## Phase 5b: `displayPriority` の `NOT NULL` 化（旧 TASK-3.8）
+
+### TASK-5b.1: `operators.displayPriority` を表示順専用に純化
+- **依存**: **TASK-5.0 が本番にデプロイされていること。** 同じPRに入れない
+- **内容**: `NOT NULL DEFAULT 0` へ変更し、既存の NULL 行を 0 で埋める
+- **理由**: 可視性の意味を外す。可視性を担う述語が
+  `stations.publishedAt` の1つだけになる
+- **同じPRに入れてはならない理由**: マイグレーションはビルド時に走るため、
+  **新しいコードが公開される前にDBが変わる**（ADR-0008）。TASK-5.0 と同居させると、
+  ビルドが終わるまでの間だけ「`displayPriority` で判定する古いコード」が
+  「全行が 0 になったDB」を見ることになり、非表示事業者の駅が露出する
+- **前提の確認**: 適用前に `apps/web` から `operators.displayPriority` を
+  読む箇所が消えていることを grep で確かめる
+- **期待結果**: 可視性を担う述語が `stations.publishedAt` の1つだけになる
 
 ---
 

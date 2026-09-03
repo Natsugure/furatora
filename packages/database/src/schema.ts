@@ -269,9 +269,16 @@ export const operators = pgTable('operators', {
   name: varchar('name', { length: 100 }).notNull().unique('operators_name_unique'),
   // 【一意制約を付けないこと】理由は stations.odptStationId と同じ（ADR-0007 決定3）
   odptOperatorId: varchar('odpt_operator_id', { length: 100 }), // ODPT API の odpt:operator (例: odpt.Operator:TokyoMetro)
-  // TODO(TASK-3.8): NOT NULL DEFAULT 0 にして表示順専用に純化する。
-  // それまでは「null=非表示」の旧仕様が残る。TASK-3.7 のバックフィルが
-  // 「移行前に非表示だった事業者」をこの null で判別するため、先に埋めてはならない
+  // TODO(TASK-5b.1): NOT NULL DEFAULT 0 にして表示順専用に純化する。
+  // それまでは「null=非表示」の旧仕様が残る。
+  //
+  // 【純化してよい時点は2つの条件を満たした後である】
+  // 1. マイグレーション 0005（published_at のバックフィル）が適用済みであること。
+  //    あれが「移行前に非表示だった事業者」をこの null で判別するため、先に埋めない
+  // 2. TASK-5.0（可視性を published_at の単一述語へ）が**本番に出ている**こと。
+  //    apps/web が isNotNull(display_priority) で判定している間に純化すると、
+  //    述語が常に真になり非表示事業者の駅が全公開される。
+  //    マイグレーションはビルド時に走る（ADR-0008）ので同じPRに入れてもいけない
   displayPriority: integer('display_priority'), // 数字=表示順、null=非表示
   ekidataCompanyCd: integer('ekidata_company_cd').unique(),
   createdAt: timestamp('created_at').defaultNow(),

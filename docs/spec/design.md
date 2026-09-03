@@ -53,7 +53,9 @@ Route Handler にこの制限は無く、`apps/admin` に既に多数存在す�
 apps/admin/src/
 ├── app/
 │   ├── api/master-import/route.ts        # multipart 受け口・2段階（plan / apply）
-│   └── master-import/page.tsx            # アップロードUI
+│   ├── api/master-migration/route.ts     # 突合。同じ4ファイル・同じ2段階
+│   ├── master-import/page.tsx            # アップロードUI
+│   └── master-migration/page.tsx         # 突合UI
 ├── features/master-import/
 │   ├── domain/
 │   │   ├── importedRecords.ts            # furatora 側の型。ekidata の列名を持たない
@@ -64,6 +66,14 @@ apps/admin/src/
 │   │   ├── planImport.ts
 │   │   └── applyImport.ts
 │   └── components/MasterImportForm.tsx
+├── features/master-migration/            # ODPT 由来行の突合（Phase 3・一度きり）
+│   ├── domain/
+│   │   ├── migrationPlan.ts              # 型
+│   │   ├── manualMappings.ts             # 手動対応表（事業者17 / 路線 / 駅）
+│   │   └── match.ts                      # 突合（純粋関数）
+│   ├── ports.ts                          # MasterMigrationRepository
+│   ├── usecases/{planMigration,applyMigration}.ts
+│   └── components/MasterMigrationForm.tsx
 ├── features/station-publishing/          # 駅の公開操作（TASK-5.2）
 │   ├── domain/
 │   │   └── romaji.ts                     # カナ→修正ヘボン式。slug 候補の生成
@@ -71,7 +81,8 @@ apps/admin/src/
 │   └── components/
 ├── external/
 │   ├── ekidata/ekidataCsvParser.ts       # CSV形式の知識はここだけ
-│   └── repository/masterImportRepository.ts
+│   ├── repository/masterImportRepository.ts
+│   └── repository/masterMigrationRepository.ts
 └── di.ts                                 # 配線を追加
 ```
 
@@ -213,9 +224,12 @@ operators += {
 // odptOperatorId は残す（ADR-0007 決定3）。一意制約は付けない
 // displayPriority を NOT NULL DEFAULT 0 に変更し、「null=非表示」の意味を外して
 // 表示順専用の列にする（理由は次項）。
-// 【実測 2026-08-30】17事業者中 15行が NULL である。バックフィルは必要であり、
-// かつ TASK-3.7（publishedAt バックフィル）がこの NULL を読み終えるまで
-// 実行してはならない。先に埋めると「移行前に非表示だった事業者」が判別できなくなる
+// 【実測】main は17事業者中 15行が NULL、development は 14行（2026-09-04）。
+// バックフィル（0005）がこの NULL を読み終えるまで実行してはならない。
+// 先に埋めると「移行前に非表示だった事業者」が判別できなくなる。
+// 【実行時点】NOT NULL 化は Phase 5b（TASK-5b.1）であり、TASK-5.0 が本番に出た後の
+// 単独PRで行う。apps/web が displayPriority を読んでいる間に純化すると
+// 述語が常に真になり、非表示事業者の駅が全公開される（tasks.md「実行順序の根拠」）
 
 lines += {
   ekidataLineCd: integer('ekidata_line_cd').unique(),
@@ -619,7 +633,8 @@ DB に置くことになる。しかし計画は最大47,800行分あり、そ�
 
 `operators.name` は一意制約付きである。そして現行DBの17事業者の `name` は
 **ekidata の `company_name` と全件完全に一致する**（JR東日本 / 東京メトロ / ゆりかもめ …）。
-移行スクリプト（Phase 3）で `ekidataCompanyCd` を突合する前にインポートを流すと、
+突合（Phase 3 / Admin の `/master-migration`）で `ekidataCompanyCd` を
+埋める前にインポートを流すと、
 17件すべてが別行として INSERT され、`operators_name_unique` の 23505 で
 **トランザクション全体が失敗する。**
 
@@ -771,8 +786,24 @@ ekidata 側が一時的に値を落とした版を配布した場合に同じ事
 
 ## 移行アルゴリズム（一度きり）
 
-`apps/scripts/src/migrate-to-ekidata.ts`。
+**Admin の画面操作として実装する**（`/master-migration`）。
+`apps/admin/src/features/master-migration/` + `external/repository/masterMigrationRepository.ts`。
+
+初版は `apps/scripts/src/migrate-to-ekidata.ts` としていたが、2点で成立しない。
+`apps/scripts` の依存は `@furatora/database` だけであり、`@/` エイリアスを使う
+`ekidataCsvParser.ts` を持ち込めない。また ADR-0008 は「各環境のアプリが自分の
+Neon ブランチに書く」形であり、本番の接続文字列をローカルへ置く経路を新設したくない。
+画面にすれば、取り込みと同じ CSV・同じ認証・同じ2段階（試算 → 承認）で完結する。
+
+**feature 間の依存 `master-migration → master-import` が新しく生じる**
+（`normalizeStationName` / `EkidataCsvSource` / `ImportedLine` / `ImportedStation`）。
+一方向で循環しないため許可する（ADR-0001「feature 間の依存」）。
+CSV 形式の知識は `external/ekidata/` に1つだけ置き、両方の feature が
+port 越しに使う。突合側に別のパーサを持たせない。
+
 **`stations.id` / `lines.id` は変更しない。** UPDATE で `ekidata*Cd` を埋める。
+**手動対応表は自動突合より先に引く**（人が CSV を読んで確認した結果の方が、
+名前一致より確かな根拠であるため）。
 
 ### 順序: 事業者 → 路線 → 駅
 
@@ -792,11 +823,16 @@ MIR→123  Yurikamome→125  TokyoMonorail→148  TWR→149  ToyoRapid→150
 
 #### 2. 路線（62件）
 
-事業者を確定した上で、路線名の正規化一致 → 全駅包含判定 の順に試みる。
-実測で **46件中42件が自動決定**、要手動4件。
+事業者を確定した上で、手動対応表 → 路線名の正規化一致 → 全駅包含判定 の順に試みる。
 
 要手動: `常磐線快速` / `東海道線` / `豊島線` / `東武スカイツリーライン(支線)`。
-対応表に直接書き下す。
+対応表に直接書き下す。**対応する `line_cd` は本設計では確定していない。**
+値は CSV を読まないと決まらないため、試算の未突合一覧（名前の近い候補を添える）を
+見て特定する。
+
+**「46件中42件が自動決定」は未解決接続由来の46路線に対する実測であり、
+メトロ10 + 都営6 を含む62件全体の数字ではない。** 62件に対する解決率は
+リハーサルの実測で確定させる。
 
 #### 3. 駅（481件）
 
@@ -827,7 +863,12 @@ MIR→123  Yurikamome→125  TokyoMonorail→148  TWR→149  ToyoRapid→150
 `publishedAt` は新規行で `NULL`（非公開）が既定になる（前述）。
 **そのままでは移行実行時に既存481駅が一斉に非公開へ落ち、本番サイトが空になる。**
 
-移行スクリプトは、突合の成否に関わらず既存481行のうち
+**手書きのSQLマイグレーション（`0005_backfill_published_at.sql`）で行う。**
+突合とは独立であり、Vercel のビルドが development / preview / production の
+すべてへ自動適用する。スクリプトや画面操作にすると環境ごとに実行忘れが起き、
+とくに Phase 5 の Preview で「公開駅0件の空サイト」を検証してしまう。
+
+突合の成否に関わらず、既存481行のうち
 `publishedAt` が未設定のものへ移行実行時刻を設定する。
 既に管理者が値を設定していた場合は上書きしない
 （本スクリプトは一度きりの初期化であり、上書きルールの対象外だが同じ方針を踏襲する）。
@@ -851,10 +892,26 @@ WHERE stations.operator_id = operators.id
 `displayPriority` を `NOT NULL DEFAULT 0` へ変更する前に本バックフィルを
 実行すること。順序を逆にすると、可視性の情報が失われて判定できなくなる。
 
+さらに、**純化は TASK-5.0（可視性述語の一元化）が本番に出た後の単独PRで行う**
+（Phase 5b）。`apps/web` が `isNotNull(operators.displayPriority)` を読んでいる間に
+`NOT NULL DEFAULT 0` にすると述語が常に真になり、非表示事業者の駅が全公開される。
+マイグレーションはビルド時に走る（ADR-0008）ため、同じPRに入れると
+ビルド完了までの間だけ古いコードが純化後のDBを見る。
+
+バックフィルの件数は環境ごとに違ってよい。この文は各環境の「移行前の可視性」を
+写すためである（2026-09-04 実測: main 335件 / development 438件）。
+
 ### `stationConnections` は全置換
 
 実測で 546件すべて難易度未入力（`stroller_difficulty` / `wheelchair_difficulty` が
-全件 NULL）であるため、保護せず削除して `station_g_cd` から作り直す。
+全件 NULL）であるため、削除して `station_g_cd` から作り直す。
+
+**ただし実測0件に依存しない。** 削除は由来で絞り、`source IS NULL` かつ
+難易度・メモがすべて NULL の行だけを対象にする。`'manual'` と `'ekidata_group'`
+には触れない。守るべき行に構造的に触れない形にしておく。
+入力済みの行が1件でもあれば `connection_has_input` として適用を止める。
+
+削除から取り込みまでの間、公開サイトの乗換接続は空になる。続けて実行すること。
 
 ### `unresolved-connections` ページの転生
 
@@ -874,7 +931,8 @@ WHERE stations.operator_id = operators.id
 | `join` の端点が現役駅でない、または `line_cd` が現役路線でない（149行） | `external/ekidata/ekidataCsvParser.ts` | FK を張れないため取り込まず、警告に計上 |
 | ekidata の事業者名が既存の別事業者と重複する | `domain/plan.ts` | **適用不能**として `plan` の時点で提示し、`apply` を受け付けない（`operators.name` の一意制約） |
 | 適用中の SQL エラー | `external/` | トランザクションをロールバックし、失敗テーブルと件数を返す |
-| 突合失敗（移行スクリプト） | `migrate-to-ekidata.ts` | NULL のまま残し、一覧を標準出力に出す。処理は継続 |
+| 突合失敗 | `master-migration/domain/match.ts` | NULL のまま残し、名前の近い候補を添えて画面に一覧表示する。処理は継続 |
+| 複数の既存行が同じ ekidata コードに突合 | `master-migration/domain/match.ts` | **適用不能**として試算の時点で提示し、`apply` を受け付けない（`ekidata*Cd` の一意制約） |
 | トランザクションのサイズ超過 | — | **起きない。** TASK-1.1 で全体7.3〜8.0秒／制限の1/37と実測済み（上記「トランザクション規模（実測）」） |
 
 ---
@@ -893,7 +951,8 @@ WHERE stations.operator_id = operators.id
 | `master-import/domain/plan.ts` | 単体 | 新規/更新/廃止の判定、空値で上書きしないこと、冪等性（同一入力で差分0） |
 | `usecases/` | 単体 | ports をスタブして計画と適用の調停を検証 |
 | `route.ts` | 結合 | 1.4MB のアップロードが通ること、plan→apply の順序 |
-| 移行スクリプト | 手動 | ドライランで突合結果を確認してから適用 |
+| `master-migration/domain/match.ts` | 単体 | 事業者の対応表、路線の名前一致・全駅包含、駅の名前一致、`ヶ`/`ケ`、適用不能の検出、冪等性（適用後の状態を入れると書き込み対象が0） |
+| 移行（画面） | 手動 | `main` から切った使い捨てブランチで、試算 → 適用 → 取り込みまで通しで演習する（tasks.md「リハーサル手順」） |
 
 ---
 
