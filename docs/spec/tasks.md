@@ -18,6 +18,7 @@ Phase 4: ODPT 後始末                             (Phase 3 完了後)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
 Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
 Phase 6: 検証・振り返り                            (必須)
+Phase 7: 移行機構の削除                            (本番投入の完了後・ADR-0007 決定4)
 ```
 
 ### 実行順序の根拠
@@ -628,6 +629,49 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 6. `/master-migration` をもう一度適用して**差分0**になること（冪等性）
 7. ブランチを削除する
 
+#### 実施結果（2026-09-04 / ブランチ `rehearsal` = `br-proud-shadow-a18el6fk`）
+
+**全手順合格。** `main` から切ったブランチに対し、手順1〜6のすべてが期待値と一致した。
+
+| 手順 | 確認内容 | 結果 |
+|---|---|---|
+| 1 | `0005` 適用後の公開駅 / NULL | **335 / 146** |
+| 2 | 突合の試算 | 事業者 17/17、路線 62→**59**（未突合3）、駅 481→**477**（未突合4）。適用不能 **0件** |
+| 3 | 突合の適用 | コード設定 17 / 59 / 477。`stationConnections` 546→**0**（入力済み0件） |
+| 4 | 取込の適用 | blockers **0件**。事業者+145 / 路線+543 / 駅+10,148 / 隣接10,040 / 乗換接続6,946 |
+| 5 | 既存データの不変性 | `platforms` 14 / `lineDirections` 52 / `trains` 10 / `stationFacilities` 0 が**不変**。`stations` / `lines` の id も維持 |
+| 6 | 冪等性 | 再試算で今回設定 **0 / 0 / 0**、乗換接続の作り直し対象 **0件**。適用しても DB は無変化 |
+
+適用後の全行数は 事業者162 / 路線605 / 駅10,629 / 乗換単位の駅8,782 /
+駅と路線の関連10,634 / 隣接10,040 / 乗換接続6,946。
+公開駅は **335 のまま**である（新規10,148駅はすべて非公開で入る）。
+`published_at IS NOT NULL AND slug IS NULL` は0件で、`published_requires_slug` と整合する。
+
+#### リハーサルで判明したこと
+
+1. **取込は `lines.name` を ekidata の表記で上書きする。**
+   `常磐線快速` → `JR常磐線(上野～取手)` / `高崎線` → `JR高崎線` /
+   `東海道線` → `JR東海道本線(東京～熱海)` / `有楽町線` → `東京メトロ有楽町線`。
+   運行系統粒度で付けた現行の名前の方が旅客案内には適しており、
+   これが [ADR-0007](../adr/0007-station-master-data-source.md) で
+   「ekidata を定期的に再取込して同期する」を却下する根拠になった
+
+2. **手動対応表のキーは、取込後には引けなくなる。**
+   `MANUAL_LINE_CD` / `MANUAL_STATION_CD` のキーが
+   `<事業者キー>/<路線名>[/<駅名>]` であり、上記の上書きでキーが変わるためである。
+   2回目の試算では未突合4駅の理由が「ekidata に対応行が無い（確認済み）」から
+   「候補なし」に変わった。**結果には影響しなかった**（コードは1回目で設定済みであり、
+   `null` エントリの行も自動突合が候補を見つけられず NULL のまま残った）が、
+   `null` エントリの役割である「自動突合を止める」安全装置は外れている。
+
+   **対応表のキーを `odptRailwayId` / `odptStationId` へ変える案は採らない。**
+   ADR-0007 決定4 により移行機構ごと削除するため、
+   対応表が再び引かれる場面そのものが消える（Phase 7）
+
+3. **`ekidata*Cd` は突合・取込の外では読まれていない。** `apps/web` からの参照は0件。
+   全使用箇所は upsert の衝突対象、CSV 内の参照解決、突合結果の書き込み先、`unique` 制約である。
+   列を残す根拠は由来の記録であって、実行時の参照ではない（ADR-0007 決定3）
+
 本番は `develop` → `main` のマージで `0005` が適用された後、
 **本番の Admin にログインして** `/master-migration` → `/master-import` の順に実行する。
 
@@ -786,7 +830,9 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
     乗換接続の由来区分、駅名正規化ルール、
     ekidata 規約に由来する制約、**`slug` の導出規則**、
     **`nameEn` は公式表記のみで機械生成しないこと**、
-    **可視性は `stations.publishedAt` が単独で担い、判定は単一の述語を通すこと**
+    **可視性は `stations.publishedAt` が単独で担い、判定は単一の述語を通すこと**、
+    **ekidata は初回シードであり継続同期しないこと**と、
+    以後の維持が Admin での手動編集であること（ADR-0007 決定1）
   - `docs/domain/README.md` の一覧に2件を追加
 - **確認**: 既存の `platform-coordinate-system.md` / `train-stop-patterns.md` に
   変更が要るかを確認し、**不要ならその旨を記録する**
@@ -801,11 +847,42 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   調査資料は Obsidian `Projects/furatora/駅・路線の粒度 — 設計のための調査メモ`。
   期限の目安は「ホーム設備の入力が共用ホーム駅（目黒等）に到達したとき」
 - **内容**: 以下を GitHub Issue として起票する
-  - 運行系統のデータ投入と Admin 管理UI（ODPT路線46件が種として使える）
-  - 列単位の上書きロック（`lockedFields`）
-  - `ekidataStationCd` の notNull 化（未突合ゼロ達成後）
+  - 運行系統のデータ投入と Admin 管理UI（ODPT路線46件が種として使える）。
+    **手動維持が主経路になるため優先度が上がる**（ADR-0007 決定1）
   - `facilityConnections` の粒度見直し
   - `operators.displayPriority` の全国運用ルール
+- **起票しないもの**（初版から削除。理由を残す）:
+  - **`ekidataStationCd` の notNull 化。** 「未突合ゼロ達成後」という前提が
+    手動運用と両立しない。手動で追加された駅は ekidata コードを持ち得ないため、
+    notNull は達成できないだけでなく**達成してはならない**（ADR-0007 決定3）
+  - **列単位の上書きロック（`lockedFields`）。** 定期取込から手動編集を守るための
+    機構であり、移行機構を削除する以上、守るべき再取込が存在しない（ADR-0007 決定4）
 
 ### TASK-6.5: ワークスペースの最終化
 - **内容**: 一時ファイル・作業用スクリプトを削除する
+- **対象**: `apps/scripts/src/measure-tx-scale.ts`（TASK-1.1 の計測用）、
+  Neon の計測ブランチとリハーサルブランチ
+
+---
+
+## Phase 7: 移行機構の削除（本番投入の完了後）
+
+> **依存**: 本番（`main`）への投入が完了し、結果が確認されていること。
+> 加えて **TASK-5.3（未突合解決UI）が完了していること**。
+> 根拠は [ADR-0007](../adr/0007-station-master-data-source.md) 決定4。
+
+### TASK-7.1: `master-import` / `master-migration` を削除
+- **対象**:
+  - `apps/admin/src/features/{master-import,master-migration}/`
+  - `apps/admin/src/external/ekidata/`、
+    同 `external/repository/{masterImportRepository,masterMigrationRepository}.ts`
+  - `apps/admin/src/app/{master-import,master-migration}/`、
+    同 `app/api/{master-import,master-migration}/`
+  - `di.ts` の配線、`Sidebar.tsx` の導線
+- **理由**: 一度きりの操作のために恒久的な画面を残すと、**再実行によって
+  手動で確定した表記が黙って上書きされる経路が常設される**。
+  Phase 4 で `update-odpt.ts` を削除するのと同じ扱いである
+- **残すもの**: `ekidata*Cd` の列と `unique` 制約（ADR-0007 決定3）。
+  **削除するのは機構であって、由来の記録ではない**
+- **TASK-5.3 より先に実行しない**: 未突合として残る路線3件・駅4件を
+  解決する手段が無くなるため
