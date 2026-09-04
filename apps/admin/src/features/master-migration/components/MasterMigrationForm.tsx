@@ -59,6 +59,7 @@ const REASON_LABELS: Record<UnmatchedReason, string> = {
   line_unresolved: '路線が未突合',
   line_unknown: '所属路線が無い',
   no_candidate: '候補なし',
+  no_ekidata_counterpart: 'ekidata に対応行が無い（確認済み）',
   ambiguous: '候補が複数',
 };
 

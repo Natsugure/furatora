@@ -253,6 +253,48 @@ describe('駅の突合', () => {
   });
 });
 
+describe('手動対応表', () => {
+  // 実際の manualMappings.ts の内容に対して固定する。
+  // 対応表は「一度きりの移行で確認済みの事実」であり、テスト用に差し替えると
+  // 本番で使う値そのものが検証されなくなる
+  it('null は「ekidata に対応行が無い」として自動突合を打ち切る', () => {
+    const plan = computeMigrationPlan(
+      records(),
+      snapshot({ lines: [existingLine({ id: 'ln-b', name: '丸ノ内線支線' })], stations: [] }),
+    );
+
+    expect(plan.lines.assigned).toHaveLength(0);
+    expect(plan.lines.unmatched).toMatchObject([{ reason: 'no_ekidata_counterpart' }]);
+  });
+
+  it('路線が未突合でも、駅の手動対応表は引く', () => {
+    // ekidata に「丸ノ内線支線」は無いが、中野新橋は親路線 28002 の駅として存在する
+    const plan = computeMigrationPlan(
+      records(),
+      snapshot({
+        lines: [existingLine({ id: 'ln-b', name: '丸ノ内線支線' })],
+        stations: [existingStation({ name: '中野新橋', lineIds: ['ln-b'] })],
+      }),
+    );
+
+    expect(plan.stations.assigned).toMatchObject([{ code: 2800226, method: 'manual' }]);
+  });
+
+  it('駅の null は突合せずに残す（同じ駅を2行が主張する場合）', () => {
+    // 中野坂上は「丸ノ内線」側の行が 2800220 を取る。ekidata は1行しか持たない
+    const plan = computeMigrationPlan(
+      records(),
+      snapshot({
+        lines: [existingLine({ id: 'ln-b', name: '丸ノ内線支線' })],
+        stations: [existingStation({ name: '中野坂上', lineIds: ['ln-b'] })],
+      }),
+    );
+
+    expect(plan.stations.assigned).toHaveLength(0);
+    expect(plan.stations.unmatched).toMatchObject([{ reason: 'no_ekidata_counterpart' }]);
+  });
+});
+
 describe('適用不能の検出', () => {
   it('2つの既存路線が同じ line_cd に寄ったら止める', () => {
     const plan = computeMigrationPlan(

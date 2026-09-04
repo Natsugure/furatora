@@ -113,10 +113,12 @@ function matchLines(
     const opKey = operatorKeyById.get(line.operatorId) ?? null;
     const context = `事業者=${opKey ?? '不明'}`;
 
-    // (a) 手動対応表。自動突合より先に引く（名前一致より確かな根拠であるため）
+    // (a) 手動対応表。自動突合より先に引く（名前一致より確かな根拠であるため）。
+    // null は「ekidata に対応行が無い」ことの確認済みの記録であり、探索を打ち切る
     const manual = opKey === null ? undefined : MANUAL_LINE_CD[`${opKey}/${line.name}`];
     if (manual !== undefined) {
-      collector.hit(line.id, manual, 'manual');
+      if (manual === null) collector.miss(line.id, line.name, 'no_ekidata_counterpart', context);
+      else collector.hit(line.id, manual, 'manual');
       continue;
     }
 
@@ -208,10 +210,12 @@ function matchStations(
     const opKey = line ? operatorKeyById.get(line.operatorId) ?? null : null;
     const context = `路線=${line?.name ?? '不明'} / 事業者=${opKey ?? '不明'}`;
 
+    // 路線が未突合でも引く。ekidata に路線行が無いだけで、駅は親路線に存在しうる
     const manual =
       line && opKey ? MANUAL_STATION_CD[`${opKey}/${line.name}/${station.name}`] : undefined;
     if (manual !== undefined) {
-      return { code: manual, method: 'manual' as const, reason: 'no_candidate' as const, context, candidates: [] };
+      const reason: UnmatchedReason = 'no_ekidata_counterpart';
+      return { code: manual ?? undefined, method: 'manual' as const, reason, context, candidates: [] };
     }
 
     const lineCd = lineCdByLineId.get(lineId);

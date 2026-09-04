@@ -33,6 +33,11 @@ export type UnmatchedReason =
   | 'line_unknown'
   /** 候補が0件 */
   | 'no_candidate'
+  /**
+   * ekidata に対応する行が存在しないことを人が確認済み
+   * （manualMappings.ts に null と書いてある）。自動突合を打ち切る
+   */
+  | 'no_ekidata_counterpart'
   /** 候補が複数あり、一意に決められない */
   | 'ambiguous';
 
