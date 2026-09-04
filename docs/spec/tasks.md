@@ -478,8 +478,12 @@ TASK-3.8 の移動については[実行順序の根拠](#displaypriority-の-no
   | 公開になる駅 | **335** | **438** |
   | NULL のまま残る駅 | 146 | 43 |
 
-- **前提の確認**: `stations.slug` の NULL は 0件 / 481行のため、
-  `published_requires_slug` の CHECK に触れない（TASK-1.3b で実測済み）
+- **`slug IS NOT NULL` を条件に含める**。`published_requires_slug` の CHECK は
+  「公開するなら slug が必要」であり、slug の無い行を公開しようとすると
+  **マイグレーション（＝ Vercel のビルド）ごと落ちる**。
+  main の実測は 0件 / 481行だが（TASK-1.3b）、development / preview は
+  行構成が違う。実測に頼らず SQL 自身が公開対象を限定する。
+  slug が無い駅は非公開のまま残り、管理者が slug を付けてから個別に公開する
 
 ### TASK-3.1〜3.5: 突合（Admin の `/master-migration`）
 - **状態**: ✅ 完了 (2026-09-04)
