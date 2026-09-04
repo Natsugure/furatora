@@ -40,13 +40,20 @@ export function computeMigrationPlan(
   records: ImportedRecords,
   snapshot: MigrationSnapshot,
 ): MigrationPlan {
+  // matchLines と matchStations が共通で使う索引。それぞれで組み直すと
+  // 約11,000行の groupBy と事業者マップを2回作ることになるため、ここで1度だけ用意する
+  const stationsByEkidataLine = groupBy(records.stations, (station) => station.ekidataLineCd);
+  const operatorKeyById: ReadonlyMap<string, string | null> = new Map(
+    snapshot.operators.map((o) => [o.id, operatorKey(o.odptOperatorId)]),
+  );
+
   const operators = matchOperators(records, snapshot);
   const companyCdByOperatorId = codeByRowId(snapshot.operators, operators.assigned, (o) => o.ekidataCompanyCd);
 
-  const lines = matchLines(records, snapshot, companyCdByOperatorId);
+  const lines = matchLines(records, snapshot, companyCdByOperatorId, stationsByEkidataLine, operatorKeyById);
   const lineCdByLineId = codeByRowId(snapshot.lines, lines.assigned, (l) => l.ekidataLineCd);
 
-  const stations = matchStations(records, snapshot, lineCdByLineId);
+  const stations = matchStations(snapshot, lineCdByLineId, stationsByEkidataLine, operatorKeyById);
 
   const blockers = collectBlockers(snapshot, { operators, lines, stations });
 
@@ -90,11 +97,11 @@ function matchLines(
   records: ImportedRecords,
   snapshot: MigrationSnapshot,
   companyCdByOperatorId: ReadonlyMap<string, number>,
+  stationsByLine: ReadonlyMap<number, ImportedStation[]>,
+  operatorKeyById: ReadonlyMap<string, string | null>,
 ): TableMatch {
   const collector = new MatchCollector(snapshot.lines.length);
   const linesByCompany = groupBy(records.lines, (line) => line.ekidataCompanyCd);
-  const stationsByLine = groupBy(records.stations, (station) => station.ekidataLineCd);
-  const operatorKeyById = new Map(snapshot.operators.map((o) => [o.id, operatorKey(o.odptOperatorId)]));
   const existingStationsByLine = groupExistingStationsByLine(snapshot.stations);
 
   for (const line of snapshot.lines) {
@@ -165,13 +172,12 @@ function matchLines(
 // --- 3. 駅（TASK-3.3 / 3.4） ---
 
 function matchStations(
-  records: ImportedRecords,
   snapshot: MigrationSnapshot,
   lineCdByLineId: ReadonlyMap<string, number>,
+  stationsByLine: ReadonlyMap<number, ImportedStation[]>,
+  operatorKeyById: ReadonlyMap<string, string | null>,
 ): TableMatch {
   const collector = new MatchCollector(snapshot.stations.length);
-  const stationsByLine = groupBy(records.stations, (station) => station.ekidataLineCd);
-  const operatorKeyById = new Map(snapshot.operators.map((o) => [o.id, operatorKey(o.odptOperatorId)]));
   const lineById = new Map(snapshot.lines.map((l) => [l.id, l]));
 
   for (const station of snapshot.stations) {

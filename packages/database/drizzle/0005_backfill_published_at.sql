@@ -18,9 +18,13 @@
 -- デプロイ後の手動操作であり、そこで入る全国の駅は published_at = NULL のまま、
 -- 管理者が個別に公開する。
 --
--- 【published_requires_slug には触れない】
--- 0004 の CHECK は「公開するなら slug が必要」である。既存行の slug は
--- 全件生成済み（NULL 0件 / 481行）であることを確認済みのため違反は出ない。
+-- 【slug IS NOT NULL を条件に入れる】
+-- 0004 の CHECK は「公開するなら slug が必要」である。main の既存481行は
+-- slug 生成済み（NULL 0件）を確認済みだが、その事実は実測にすぎない。
+-- development / preview は行構成が違い、slug 未生成の行が混ざれば
+-- この UPDATE が CHECK 違反で失敗し、Vercel のビルド（= マイグレーション）ごと落ちる。
+-- 実測に頼らず、SQL 自身が公開対象を「slug を持つ行」に限定する。
+-- slug が無い駅は公開されないまま残り、管理者が slug を付けてから個別に公開する。
 --
 -- 実行前の実測（2026-09-04）: main は 335行が公開・146行が NULL のまま。
 -- development は JR東日本の display_priority が入っているため 438行になる。
@@ -29,4 +33,5 @@ UPDATE "stations" SET "published_at" = now()
 FROM "operators"
 WHERE "stations"."operator_id" = "operators"."id"
   AND "stations"."published_at" IS NULL
+  AND "stations"."slug" IS NOT NULL
   AND "operators"."display_priority" IS NOT NULL;

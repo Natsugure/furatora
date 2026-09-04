@@ -51,37 +51,39 @@ const REPLACEABLE_CONNECTION = sql`
 `;
 
 async function readSnapshot(reader: SnapshotReader): Promise<MigrationSnapshot> {
-  const operatorRows = await reader
-    .select({
-      id: operators.id,
-      name: operators.name,
-      odptOperatorId: operators.odptOperatorId,
-      ekidataCompanyCd: operators.ekidataCompanyCd,
-    })
-    .from(operators);
-
-  const lineRows = await reader
-    .select({
-      id: lines.id,
-      name: lines.name,
-      operatorId: lines.operatorId,
-      ekidataLineCd: lines.ekidataLineCd,
-    })
-    .from(lines);
-
-  const stationRows = await reader
-    .select({
-      id: stations.id,
-      name: stations.name,
-      ekidataStationCd: stations.ekidataStationCd,
-    })
-    .from(stations);
-
-  const pairs = await reader
-    .select({ stationId: stationLines.stationId, lineId: stationLines.lineId })
-    .from(stationLines);
-
-  const connections = await readConnectionCounts(reader);
+  // 5本の読み取りは互いに依存しない。plan の経路（neon-http）では1本あたり
+  // 約140ms の HTTP 往復（TASK-1.1 実測）になるため、逐次に await すると
+  // 試算のたびに約0.5秒を無駄にする。apply の経路（単一トランザクション接続）では
+  // 実際には直列化されるが、pg クライアントがキューで捌くため害はない。
+  const [operatorRows, lineRows, stationRows, pairs, connections] = await Promise.all([
+    reader
+      .select({
+        id: operators.id,
+        name: operators.name,
+        odptOperatorId: operators.odptOperatorId,
+        ekidataCompanyCd: operators.ekidataCompanyCd,
+      })
+      .from(operators),
+    reader
+      .select({
+        id: lines.id,
+        name: lines.name,
+        operatorId: lines.operatorId,
+        ekidataLineCd: lines.ekidataLineCd,
+      })
+      .from(lines),
+    reader
+      .select({
+        id: stations.id,
+        name: stations.name,
+        ekidataStationCd: stations.ekidataStationCd,
+      })
+      .from(stations),
+    reader
+      .select({ stationId: stationLines.stationId, lineId: stationLines.lineId })
+      .from(stationLines),
+    readConnectionCounts(reader),
+  ]);
 
   // 1駅が複数路線を持つことを禁じていないため、路線は配列で束ねる
   const lineIdsByStation = new Map<string, string[]>();
