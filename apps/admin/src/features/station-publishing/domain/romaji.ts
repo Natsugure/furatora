@@ -13,7 +13,8 @@
 // slug の形を決める furatora の判断である。他プロジェクトへ持ち出す前提を
 // 置いていない（design.md「romaji.ts は master-import に置かない」）。
 //
-// 実測（2026-09 実CSV突合。station-publishing/domain/romaji.regression.test.ts 参照）:
+// 実測（2026-09 実CSV突合。station-publishing/domain/romaji.test.ts の
+// describe('hepburn: 回帰（実CSV155駅）') 参照）:
 // 決定的規則のみで純粋なローマ字化としての正解率は約86%、
 // 本モジュールが対応する置換辞書・撥音方針を含めると約90%まで上がる。
 // 残る約10%は「原理的に決まらないもの」（後述）であり、
@@ -98,14 +99,9 @@ const SMALL_KANA = new Set(['ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ャ', 'ュ', '�
  * 境界（タケオ+オンセン→takeonsen 等）は design.md「原理的に決まらないもの」として
  * 許容し、形態素解析器は導入しない。
  */
-function isChouonContinuation(prevVowel: string, kana: string): boolean {
+function isChouonContinuation(prevChar: string, kana: string): boolean {
   if (kana === CHOUON_MARK) return true;
-  return prevVowel === 'o' && (kana === 'ウ' || kana === 'オ');
-}
-
-function lastVowel(romaji: string): string {
-  const m = romaji.match(/[aiueo](?!.*[aiueo])/);
-  return m ? m[0] : '';
+  return prevChar === 'o' && (kana === 'ウ' || kana === 'オ');
 }
 
 /**
@@ -146,8 +142,11 @@ export function hepburn(kana: string): string {
       continue;
     }
 
-    const prevVowel = lastVowel(result);
-    if (prevVowel && isChouonContinuation(prevVowel, ch)) {
+    // 長音縮約は「直前に出力した音の末尾」でのみ判定する。撥音（ン→'n'）を挟むと
+    // 末尾は子音になり縮約は起きない。子音を越えて母音を探すと、[お段]+ン+オ／ウ で
+    // 「ホンオオクボ→honkubo（正: honokubo）」のようにモーラを落としてしまう（本大久保 等）。
+    const prevChar = result[result.length - 1] ?? '';
+    if (prevChar && isChouonContinuation(prevChar, ch)) {
       i += 1;
       continue;
     }

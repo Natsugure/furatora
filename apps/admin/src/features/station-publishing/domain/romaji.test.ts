@@ -53,6 +53,10 @@ describe('hepburn: 長音の縮約（方針）', () => {
     expect(hepburn('タイセイ')).toBe('taisei');
     expect(hepburn('シンイワクニ')).toBe('shiniwakuni');
   });
+
+  it('撥音を挟むと縮約しない（[お段]+ン+オ／ウ、本大久保 京成本線）', () => {
+    expect(hepburn('ホンオオクボ')).toBe('honokubo');
+  });
 });
 
 describe('hepburn: 方針として決めるもの', () => {
