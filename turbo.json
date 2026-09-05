@@ -1,11 +1,21 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local"],
-  "globalEnv": ["DATABASE_URL"],
+  "globalDependencies": [
+    "**/.env.*local"
+  ],
+  "globalEnv": [
+    "DATABASE_URL"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**"
+      ],
       "env": [
         "DATABASE_URL",
         "DATABASE_URL_UNPOOLED",
@@ -28,16 +38,22 @@
         "POSTGRES_URL_NO_SSL",
         "POSTGRES_PRISMA_URL",
         "NEXT_PUBLIC_GA_ID",
-        "GEMINI_API_KEY"
+        "GEMINI_API_KEY",
+        "AUTH_REDIRECT_PROXY_URL"
       ]
     },
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["DATABASE_URL", "NODE_ENV"]
+      "env": [
+        "DATABASE_URL",
+        "NODE_ENV"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "test": {},
     "db:push": {
