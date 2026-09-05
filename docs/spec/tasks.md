@@ -13,10 +13,12 @@
 Phase 0: docs/spec・ADR更新                      (完了)
 Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
 Phase 2: インポート機構                           (完了)
-Phase 3: 移行スクリプト（突合）                    (P0・Phase 2 に依存)
+Phase 3: 突合と publishedAt バックフィル           (完了・Phase 2 に依存)
 Phase 4: ODPT 後始末                             (Phase 3 完了後)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
+Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
 Phase 6: 検証・振り返り                            (必須)
+Phase 7: 移行機構の削除                            (本番投入の完了後・ADR-0007 決定4)
 ```
 
 ### 実行順序の根拠
@@ -35,10 +37,28 @@ Phase 5 に**現行バージョンのバグ修正**（TASK-5.0）が入る。可
 （requirements.md US-7）。可視性が `publishedAt` へ移る本Issueと
 不可分であるため、別Issueに切り出さずここで塞ぐ。
 
-TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` の
-`NOT NULL` 化）の順序は**入れ替えられない**。バックフィルが
-「移行前に非表示だった事業者」を `displayPriority IS NULL` で判別するため、
-先に埋めると情報が失われ、非表示だった駅まで公開されてバグが恒久化する。
+### `displayPriority` の `NOT NULL` 化は Phase 5 の後に置く（初版から変更）
+
+初版は TASK-3.7（`publishedAt` バックフィル）→ TASK-3.8（`displayPriority` の
+`NOT NULL` 化）を Phase 3 内に並べ、TASK-5.0 が TASK-3.8 に依存するとしていた。
+**依存が逆であり、この順序では稼働中のサイトが壊れる。**
+
+`apps/web` の2箇所は `isNotNull(operators.displayPriority)` で可視性を判定している。
+`NOT NULL DEFAULT 0` にすると**この述語が常に真になり、ゆりかもめ等の
+非公開事業者の駅が全公開される**。ルート `CLAUDE.md` の禁止事項
+「その列を読むコードが稼働したままの `NOT NULL` 化」に該当する。
+
+正しい順序は3つのデプロイに分かれる。
+
+| デプロイ | 内容 | その時点の `apps/web` |
+|---|---|---|
+| 1（Phase 3） | `0005` バックフィル + 突合UI | `displayPriority` で判定。**挙動は変わらない** |
+| 2（Phase 5） | TASK-5.0: 可視性を `publishedAt` の単一述語へ | `displayPriority` を読むコードが消える |
+| 3（Phase 5b） | `0006`: `NOT NULL DEFAULT 0` | 読み手がいないので安全 |
+
+バックフィルが「移行前に非表示だった事業者」を `displayPriority IS NULL` で
+判別する点は初版のまま変わらない。**先に埋めてはならない**という制約は、
+デプロイ1 と デプロイ3 の間隔として表現される。
 
 ---
 
@@ -86,8 +106,8 @@ Phase 2 より前であることは変わらないため、「唯一の未知を
   `stations.ekidataStationCd` / `stations.stationGroupId` / `stations.prefCode` /
   `stations.abolishedAt` / `stations.publishedAt` / `stationConnections.source` を追加
 - **注意**: `operators.displayPriority` の `NOT NULL DEFAULT 0` 化は**ここで行わない**。
-  TASK-3.7 のバックフィルが「移行前に非表示だった事業者」を判別するために
-  NULL を必要とする。TASK-3.8 で行う
+  バックフィル（`0005` / TASK-3.0）が「移行前に非表示だった事業者」を判別するために
+  NULL を必要とする。純化は TASK-5b.1 で行う
 - **注意**: この時点では**制約の削除を行わない**。既存データが移行前のため
 - **期待結果**: 列が追加され、既存の読み書きが壊れない
 
@@ -97,7 +117,7 @@ Phase 2 より前であることは変わらないため、「唯一の未知を
 - **内容**: `check('published_requires_slug', sql\`published_at IS NULL OR slug IS NOT NULL\`)`
 - **事前確認**: **既存481行の `slug` に NULL が無いことを SQL で確認する。**
   design.md は「`update-odpt.ts` が全件生成済み」を前提にしているが、
-  TASK-3.7 のバックフィルが失敗しないことを保証するため実測する
+  バックフィル（`0005` / TASK-3.0）が失敗しないことを保証するため実測する
 - **事前確認の結果（2026-08-30 実測）**: `stations.slug` の NULL は **0件 / 481行**、
   `lines.slug` の NULL も **0件 / 62行**。制約違反なしで付与できることを確認済み
 - **期待結果**: 制約が付与される。この時点で `publishedAt` は全行 NULL のため違反は出ない
@@ -424,64 +444,93 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 
 ---
 
-## Phase 3: 移行スクリプト（突合）
+## Phase 3: 突合と `publishedAt` バックフィル（完了 2026-09-04）
 
 > **実行順序は「突合 → インポート」である。** Phase 2 の実装で判明した通り、
 > 現行DBの17事業者の `name` は ekidata の `company_name` と全件一致する。
 > 突合前にインポートを流すと `operators_name_unique` に衝突し、
 > 差分計画が適用不能として拒否する（Phase 2「TASK-2.3」参照）。
 
-### TASK-3.1: 事業者の突合
-- **依存**: Phase 2
-- **成果物**: `apps/scripts/src/migrate-to-ekidata.ts`
-- **内容**: `odptOperatorId` → `company_cd` の対応表17件（design.md に記載済み）
-- **期待結果**: 17件すべてに `ekidataCompanyCd` が入る
+### 初版から変えた2点
 
-### TASK-3.2: 路線の突合
-- **依存**: TASK-3.1
-- **内容**: 事業者を確定した上で、路線名の正規化一致 → 全駅包含判定の順に試みる。
-  要手動4件（`常磐線快速` / `東海道線` / `豊島線` / `東武スカイツリーライン(支線)`）は
-  対応表に直接書く
-- **期待結果**: 62路線のうち自動42 + 手動4 が解決。残りは NULL のまま一覧化
+| # | 初版 | 変更 | 理由 |
+|---|---|---|---|
+| 1 | `apps/scripts/src/migrate-to-ekidata.ts` | **Admin の画面操作**（`/master-migration`） | `apps/scripts` の依存は `@furatora/database` だけであり、`@/` エイリアスを使う `ekidataCsvParser.ts` を持ち込めない。また ADR-0008 は「各環境のアプリが自分の Neon ブランチに書く」形であり、本番の接続文字列をローカルに置く経路を新設せずに済む |
+| 2 | TASK-3.7 をスクリプト内で実行 | **手書きSQLマイグレーション `0005`** | Vercel のビルドが development / preview / production のすべてに自動適用する。とくに Phase 5 の Preview で「公開駅0件の空サイト」を検証してしまう事故を防ぐ |
 
-### TASK-3.3: 駅の突合
-- **依存**: TASK-3.2
-- **内容**: 路線確定後、正規化した駅名の完全一致で `station_cd` を引く。
-  **`stations.id` は変更しない**（`platforms` 14件・`lineDirections` 52件の参照維持）
-- **期待結果**: 未解決由来146件のうち131件が自動解決。
-  残り15件（新幹線11 + 手動4）は NULL のまま一覧に出る
-- **完了条件**: ドライランで突合結果を確認してから適用する
-- **注意（2026-08-31 実測）**: **`development` は `main` の正確なコピーではない。**
-  ドライランの結果をそのまま本番の期待値として扱わないこと
+TASK-3.8 の移動については[実行順序の根拠](#displaypriority-の-not-null-化は-phase-5-の-後に置く初版から変更)を参照。
+
+### TASK-3.0: `publishedAt` バックフィル（旧 TASK-3.7）
+- **状態**: ✅ 完了 (2026-09-04)
+- **成果物**: `packages/database/drizzle/0005_backfill_published_at.sql`
+  （`drizzle-kit generate --custom` で作成）
+- **内容**: `display_priority IS NOT NULL` の事業者に属し、`published_at` が
+  未設定の駅へ `now()` を入れる。既に値がある行は上書きしない
+- **理由**: 新規行の既定は NULL（非公開）であるため、
+  **これを行わないと移行後に本番サイトが空になる**
+- **`display_priority IS NOT NULL` の条件を落とさないこと**。移行前に非表示だった
+  事業者の駅まで公開すると、requirements.md US-7 の実バグを仕様として恒久化する
+- **件数は環境ごとに違ってよい**（2026-09-04 実測）。この文は各環境の
+  「移行前の可視性」を写すためであり、一致しないことが正しい
 
   | | main | development |
   |---|---|---|
-  | `stations` / `lines` / `operators` / `stationConnections` | 481 / 62 / 17 / 546 | 同じ |
-  | `platforms` | 14 | 18 |
-  | `lineDirections` | 52 | 34 |
-  | `trains` | 10 | 13 |
-  | `stationFacilities` | 0 | 14 |
+  | `display_priority` が NULL の事業者 | 15 / 17 | 14 / 17（JR東日本に 3 が入っている） |
+  | 公開になる駅 | **335** | **438** |
+  | NULL のまま残る駅 | 146 | 43 |
 
-  本タスクの「`platforms` 14件・`lineDirections` 52件の参照維持」は **main の数字**である。
-  参照を切らないという要件自体は両ブランチで同じだが、件数での検証は
-  各ブランチの実数に対して行うこと
+- **`slug IS NOT NULL` を条件に含める**。`published_requires_slug` の CHECK は
+  「公開するなら slug が必要」であり、slug の無い行を公開しようとすると
+  **マイグレーション（＝ Vercel のビルド）ごと落ちる**。
+  main の実測は 0件 / 481行だが（TASK-1.3b）、development / preview は
+  行構成が違う。実測に頼らず SQL 自身が公開対象を限定する。
+  slug が無い駅は非公開のまま残り、管理者が slug を付けてから個別に公開する
 
-### TASK-3.4: 新幹線11駅の突合
-- **状態**: 前提の確認は完了 (2026-09-03)。突合そのものは TASK-3.3 の一部として行う
-- **依存**: TASK-3.3
-- **確認結果**: **会員版 `station` CSV に新幹線の駅は含まれる。**
-  東海道新幹線（`line_cd = 1002`）に東京 `100201` / 品川 `100202` / 新横浜 `100203` …
-  が存在する（会員版と無料版の現役駅数の差160件がこれにあたる）。
-  requirements.md の **C-1 は解消**した
-- **期待結果**: 11駅すべてに `ekidataStationCd` が入る
+### TASK-3.1〜3.5: 突合（Admin の `/master-migration`）
+- **状態**: ✅ 完了 (2026-09-04)
+- **依存**: Phase 2
+- **成果物**:
+  - `apps/admin/src/features/master-migration/`
+    （`domain/{migrationPlan,manualMappings,match}.ts` / `ports.ts` /
+    `usecases/{planMigration,applyMigration}.ts` / `components/MasterMigrationForm.tsx`）
+  - `apps/admin/src/external/repository/masterMigrationRepository.ts`
+  - `apps/admin/src/app/{master-migration/page.tsx,api/master-migration/route.ts}`
+  - `di.ts` への配線、`Sidebar.tsx` への導線
+- **再利用したもの（新規に書いていない）**: `ekidataCsvSource`（`parse` / `digest`）、
+  `normalizeStationName`、`ImportedLine` / `ImportedStation`、`withTransaction`。
+  **feature 間の依存 `master-migration → master-import` が新しく生じる。**
+  一方向で循環しない（ADR-0001）
+- **突合の順序**: 事業者 → 路線 → 駅。手動対応表を**自動突合より先に**引く
+  （人が CSV を読んで確認した結果の方が、名前一致より確かな根拠であるため）
+  - **事業者（TASK-3.1）**: `odptOperatorId` → `company_cd` の対応表17件。
+    実DBの値は `odpt.Operator:TokyoMetro` 形式（2026-09-04 実測）。
+    照合は `:` の後ろで行い、接頭辞の有無どちらでも引ける
+  - **路線（TASK-3.2）**: 手動表 → 正規化名の完全一致 → 全駅包含判定
+  - **駅（TASK-3.3 / 3.4）**: 手動表 → 確定した路線の中で正規化名の完全一致
+- **`stations.id` / `lines.id` は変更しない**（`platforms` / `lineDirections`
+  からの参照維持。REQ-3.4）。UPDATE でコード列だけを埋める
+- **未突合行は削除しない**（REQ-3.2）。コードを NULL のまま残し、画面に一覧表示する。
+  **未突合一覧には「名前が近い ekidata の候補」を添える。**
+  手動対応表の値は docs に記録が無く CSV から人が特定するしかないため、
+  その作業を CSV の grep 無しで終わらせるための補助である
+- **適用不能（blockers）— `apply` を拒否する条件**:
 
-### TASK-3.5: `stationConnections` の全置換
-- **依存**: TASK-3.3
-- **内容**: 既存546行を削除し、インポート（TASK-2.8）の生成結果に置き換える。
-  生成は `stations` の自己結合による `INSERT ... SELECT` で行われるため、
-  削除後にインポートを再実行すれば埋め直される
-- **前提の再確認**: 適用直前に「難易度入力済みの行が0件であること」を
-  スクリプト内で検証する。0件でなければ停止する
+  | code | 内容 |
+  |---|---|
+  | `duplicate_ekidata_code` | 複数の既存行が同じコードに突合した。`ekidata*Cd` は unique であり 23505 で落ちる。ODPT の路線は運行系統粒度であり、実際に起こりうる |
+  | `code_taken_by_other_row` | 割り当て先のコードを既に別の行が持っている（再実行時） |
+  | `connection_has_input` | 難易度・メモが入力済みの乗換接続がある。TASK-3.5 の前提が崩れている |
+
+- **TASK-3.5（`stationConnections` の全置換）**: 削除は**由来で絞る**。
+  `source IS NULL` かつ難易度・メモがすべて NULL の行だけを消す。
+  `'manual'` と `'ekidata_group'` には触れない。
+  実測0件に依存せず、**守るべき行に構造的に触れない**形にした。
+  埋め直すのはインポート側の `INSERT ... SELECT`（TASK-2.8）である。
+  **削除から取り込みまでの間、公開サイトの乗換接続は空になる。** 続けて実行すること
+- **テスト**: `domain/match.test.ts`（19件）/ `usecases/*.test.ts`（7件）/
+  `route.test.ts`（9件）。突合・冪等性・適用不能の検出を DB 無しで固定した
+
+### TASK-3.6: 欠番
 
 > **TASK-3.6（`stationLines` の 1:1 制約を付与）は削除した。** 実測0件は
 > ekidata が路線ごとに駅を割った結果であり、ドメインの不変条件ではないため。
@@ -489,24 +538,142 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 > 番号は欠番のまま残す（[design.md](./design.md)「`stationLines` に
 > `unique(stationId)` を付けない理由」）。
 
-### TASK-3.7: 既存481行の `publishedAt` バックフィル
-- **依存**: TASK-1.3b, TASK-3.3
-- **内容**: 突合の成否に関わらず既存481行のうち `publishedAt` が
-  未設定のものへ移行実行時刻を設定する。既に値がある行は上書きしない
-- **理由**: 新規行の既定は NULL（非公開）であるため、
-  **これを行わないと移行実行時に本番サイトが空になる**
-- **注意**: 現行で `displayPriority` が NULL（非表示）の事業者に属する駅は
-  **公開してはならない**。移行前の可視性をそのまま引き継ぐこと。
-  ゆりかもめ等が該当する（requirements.md US-7 の実バグ対象）
-- **期待結果**: 移行前に表示されていた駅がすべて公開、
-  非表示だった事業者の駅は `publishedAt` が NULL のまま
+### 手動対応表の確定（完了 2026-09-04）
 
-### TASK-3.8: `operators.displayPriority` を表示順専用に純化
-- **依存**: TASK-3.7（**順序を逆にしない**）
-- **内容**: `NOT NULL DEFAULT 0` へ変更。既存の NULL 行を 0 で埋める
-- **理由**: 可視性の意味を外す。TASK-3.7 が NULL を読み終えた後でなければ、
-  移行前に非表示だった事業者を判別できなくなる
-- **期待結果**: 可視性を担う述語が `stations.publishedAt` の1つだけになる
+会員版CSV（`line20260618` / `station20260731`）と本番相当のDBに対して突合を実行し、
+未突合・適用不能として出た行を CSV で確認して `manualMappings.ts` を埋めた。
+
+**突合の実測（適用不能 0 件）**
+
+| | 全行 | 突合 | 未突合 | 内訳（手動/名前/全駅包含） |
+|---|---|---|---|---|
+| 事業者 | 17 | 17 | 0 | 17 / 0 / 0 |
+| 路線 | 62 | **59** | 3 | 9 / 25 / 25 |
+| 駅 | 481 | **477** | 4 | 7 / 470 / 0 |
+
+design.md の「46件中42件が自動決定」は未解決由来46路線に対する実測であり、
+**62件全体では自動50・手動9**である。初版 tasks.md の「自動42 + 手動4」は
+この数字に置き換わる。
+
+#### 自動突合が決められなかった理由は2種類だった
+
+1. **包含判定が複数に一致する（7件）**。ODPT の路線は運行系統粒度で区間が短く、
+   駅数が少ないほど「その駅を全部持つ ekidata 路線」が増える。
+   `高崎線` の {上野, 東京} は**新幹線5路線すべて**に含まれる。
+   `東海道線` / `横須賀線` の {東京, 新橋} は山手線・京浜東北線にも含まれる
+2. **包含判定が成立しない（2件）**。`常磐線快速` は上野東京ライン経由の
+   東京・新橋を含むが ekidata の常磐線にその2駅は無い。
+   `有楽町線` は現行DBの `麴町`（U+9EB4）と ekidata の `麹町`（U+9EB9）が
+   異体字で一致せず1駅欠ける
+
+いずれも**候補を提示して人に渡す**という設計どおりに振る舞った。
+機械的に1件へ倒していたら、根拠の無い対応が黙って入っていた。
+
+#### 対応表に `null`（対応行が無い）を表現できるようにした
+
+3つの路線は **ekidata に対応する行が存在しない**。値を書けないだけでなく、
+自動突合を**止めなければならない**（放置すると親路線に吸われて
+`duplicate_ekidata_code` になる）。そのため対応表の値を `number | null` にし、
+`null` を「人が確認した結果、対応行が無い」の記録とした。
+
+| 現行DBの路線 | 理由 |
+|---|---|
+| `丸ノ内線支線` | ekidata の東京メトロは9路線で、方南町の分岐線は `28002` に畳まれている |
+| `東武スカイツリーライン(支線)` | ekidata の東武は `21002` 東武伊勢崎線1本で、押上支線はそこに畳まれている |
+| `常磐線各駅停車` | `11320` は快速線と緩行線の両方の駅を1本に持つ。快速が4駅一致するのに対し各駅停車は綾瀬1駅のみのため、`11320` は快速が取る |
+
+所属駅は親路線の駅として ekidata に存在するため、駅側の対応表で個別に埋めた
+（`中野新橋` `中野富士見町` `方南町` `押上` `綾瀬`）。
+
+#### 対応づけられない4駅（粒度の不一致）
+
+| 現行DBの駅 | 理由 |
+|---|---|
+| `丸ノ内線支線` の `中野坂上` | 現行DBは路線×駅粒度で同じ駅を2行持つが、ekidata は `2800220` 1行しか持たない。`丸ノ内線` 側が取る |
+| `常磐線快速` の `東京` / `新橋`、`高崎線` の `東京` | これらに当たるのは `11343`「上野東京ライン」の1行だけであり、`東京` を必要とする行が2つある。`ekidataStationCd` は一意で、片方に割り当てる根拠が無い |
+
+**これは突合の失敗ではなく、粒度が一致しないことの現れである。**
+現行の路線×駅粒度は暫定であり（design.md「粒度は暫定である」）、
+確定は実データ投入後の後続Issue（TASK-6.4）で行う。
+それまで4駅は `ekidataStationCd` が NULL のまま Admin の
+未突合解決UI（TASK-5.3）に出続ける。行は削除しない（REQ-3.2）。
+
+### リハーサル手順（本番適用の前に必ず行う）
+
+`development` は `main` の正確なコピーではない（下表）。
+**試算の結果をそのまま本番の期待値として扱わないこと。**
+
+| | main | development |
+|---|---|---|
+| `stations` / `lines` / `operators` / `stationConnections` | 481 / 62 / 17 / 546 | 同じ |
+| `platforms` | 14 | 18 |
+| `lineDirections` | 52 | 34 |
+| `trains` | 10 | 13 |
+| `stationFacilities` | 0 | 14 |
+| `display_priority` が NULL の事業者 | 15 | 14 |
+
+`main` から使い捨ての Neon ブランチを切って通しで演習する。
+
+```bash
+neonctl branches create --project-id patient-meadow-13439419 --parent main --name rehearsal
+MIGRATION_DATABASE_URL='<rehearsal>' pnpm -w run db:migrate
+DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
+```
+
+1. `0005` 適用後、公開駅が **335**・NULL が **146** であること
+2. `/master-migration` で CSV 4件 → 試算。未突合一覧から手動対応表の値を特定する
+3. 適用 → コードの埋まり方と `stationConnections` の削除件数を確認
+4. `/master-import` に同じCSV → **blockers が0件**になっていること → 適用
+5. `platforms` / `lineDirections` / `trains` / `stationFacilities` の件数が
+   演習開始時と**変わっていない**こと（REQ-2.3 / REQ-3.4）
+6. `/master-migration` をもう一度適用して**差分0**になること（冪等性）
+7. ブランチを削除する
+
+#### 実施結果（2026-09-04 / ブランチ `rehearsal` = `br-proud-shadow-a18el6fk`）
+
+**全手順合格。** `main` から切ったブランチに対し、手順1〜6のすべてが期待値と一致した。
+
+| 手順 | 確認内容 | 結果 |
+|---|---|---|
+| 1 | `0005` 適用後の公開駅 / NULL | **335 / 146** |
+| 2 | 突合の試算 | 事業者 17/17、路線 62→**59**（未突合3）、駅 481→**477**（未突合4）。適用不能 **0件** |
+| 3 | 突合の適用 | コード設定 17 / 59 / 477。`stationConnections` 546→**0**（入力済み0件） |
+| 4 | 取込の適用 | blockers **0件**。事業者+145 / 路線+543 / 駅+10,148 / 隣接10,040 / 乗換接続6,946 |
+| 5 | 既存データの不変性 | `platforms` 14 / `lineDirections` 52 / `trains` 10 / `stationFacilities` 0 が**不変**。`stations` / `lines` の id も維持 |
+| 6 | 冪等性 | 再試算で今回設定 **0 / 0 / 0**、乗換接続の作り直し対象 **0件**。適用しても DB は無変化 |
+
+適用後の全行数は 事業者162 / 路線605 / 駅10,629 / 乗換単位の駅8,782 /
+駅と路線の関連10,634 / 隣接10,040 / 乗換接続6,946。
+公開駅は **335 のまま**である（新規10,148駅はすべて非公開で入る）。
+`published_at IS NOT NULL AND slug IS NULL` は0件で、`published_requires_slug` と整合する。
+
+#### リハーサルで判明したこと
+
+1. **取込は `lines.name` を ekidata の表記で上書きする。**
+   `常磐線快速` → `JR常磐線(上野～取手)` / `高崎線` → `JR高崎線` /
+   `東海道線` → `JR東海道本線(東京～熱海)` / `有楽町線` → `東京メトロ有楽町線`。
+   運行系統粒度で付けた現行の名前の方が旅客案内には適しており、
+   これが [ADR-0007](../adr/0007-station-master-data-source.md) で
+   「ekidata を定期的に再取込して同期する」を却下する根拠になった
+
+2. **手動対応表のキーは、取込後には引けなくなる。**
+   `MANUAL_LINE_CD` / `MANUAL_STATION_CD` のキーが
+   `<事業者キー>/<路線名>[/<駅名>]` であり、上記の上書きでキーが変わるためである。
+   2回目の試算では未突合4駅の理由が「ekidata に対応行が無い（確認済み）」から
+   「候補なし」に変わった。**結果には影響しなかった**（コードは1回目で設定済みであり、
+   `null` エントリの行も自動突合が候補を見つけられず NULL のまま残った）が、
+   `null` エントリの役割である「自動突合を止める」安全装置は外れている。
+
+   **対応表のキーを `odptRailwayId` / `odptStationId` へ変える案は採らない。**
+   ADR-0007 決定4 により移行機構ごと削除するため、
+   対応表が再び引かれる場面そのものが消える（Phase 7）
+
+3. **`ekidata*Cd` は突合・取込の外では読まれていない。** `apps/web` からの参照は0件。
+   全使用箇所は upsert の衝突対象、CSV 内の参照解決、突合結果の書き込み先、`unique` 制約である。
+   列を残す根拠は由来の記録であって、実行時の参照ではない（ADR-0007 決定3）
+
+本番は `develop` → `main` のマージで `0005` が適用された後、
+**本番の Admin にログインして** `/master-migration` → `/master-import` の順に実行する。
 
 ---
 
@@ -540,7 +707,10 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 ## Phase 5: 公開ガードと Admin UI
 
 ### TASK-5.0: 可視性述語の一元化（**現行バグの修正**）
-- **依存**: TASK-3.8
+- **依存**: TASK-3.0（`0005` バックフィル）。
+  **TASK-3.8 には依存しない**（初版は逆に書いていた。
+  [実行順序の根拠](#displaypriority-の-not-null-化は-phase-5-の-後に置く初版から変更)）。
+  バックフィル済みのDBでなければ、置き換えた瞬間に公開駅が0件になる
 - **対象**: `apps/web`
 - **成果物**: `apps/web/src/features/station/domain/visibility.ts`
 - **内容**: design.md「現行の可視性ガードは一覧にしか無い」の表に従い、
@@ -628,6 +798,23 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
 
 ---
 
+## Phase 5b: `displayPriority` の `NOT NULL` 化（旧 TASK-3.8）
+
+### TASK-5b.1: `operators.displayPriority` を表示順専用に純化
+- **依存**: **TASK-5.0 が本番にデプロイされていること。** 同じPRに入れない
+- **内容**: `NOT NULL DEFAULT 0` へ変更し、既存の NULL 行を 0 で埋める
+- **理由**: 可視性の意味を外す。可視性を担う述語が
+  `stations.publishedAt` の1つだけになる
+- **同じPRに入れてはならない理由**: マイグレーションはビルド時に走るため、
+  **新しいコードが公開される前にDBが変わる**（ADR-0008）。TASK-5.0 と同居させると、
+  ビルドが終わるまでの間だけ「`displayPriority` で判定する古いコード」が
+  「全行が 0 になったDB」を見ることになり、非表示事業者の駅が露出する
+- **前提の確認**: 適用前に `apps/web` から `operators.displayPriority` を
+  読む箇所が消えていることを grep で確かめる
+- **期待結果**: 可視性を担う述語が `stations.publishedAt` の1つだけになる
+
+---
+
 ## Phase 6: 検証・振り返り
 
 ### TASK-6.1: 受け入れ基準の検証
@@ -643,7 +830,9 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
     乗換接続の由来区分、駅名正規化ルール、
     ekidata 規約に由来する制約、**`slug` の導出規則**、
     **`nameEn` は公式表記のみで機械生成しないこと**、
-    **可視性は `stations.publishedAt` が単独で担い、判定は単一の述語を通すこと**
+    **可視性は `stations.publishedAt` が単独で担い、判定は単一の述語を通すこと**、
+    **ekidata は初回シードであり継続同期しないこと**と、
+    以後の維持が Admin での手動編集であること（ADR-0007 決定1）
   - `docs/domain/README.md` の一覧に2件を追加
 - **確認**: 既存の `platform-coordinate-system.md` / `train-stop-patterns.md` に
   変更が要るかを確認し、**不要ならその旨を記録する**
@@ -658,11 +847,42 @@ RTT を仮に80msとすると**ネットワーク待ちだけで約37秒**が積
   調査資料は Obsidian `Projects/furatora/駅・路線の粒度 — 設計のための調査メモ`。
   期限の目安は「ホーム設備の入力が共用ホーム駅（目黒等）に到達したとき」
 - **内容**: 以下を GitHub Issue として起票する
-  - 運行系統のデータ投入と Admin 管理UI（ODPT路線46件が種として使える）
-  - 列単位の上書きロック（`lockedFields`）
-  - `ekidataStationCd` の notNull 化（未突合ゼロ達成後）
+  - 運行系統のデータ投入と Admin 管理UI（ODPT路線46件が種として使える）。
+    **手動維持が主経路になるため優先度が上がる**（ADR-0007 決定1）
   - `facilityConnections` の粒度見直し
   - `operators.displayPriority` の全国運用ルール
+- **起票しないもの**（初版から削除。理由を残す）:
+  - **`ekidataStationCd` の notNull 化。** 「未突合ゼロ達成後」という前提が
+    手動運用と両立しない。手動で追加された駅は ekidata コードを持ち得ないため、
+    notNull は達成できないだけでなく**達成してはならない**（ADR-0007 決定3）
+  - **列単位の上書きロック（`lockedFields`）。** 定期取込から手動編集を守るための
+    機構であり、移行機構を削除する以上、守るべき再取込が存在しない（ADR-0007 決定4）
 
 ### TASK-6.5: ワークスペースの最終化
 - **内容**: 一時ファイル・作業用スクリプトを削除する
+- **対象**: `apps/scripts/src/measure-tx-scale.ts`（TASK-1.1 の計測用）、
+  Neon の計測ブランチとリハーサルブランチ
+
+---
+
+## Phase 7: 移行機構の削除（本番投入の完了後）
+
+> **依存**: 本番（`main`）への投入が完了し、結果が確認されていること。
+> 加えて **TASK-5.3（未突合解決UI）が完了していること**。
+> 根拠は [ADR-0007](../adr/0007-station-master-data-source.md) 決定4。
+
+### TASK-7.1: `master-import` / `master-migration` を削除
+- **対象**:
+  - `apps/admin/src/features/{master-import,master-migration}/`
+  - `apps/admin/src/external/ekidata/`、
+    同 `external/repository/{masterImportRepository,masterMigrationRepository}.ts`
+  - `apps/admin/src/app/{master-import,master-migration}/`、
+    同 `app/api/{master-import,master-migration}/`
+  - `di.ts` の配線、`Sidebar.tsx` の導線
+- **理由**: 一度きりの操作のために恒久的な画面を残すと、**再実行によって
+  手動で確定した表記が黙って上書きされる経路が常設される**。
+  Phase 4 で `update-odpt.ts` を削除するのと同じ扱いである
+- **残すもの**: `ekidata*Cd` の列と `unique` 制約（ADR-0007 決定3）。
+  **削除するのは機構であって、由来の記録ではない**
+- **TASK-5.3 より先に実行しない**: 未突合として残る路線3件・駅4件を
+  解決する手段が無くなるため
