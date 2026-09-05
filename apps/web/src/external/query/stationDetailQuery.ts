@@ -17,7 +17,8 @@ import {
   facilityConnections,
   stationConnections,
 } from '@furatora/database/schema';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import { publishedStation } from './visibility';
 import type { StationDetailQuery } from '@/features/station/ports';
 import type { StationDetailDTO, TransferConnectionDTO } from '@/features/station/domain/types';
 import type {
@@ -33,6 +34,9 @@ import type {
 // connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列であり、ekidata 由来の
 // インポートは書かない）。ekidata は路線ごとに駅を割るモデルであり、接続先の駅が決まれば
 // stationLines 経由で路線が一意に定まる（実測: 駅あたり1路線が10,629駅、2路線が5駅のみ）。
+//
+// TASK-5.0: 接続先の駅にも publishedStation() を通す。未公開駅への乗換リンクを
+// 詳細ページに出すと、そこから未公開ページへ到達できてしまう（REQ-7.4）。
 async function getStationConnectionRows(stationId: string) {
   return db
     .select({
@@ -45,9 +49,10 @@ async function getStationConnectionRows(stationId: string) {
       notesAboutWheelchair: stationConnections.notesAboutWheelchair,
     })
     .from(stationConnections)
+    .innerJoin(stations, eq(stations.id, stationConnections.connectedStationId))
     .innerJoin(stationLines, eq(stationLines.stationId, stationConnections.connectedStationId))
     .innerJoin(lines, eq(lines.id, stationLines.lineId))
-    .where(eq(stationConnections.stationId, stationId));
+    .where(and(eq(stationConnections.stationId, stationId), publishedStation()));
 }
 
 function buildTransferConnections(
@@ -93,7 +98,13 @@ function buildLinesByStation(rows: Awaited<ReturnType<typeof getStationConnectio
 
 export const dbStationDetailQuery: StationDetailQuery = {
   async getBySlug(slug) {
-    const [stationRow] = await db.select().from(stations).where(eq(stations.slug, slug)).limit(1);
+    // TASK-5.0: 未公開駅は 404（該当なし）にする。CHECK 制約により公開駅は
+    // 必ず slug を持つため、この条件を足しても公開駅の到達性は変わらない。
+    const [stationRow] = await db
+      .select()
+      .from(stations)
+      .where(and(eq(stations.slug, slug), publishedStation()))
+      .limit(1);
     if (!stationRow) return null;
 
     const [headerLineRows, platformList, stationConnectionRows] = await Promise.all([
