@@ -12,7 +12,7 @@ type Props = {
 
 export function StationCard({ station, lineColor }: Props) {
   return (
-    <Link href={`/stations/${station.slug ?? station.id}`}>
+    <Link href={`/stations/${station.slug}`}>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3 hover:shadow-md hover:border-blue-200 transition-all">
         <StationBadge code={station.code} color={lineColor} />
         <div className="flex-1 min-w-0">

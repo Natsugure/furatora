@@ -1,28 +1,14 @@
 import { NextResponse } from 'next/server';
-import { db } from '@furatora/database/client';
-import { operators, lines } from '@furatora/database/schema';
-import { asc } from 'drizzle-orm';
-import type { OperatorsApiResponse, OperatorWithLines } from '@/types';
+import { getVisibleOperatorsWithLines } from '@/external/query/operatorListQuery';
+import type { OperatorsApiResponse } from '@/types';
 
+// TASK-5.0: 旧実装は `.select().from(operators)` が無条件で、URL推測すら不要に
+// 非表示事業者の一覧が取れた（design.md「現行の可視性ガードは一覧にしか無い」で
+// 「最も重い漏れ」と特定された経路）。可視性の判定を getVisibleOperatorsWithLines に
+// 一本化し、公開駅を1件以上持つ事業者だけを返す。
 export async function GET() {
   try {
-    // Fetch all operators
-    const operatorList = await db
-      .select()
-      .from(operators)
-      .orderBy(asc(operators.name));
-
-    // Fetch all lines
-    const lineList = await db
-      .select()
-      .from(lines)
-      .orderBy(asc(lines.operatorId), asc(lines.displayOrder));
-
-    // Group lines by operatorId
-    const operatorsWithLines: OperatorWithLines[] = operatorList.map((op) => ({
-      ...op,
-      lines: lineList.filter((line) => line.operatorId === op.id),
-    }));
+    const operatorsWithLines = await getVisibleOperatorsWithLines();
 
     const response: OperatorsApiResponse = {
       operators: operatorsWithLines,

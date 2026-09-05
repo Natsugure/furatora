@@ -769,12 +769,24 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 ## Phase 5: 公開ガードと Admin UI
 
 ### TASK-5.0: 可視性述語の一元化（**現行バグの修正**）
+- **状態**: ✅ 完了 (2026-09-05)
 - **依存**: TASK-3.0（`0005` バックフィル）。
   **TASK-3.8 には依存しない**（初版は逆に書いていた。
   [実行順序の根拠](#displaypriority-の-not-null-化は-phase-5-の-後に置く初版から変更)）。
   バックフィル済みのDBでなければ、置き換えた瞬間に公開駅が0件になる
 - **対象**: `apps/web`
-- **成果物**: `apps/web/src/features/station/domain/visibility.ts`
+- **成果物**: `apps/web/src/external/query/visibility.ts`
+  （design.md / 初版は `features/station/domain/visibility.ts` としていたが変更した。
+  中身が `isNotNull(stations.publishedAt)` 等 drizzle と schema を import するため、
+  ADR-0001 の依存表（`features/*/domain/` から drizzle は ❌）に反する。
+  ADR に例外を足すのではなく、ADR の依存ルールに従って `external/query/` に置いた）
+- **あわせて `app/` から drizzle を追い出した**。対象6ファイルのうち5つが
+  `apps/web/eslint.config.mjs` の legacy 除外リストに載っており、
+  ADR-0001「`app/` から DB を触らない」に違反していた。述語を足すついでに
+  クエリを `external/query/{operatorListQuery,lineStationsQuery,stationSearchQuery,
+  stationByIdQuery}.ts` へ切り出し、除外リストを完全に削除した
+  （重複コード2組も解消: `lines/[slug]/stations` の page/route、
+  `page.tsx`/`api/v1/operators` の事業者+路線取得）
 - **内容**: design.md「現行の可視性ガードは一覧にしか無い」の表に従い、
   8つの読み取り経路すべてを単一の述語 `isNotNull(stations.publishedAt)` に通す
   - 置き換え（2件）: `app/page.tsx:16` / `app/api/v1/stations/route.ts:39` の
@@ -809,13 +821,39 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   `yurikamome-yurikamome`（路線）を回帰ケースに含める。
   slug が NULL の路線が一覧に出ないこと
 - **期待結果**: REQ-7.1〜7.5 を満たす。`/lines/null/stations` が生成されない
+- **テスト**: `external/query/visibility.test.ts` で `publishedStation()` /
+  `visibleLine()` / `visibleOperator()` が生成する SQL を `.toSQL()` で固定した
+  （`@furatora/database/client` はモジュール読込時に `DATABASE_URL` を要求するため、
+  テストはダミー値を `beforeAll` で設定してから動的 import する。実ネットワークには繋がない）
+- **手動検証（2026-09-05 / `main` から切った使い捨て Neon ブランチ / production
+  ビルドで実施）**:
+  - `/api/v1/operators` は東京メトロ・東京都交通局の2件のみ返す（ゆりかもめ等15事業者は含まれない）
+  - `/api/v1/stations?q=汐留` はゆりかもめの汐留（`yurikamome-yurikamome-shiodome`）を
+    含まず、都営大江戸線の汐留（`toei-oedo-shiodome`）のみ返す
+  - `/api/v1/lines/yurikamome-yurikamome/stations` は 404
+  - `getBySlug('yurikamome-yurikamome-shiodome')` と
+    `getVisibleLineWithStations('yurikamome-yurikamome')` はいずれも `null` を返し、
+    ページは `notFound()` を呼んで「ページが見つかりません」を描画する
+- **既知の制限（Phase 5 の範囲外・[Issue #70](https://github.com/Natsugure/furatora/issues/70)）**:
+  ページ側（`/stations/[slug]`、`/lines/[slug]/stations`）の `notFound()` は
+  正しいコンテンツを描画するが、HTTPステータスは200のまま返る。
+  **Phase 5 が原因ではない。** 完全に無関係な garbage slug でも同じ現象が再現するため、
+  `notFound()` を使う実装全般に及ぶ既存のNext.jsの挙動である
+  （`export const dynamic = 'force-dynamic'` を足しても変わらないことを確認済み）。
+  非公開データの隠蔽そのものは正しく機能しており（REQ-7.1〜7.4の実質は満たす）、
+  ステータスコードのみの不整合。原因調査と修正はIssue #70で追跡する。
+  APIルート（`/api/v1/*`）は明示的に `NextResponse.json(..., { status: 404 })` を
+  返すため、この制限を受けない
 
 ### TASK-5.1: `slug ?? id` フォールバックの整理
+- **状態**: ✅ 完了 (2026-09-05)
 - **依存**: TASK-5.0
 - **対象**: `apps/web/src/components/StationCard.tsx:15`、
   `apps/web/src/components/StationSearch.tsx:112`
 - **内容**: CHECK 制約により公開駅は必ず slug を持つため、
-  `station.slug ?? station.id` はデッドコードになる。型と併せて整理する
+  `station.slug ?? station.id` はデッドコードになる。型と併せて整理した
+  （`apps/web/src/types/index.ts` の `Station.slug` / `StationInGroup.slug` を
+  `string | null` から `string` へ狭めた）
 - **理由**: REQ-6.2 の削除に伴う後始末
 
 ### TASK-5.1b: カナ→修正ヘボン式の変換器

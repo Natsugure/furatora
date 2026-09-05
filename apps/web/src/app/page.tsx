@@ -1,34 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { Train } from 'lucide-react';
-import { db } from '@furatora/database/client';
-import { operators, lines } from '@furatora/database/schema';
-import { asc, isNotNull } from 'drizzle-orm';
+import { getVisibleOperatorsWithLines } from '@/external/query/operatorListQuery';
 import { SearchTabs } from '@/components/SearchTabs';
 import { Container } from '@/components/ui/Container';
-import type { OperatorWithLines } from '@/types';
 import { List, ListItem } from '@mantine/core';
 
-async function fetchOperatorsWithLines(): Promise<OperatorWithLines[]> {
-  const operatorList = await db
-    .select()
-    .from(operators)
-    .where(isNotNull(operators.displayPriority))
-    .orderBy(asc(operators.name));
-
-  const lineList = await db
-    .select()
-    .from(lines)
-    .orderBy(asc(lines.operatorId), asc(lines.displayOrder));
-
-  return operatorList.map((op) => ({
-    ...op,
-    lines: lineList.filter((line) => line.operatorId === op.id),
-  }));
-}
-
 export default async function Home() {
-  const operatorsWithLines = await fetchOperatorsWithLines();
+  const operatorsWithLines = await getVisibleOperatorsWithLines();
 
   return (
     <Container className="py-6">
