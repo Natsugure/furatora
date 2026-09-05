@@ -39,7 +39,9 @@
         "POSTGRES_PRISMA_URL",
         "NEXT_PUBLIC_GA_ID",
         "GEMINI_API_KEY",
-        "AUTH_REDIRECT_PROXY_URL"
+        "AUTH_REDIRECT_PROXY_URL",
+        "AUTH_ALLOWED_GITHUB_LOGIN",
+        "NEON_PROJECT_ID"
       ]
     },
     "dev": {
