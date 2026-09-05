@@ -23,6 +23,14 @@ function request(body: unknown) {
   });
 }
 
+function rawRequest(rawBody: string) {
+  return new Request(`http://localhost/api/stations/${STATION_ID}/publication`, {
+    method: 'PATCH',
+    body: rawBody,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 describe('PATCH /api/stations/[stationId]/publication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,6 +71,28 @@ describe('PATCH /api/stations/[stationId]/publication', () => {
     const response = await PATCH(request({ action: 'delete' }), { params: mockParams });
 
     expect(response.status).toBe(400);
+  });
+
+  it('slug の先頭・末尾・連続ハイフンは400を返す', async () => {
+    for (const slug of ['-shinjuku', 'shinjuku-', 'jr--east', '---']) {
+      const response = await PATCH(request({ action: 'publish', slug }), { params: mockParams });
+      expect(response.status).toBe(400);
+    }
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('ボディが空の場合は500ではなく400を返す', async () => {
+    const response = await PATCH(rawRequest(''), { params: mockParams });
+
+    expect(response.status).toBe(400);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('ボディが不正な JSON の場合は500ではなく400を返す', async () => {
+    const response = await PATCH(rawRequest('{ not json'), { params: mockParams });
+
+    expect(response.status).toBe(400);
+    expect(publish).not.toHaveBeenCalled();
   });
 
   it('対象の駅が存在しない場合は404を返す', async () => {

@@ -20,7 +20,16 @@ export async function PATCH(
 ) {
   try {
     const { stationId } = await params;
-    const body = await request.json();
+
+    // 空ボディ・不正 JSON は 400 系のクライアントエラー。
+    // request.json() の例外を下の catch に落とすと 500 になってしまう
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'リクエストボディが不正な JSON です' }, { status: 400 });
+    }
+
     const parsed = stationPublicationSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });

@@ -8,6 +8,7 @@ import {
   Alert, Badge, Button, Card, Group, List, ListItem, Stack, Text, TextInput, Title,
 } from '@mantine/core';
 import type { LineMissingSlugDTO, PublishingLineDTO, PublishingStationDTO } from '../ports';
+import { describeError } from '../describeError';
 
 type Props = {
   stationId: string;
@@ -33,6 +34,9 @@ export function StationPublishingForm({
 
   const isPublished = station.publishedAt !== null;
   const canPublish = !!line?.slug;
+  // slug が既に確定している駅は URL を変えられない（再公開時も同じ URL を維持する。
+  // サーバー側 stationPublishingRepository.publish も渡された slug を無視して既存値を使う）
+  const slugLocked = station.slug !== null;
 
   async function handlePublish() {
     if (!slug) {
@@ -118,11 +122,15 @@ export function StationPublishingForm({
 
       <TextInput
         label="slug（URL識別子）"
-        description="路線のslugとカナから機械生成した候補です。確認・編集してから確定してください"
+        description={
+          slugLocked
+            ? '確定済みの slug です。公開 URL を維持するため変更できません'
+            : '路線のslugとカナから機械生成した候補です。確認・編集してから確定してください'
+        }
         placeholder={slugCandidate ?? '路線のslugが無いため候補を生成できません'}
         value={slug}
         onChange={(e) => setSlug(e.target.value)}
-        disabled={!canPublish || isPublished}
+        disabled={!canPublish || isPublished || slugLocked}
       />
 
       <Group gap="sm">
@@ -151,11 +159,4 @@ export function StationPublishingForm({
       )}
     </Stack>
   );
-}
-
-function describeError(body: unknown): string {
-  if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') {
-    return body.error;
-  }
-  return '保存に失敗しました';
 }
