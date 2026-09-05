@@ -14,7 +14,7 @@ Phase 0: docs/spec・ADR更新                      (完了)
 Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
 Phase 2: インポート機構                           (完了)
 Phase 3: 突合と publishedAt バックフィル           (完了・Phase 2 に依存)
-Phase 4: ODPT 後始末                             (PR1 実装済み・PR2 未着手)
+Phase 4: ODPT 後始末                             (PR1マージ・デプロイ済み / PR2実装済み・未マージ)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
 Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
 Phase 6: 検証・振り返り                            (必須)
@@ -677,7 +677,12 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 
 ---
 
-## Phase 4: ODPT 後始末（PR1 実装済み・未マージ / PR2 未着手 — 2026-09-05）
+## Phase 4: ODPT 後始末（PR1 マージ・デプロイ済み / PR2 実装済み・未マージ — 2026-09-05）
+
+- PR1: [#65](https://github.com/Natsugure/furatora/pull/65)。`develop` → `main` にマージ済み。
+  Vercel（`furatora` / `furatora-admin` 両プロジェクト）のデプロイ完了を確認済み
+- PR2: `feature/issue56-phase4-migration` ブランチで実装済み。
+  PR1 のデプロイ確認後に着手した（二段階デプロイの2段目）
 
 **実行順序を初版から変更した。** ADR-0008 / CLAUDE.md 禁止事項により
 `DROP COLUMN` / `DROP TABLE` / `NOT NULL` 化は二段階デプロイが必須であるため、
@@ -743,7 +748,7 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 
 ### PR2: マイグレーション（`feature/issue56-phase4-migration`）
 
-**PR1 が main にマージされ、本番デプロイが完了してから着手する。**
+**PR1 が main にマージされ、本番デプロイが完了してから着手した。**
 
 - **TASK-4.1: 一意制約の削除**。`uniqueStationPerOperator` / `uniqueRailwayPerOperator` を
   削除。`ekidataStationCd` / `ekidataLineCd` / `ekidataCompanyCd` の unique は Phase 1 で
@@ -753,8 +758,11 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   `odptRailwayId` / `connectedRailwayId` を削除し、`connectedStationId` を notNull 化
   （main / development ともに NULL 行 0件を実測済み）
 - **TASK-4.3: `odptMetadata` テーブルを削除**
-- マイグレーション番号は **`0006`**。Phase 5b（旧 TASK-3.8、`displayPriority` の
-  NOT NULL 化）はこれより後に生成されるため、そちらの番号は `0007` 以降に読み替える
+- **成果物**: `packages/database/drizzle/0006_phase4_odpt_cleanup.sql`
+  （`DROP TABLE` 1件 / `DROP CONSTRAINT` 2件 / `DROP COLUMN` 3件 / `SET NOT NULL` 1件。
+  これ以外の DDL は含まれない。とくに `ekidata*Cd` への `SET NOT NULL` が無いことを確認済み）
+- Phase 5b（旧 TASK-3.8、`displayPriority` の NOT NULL 化）はこれより後に生成されるため、
+  そちらの番号は `0007` 以降に読み替える
 
 ---
 
