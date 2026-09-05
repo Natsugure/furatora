@@ -29,6 +29,20 @@
       "when": 1786778206883,
       "tag": "0003_living_scrambler",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788058418309,
+      "tag": "0004_red_the_santerians",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788477731977,
+      "tag": "0005_backfill_published_at",
+      "breakpoints": true
     }
   ]
 }

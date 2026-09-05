@@ -53,4 +53,5 @@ public/gtfs-data/*
 
 # VSCode config files
 .vscode/
+
 .claude/settings.local.json

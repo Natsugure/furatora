@@ -56,6 +56,8 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0004](./0004-neon-branch-dev-environment.md) | 開発環境を Neon ブランチに統一し、ローカル PostgreSQL / Docker を廃止する        | Proposed   | 2026-08-15 |
 | [0005](./0005-write-atomicity-driver.md)      | 書き込みの原子性を担保するため、読み取りと書き込みで Neon のドライバを使い分ける | Proposed   | 2026-08-15 |
 | [0006](./0006-diagram-text-in-html-overlay.md) | ホーム図のテキストは SVG ではなく HTML オーバーレイ層に置く                      | Proposed   | 2026-08-23 |
+| [0007](./0007-station-master-data-source.md) | 駅・路線マスタを ODPT 同期から駅データ.jp の初回シードに移行し、以後は手動で維持する | Proposed   | 2026-08-27 |
+| [0008](./0008-environment-database-branch-mapping.md) | 環境ごとに Neon ブランチを1対1で対応させ、マイグレーションをビルド時に適用する | Accepted   | 2026-09-01 |
 
 ## 関連ドキュメント
 

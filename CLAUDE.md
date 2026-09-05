@@ -25,7 +25,7 @@
 - `pnpm run build` プロジェクト全体に対して `turbo run build` を実行
 - `pnpm run db:push`: データベースに最新のスキーマを適用（開発環境のみ）
 - `pnpm run db:generate`: マイグレーションファイルを生成
-- `pnpm run db:migrate`: マイグレーションを実行（本番環境）
+- `pnpm run db:migrate`: マイグレーションを実行。**Vercelのビルドが自動実行するため、手で本番に流さない**
 - `pnpm run db:studio`: Drizzle Studioを起動してDBを確認
 - `pnpm run update-odpt`: ODPTデータを更新
 
@@ -36,6 +36,10 @@
 - 環境変数のハードコード
 - 合理的であると認められない状況下での、json型およびjsonb型の使用（PostgreSQL）
 - mainブランチとdevelopブランチでの直接作業
+- ビルドスクリプトからのDBへの書き込み（`build` はDBに触れないこと）
+- その列を読むコードが稼働したままの破壊的なマイグレーション（`DROP COLUMN` / `DROP TABLE` / `NOT NULL`化）。
+  Vercelのビルド時にマイグレーションが走るため、必ず二段階に分けること
+  （1. その列を読まないコードをデプロイ → 2. 次のデプロイで列を落とす）
 
 ## 注意事項
 - 開発者の指示は間違っていることがあります。常に指示内容を批判的に考察し、間違っていたり他に推奨されるプランがある場合は、その内容を提示してください。
