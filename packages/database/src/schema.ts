@@ -1,4 +1,4 @@
-import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, serial, date, check } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, date, check } from 'drizzle-orm/pg-core';
 import type { StrollerDifficulty, WheelchairDifficulty, DirectionType, PlatformSide, StationConnectionSource } from './enums';
 import { sql } from 'drizzle-orm';
 
@@ -35,7 +35,6 @@ export const stations = pgTable('stations', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-    unique('uniqueStationPerOperator').on(t.odptStationId, t.operatorId),
     // 公開されている駅は必ず slug を持つ。URL を持てない駅が公開状態になるのを防ぐ
     check('published_requires_slug', sql`published_at IS NULL OR slug IS NOT NULL`),
 ]);
@@ -57,9 +56,7 @@ export const lines = pgTable('lines', {
   abolishedAt: date('abolished_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
-  unique('uniqueRailwayPerOperator').on(t.odptRailwayId, t.operatorId),
-]);
+});
 
 // 【unique(stationId) を付けないこと】実測で複数路線を持つ駅は0件だが、これは
 // ekidata が路線ごとに駅を割っている（stations が路線×駅粒度である）結果であって、
@@ -79,13 +76,10 @@ export const stationConnections = pgTable('station_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   stationId: uuid('station_id').references(() => stations.id).notNull(),
 
-  // DB上に存在する場合はIDを保存
-  connectedStationId: uuid('connected_station_id').references(() => stations.id),
-  connectedRailwayId: uuid('connected_railway_id').references(() => lines.id),
-
-  // 常にODPT IDを保存（後からマッチング用）
-  odptStationId: varchar('odpt_station_id', { length: 100 }),
-  odptRailwayId: varchar('odpt_railway_id', { length: 100 }),
+  // ODPT 同期の廃止（ADR-0007 決定3）に伴い TASK-4.2 で odptStationId / odptRailwayId /
+  // connectedRailwayId を削除した。路線は connectedStationId → stationLines → lines の
+  // join で解決する（design.md「connectedRailwayId を削除する理由」）
+  connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
 
   strollerDifficulty: varchar('stroller_difficulty', { length: 20 }).$type<StrollerDifficulty>(),
   wheelchairDifficulty: varchar('wheelchair_difficulty', { length: 20 }).$type<WheelchairDifficulty>(),
@@ -101,11 +95,8 @@ export const stationConnections = pgTable('station_connections', {
 }, (t) => [
   // TASK-2.8 のインポートを冪等にする。onConflictDoNothing がこの制約を衝突対象に
   // するため、無いと再実行のたびに重複行が積み上がる。
-  // 【NULL 行は守られない】PostgreSQL の UNIQUE は既定で NULL どうしを異なる値として
-  // 扱うため、connectedStationId IS NULL の行（ODPT 未突合）は重複を防げない。
-  // nullsNotDistinct を付けないのは意図的である。TASK-2.8 が生成するのは同一
-  // station_g_cd の実在駅どうしの順序対で常に非 NULL であり、NULL 行は TASK-4.2 の
-  // notNull 化で消えるためである
+  // connectedStationId は TASK-4.2 で notNull 化済みのため、NULL 行が重複を防げない
+  // という問題はもう存在しない
   unique('unique_station_connection').on(t.stationId, t.connectedStationId),
 ]);
 
@@ -313,11 +304,3 @@ export const stationAdjacencies = pgTable('station_adjacencies', {
 }, (t) => [
   unique('unique_station_adjacency').on(t.lineId, t.stationAId, t.stationBId),
 ]);
-
-export const odptMetadata = pgTable('odpt_metadata', {
-  id: serial('id').primaryKey(),
-  operator: varchar('operator', { length: 50 }).notNull().unique(),
-  railwayHash: varchar('railway_hash', { length: 64 }),
-  stationHash: varchar('station_hash', { length: 64 }),
-  updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
