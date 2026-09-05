@@ -14,7 +14,7 @@ Phase 0: docs/spec・ADR更新                      (完了)
 Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
 Phase 2: インポート機構                           (完了)
 Phase 3: 突合と publishedAt バックフィル           (完了・Phase 2 に依存)
-Phase 4: ODPT 後始末                             (PR1マージ・デプロイ済み / PR2実装済み・未マージ)
+Phase 4: ODPT 後始末                             (PR1・PR2 とも本番デプロイ済み)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
 Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
 Phase 6: 検証・振り返り                            (必須)
@@ -677,12 +677,13 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 
 ---
 
-## Phase 4: ODPT 後始末（PR1 マージ・デプロイ済み / PR2 実装済み・未マージ — 2026-09-05）
+## Phase 4: ODPT 後始末（PR1・PR2 とも `main` にマージ・デプロイ済み — 2026-09-05）
 
 - PR1: [#65](https://github.com/Natsugure/furatora/pull/65)。`develop` → `main` にマージ済み。
   Vercel（`furatora` / `furatora-admin` 両プロジェクト）のデプロイ完了を確認済み
-- PR2: `feature/issue56-phase4-migration` ブランチで実装済み。
-  PR1 のデプロイ確認後に着手した（二段階デプロイの2段目）
+- PR2: [#67](https://github.com/Natsugure/furatora/pull/67)。`develop` → `main` にマージ済み。
+  `0006_phase4_odpt_cleanup.sql` は本番に適用済み（`main` の実測で確認: 未突合 路線3 / 駅4 /
+  事業者0、公開駅335、`operators.display_priority` が NULL でない事業者2）
 
 **実行順序を初版から変更した。** ADR-0008 / CLAUDE.md 禁止事項により
 `DROP COLUMN` / `DROP TABLE` / `NOT NULL` 化は二段階デプロイが必須であるため、
@@ -744,9 +745,10 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 
 > **元 TASK-5.3（`unresolved-connections` の ekidata 未突合解決UIへの転生）は成立しなくなった。**
 > 転生元の実装を Phase 4 で削除したため、TASK-5.3 は「`features/` 配下に新規UIを作成する」
-> に読み替える。解決対象は路線3件・駅4件のまま変わらない
+> に読み替えていた。**この読み替え自体が Phase 5（TASK-5.4）で不要になった。**
+> 理由は Phase 5 の節を参照
 
-### PR2: マイグレーション（`feature/issue56-phase4-migration`）
+### PR2: マイグレーション（[#67](https://github.com/Natsugure/furatora/pull/67)）
 
 **PR1 が main にマージされ、本番デプロイが完了してから着手した。**
 
@@ -848,17 +850,60 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   必須にすると機械ローマ字を貼る圧力が生じ、公式表記のみを入れる方針が崩れる
 - **期待結果**: 誤変換の約3%が公開時に人の目を通る
 
-### TASK-5.3: ekidata 未突合解決UIを新規作成
-- **依存**: Phase 4
-- **初版からの変更**: 当初は既存の `unresolved-connections`（556行）を
-  「転生」させる計画だったが、転生元は ODPT ID をキーにした画面であり、
-  ODPT 由来の実装だったため Phase 4（TASK-4.3a）で削除した。
-  現時点で `features/` 配下への**新規作成**として作り直す
-- **対象**: `apps/admin/src/features/`（[ADR-0001](../adr/0001-layer-structure.md)
-  の4層に沿って作成する）
-- **内容**: `ekidata*Cd` が NULL の行を一覧し、手動で `station_cd` / `line_cd` を
-  割り当てられるようにする
-- **期待結果**: Phase 3 で残った未突合（路線3件・駅4件）が画面から解決できる
+### TASK-5.3: 欠番（未突合解決UIは不要になった）
+
+> **TASK-5.3（ekidata 未突合解決UI）は削除した。** 当初は Phase 3 で残った
+> 未突合（路線3件・駅4件）を管理者が手動でコード割り当てできる画面を作る計画だったが、
+> TASK-5.4 の実測により、この7件は**割り当てる根拠が存在しないことが確定した**。
+>
+> - 路線3件（丸ノ内線支線・常磐線各駅停車・東武スカイツリーライン(支線)）は
+>   ekidata に対応行が無い（`manualMappings.ts` に `null` として記録済み）
+> - 駅4件のうち3件（中野新橋・中野富士見町・方南町・押上・綾瀬 ※実際は
+>   分岐線側の駅で本線側に同名の別行を持つ）は本線側の行が既に ekidata コードを持つ
+> - 駅1件（中野坂上）は本線側に同じ駅ナンバリング・同じ ekidata コードを持つ
+>   別行が既に存在する純粋な重複行
+>
+> 割り当て候補が存在しない行のために「割り当てる画面」を作る意味が無いため、
+> TASK-5.4 でこれらの行自体を削除し、未突合を0件にする。番号は欠番のまま残す
+> （[design.md](./design.md) の想定ディレクトリ `station-publishing/` とは無関係な変更のため
+>  design.md 側の修正は不要）。
+
+### TASK-5.4: 分岐線を本線に畳む（未突合解消・新設）
+- **状態**: ✅ 完了 (2026-09-05)
+- **依存**: なし
+- **成果物**: `packages/database/drizzle/0007_fold_branch_lines.sql`
+- **背景**: Phase 3 の突合で解決できなかった7行（路線3・駅4）は、
+  furatora の路線×駅粒度（暫定）が ekidata より細かいために生じていた。
+  ekidata は以下をすべて本線に畳んでいる。
+
+  | furatora の分岐線 | ekidata での扱い |
+  |---|---|
+  | 丸ノ内線支線（方南町〜中野坂上） | `28002` 東京メトロ丸ノ内線 に統合 |
+  | 常磐線各駅停車（綾瀬のみ残存） | `11320` JR常磐線(上野～取手) に統合 |
+  | 東武スカイツリーライン(支線)（押上のみ） | `21002` 東武伊勢崎線 に統合 |
+
+- **削除しても実害が無いことを本番DBで実測確認済み（2026-09-05）**:
+  - 分岐線側の駅（中野新橋・中野富士見町・方南町・綾瀬・押上）は
+    本線側の `station_lines` 行を既に持っており、削除しても孤立しない
+  - 中野坂上は本線側に同じ駅ナンバリング（`M06`）・同じ ekidata コード
+    （`2800220`）を持つ別行が既に公開状態で存在する純粋な重複行
+  - 対象7行に `platforms` / `station_connections` / `station_adjacencies` /
+    `facility_connections` は1件も無い
+  - 付随して削除されるのは `line_directions` 2件（丸ノ内線支線の上下）と
+    `station_lines` 9件（路線側6 + 駅側3）のみ
+- **内容**: 3路線・4駅を削除し、残存する分岐線側の駅5件（中野新橋・中野富士見町・
+  方南町・綾瀬・押上）の `slug` を本線基準（`${本線.slug}-${hepburn}`）へ付け替える。
+  公開中の3駅（中野新橋・中野富士見町・方南町）は URL が変わる
+  （設備データ未入力のため実害が小さく、リダイレクトは設けない）
+- **粒度の確定そのものはスコープ外のまま**（TASK-6.4 の後続Issueへ）。
+  「ekidata に存在する分岐＝本線に含まれる」という対応は ekidata 側の事実であり、
+  furatora が独自の粒度判断を下したわけではない
+- **リハーサル結果（2026-09-05 / `main` から切った使い捨てブランチ）**: 適用後、
+  未突合 路線0 / 駅0、公開駅 335→334（中野坂上の重複解消分）、孤立行0件。
+  4駅（中野坂上・中野新橋・中野富士見町・方南町）が `東京メトロ丸ノ内線` 配下で
+  公開状態のまま存在することを確認済み
+- **派生する変更**: TASK-5.3（未突合解決UI）が不要になる（上記参照）。
+  Phase 7（TASK-7.1）の「TASK-5.3 より先に実行しない」という依存も消える
 
 ---
 
@@ -932,8 +977,10 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 ## Phase 7: 移行機構の削除（本番投入の完了後）
 
 > **依存**: 本番（`main`）への投入が完了し、結果が確認されていること。
-> 加えて **TASK-5.3（未突合解決UI）が完了していること**。
 > 根拠は [ADR-0007](../adr/0007-station-master-data-source.md) 決定4。
+>
+> 初版は「TASK-5.3（未突合解決UI）が完了していること」も依存に含めていたが、
+> TASK-5.4 で未突合を0件にしたため TASK-5.3 自体が欠番になり、この依存は消えた。
 
 ### TASK-7.1: `master-import` / `master-migration` を削除
 - **対象**:
@@ -948,5 +995,3 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   Phase 4 で `update-odpt.ts` を削除するのと同じ扱いである
 - **残すもの**: `ekidata*Cd` の列と `unique` 制約（ADR-0007 決定3）。
   **削除するのは機構であって、由来の記録ではない**
-- **TASK-5.3 より先に実行しない**: 未突合として残る路線3件・駅4件を
-  解決する手段が無くなるため
