@@ -22,7 +22,10 @@ export type OperatorWithLines = Operator & {
 
 export type Station = {
   id: string;
-  slug: string | null;
+  // 公開駅は CHECK 制約（published_requires_slug）により必ず slug を持つ。
+  // ここに現れる Station は可視性述語（publishedStation()）を通った行のみであるため
+  // null を許さない（TASK-5.1: `slug ?? id` フォールバックの整理）。
+  slug: string;
   code: string | null;
   name: string;
   nameEn: string | null;
@@ -36,7 +39,8 @@ export type StationWithOrder = Station & {
 
 export type StationInGroup = {
   id: string;
-  slug: string | null;
+  // Station.slug と同じ理由で null を許さない
+  slug: string;
   code: string | null;
   lineId: string | null;
   lineName: string | null;
