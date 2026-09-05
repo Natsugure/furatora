@@ -5,8 +5,6 @@ import {
   lineUpdateSchema,
   directionSchema,
   stationConnectionUpdateSchema,
-  unresolvedRailwaySchema,
-  unresolvedStationSchema,
 } from './validations';
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -142,92 +140,6 @@ describe('stationConnectionUpdateSchema', () => {
   it('wheelchairDifficultyに不正な値の場合は失敗する', () => {
     const result = stationConnectionUpdateSchema.safeParse({
       wheelchairDifficulty: 'easy',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('unresolvedRailwaySchema', () => {
-  it('必須フィールドで正常にパースされる', () => {
-    const result = unresolvedRailwaySchema.safeParse({
-      odptRailwayId: 'odpt.Railway:JR-East.Yamanote',
-      name: '山手線',
-      operatorId: VALID_UUID,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('odptRailwayIdがない場合は失敗する', () => {
-    const result = unresolvedRailwaySchema.safeParse({
-      name: '山手線',
-      operatorId: VALID_UUID,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('nameが空の場合は失敗する', () => {
-    const result = unresolvedRailwaySchema.safeParse({
-      odptRailwayId: 'odpt.Railway:JR-East.Yamanote',
-      name: '',
-      operatorId: VALID_UUID,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('operatorIdがUUIDでない場合は失敗する', () => {
-    const result = unresolvedRailwaySchema.safeParse({
-      odptRailwayId: 'odpt.Railway:JR-East.Yamanote',
-      name: '山手線',
-      operatorId: 'not-uuid',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('unresolvedStationSchema', () => {
-  it('action=createで正常にパースされる', () => {
-    const result = unresolvedStationSchema.safeParse({
-      action: 'create',
-      odptStationId: 'odpt.Station:JR-East.Yamanote.Shibuya',
-      name: '渋谷',
-      operatorId: VALID_UUID,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('action=linkで正常にパースされる', () => {
-    const result = unresolvedStationSchema.safeParse({
-      action: 'link',
-      odptStationId: 'odpt.Station:JR-East.Yamanote.Shibuya',
-      stationId: VALID_UUID,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('不正なactionの場合は失敗する', () => {
-    const result = unresolvedStationSchema.safeParse({
-      action: 'delete',
-      odptStationId: 'odpt.Station:JR-East.Yamanote.Shibuya',
-      name: '渋谷',
-      operatorId: VALID_UUID,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('action=createでodptStationIdがない場合は失敗する', () => {
-    const result = unresolvedStationSchema.safeParse({
-      action: 'create',
-      name: '渋谷',
-      operatorId: VALID_UUID,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('action=linkでstationIdがUUIDでない場合は失敗する', () => {
-    const result = unresolvedStationSchema.safeParse({
-      action: 'link',
-      odptStationId: 'odpt.Station:JR-East.Yamanote.Shibuya',
-      stationId: 'not-uuid',
     });
     expect(result.success).toBe(false);
   });

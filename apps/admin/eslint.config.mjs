@@ -45,10 +45,6 @@ const legacyExclusions = {
     'src/app/api/trains/route.ts',
     'src/app/api/trains/\\[trainId\\]/route.ts',
     'src/app/api/station-connections/\\[connectionId\\]/route.ts',
-    'src/app/api/unresolved-connections/route.ts',
-    'src/app/api/unresolved-connections/railways/route.ts',
-    'src/app/api/unresolved-connections/stations/route.ts',
-    'src/components/ConnectionsEditSection.tsx',
     'src/components/StationEditForm.tsx',
   ],
   rules: {

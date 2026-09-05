@@ -290,6 +290,18 @@ furatora のドメインの不変条件ではない。** ekidata の粒度は暫
 路線が一意に定まる」を根拠にしていたが、上記の通り 1:1 は固定しないため
 この根拠は使わない。**再生成可能であることが根拠である。**
 
+**列を削除した以上、路線名は `connectedStationId → stationLines → lines` の
+join で解決する。** `apps/web`（`stationDetailQuery.ts`）と `apps/admin`
+（`stations/route.ts` の `connectedFrom` 分岐、`stations/[stationId]/edit`）の
+両方がこの形に揃っている。実測で複数路線を持つ駅は10,629駅中5駅のみであり、
+その5駅は `(connectedStationId, lineName)` の組で重複除去して吸収する。
+
+**この張り替えは Phase 4 で公開サイトの実害を修復する副産物でもあった。**
+着手時点で `apps/web` は旧来 `connectedRailwayId` に innerJoin しており、
+ekidata インポート（TASK-2.8）がこの列を書かないため本番6,946行すべてで
+NULL となり、乗換路線名の表示が0件になっていた。列の削除と表示の復旧を
+同じ変更で行った。
+
 #### ODPT ID 列に一意制約が無い理由をコメントに残す
 
 [ADR-0007](../adr/0007-station-master-data-source.md) の「影響」に従い、
@@ -944,11 +956,21 @@ WHERE stations.operator_id = operators.id
 
 削除から取り込みまでの間、公開サイトの乗換接続は空になる。続けて実行すること。
 
-### `unresolved-connections` ページの転生
+### `unresolved-connections` ページは転生させず削除する（初版から変更）
 
-`apps/admin/src/app/unresolved-connections/`（556行）は ODPT の未解決接続を
-人が解消するUIだった。役割は同じまま、**キーを ODPT ID から ekidata コードへ
-差し替えて「ekidata 未突合マスタの解決UI」にする。** 上記の未突合15件が最初の対象になる。
+初版は `apps/admin/src/app/unresolved-connections/`（556行）を
+「キーを ODPT ID から ekidata コードへ差し替えて転生させる」計画だったが、
+**Phase 4 の着手時点でこの画面はすでに常に空を返す死んだ機能だった。**
+ekidata インポート（TASK-2.8）は `stationConnections` の ODPT 列
+（`odptStationId` / `odptRailwayId`）を一切書かないため、本番の乗換接続
+6,946行すべてでこれらが NULL であり、この画面の検索条件
+（`odpt_railway_id IS NOT NULL` 等）に1件も一致しない。
+
+実装（ODPT ID の文字列パース、Gemini による名前推測、`connectedStationId` /
+`connectedRailwayId` への書き込み）ごと ODPT 由来であり、転生というより
+書き直しに等しい。Phase 4（TASK-4.3a）で削除し、
+`features/` 配下への新規UIは TASK-5.3 として作り直す
+（キーは最初から ekidata コード、検索条件は `ekidata*Cd IS NULL`）。
 
 ---
 

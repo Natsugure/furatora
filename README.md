@@ -18,7 +18,6 @@
 - **プラットフォーム情報** - ホームに停車する列車の号車位置とバリアフリー設備の位置を視覚的に表示
 - **乗り換え難易度** - ベビーカー・車いすでの乗り換えしやすさをレベル別に表示
 - **設備情報** - エレベーター等の設置場所をホームの号車位置と紐付けて提供
-- **ODPT連携** - 公共交通オープンデータセンター（ODPT）のAPIを活用した駅・路線データの自動取得
 
 ### 技術スタック
 
@@ -65,12 +64,6 @@
 | [pnpm](https://pnpm.io/) | v10 | パッケージマネージャー |
 | [TypeScript](https://www.typescriptlang.org/) | v5 | 型安全な開発 |
 
-#### 外部API
-
-| サービス | 用途 |
-|---|---|
-| [ODPT（公共交通オープンデータセンター）](https://www.odpt.org/) | 鉄道駅・路線データの取得 |
-
 ### セットアップ
 
 #### 前提条件
@@ -94,8 +87,8 @@ pnpm install
    | ファイル | 内容 |
    |---|---|
    | `apps/web/.env.local` | `DATABASE_URL`（プールド）, `NEXT_PUBLIC_GA_ID` |
-   | `apps/admin/.env.local` | `DATABASE_URL`（プールド）, `AUTH_*`, `GEMINI_API_KEY` |
-   | `apps/scripts/.env` | `DATABASE_URL`（直結）, `ODPT_API_KEY` |
+   | `apps/admin/.env.local` | `DATABASE_URL`（プールド）, `AUTH_*` |
+   | `apps/scripts/.env` | `DATABASE_URL`（直結） |
    | `packages/database/.env` | `DATABASE_URL`（直結） |
 
 #### 開発サーバーの起動
@@ -123,9 +116,6 @@ pnpm run db:push
 
 # 2. マスタデータを投入
 pnpm --filter scripts seed
-
-# 3. ODPTから駅・路線データを取得
-pnpm run update-odpt
 ```
 
 ホーム・列車・停車位置・コンコース・設備は Admin での手入力データのため、
@@ -139,7 +129,6 @@ pnpm run build      # 全アプリのビルド
 pnpm run lint       # リント実行
 pnpm run db:push    # DBスキーマを適用
 pnpm run db:studio  # Drizzle Studio（DB GUI）を起動
-pnpm run update-odpt # ODPTから駅・路線データを取得・更新
 ```
 
 ### デプロイとマイグレーション
@@ -192,7 +181,6 @@ Users can visually check the locations of accessible facilities on platforms, tr
 - **Platform View** - Visual display of train car positions and barrier-free facility locations on platforms
 - **Transfer Difficulty** - Stroller/wheelchair accessibility ratings for transfers between lines
 - **Facility Information** - Elevator and accessible restroom locations mapped to platform car positions
-- **ODPT Integration** - Automatic station/railway data fetching via the Open Data for Public Transportation (ODPT) API
 
 ### Tech Stack
 
@@ -239,12 +227,6 @@ Users can visually check the locations of accessible facilities on platforms, tr
 | [pnpm](https://pnpm.io/) | v10 | Package manager |
 | [TypeScript](https://www.typescriptlang.org/) | v5 | Type-safe development |
 
-#### External API
-
-| Service | Purpose |
-|---|---|
-| [ODPT (Open Data for Public Transportation)](https://www.odpt.org/) | Railway station & line data |
-
 ### Setup
 
 #### Prerequisites
@@ -270,8 +252,8 @@ pnpm install
    | File | Contents |
    |---|---|
    | `apps/web/.env.local` | `DATABASE_URL` (pooled), `NEXT_PUBLIC_GA_ID` |
-   | `apps/admin/.env.local` | `DATABASE_URL` (pooled), `AUTH_*`, `GEMINI_API_KEY` |
-   | `apps/scripts/.env` | `DATABASE_URL` (direct), `ODPT_API_KEY` |
+   | `apps/admin/.env.local` | `DATABASE_URL` (pooled), `AUTH_*` |
+   | `apps/scripts/.env` | `DATABASE_URL` (direct) |
    | `packages/database/.env` | `DATABASE_URL` (direct) |
 
 #### Start Development Server
@@ -298,9 +280,6 @@ pnpm run db:push
 
 # 2. Seed master data
 pnpm --filter scripts seed
-
-# 3. Fetch station/line data from ODPT
-pnpm run update-odpt
 ```
 
 Platforms, trains, stop patterns, concourses, and facilities are manually entered via
@@ -315,7 +294,6 @@ pnpm run build       # Build all apps
 pnpm run lint        # Run linters
 pnpm run db:push     # Apply DB schema
 pnpm run db:studio   # Launch Drizzle Studio (DB GUI)
-pnpm run update-odpt # Fetch & update station/line data from ODPT
 ```
 
 ### Deployment and migrations
