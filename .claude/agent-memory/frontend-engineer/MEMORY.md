@@ -6,18 +6,23 @@
 - `packages/database/src/schema.ts` - 全テーブル定義の集約ファイル
 - DBクライアントは `@furatora/database/client` からインポート
 
-## 重要パターン: stationConnections テーブルの null 問題
+## 重要パターン: stationConnections の路線解決（Phase 4 で変更、旧パターンは使わない）
 
-`stationConnections` テーブルでは `connectedStationId` と `connectedRailwayId` が
-それぞれ独立して `null` になり得る（ODPT データが未解決の場合）。
+`stationConnections.connectedRailwayId` と `odptRailwayId` は Issue #56 Phase 4 で
+削除された（ODPT 同期専用の列で、ekidata 由来のインポートは書かないため）。
+**「`connectedRailwayId` で試み、失敗したら `odptRailwayId` でフォールバック」という
+旧パターンはもう存在しない。再導入しないこと。**
 
-- **Toei（都営）のデータは `connectedRailwayId` が `null` になるケースがある**
-  - `update-odpt.ts` の処理順序や ODPT データの構造上の問題が原因
-- `INNER JOIN` を使うと `null` のレコードが除外される → `LEFT JOIN` を使うこと
-- 路線名の解決は `connectedRailwayId`（DB UUID）で試み、
-  失敗した場合は `odptRailwayId` でテーブルを引いて補完するパターンが有効
+路線名の解決は `connectedStationId → stationLines → lines` の join で行う
+（ekidata は路線ごとに駅を割るため、駅が決まればほぼ1路線に定まる。実測で
+複数路線を持つ駅はごく少数。その場合は `(connectedStationId, lineName)` で
+重複除去する）。参考実装: `apps/web/src/external/query/stationDetailQuery.ts`
+の `getStationConnectionRows`。
 
-詳細: `docs/spec/` を参照 (Issue #33 修正)
+`connectedStationId` は Phase 4 で notNull 化される予定（PR2）。それまでは
+nullable だが、null 行は「未突合」ではなく単に存在しない。
+
+詳細: `docs/spec/tasks.md` Phase 4 を参照
 
 ## TypeScript テストエラーについて
 `apps/admin/src/app/api/operators/[operatorId]/route.test.ts` などのテストファイルに

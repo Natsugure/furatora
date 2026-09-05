@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "update-odpt": "tsx --env-file-if-exists=.env src/update-odpt.ts",
     "seed": "tsx --env-file-if-exists=.env src/seed-master-data.ts"
   },
   "dependencies": {

@@ -52,30 +52,3 @@ export const stationConnectionUpdateSchema = z.object({
   notesAboutStroller: z.string().nullable().optional(),
   notesAboutWheelchair: z.string().nullable().optional(),
 });
-
-export const unresolvedRailwaySchema = z.object({
-  odptRailwayId: z.string().min(1),
-  name: z.string().min(1),
-  nameEn: z.string().nullable().optional(),
-  operatorId: z.string().uuid(),
-  lineCode: z.string().nullable().optional(),
-  color: z.string().nullable().optional(),
-});
-
-export const unresolvedStationSchema = z
-  .discriminatedUnion('action', [
-    z.object({
-      action: z.literal('create'),
-      odptStationId: z.string().min(1),
-      name: z.string().min(1),
-      nameEn: z.string().nullable().optional(),
-      code: z.string().nullable().optional(),
-      operatorId: z.string().uuid(),
-      lineId: z.string().uuid().optional(),
-    }),
-    z.object({
-      action: z.literal('link'),
-      odptStationId: z.string().min(1),
-      stationId: z.string().uuid(),
-    }),
-  ]);

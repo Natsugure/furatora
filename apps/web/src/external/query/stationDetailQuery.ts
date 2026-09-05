@@ -30,6 +30,9 @@ import type {
 // apps/admin/src/external/query/stopPatternPageQuery.ts のスタイルを踏襲する。
 // decimal → number の変換はすべてここで完結させる（DTOより上に string を渡さない）。
 
+// connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列であり、ekidata 由来の
+// インポートは書かない）。ekidata は路線ごとに駅を割るモデルであり、接続先の駅が決まれば
+// stationLines 経由で路線が一意に定まる（実測: 駅あたり1路線が10,629駅、2路線が5駅のみ）。
 async function getStationConnectionRows(stationId: string) {
   return db
     .select({
@@ -42,30 +45,44 @@ async function getStationConnectionRows(stationId: string) {
       notesAboutWheelchair: stationConnections.notesAboutWheelchair,
     })
     .from(stationConnections)
-    .innerJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
+    .innerJoin(stationLines, eq(stationLines.stationId, stationConnections.connectedStationId))
+    .innerJoin(lines, eq(lines.id, stationLines.lineId))
     .where(eq(stationConnections.stationId, stationId));
 }
 
 function buildTransferConnections(
   rows: Awaited<ReturnType<typeof getStationConnectionRows>>,
 ): TransferConnectionDTO[] {
-  return rows
-    .filter((r) => r.strollerDifficulty !== null || r.wheelchairDifficulty !== null)
-    .map((r) => ({
+  // 2路線を持つ駅（実測5件）は connectedStationId ごとに複数行になるため、
+  // 同一路線の重複を除いてから DTO 化する
+  const seen = new Set<string>();
+  const result: TransferConnectionDTO[] = [];
+  for (const r of rows) {
+    if (r.strollerDifficulty === null && r.wheelchairDifficulty === null) continue;
+    const key = `${r.connectedStationId}:${r.lineName}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({
       lineName: r.lineName,
       lineColor: r.lineColor,
       strollerDifficulty: r.strollerDifficulty,
       wheelchairDifficulty: r.wheelchairDifficulty,
       notesAboutStroller: r.notesAboutStroller,
       notesAboutWheelchair: r.notesAboutWheelchair,
-    }));
+    });
+  }
+  return result;
 }
 
 // connectedStationId ごとの乗換路線名・色（facilityConnections のラベル付けに使う）
 function buildLinesByStation(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
   const map = new Map<string, { names: string[]; colors: (string | null)[] }>();
+  const seen = new Set<string>();
   for (const row of rows) {
     if (!row.connectedStationId) continue;
+    const key = `${row.connectedStationId}:${row.lineName}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     if (!map.has(row.connectedStationId)) map.set(row.connectedStationId, { names: [], colors: [] });
     const entry = map.get(row.connectedStationId)!;
     entry.names.push(row.lineName);

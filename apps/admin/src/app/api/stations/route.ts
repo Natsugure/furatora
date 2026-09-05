@@ -30,6 +30,9 @@ export async function GET(request: Request) {
     }
 
     if (connectedFromStationId) {
+      // connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列）。
+      // 路線は stationLines 経由で解決する（ekidata は路線ごとに駅を割るため、
+      // 駅が決まればほぼ1路線に定まる。実測で複数路線を持つ駅は5件のみ）
       const result = await db
         .select({
           id: stations.id,
@@ -37,11 +40,11 @@ export async function GET(request: Request) {
           code: stations.code,
           lineId: lines.id,
           lineName: lines.name,
-          odptRailwayId: stationConnections.odptRailwayId,
         })
         .from(stationConnections)
         .innerJoin(stations, eq(stationConnections.connectedStationId, stations.id))
-        .leftJoin(lines, eq(stationConnections.connectedRailwayId, lines.id))
+        .leftJoin(stationLines, eq(stationLines.stationId, stations.id))
+        .leftJoin(lines, eq(lines.id, stationLines.lineId))
         .where(and(
           eq(stationConnections.stationId, connectedFromStationId),
           isNotNull(stationConnections.connectedStationId),
