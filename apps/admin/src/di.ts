@@ -5,6 +5,8 @@ import { dbStopPatternRepository } from '@/external/repository/stopPatternReposi
 import { dbStopPatternPageQuery } from '@/external/query/stopPatternPageQuery';
 import { dbMasterImportRepository } from '@/external/repository/masterImportRepository';
 import { dbMasterMigrationRepository } from '@/external/repository/masterMigrationRepository';
+import { dbStationPublishingRepository } from '@/external/repository/stationPublishingRepository';
+import { dbStationPublishingPageQuery } from '@/external/query/stationPublishingPageQuery';
 import { ekidataCsvSource } from '@/external/ekidata/ekidataCsvParser';
 import { makePlanImport } from '@/features/master-import/usecases/planImport';
 import { makeApplyImport } from '@/features/master-import/usecases/applyImport';
@@ -15,6 +17,8 @@ export const platformRepository = dbPlatformRepository;
 export const platformLocationRepository = dbPlatformLocationRepository;
 export const stopPatternRepository = dbStopPatternRepository;
 export const stopPatternPageQuery = dbStopPatternPageQuery;
+export const stationPublishingRepository = dbStationPublishingRepository;
+export const stationPublishingPageQuery = dbStationPublishingPageQuery;
 
 // ekidata マスタ取り込み。CSV 形式の知識も external/ にあるため、
 // usecase からは port 越しにしか触らせない（ADR-0002）
