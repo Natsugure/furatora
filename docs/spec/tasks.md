@@ -14,7 +14,7 @@ Phase 0: docs/spec・ADR更新                      (完了)
 Phase 1: スキーマ変更 + トランザクション規模の計測  (完了・未知は解消)
 Phase 2: インポート機構                           (完了)
 Phase 3: 突合と publishedAt バックフィル           (完了・Phase 2 に依存)
-Phase 4: ODPT 後始末                             (Phase 3 完了後)
+Phase 4: ODPT 後始末                             (PR1 実装済み・PR2 未着手)
 Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
 Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
 Phase 6: 検証・振り返り                            (必須)
@@ -54,7 +54,7 @@ Phase 5 に**現行バージョンのバグ修正**（TASK-5.0）が入る。可
 |---|---|---|
 | 1（Phase 3） | `0005` バックフィル + 突合UI | `displayPriority` で判定。**挙動は変わらない** |
 | 2（Phase 5） | TASK-5.0: 可視性を `publishedAt` の単一述語へ | `displayPriority` を読むコードが消える |
-| 3（Phase 5b） | `0006`: `NOT NULL DEFAULT 0` | 読み手がいないので安全 |
+| 3（Phase 5b） | `0007`: `NOT NULL DEFAULT 0` | 読み手がいないので安全 |
 
 バックフィルが「移行前に非表示だった事業者」を `displayPriority IS NULL` で
 判別する点は初版のまま変わらない。**先に埋めてはならない**という制約は、
@@ -677,30 +677,84 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 
 ---
 
-## Phase 4: ODPT 後始末
+## Phase 4: ODPT 後始末（PR1 実装済み・未マージ / PR2 未着手 — 2026-09-05）
 
-### TASK-4.1: 一意制約の張り替え
-- **依存**: Phase 3 完了
-- **内容**: `uniqueStationPerOperator` / `uniqueRailwayPerOperator` を削除。
-  `ekidataStationCd` / `ekidataLineCd` / `ekidataCompanyCd` の unique は Phase 1 で付与済み
-- **注意**: `ekidata*Cd` は **nullable のまま**とする（未突合行が残るため。
+**実行順序を初版から変更した。** ADR-0008 / CLAUDE.md 禁止事項により
+`DROP COLUMN` / `DROP TABLE` / `NOT NULL` 化は二段階デプロイが必須であるため、
+**PR1（コードから ODPT 依存を外す）→ PR2（マイグレーション）** の2PRに分けた。
+また着手時点で実害が2件見つかっており、Phase 4 の中で修復した。
+
+#### 着手前に見つかった実害2件
+
+1. **`update-odpt` の cron が本番DBに対して生きていた。** `.github/workflows/update-odpt.yml`
+   が毎日 03:00 UTC に本番 `DATABASE_URL` に対して `update-odpt.ts` を実行する設定のままで、
+   ODPT 側のデータが更新された日に発火すると `stationLines` / `stationConnections` を
+   事業者単位で全削除して ODPT 版で作り直し、移行済み481駅・62路線の `slug` / `name` を
+   ODPT 表記に戻す。ekidata の乗換接続6,946行も破壊される。無害だったのは
+   `odpt_metadata` のハッシュが一致して早期 return していたために過ぎない
+2. **公開サイトの乗換情報が全滅していた。** `apps/web` の乗換クエリが
+   `stationConnections.connectedRailwayId` に innerJoin していたが、TASK-2.8 の
+   `INSERT ... SELECT` はこの列を書かない。本番6,946行すべてで NULL のため
+   join が0行を返し、`transferConnections` も `facilityConnections` の路線ラベルも
+   出ていなかった
+
+### PR1: コードから ODPT 依存を外す（`feature/issue56-phase4-odpt-cleanup`）
+
+- **TASK-4.4a: ODPT 同期機構の削除**（**最優先で実施**）
+  - `apps/scripts/src/update-odpt.ts`（396行）、`.github/workflows/update-odpt.yml`、
+    ルート `package.json` と `apps/scripts/package.json` の `update-odpt` スクリプトを削除
+  - `stations.odptStationId` / `lines.odptRailwayId` / `operators.odptOperatorId` の
+    **列は残す**（ADR-0007 決定3）。消すのは同期機構だけ
+  - この削除は TASK-4.1（一意制約の削除）より**先でなければならない**。
+    `update-odpt.ts` の `ON CONFLICT` が `uniqueStationPerOperator` /
+    `uniqueRailwayPerOperator` を衝突対象にしており、制約が先に消えると
+    実行時 42P10 になるため
+- **TASK-4.2a: `apps/web` の乗換 join を張り替える（実害2の修復）**
+  - `stationDetailQuery.ts` の `connectedRailwayId` innerJoin を、
+    `connectedStationId → stationLines → lines` 経由に張り替えた
+    （ekidata は路線ごとに駅を割るため、駅が決まればほぼ1路線に定まる。
+    実測で複数路線を持つ駅は5件のみ。この5件は `(connectedStationId, lineName)` で
+    重複除去して吸収する）
+  - TASK-5.0（可視性述語の一元化）はここでは行わない。join の張り替えのみ
+- **TASK-4.2b: `apps/admin` の `stationConnections` ODPT 列参照を除去**
+  - `apps/api/stations/route.ts` の `connectedFrom` 分岐、
+    `stations/[stationId]/edit/page.tsx`、`FacilityForm.tsx` を同様に
+    `stationLines` 経由の解決へ張り替え
+  - **`apps/admin/src/components/ConnectionsEditSection.tsx` は削除した**
+    （どこからも import されていない死んだコンポーネントだったため、
+    修正ではなく削除を選んだ）
+- **TASK-4.3a: `/unresolved-connections` 一式を削除**。この機能は
+  `stationConnections` の ODPT 4列の上にのみ成立しており、本番では全6,946行が
+  NULL のため**着手前から常に空を返す死んだ機能**だった。実害なく削除できた。
+  対象: `app/unresolved-connections/`（556行）、`app/api/unresolved-connections/`
+  （3 route）、`RailwayBulkSuggestModal.tsx` / `StationBulkSuggestModal.tsx`、
+  `actions/gemini.ts`（唯一の呼び出し元がこの機能だった）、
+  `validations.ts` の `unresolvedRailwaySchema` / `unresolvedStationSchema`、
+  `Sidebar.tsx` の導線、`eslint.config.mjs` の除外リスト。
+  ekidata は CSV に名前を持つため Gemini 名前推測も不要になり、`GEMINI_API_KEY` を
+  `turbo.json` / README から削除した（`.env.example` は権限設定によりこのセッションから
+  編集できず未対応。手動での削除が必要）
+- **TASK-4.4b: ドキュメントの追随**。README（日英）から ODPT 連携の記述・
+  `ODPT_API_KEY`・`pnpm run update-odpt` を削除
+
+> **元 TASK-5.3（`unresolved-connections` の ekidata 未突合解決UIへの転生）は成立しなくなった。**
+> 転生元の実装を Phase 4 で削除したため、TASK-5.3 は「`features/` 配下に新規UIを作成する」
+> に読み替える。解決対象は路線3件・駅4件のまま変わらない
+
+### PR2: マイグレーション（`feature/issue56-phase4-migration`）
+
+**PR1 が main にマージされ、本番デプロイが完了してから着手する。**
+
+- **TASK-4.1: 一意制約の削除**。`uniqueStationPerOperator` / `uniqueRailwayPerOperator` を
+  削除。`ekidataStationCd` / `ekidataLineCd` / `ekidataCompanyCd` の unique は Phase 1 で
+  付与済み。**注意**: `ekidata*Cd` は **nullable のまま**とする（未突合行が残るため。
   requirements.md C-3）
-
-### TASK-4.2: `stationConnections` の ODPT 列を削除
-- **依存**: TASK-4.1
-- **内容**: `odptStationId` / `odptRailwayId` / `connectedRailwayId` を削除し、
-  `connectedStationId` を notNull 化
-
-### TASK-4.3: `odptMetadata` テーブルを削除
-- **依存**: TASK-4.2
-
-### TASK-4.4: ODPT 同期機構の削除
-- **依存**: TASK-4.3
-- **内容**: `apps/scripts/src/update-odpt.ts`（396行）、
-  ルート `package.json` の `update-odpt` スクリプト、
-  `.github/workflows/update-odpt.yml` を削除
-- **注意**: `odptStationId` / `odptRailwayId` / `odptOperatorId` の**列は残す**
-  （ADR-0007 決定3）。消すのは同期機構だけである
+- **TASK-4.2: `stationConnections` の ODPT 列を削除**。`odptStationId` /
+  `odptRailwayId` / `connectedRailwayId` を削除し、`connectedStationId` を notNull 化
+  （main / development ともに NULL 行 0件を実測済み）
+- **TASK-4.3: `odptMetadata` テーブルを削除**
+- マイグレーション番号は **`0006`**。Phase 5b（旧 TASK-3.8、`displayPriority` の
+  NOT NULL 化）はこれより後に生成されるため、そちらの番号は `0007` 以降に読み替える
 
 ---
 
@@ -786,15 +840,17 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   必須にすると機械ローマ字を貼る圧力が生じ、公式表記のみを入れる方針が崩れる
 - **期待結果**: 誤変換の約3%が公開時に人の目を通る
 
-### TASK-5.3: `unresolved-connections` を ekidata 未突合解決UIへ転生
+### TASK-5.3: ekidata 未突合解決UIを新規作成
 - **依存**: Phase 4
-- **対象**: `apps/admin/src/app/unresolved-connections/`（556行）と
-  `app/api/unresolved-connections/*`
-- **内容**: 検索キーを ODPT ID から ekidata コードへ差し替える。
-  `ekidata*Cd` が NULL の行を一覧し、手動で `station_cd` を割り当てられるようにする
-- **期待結果**: Phase 3 で残った15件が画面から解決できる
-- **注意**: [ADR-0001](../adr/0001-layer-structure.md) の4層に沿って
-  `features/` へ移す（現在は `app/` に556行が直書きされている）
+- **初版からの変更**: 当初は既存の `unresolved-connections`（556行）を
+  「転生」させる計画だったが、転生元は ODPT ID をキーにした画面であり、
+  ODPT 由来の実装だったため Phase 4（TASK-4.3a）で削除した。
+  現時点で `features/` 配下への**新規作成**として作り直す
+- **対象**: `apps/admin/src/features/`（[ADR-0001](../adr/0001-layer-structure.md)
+  の4層に沿って作成する）
+- **内容**: `ekidata*Cd` が NULL の行を一覧し、手動で `station_cd` / `line_cd` を
+  割り当てられるようにする
+- **期待結果**: Phase 3 で残った未突合（路線3件・駅4件）が画面から解決できる
 
 ---
 

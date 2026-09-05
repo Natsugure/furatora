@@ -24,7 +24,6 @@ type ConnectedStation = {
   code: string | null;
   lineId: string | null;
   lineName: string | null;
-  odptRailwayId: string | null;
 }
 
 type Direction = {
@@ -432,7 +431,7 @@ export function FacilityForm({ stationId, initialData, isEdit = false }: Props) 
               const stationPlatforms = connectedStationPlatforms[row.stationId] ?? [];
               const stationDirections = connectedStationDirections[row.stationId] ?? [];
               const lineLabel = station
-                ? (station.lineName ?? station.odptRailwayId?.replace('odpt.Railway:', '') ?? '(路線不明)')
+                ? (station.lineName ?? '(路線不明)')
                 : '(読込中)';
               const stationLabel = station ? station.name : row.stationId;
               return (

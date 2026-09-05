@@ -27,7 +27,6 @@
 - `pnpm run db:generate`: マイグレーションファイルを生成
 - `pnpm run db:migrate`: マイグレーションを実行。**Vercelのビルドが自動実行するため、手で本番に流さない**
 - `pnpm run db:studio`: Drizzle Studioを起動してDBを確認
-- `pnpm run update-odpt`: ODPTデータを更新
 
 ## 禁止事項
 - console.logのコミット

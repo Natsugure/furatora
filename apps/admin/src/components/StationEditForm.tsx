@@ -17,8 +17,6 @@ export type ConnectionRow = {
   id: string;
   connectedStationName: string | null;
   connectedLineName: string | null;
-  odptStationId: string | null;
-  odptRailwayId: string | null;
   strollerDifficulty: StrollerDifficulty | null;
   wheelchairDifficulty: WheelchairDifficulty | null;
   notesAboutStroller: string | null;
@@ -55,9 +53,7 @@ function displayName(conn: ConnectionRow): string {
   }
   if (conn.connectedLineName) return conn.connectedLineName;
   if (conn.connectedStationName) return conn.connectedStationName;
-  const railway = conn.odptRailwayId?.replace('odpt.Railway:', '') ?? '';
-  const station = conn.odptStationId?.replace('odpt.Station:', '') ?? '';
-  return station || railway || '(不明)';
+  return '(不明)';
 }
 
 const strollerOptions = [

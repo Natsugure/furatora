@@ -11,7 +11,6 @@ const navItems = [
   { href: '/stations', label: '駅' },
   { href: '/lines', label: '路線' },
   { href: '/operators', label: '事業者' },
-  { href: '/unresolved-connections', label: '未解決接続' },
   { href: '/master-migration', label: 'マスタ突合' },
   { href: '/master-import', label: 'マスタ取込' },
 ];

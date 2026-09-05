@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
-import { stations, stationConnections, lines } from '@furatora/database/schema';
+import { stations, stationConnections, stationLines, lines } from '@furatora/database/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { Title, Text } from '@mantine/core';
 import { StationEditForm, type ConnectionRow } from '@/components/StationEditForm';
@@ -19,10 +19,7 @@ export default async function StationEditPage({ params }: Props) {
   const connectionRows = await db
     .select({
       id: stationConnections.id,
-      odptStationId: stationConnections.odptStationId,
-      odptRailwayId: stationConnections.odptRailwayId,
       connectedStationId: stationConnections.connectedStationId,
-      connectedRailwayId: stationConnections.connectedRailwayId,
       strollerDifficulty: stationConnections.strollerDifficulty,
       wheelchairDifficulty: stationConnections.wheelchairDifficulty,
       notesAboutStroller: stationConnections.notesAboutStroller,
@@ -34,41 +31,34 @@ export default async function StationEditPage({ params }: Props) {
   const connectedStationIds = connectionRows
     .map((c) => c.connectedStationId)
     .filter((id): id is string => id !== null);
-  const connectedRailwayIds = connectionRows
-    .map((c) => c.connectedRailwayId)
-    .filter((id): id is string => id !== null);
-  const unresolvedOdptRailwayIds = connectionRows
-    .filter((c) => c.connectedRailwayId === null && c.odptRailwayId !== null)
-    .map((c) => c.odptRailwayId as string);
 
-  const [connectedStationList, connectedLineList, unresolvedLineList] = await Promise.all([
+  // connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列）。
+  // 路線名は stationLines 経由で解決する（駅が決まればほぼ1路線に定まる）
+  const [connectedStationList, connectedLineRows] = await Promise.all([
     connectedStationIds.length > 0
       ? db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, connectedStationIds))
       : Promise.resolve([]),
-    connectedRailwayIds.length > 0
-      ? db.select({ id: lines.id, name: lines.name }).from(lines).where(inArray(lines.id, connectedRailwayIds))
-      : Promise.resolve([]),
-    unresolvedOdptRailwayIds.length > 0
-      ? db.select({ odptRailwayId: lines.odptRailwayId, name: lines.name }).from(lines).where(inArray(lines.odptRailwayId, unresolvedOdptRailwayIds))
+    connectedStationIds.length > 0
+      ? db
+          .select({ stationId: stationLines.stationId, lineName: lines.name })
+          .from(stationLines)
+          .innerJoin(lines, eq(lines.id, stationLines.lineId))
+          .where(inArray(stationLines.stationId, connectedStationIds))
       : Promise.resolve([]),
   ]);
 
   const stationNameMap = Object.fromEntries(connectedStationList.map((s) => [s.id, s.name]));
-  const lineNameByIdMap = Object.fromEntries(connectedLineList.map((l) => [l.id, l.name]));
-  const lineNameByOdptIdMap = Object.fromEntries(
-    unresolvedLineList
-      .filter((l): l is { odptRailwayId: string; name: string } => l.odptRailwayId !== null)
-      .map((l) => [l.odptRailwayId, l.name])
-  );
+  const lineNameByStationIdMap = new Map<string, string>();
+  for (const row of connectedLineRows) {
+    if (!lineNameByStationIdMap.has(row.stationId)) {
+      lineNameByStationIdMap.set(row.stationId, row.lineName);
+    }
+  }
 
   const connections: ConnectionRow[] = connectionRows.map((c) => ({
     id: c.id,
     connectedStationName: c.connectedStationId ? (stationNameMap[c.connectedStationId] ?? null) : null,
-    connectedLineName: c.connectedRailwayId
-      ? (lineNameByIdMap[c.connectedRailwayId] ?? null)
-      : (c.odptRailwayId ? (lineNameByOdptIdMap[c.odptRailwayId] ?? null) : null),
-    odptStationId: c.odptStationId,
-    odptRailwayId: c.odptRailwayId,
+    connectedLineName: c.connectedStationId ? (lineNameByStationIdMap.get(c.connectedStationId) ?? null) : null,
     strollerDifficulty: c.strollerDifficulty,
     wheelchairDifficulty: c.wheelchairDifficulty,
     notesAboutStroller: c.notesAboutStroller,
