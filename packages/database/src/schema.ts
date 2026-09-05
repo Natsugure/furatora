@@ -34,7 +34,7 @@ export const stations = pgTable('stations', {
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-}, (t) => [
+}, () => [
     // 公開されている駅は必ず slug を持つ。URL を持てない駅が公開状態になるのを防ぐ
     check('published_requires_slug', sql`published_at IS NULL OR slug IS NOT NULL`),
 ]);
