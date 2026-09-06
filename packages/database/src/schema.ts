@@ -99,8 +99,9 @@ export const stationConnections = pgTable('station_connections', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-  // 【(stationId, connectedStationId) は1行しか持たない】管理者が手で追加する
-  // 乗換接続はこの制約を衝突対象にして冪等に upsert する。無いと同じ組が重複する
+  // 【(stationId, connectedStationId) は1行しか持たない】無いと同じ組が重複する。
+  // 現時点でこのテーブルへ INSERT するコードは無い（作成 API / UI は Issue #88）。
+  // 追加するときは、この制約を衝突対象にして冪等な upsert にすること
   unique('unique_station_connection').on(t.stationId, t.connectedStationId),
 ]);
 

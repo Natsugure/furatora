@@ -6,14 +6,17 @@
 > 隣接10,040 / 乗換接続6,946）。`packages/database/src/schema.ts` と一致する。
 > CSV の取込・突合を行った Admin の機構（`master-import` / `master-migration`）は
 > **投入完了後に削除済み**（[ADR-0007](../adr/0007-station-master-data-source.md) 決定4 / Issue #56）。
-> 以後の維持は Admin での手動編集が主経路になる。経緯と却下案は
+> 以後の維持は Admin での手動編集が主経路になる。ただし**現時点の Admin は
+> 既存行の更新しかできず、駅・路線・乗換接続・隣接を新規作成する UI / API は無い**
+> （[Issue #88](https://github.com/Natsugure/furatora/issues/88)）。経緯と却下案は
 > [ADR-0007](../adr/0007-station-master-data-source.md)。
 
 ## データ源
 
 - **駅・路線・事業者のマスタは ekidata 会員版CSV（`company` / `line` / `station` / `join`）を初回シードとして投入した。**
 - **ekidata は初回シードである。継続同期はしない**（[ADR-0007](../adr/0007-station-master-data-source.md) 決定1・決定4）。
-  投入後の維持は Admin での手動編集が主経路になる。取込・突合の機構は
+  投入後の維持は Admin での手動編集が主経路になる（新規作成手段の欠落は
+  [Issue #88](https://github.com/Natsugure/furatora/issues/88)）。取込・突合の機構は
   投入完了後に削除済み（Issue #56）。定期再取込の機構
   （旧 `update-odpt.ts` に相当するもの）も設けない。理由は、運行系統粒度で
   付けた案内名（例: `常磐線快速`）や手入力した `slug` / `nameEn` を
@@ -104,7 +107,8 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
   **`unique_station_adjacency`（`lineId, stationAId, stationBId`）は逆向きペアを別行として
   通す**ため、DB 制約は逆向き重複を防げない。昇順正規化は**書き込み側が守る規約**であり、
   現時点でそれを担保するコードは存在しない（初回シードの実装は投入完了後に削除済み）。
-  次に `stationAdjacencies` へ書き込むコードを追加するときは、この正規化を実装すること。
+  次に `stationAdjacencies` へ書き込むコードを追加するときは、この正規化を実装すること
+  （作成 API / UI は [Issue #88](https://github.com/Natsugure/furatora/issues/88)）。
 
 ## 乗換接続（`stationConnections`）
 
@@ -115,14 +119,21 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
 | `NULL` | ODPT 時代の行。初回シードの突合時に、難易度・メモがすべて NULL の行だけ削除した |
 
 `station_g_cd` は同一構内の乗り換えしか捉えない。地下通路や連絡改札で繋がる
-別グループ間の乗り換えは、`source = 'manual'` で個別に足す。
+別グループ間の乗り換えは、`source = 'manual'` で個別に足す設計である。
+ただし**現時点で行を追加する手段は無い**。Admin にあるのは既存行を更新する
+`PUT /api/station-connections/[connectionId]` だけで、作成 API / UI は
+[Issue #88](https://github.com/Natsugure/furatora/issues/88)。追加時は
+`unique_station_connection` を衝突対象にした冪等な upsert にすること。
 再取込の機構は無いため、この3区分は現在は**由来の記録**として働く。
 
 ## 駅名の正規化ルール
 
 初回シードの突合（ODPT 由来の既存行と ekidata の駅の対応づけ）で使った正規化キー。
-**正規化した値は保存しない。** 重複検出など、駅名の同一性を機械的に判定する
-場面で同じ規則を使う。
+**正規化した値は保存しない。**
+**この規則を実装したコードは現在リポジトリに存在しない。** 初回シードの実装
+（`features/master-import/domain/normalize.ts`）は投入完了後に削除済み（Issue #56）。
+重複検出など、駅名の同一性を機械的に判定する処理を次に実装するときは、
+以下の規則に従うこと。
 
 - 括弧とその中身を落とす（`押上〈スカイツリー前〉` = `押上（スカイツリー前）`）。半角丸括弧も対象。
 - `ヶ` を `ケ` に寄せる（`市ケ谷` / `市ヶ谷`）。
