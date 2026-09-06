@@ -18,7 +18,7 @@ Phase 4: ODPT 後始末                             (PR1・PR2 とも本番デ�
 Phase 5: 公開ガードと Admin UI                     (完了・現行バグの修正を含む)
 Phase 5b: displayPriority の NOT NULL 化           (完了 2026-09-06・PR #79/#80 で本番反映)
 Phase 6: 検証・振り返り                            (完了 2026-09-06)
-Phase 7: 移行機構の削除                            (前提充足・未実施・ADR-0007 決定4)
+Phase 7: 移行機構の削除                            (完了 2026-09-06・ADR-0007 決定4)
 ```
 
 ### 実行順序の根拠
@@ -1157,8 +1157,7 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   - 決定1（ekidata 初回シード・以後手動維持）: ✅ 本番投入済み
   - 決定2（経路探索の方式選定は保留）: 保留のまま。Issue #56 本体で扱う
   - 決定3（ODPT ID の列を参照キーとして残す）: ✅ 列は残置、同期機構は Phase 4 で削除済み
-  - 決定4（移行機構ごと削除）: **未実施。Phase 7 で行う**（本番投入の完了が前提。
-    その前提は満たされたため Phase 7 は実行可能）
+  - 決定4（移行機構ごと削除）: ✅ Phase 7 で実施済み（2026-09-06）
 
 ### TASK-6.4: 後続Issue の起票
 - **状態**: ✅ 完了 (2026-09-06)
@@ -1197,7 +1196,7 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 
 ---
 
-## Phase 7: 移行機構の削除（本番投入の完了後）
+## Phase 7: 移行機構の削除（完了 2026-09-06）
 
 > **依存**: 本番（`main`）への投入が完了し、結果が確認されていること。
 > 根拠は [ADR-0007](../adr/0007-station-master-data-source.md) 決定4。
@@ -1207,19 +1206,68 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 >
 > **前提の充足状況（2026-09-06）**: 本番投入は完了済み（[SQL] 事業者162 / 路線602 /
 > 駅10,625 / 未突合0 / 公開駅334）。突合・取込・公開ガード・`displayPriority` 純化まで
-> 本番で検証済み（Phase 3〜6）。**Phase 7 は実行可能な状態にある。**
-> 本Issue（#56 Phase 6）のスコープ外のため、実行は別途行う。
+> 本番で検証済み（Phase 3〜6）。
+
+**結果**: `master-import` / `master-migration` の機構（約5,720行・テスト127件）を
+削除した。`ekidata*Cd` 列・`unique` 制約・`stationGroups` / `stationAdjacencies`・
+マイグレーションファイルは由来の記録として残置。削除で古くなる schema コメントと
+`docs/domain/station-master-model.md` を上書き更新した。
+
+### TASK-7.0: `development` ブランチを `main` から作り直す
+- **状態**: ✅ 完了 (2026-09-06)。開発者が実行
+- **背景**: `development` は Phase 1 以降の移行を受けておらず（駅481 / 公開0 /
+  マイグレーション `0003` 止まり）、移行機構を消すと突合・取込で作り直す経路が
+  なくなる。`main` は投入済みのため、削除前に `main` から作り直す
+- **実行**: `neonctl branches reset development --project-id patient-meadow-13439419 --parent`
+  （ブランチID `br-tiny-shape-a1wkfnzx` と接続文字列を保つため delete+create ではなく reset）
+- **確認（reset 後・開発者実測）**: 駅 10,625 / 未突合 0 / 公開駅 334 /
+  最終マイグレーション `0008`。期待値と一致
+- **失われたもの**: `development` にしか無かった開発用の手入力
+  （`station_facilities` 14件・`train_stop_patterns` 4件ほか）は `main` の値に置き換わった
 
 ### TASK-7.1: `master-import` / `master-migration` を削除
-- **対象**:
-  - `apps/admin/src/features/{master-import,master-migration}/`
-  - `apps/admin/src/external/ekidata/`、
-    同 `external/repository/{masterImportRepository,masterMigrationRepository}.ts`
+- **状態**: ✅ 完了 (2026-09-06)
+- **削除したファイル**（ディレクトリごと）:
+  - `apps/admin/src/features/master-import/`（12ファイル）
+  - `apps/admin/src/features/master-migration/`（10ファイル）
+  - `apps/admin/src/external/ekidata/`（4ファイル）
   - `apps/admin/src/app/{master-import,master-migration}/`、
     同 `app/api/{master-import,master-migration}/`
-  - `di.ts` の配線、`Sidebar.tsx` の導線
+  - `apps/admin/src/external/repository/{masterImportRepository,masterMigrationRepository}.ts`
+- **編集した2ファイル**:
+  - `di.ts` — import 7行と `planImport` / `applyImport` / `planMigration` /
+    `applyMigration` の export 4件を削除。残る6 export は不変
+  - `components/Sidebar.tsx` — `navItems` から「マスタ突合」「マスタ取込」の2エントリを削除
 - **理由**: 一度きりの操作のために恒久的な画面を残すと、**再実行によって
   手動で確定した表記が黙って上書きされる経路が常設される**。
   Phase 4 で `update-odpt.ts` を削除するのと同じ扱いである
-- **残すもの**: `ekidata*Cd` の列と `unique` 制約（ADR-0007 決定3）。
+- **残したもの**: `ekidata*Cd` の列と `unique` 制約、`StationConnectionSource` の
+  `'ekidata_group'`、`stationGroups` / `stationAdjacencies` テーブル、
+  マイグレーション `0004`〜`0008`（ADR-0007 決定3）。
+  `station-publishing/domain/romaji.ts` も残す（公開操作で使用中）。
   **削除するのは機構であって、由来の記録ではない**
+
+### TASK-7.2: 削除で古くなる記述の更新
+- **状態**: ✅ 完了 (2026-09-06)
+- **`packages/database/src/schema.ts`**（4箇所）: `ekidataStationCd` / `ekidataLineCd` /
+  `stationConnections.source` / `unique_station_connection` / `stationAdjacencies` の
+  コメントから、消えた機構（`features/master-import` / `TASK-2.8` / `requirements.md C-3`）
+  への参照を外し、制約そのものの不変条件として書き直した。参照先は ADR-0007 決定3 と
+  `docs/domain/station-master-model.md`
+- **`packages/database/src/enums.ts`**: `StationConnectionSource` のコメントを
+  「インポートは 'manual' の行に触れない」→「初回シードで機械生成した行と手動追加行の区別」へ
+- **`docs/domain/station-master-model.md`**（上書き）: 適用状況に機構削除を明記、
+  「乗換接続」表の `ekidata_group` / `NULL` 行を由来の記録として書き直し、
+  「駅名の正規化」節から実在しない `normalize.ts` パス参照を除去（規則本文は保持）
+- **ADR-0007 は本文不変**（`.claude/rules/adr.md`）。ステータスは既に `Accepted`
+
+### TASK-7.3: 検証
+- **状態**: ✅ 完了 (2026-09-06)
+- `pnpm --filter @furatora/admin exec tsc --noEmit` → エラー0
+- `pnpm --filter @furatora/admin run lint` → エラー0（既存の warning 9件のみ、対象外ファイル）
+- `pnpm run test` → admin 268 / frontend 167、全 green（admin は移行機構削除で約395→268）
+- `pnpm --filter @furatora/admin run build` / 同 `@furatora/frontend` → 両方成功。
+  ビルド後の `app-paths-manifest.json` に `/master-import` `/master-migration`
+  （API 含む）が存在しないことを確認
+- frontend のテスト数が 167 のまま不変であることで、`apps/web` からの隠れ依存が
+  無かったことを確認

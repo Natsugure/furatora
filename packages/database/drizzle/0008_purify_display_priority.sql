@@ -1,4 +1,5 @@
--- TASK-5b.1: operators.display_priority を表示順専用に純化する（Issue #56 / docs/spec/tasks.md Phase 5b）
+-- operators.display_priority を表示順専用に純化する
+-- （Issue #56 / ADR-0007 / docs/domain/station-visibility.md）
 --
 -- 【背景】この列はかつて「数字=表示順 / NULL=非表示」の二役を担っていた。
 -- 可視性の判定は 0005 のバックフィルと TASK-5.0（可視性述語を stations.published_at へ

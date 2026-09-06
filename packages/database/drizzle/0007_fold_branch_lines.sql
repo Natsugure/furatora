@@ -1,4 +1,4 @@
--- TASK-5.4: 分岐線を本線に畳む（Issue #56 / docs/spec/tasks.md Phase 5）
+-- 分岐線を本線に畳む（Issue #56 / ADR-0007 / docs/domain/station-master-model.md「路線概念の3分類」）
 --
 -- 【背景】Phase 3 の突合で、3路線・4駅が ekidata に対応行を持たないまま残った。
 -- 原因は furatora の路線×駅粒度（暫定。stations 冒頭コメント参照）が ekidata より
@@ -88,7 +88,8 @@ WHERE "slug" IN (
 );
 
 -- 6. 残存駅の slug を本線基準に付け替える
---    slug の導出規則は `${lines.slug}-${hepburn(nameKana)}`（design.md「slug の導出」）。
+--    slug の導出規則は `${lines.slug}-${hepburn(nameKana)}`
+--    （docs/domain/station-master-model.md「slug の導出規則」）。
 --    所属路線が本線1本だけになったため、分岐線由来の slug のままでは規則と食い違う。
 --    公開中の3駅（中野新橋・中野富士見町・方南町）は URL が変わる。リダイレクトは設けない
 --    （設備データが未入力で影響が小さいため。旧URLは404になる）。

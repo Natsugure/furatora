@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 // slug は stations.slug と同じ制約（varchar(100)）。URL識別子であり
-// 公式表記の正しさは問わない（design.md「nameEn と分離する」）。
+// 公式表記の正しさは問わない（slug と nameEn は別物。
+// docs/domain/station-master-model.md「slug の導出規則」「nameEn」）。
 // 英小文字・数字の区間をハイフン1個で繋ぐ形のみ許可する。
 // 先頭・末尾のハイフン、連続ハイフン、ハイフンのみの文字列は
 // 不正な公開 URL になるため弾く（buildSlugCandidate の出力はこの形を満たす）。

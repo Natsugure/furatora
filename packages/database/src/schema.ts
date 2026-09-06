@@ -22,7 +22,10 @@ export const stations = pgTable('stations', {
   lat: decimal('lat', { precision: 9, scale: 6 }),
   lon: decimal('lon', { precision: 9, scale: 6 }),
   operatorId: uuid('operator_id').references(() => operators.id).notNull(),
-  // ekidata station_cd。未突合の行が残るため nullable のまま（requirements.md C-3）
+  // ekidata station_cd。初回シード時の対応スナップショットであり、由来の記録として残す
+  // （ADR-0007 決定3）。手動追加された駅は ekidata コードを持ち得ないため nullable のまま。
+  // notNull 化しないこと（手動運用そのものを禁じる制約になる）。
+  // unique は「2行が同じ ekidata 駅を主張しない」ためで、NULL 行とは共存する
   ekidataStationCd: integer('ekidata_station_cd').unique(),
   stationGroupId: uuid('station_group_id').references(() => stationGroups.id),
   prefCode: integer('pref_code'),
@@ -51,7 +54,8 @@ export const lines = pgTable('lines', {
   color: varchar('color', { length: 7 }), // カラーコード (例: #F62E36)
   displayOrder: integer('display_order').default(0), // 表示順
   operatorId: uuid('operator_id').references(() => operators.id).notNull(),
-  // ekidata line_cd。未突合の行が残るため nullable のまま（requirements.md C-3）
+  // ekidata line_cd。理由は stations.ekidataStationCd と同じ（ADR-0007 決定3）。
+  // 由来の記録。手動追加された路線は持ち得ないため nullable のまま。notNull 化しないこと
   ekidataLineCd: integer('ekidata_line_cd').unique(),
   abolishedAt: date('abolished_at'),
   createdAt: timestamp('created_at').defaultNow(),
@@ -76,9 +80,9 @@ export const stationConnections = pgTable('station_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   stationId: uuid('station_id').references(() => stations.id).notNull(),
 
-  // ODPT 同期の廃止（ADR-0007 決定3）に伴い TASK-4.2 で odptStationId / odptRailwayId /
-  // connectedRailwayId を削除した。路線は connectedStationId → stationLines → lines の
-  // join で解決する（design.md「connectedRailwayId を削除する理由」）
+  // ODPT 同期の廃止（ADR-0007 決定3）に伴い odptStationId / odptRailwayId /
+  // connectedRailwayId は削除済み。路線は connectedStationId → stationLines → lines の
+  // join で解決する（docs/domain/station-master-model.md「乗換接続（stationConnections）」）
   connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
 
   strollerDifficulty: varchar('stroller_difficulty', { length: 20 }).$type<StrollerDifficulty>(),
@@ -87,16 +91,17 @@ export const stationConnections = pgTable('station_connections', {
   notesAboutStroller: text('notes_about_stroller'),
   notesAboutWheelchair: text('notes_about_wheelchair'),
 
-  // 由来。'ekidata_group' はインポートが再生成してよい行、'manual' は触れてはならない行
+  // 行の由来。'ekidata_group' は初回シードで station_g_cd から機械生成された行、
+  // 'manual' は管理者が手で足した行、NULL は ODPT 時代の行。
+  // 詳細は docs/domain/station-master-model.md「乗換接続」
   source: varchar('source', { length: 20 }).$type<StationConnectionSource>(),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
-  // TASK-2.8 のインポートを冪等にする。onConflictDoNothing がこの制約を衝突対象に
-  // するため、無いと再実行のたびに重複行が積み上がる。
-  // connectedStationId は TASK-4.2 で notNull 化済みのため、NULL 行が重複を防げない
-  // という問題はもう存在しない
+  // 【(stationId, connectedStationId) は1行しか持たない】無いと同じ組が重複する。
+  // 現時点でこのテーブルへ INSERT するコードは無い（作成 API / UI は Issue #88）。
+  // 追加するときは、この制約を衝突対象にして冪等な upsert にすること
   unique('unique_station_connection').on(t.stationId, t.connectedStationId),
 ]);
 
@@ -262,8 +267,8 @@ export const operators = pgTable('operators', {
   odptOperatorId: varchar('odpt_operator_id', { length: 100 }), // ODPT API の odpt:operator (例: odpt.Operator:TokyoMetro)
   // 【表示順専用。可視性の意味は持たない】小さいほど先に並ぶ。既定 0。
   // 可視性は stations.publishedAt が単独で担う（docs/domain/station-visibility.md /
-  // ADR-0007）。かつては null = 非表示という旧仕様があったが、0008 で NOT NULL DEFAULT 0
-  // に純化し、可視性の判定から切り離した（tasks.md Phase 5b）
+  // ADR-0007）。かつては null = 非表示という旧仕様があったが、マイグレーション 0008 で
+  // NOT NULL DEFAULT 0 に純化し、可視性の判定から切り離した
   displayPriority: integer('display_priority').notNull().default(0),
   ekidataCompanyCd: integer('ekidata_company_cd').unique(),
   createdAt: timestamp('created_at').defaultNow(),
@@ -287,9 +292,10 @@ export const stationGroups = pgTable('station_groups', {
 // 【1辺につき1行しか持たない】無向グラフだが両方向の2行は作らない。
 // 2行に増やすと片方だけが更新される状態を作れてしまうためである。
 // unique_station_adjacency は (lineId, stationAId, stationBId) の順序に依存するので、
-// 書き込み側（features/master-import）は端点 UUID を昇順へ正規化してから INSERT する。
-// これにより供給元が辺を逆向きに配布し直しても重複行にならない。
-// 隣接を引く側は (stationAId = X OR stationBId = X) の両方を見ること
+// この表に書き込むコードは端点 UUID を昇順へ正規化してから INSERT すること。
+// これにより辺が逆向きに与えられても重複行にならない。
+// 隣接を引く側は (stationAId = X OR stationBId = X) の両方を見ること。
+// 詳細は docs/domain/station-master-model.md「隣接」
 export const stationAdjacencies = pgTable('station_adjacencies', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   lineId: uuid('line_id').references(() => lines.id).notNull(),

@@ -1,9 +1,9 @@
-// TASK-5.2（Issue #56 / docs/spec/design.md「Admin の公開操作UI」）。
+// 駅の公開操作（公開状態の切り替えと slug の確定）を担う feature。
+// 設計・経緯: docs/domain/station-visibility.md / ADR-0007（Issue #56）。
 //
 // 読み取りは PageQuery、書き込みは Repository（ADR-0003）。
-// この feature は単一駅を対象にした操作であり、master-import/master-migration の
-// ような複数ファイルの調停ロジックが無いため、usecases/ 層は置かない
-// （stop-pattern / platform / facility の各 feature と同じ構成。
+// この feature は単一駅を対象にした操作であり、複数ファイルの調停ロジックが無いため
+// usecases/ 層は置かない（stop-pattern / platform / facility の各 feature と同じ構成。
 //  route.ts が `@/di` 経由でこの2ポートを直接呼ぶ）。
 
 export type PublishingLineDTO = {
@@ -22,7 +22,7 @@ export type PublishingStationDTO = {
 };
 
 /**
- * 公開操作画面が必要とする確認材料（design.md「確認材料の表示」）。
+ * 公開操作画面が必要とする確認材料。
  * 正しさの担保（可視性の判定）は apps/web 側の述語が単独で担う。
  * ここでの表示は付け忘れ・入力漏れを人に気づかせるためのものであり、
  * 公開条件そのものにはしない（nameEn・設備充足度のいずれも必須にしない）。
@@ -36,7 +36,11 @@ export type PublishingContextDTO = {
   facilityTypeCount: number;
 };
 
-/** 「公開駅を持つのに slug が無い路線」一覧（データ健全性の警告。design.md 参照） */
+/**
+ * 「公開駅を持つのに slug が無い路線」一覧（データ健全性の警告）。
+ * 正しさの担保ではなく、`lines.slug` の付け忘れを人に気づかせるための一覧
+ * （docs/domain/station-visibility.md）。
+ */
 export type LineMissingSlugDTO = {
   lineId: string;
   lineName: string;
@@ -70,9 +74,9 @@ export interface StationPublishingRepository {
    * （route.ts が 404 に写像する）。
    *
    * slug の生成自体はドメイン関数（domain/slugCandidate.ts）が担い、
-   * ここでは確定値を受け取って書き込むだけである
-   * （design.md「インポートでは slug を書かない」と同じ理由で、
-   *  公開の可否と slug の確定はどちらも管理者の操作を通す）。
+   * ここでは確定値を受け取って書き込むだけである。slug の確定は自動投入せず、
+   * 公開の可否とあわせて必ず管理者の操作を通す
+   * （docs/domain/station-master-model.md「slug の導出規則」）。
    */
   publish(stationId: string, slug: string): Promise<boolean>;
   /** publishedAt を NULL に戻す。slug は消さない（再公開時に同じ URL を維持するため） */

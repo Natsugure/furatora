@@ -93,7 +93,8 @@ export const dbStationPublishingRepository: StationPublishingRepository = {
   },
 
   async unpublish(stationId) {
-    // slug は消さない（design.md「生成タイミング」。再公開時に同じ URL を維持する）
+    // slug は消さない（再公開時に同じ URL を維持する。
+    // docs/domain/station-visibility.md / station-master-model.md「slug の導出規則」）
     const [updated] = await db
       .update(stations)
       .set({ publishedAt: null, updatedAt: new Date() })

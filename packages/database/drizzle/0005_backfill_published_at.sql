@@ -1,4 +1,4 @@
--- TASK-3.7: 既存駅の published_at バックフィル（Issue #56 / docs/spec/design.md）
+-- 既存駅の published_at バックフィル（Issue #56 / ADR-0007 / docs/domain/station-visibility.md）
 --
 -- 【なぜスキーマ差分ではなく手書きのデータ移行なのか】
 -- stations.published_at は 0004 で追加され、全行 NULL = 非公開である。
@@ -11,7 +11,7 @@
 -- 移行前の可視性をそのまま引き継ぐための条件である。現行の apps/web は
 -- 「display_priority が NULL の事業者は表示しない」で可視性を判定している。
 -- この条件を外すと、移行前に非表示だった事業者（ゆりかもめ等）の駅まで公開され、
--- requirements.md US-7 の実バグを仕様として恒久化することになる。
+-- 「URL 直打ちで非表示事業者の駅が見える」実バグ（Issue #56）を仕様として恒久化することになる。
 --
 -- 【ekidata の駅が入る前に走ること】
 -- 対象は ODPT 由来の既存行だけである。インポート（Admin の /master-import）は

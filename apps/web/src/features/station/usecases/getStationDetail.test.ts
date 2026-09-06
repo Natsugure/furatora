@@ -75,7 +75,7 @@ describe('makeGetStationDetail', () => {
     ]);
   });
 
-  it('停車位置パターンが0件のホームは列車0本のまま返る（REQ-6.1）', async () => {
+  it('停車位置パターンが0件のホームは列車0本のまま返る', async () => {
     const p = platform({ id: 'p1', stopPatterns: [] });
     const fixture = stationDetail({ platforms: [p] });
     const fake: StationDetailQuery = { getBySlug: async () => fixture };
