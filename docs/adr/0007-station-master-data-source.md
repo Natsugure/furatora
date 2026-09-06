@@ -1,6 +1,6 @@
 # ADR-0007: 駅・路線マスタを ODPT 同期から駅データ.jp の初回シードに移行し、以後は手動で維持する
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-08-27
 - **決定者**: @Natsugure
 - **関連**: [ADR-0001](./0001-layer-structure.md), GitHub Issue #56
