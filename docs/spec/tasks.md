@@ -859,33 +859,113 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 - **理由**: REQ-6.2 の削除に伴う後始末
 
 ### TASK-5.1b: カナ→修正ヘボン式の変換器
+- **状態**: ✅ 完了 (2026-09-05)
 - **依存**: なし（Phase 1〜4 と並行可）
-- **成果物**: `apps/admin/src/features/station-publishing/domain/romaji.ts`
+- **成果物**: `apps/admin/src/features/station-publishing/domain/romaji.ts` /
+  同 `romaji.test.ts`
 - **内容**: design.md「ローマ字変換規則」の表に従う。
   決定的規則（`ヂ`/`ヅ`、促音、拗音・外来音、`ー` 削除、`ジェイアール`→`jr`）と、
   方針（長音は縮約する / 撥音は `m` 化**しない** / アポストロフィを入れない）
 - **注意**: **変換元は `station_name_k`。`station_name_r` を修理する実装にしない**
-- **テスト**: 上記各規則の単体ケースに加え、
-  **CSV の手入力ヘボン式186件を回帰用の固定データとして持つ**。
-  design.md が「原理的に決まらない」と記した形態素境界の4件
-  （武雄温泉 / 嬉野温泉 / えちご押上ひすい海岸 / てだこ浦西）は
-  **既知の不一致として明示的に許容する**（期待値に誤変換side を書く）
+- **長音の縮約はお段のみに限定した（design.md からの補足・実データで判明）**。
+  実装当初は「あ段+ア／い段+イ／う段+ウ／え段+イ・エ」も一律に縮約する案だったが、
+  会員版CSV（`station20260731.csv`）の実データ突合で誤りと判明した。
+  `ニイガタ`（新潟）は `niigata`、`タイセイ`（大成）は `taisei`、
+  `シンイワクニ`（新岩国）は `shiniwakuni` が正しく、い段・え段を縮約すると
+  いずれも誤る。お段+ウ／オ（`トウキョウ→tokyo`）だけが実務上広く通用する縮約であり、
+  実装をお段限定に修正した
+- **テスト（`romaji.test.ts`）**:
+  - design.md 記載の決定的規則・方針をそれぞれ単体ケース化。
+    駅コードを添えたものは会員版CSVで実在を確認済み（例: 促音+ch＝倶知安 1110211、
+    ジェイアール接頭辞＝JR総持寺 1160217、ヂ/ヅ＝お花茶屋 2300108・国府津 1130114）
+  - **形態素境界の4件**（武雄温泉 / 嬉野温泉 / えちご押上ひすい海岸 / てだこ浦西。
+    加えて design.md が個別に挙げる小海）を**既知の不一致として明示的に許容**
+    （期待値に誤変換側を書く）
+  - **カナ欠陥9駅**のうち天童南・家城・植木を確認し、末尾の `エキ` を
+    機械的に落とさないことを固定した
+  - **回帰用の固定データ155件**。会員版CSVの現役10,625駅から、公式の英語表記
+    （`station_name_r`）が付与されている駅（大文字始まり・ハイフン・空白を含む398件）を
+    抽出し、うち明らかな英訳（`City Hall`・`Peace Park` 等48件）を除いた350件のうち、
+    本実装の出力が公式表記と（大文字・記号を除いて）一致した155件を採用した
+  - **初版が引用していた「186件・正解率85.9%」は再現していない。** 前セッションの
+    分析対象一覧が記録に残っておらず、この計画では再現できなかったため。
+    会員版CSV自体は本セッションで参照可能であったため独立に実測し直した。
+    `station_name_r` は単一の規則に従っておらず（公式表記が付く駅がある一方、
+    撥音を `nn` と重ねる・長音を縮約しない等の素朴な機械転写のみの駅が大半を占める）、
+    全10,625件に対する単純な完全一致率は指標として意味を持たない
 
 ### TASK-5.2: Admin の公開操作UI（slug の確定を含む）
+- **状態**: ✅ 完了 (2026-09-05)
 - **依存**: TASK-5.1b, TASK-5.0
 - **対象**: `apps/admin/src/features/station-publishing/`
+- **成果物**:
+  - `domain/slugCandidate.ts`（+ `.test.ts`）: slug 候補の組み立て、
+    カナ欠陥の検出（`hasKanaEkiSuffixMismatch`）
+  - `ports.ts`: `StationPublishingPageQuery` / `StationPublishingRepository`
+  - `external/query/stationPublishingPageQuery.ts`、
+    `external/repository/stationPublishingRepository.ts`（+ `route.test.ts`）
+  - `schema.ts`: `stationPublicationSchema`（zod。`publish`/`unpublish` の判別共用体）
+  - `components/StationPublishingForm.tsx`
+  - `app/stations/[stationId]/publish/page.tsx`、
+    `app/api/stations/[stationId]/publication/route.ts`（`PATCH`）
+  - `di.ts` への配線、`app/stations/page.tsx` に公開状態バッジと導線を追加
+- **設計からの変更: usecases/ 層を置かない**。design.md の想定ディレクトリには
+  `usecases/{getPublishingCandidate,publishStation}.ts` があったが、実装時に
+  `stop-pattern` / `platform` / `facility` の既存 feature を確認したところ、
+  単一エンティティの単純な読み書き（複数ファイルの調停が無い）には usecases/ を
+  置かず、route.ts / page.tsx が `@/di` 経由で Repository / PageQuery を直接呼ぶ
+  構成になっていた。master-import / master-migration の usecases/ 層は
+  CSVパースとの調停という実質のあるロジックを持つための層であり、
+  本 feature にはその実質が無いため、既存の単純feature群と同じ構成に揃えた
 - **内容**: 駅の公開・非公開を切り替えるUI。TASK-5.1b の `romaji.ts` は
   この feature の `domain/` に属する（master-import からは呼ばれない）。公開時に以下を行う
-  - `lines.slug` + `hepburn(normalize(nameKana))` から slug の**候補を提示**し、
+  - `lines.slug` + `hepburn(nameKana)` から slug の**候補を提示**し、
     管理者が確認・編集して確定する（**インポートでは slug を書かない**）
-  - `lines.slug` が未設定の場合は、先に路線の slug を求める
-  - 確認材料の表示: 設備の入力件数、`nameEn` 未設定の警告、
-    カナ欠陥9駅（design.md 参照）に該当する場合の注意
+  - `lines.slug` が未設定の場合は、先に路線の slug を求める導線を出し、
+    `PATCH .../publication` は repository 側でも再検証する（`LineSlugMissingError` → 422）
+  - 確認材料の表示: 設備タイプの入力件数（入力済みタイプ数 / `facilityTypes` の総数）、
+    `nameEn` 未設定の警告、カナ欠陥（design.md「カナ側の欠陥」）に該当する場合の注意
   - **データ健全性の警告**: 「公開駅を持つのに `slug` が無い路線」を一覧表示する。
     正しさは TASK-5.0 の述語が担保するため、これは
     `lines.slug` の付け忘れを検知するための表示である
+- **カナ欠陥の検出は固定リストではなくヒューリスティック**。design.md は
+  「要確認9駅」と具体的な件数を記すが、その9件の内訳は前セッションの記録に
+  残っておらず本セッションでは再現できなかった（TASK-5.1b と同種の事情）。
+  代わりに「カナが `エキ`／`テイリュウジョウ` で終わるが、漢字表記が
+  `駅`／`停留場` で終わらない」という一般規則で検出する
+  （`hasKanaEkiSuffixMismatch`）。家城・植木のように正当な駅名も拾ってしまうが、
+  確認材料としては安全側（見逃しよりも過検出を許容する）に倒した
+- **既存の `PUT /api/stations/[stationId]` に相乗りさせなかった**。
+  あの route の `stationUpdateSchema` は `publishedAt` を持たず `.set()` が
+  全10列を無条件に上書きするため、公開切り替えのたびに slug や nameEn を
+  巻き込む。`PATCH /api/stations/[stationId]/publication` を新設した
 - **注意**: `nameEn` は**公開の必須条件にしない**（警告に留める）。
   必須にすると機械ローマ字を貼る圧力が生じ、公式表記のみを入れる方針が崩れる
+- **リハーサルで発見した実バグ（修正済み）**: `isUniqueViolation` の判定を
+  当初 `err.code === '23505'` のみで実装したが、`main` から切った使い捨て
+  Neonブランチで実際に slug の衝突を発生させたところ、drizzle-orm 0.45.1 が
+  `withTransaction` 経由の失敗を `DrizzleQueryError` でラップし、実際の
+  pg エラーコードは `err.cause.code` に入ることが判明した。`err.code` だけを
+  見る判定は 23505 を検知できず、`SlugTakenError` に写像されないまま
+  500 になっていた。`err.cause?.code` も見るよう修正した。
+  **同種の判定を持つ既存の `stopPatternRepository.ts` にも同じ問題があることを
+  実DBで確認済み**（`DuplicateStopPatternError` に変換されず409ではなく500になる）。
+  本PRのスコープ外のため [Issue #73](https://github.com/Natsugure/furatora/issues/73)
+  として別途起票した
+- **テスト**: `slugCandidate.test.ts`（8ケース）、`route.test.ts`（8ケース。
+  400/404/409/422/500 のステータス写像を網羅）
+- **手動検証（2026-09-05 / `main` から切った使い捨て Neon ブランチ）**:
+  admin は GitHub OAuth 認証必須のためヘッドレスでの HTTP 検証ができず、
+  Repository / PageQuery を直接呼んで実DBに対する検証を行った。
+  - 品川（東海道新幹線、slug 未設定・非公開）: `getContext` が候補
+    `jr-central-tokaidoshinkansen-shinagawa` を計算できることを確認
+  - 品川を `publish` → `publishedAt` が設定され slug が確定することを確認
+  - 別駅（新横浜）に同じ slug で `publish` → `SlugTakenError`（修正後）
+  - 品川を `unpublish` → `publishedAt` が NULL に戻り、**slug は維持**されることを確認
+  - 西明石（山陽新幹線、路線の slug が NULL）: `publish` が
+    `LineSlugMissingError` で拒否されることを確認
+  - 存在しない駅IDでは `getContext` が `null`、`unpublish` が `false` を返すことを確認
+  - `listLinesMissingSlug`: slug を持つ路線（東海道新幹線）が結果に含まれないことを確認
 - **期待結果**: 誤変換の約3%が公開時に人の目を通る
 
 ### TASK-5.3: 欠番（未突合解決UIは不要になった）
