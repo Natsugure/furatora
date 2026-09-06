@@ -21,7 +21,7 @@ export async function PUT(
       .set({
         name,
         odptOperatorId: odptOperatorId ?? null,
-        displayPriority: displayPriority ?? null,
+        displayPriority: displayPriority ?? 0,
       })
       .where(eq(operators.id, operatorId))
       .returning();

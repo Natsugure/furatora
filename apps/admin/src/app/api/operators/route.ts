@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       .values({
         name,
         odptOperatorId: odptOperatorId ?? null,
-        displayPriority: displayPriority ?? null,
+        displayPriority: displayPriority ?? 0,
       })
       .returning();
     return NextResponse.json(operator, { status: 201 });

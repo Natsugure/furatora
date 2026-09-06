@@ -27,7 +27,7 @@ export default async function OperatorsPage() {
               <TableTr>
                 <TableTh>事業者名</TableTh>
                 <TableTh>ODPTコード</TableTh>
-                <TableTh>表示優先度</TableTh>
+                <TableTh>表示順</TableTh>
                 <TableTh>操作</TableTh>
               </TableTr>
             </TableThead>
@@ -42,7 +42,7 @@ export default async function OperatorsPage() {
                   </TableTd>
                   <TableTd>
                     <Text size="sm">
-                      {operator.displayPriority ?? '-'}
+                      {operator.displayPriority}
                     </Text>
                   </TableTd>
                   <TableTd>
