@@ -109,7 +109,7 @@ function StationGroupCard({ group }: { group: StationGroup }) {
         {group.stations.map((station) => (
           <Link
             key={station.id}
-            href={`/stations/${station.slug ?? station.id}`}
+            href={`/stations/${station.slug}`}
           >
             <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors group">
               <div

@@ -7,7 +7,7 @@ import {
 } from '@furatora/database/schema';
 import { asc, eq } from 'drizzle-orm';
 import { LinkAnchor } from '@/components/LinkElements';
-import { Group, ScrollArea, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
+import { Badge, Group, ScrollArea, Stack, Table, TableTbody, TableTd, TableTh, TableThead, TableTr, Text, Title } from '@mantine/core';
 
 export default async function StationsPage() {
   const operatorList = await db.select().from(operators).orderBy(asc(operators.name));
@@ -20,6 +20,7 @@ export default async function StationsPage() {
       name: stations.name,
       nameEn: stations.nameEn,
       code: stations.code,
+      publishedAt: stations.publishedAt,
       stationOrder: stationLines.stationOrder,
     })
     .from(stationLines)
@@ -80,6 +81,7 @@ export default async function StationsPage() {
                           <TableTh>駅番号</TableTh>
                           <TableTh>駅名</TableTh>
                           <TableTh>駅名（英語）</TableTh>
+                          <TableTh>公開</TableTh>
                           <TableTh>設備</TableTh>
                           <TableTh>編集</TableTh>
                         </TableTr>
@@ -96,6 +98,13 @@ export default async function StationsPage() {
                             <TableTd>{stn.name}</TableTd>
                             <TableTd>
                               <Text c="dimmed">{stn.nameEn ?? '-'}</Text>
+                            </TableTd>
+                            <TableTd>
+                              <LinkAnchor href={`/stations/${stn.id}/publish`} size="sm">
+                                <Badge color={stn.publishedAt ? 'green' : 'gray'} size="sm">
+                                  {stn.publishedAt ? '公開中' : '非公開'}
+                                </Badge>
+                              </LinkAnchor>
                             </TableTd>
                             <TableTd>
                               <LinkAnchor href={`/stations/${stn.id}/facilities`} size="sm">

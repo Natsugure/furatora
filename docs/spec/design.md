@@ -511,9 +511,17 @@ slug は URL 識別子であって公式英語名ではない。`Kita-senju` の
 
 | 論点 | 決定 |
 |---|---|
-| 長音の縮約 | **縮約する**。トウキョウ→`tokyo` |
+| 長音の縮約 | **お段（+ウ／オ）のみ縮約する**。トウキョウ→`tokyo` |
 | 撥音の `n`→`m` 化（b/p/m の前） | **しない**。コウエンマエ→`koenmae` |
 | `ン`＋母音のアポストロフィ | **入れない**。シンオオサカ→`shinosaka` |
+
+**「お段のみ」に限定した理由（実装時に会員版CSVの実測で判明）**。
+あ段+ア／い段+イ／う段+ウ／え段+イ・エも一律に縮約する案を当初検討したが、
+`ニイガタ`（新潟）→`niigata`、`タイセイ`（大成）→`taisei`、
+`シンイワクニ`（新岩国）→`shiniwakuni` が正しく、これらの段を縮約すると
+いずれも誤る（`nigata` / `taise` / `shinwakuni`）。長音が広く縮約される慣行が
+実務上通用しているのはお段+ウ／オ（`トウキョウ→tokyo`、`オオサカ→osaka`）だけであり、
+他の段は形態素境界（複合語の切れ目）であることが多い。
 
 `n`→`m` は修正ヘボン式としては正しいが、slug はハイフンを入れないため
 `mm` が出る（実測221件が該当。`koemmae` / `byoimmae` / `kumamotokosemmae`）。
@@ -527,9 +535,11 @@ slug は URL 識別子であって公式英語名ではない。`Kita-senju` の
 カナから判別できない。
 
 ```
-タケオオンセン  武雄温泉    タケオ + オンセン  → takeonsen      (正: takeo-onsen)
-テダコウラニシ  てだこ浦西  テダコ + ウラニシ  → tedakoranishi  (正: tedako-uranishi)
-コウミ          小海        長音               → komi           (正: koumi)
+タケオオンセン        武雄温泉          タケオ + オンセン      → takeonsen              (正: takeo-onsen)
+ウレシノオンセン      嬉野温泉          ウレシノ + オンセン    → ureshinonsen           (正: ureshino-onsen)
+テダコウラニシ        てだこ浦西        テダコ + ウラニシ      → tedakoranishi          (正: tedako-uranishi)
+エチゴオシアゲヒスイカイガン えちご押上ひすい海岸 エチゴ + オシアゲ...  → echigoshiagehisuikaigan (正: echigo-oshiage-hisuikaigan)
+コウミ                小海              長音                    → komi                    (正: koumi)
 ```
 
 露出は長音縮約が発火する2,680行（25.2%）、実測誤り率は約3%。
