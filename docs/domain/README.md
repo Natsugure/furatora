@@ -34,5 +34,7 @@ ADR との違いは「不変か、最新か」です。ADR は決定した時点
 
 | 文書 | 内容 |
 |---|---|
+| [station-master-model.md](./station-master-model.md) | 駅・路線マスタのモデル。ekidata のコード体系、粒度が暫定であること、隣接・乗換接続・slug・nameEn の規則 |
+| [station-visibility.md](./station-visibility.md) | 駅・路線・事業者の公開状態。`publishedAt` が単独で担うこと、単一述語、`published_requires_slug` |
 | [platform-coordinate-system.md](./platform-coordinate-system.md) | ホームの座標系。原点の定義、単位、描画範囲 |
 | [train-stop-patterns.md](./train-stop-patterns.md) | 列車の停車位置パターン。号車座標、標準車両長、現在の制約 |

@@ -15,10 +15,10 @@ Phase 1: スキーマ変更 + トランザクション規模の計測  (完了�
 Phase 2: インポート機構                           (完了)
 Phase 3: 突合と publishedAt バックフィル           (完了・Phase 2 に依存)
 Phase 4: ODPT 後始末                             (PR1・PR2 とも本番デプロイ済み)
-Phase 5: 公開ガードと Admin UI                     (P0・現行バグの修正を含む)
-Phase 5b: displayPriority の NOT NULL 化           (TASK-5.0 のデプロイ後・単独PR)
-Phase 6: 検証・振り返り                            (必須)
-Phase 7: 移行機構の削除                            (本番投入の完了後・ADR-0007 決定4)
+Phase 5: 公開ガードと Admin UI                     (完了・現行バグの修正を含む)
+Phase 5b: displayPriority の NOT NULL 化           (完了 2026-09-06・PR #79/#80 で本番反映)
+Phase 6: 検証・振り返り                            (完了 2026-09-06)
+Phase 7: 移行機構の削除                            (前提充足・未実施・ADR-0007 決定4)
 ```
 
 ### 実行順序の根拠
@@ -1028,6 +1028,8 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 ## Phase 5b: `displayPriority` の `NOT NULL` 化（旧 TASK-3.8）
 
 ### TASK-5b.1: `operators.displayPriority` を表示順専用に純化
+- **状態**: ✅ 完了 (2026-09-06)。PR [#79](https://github.com/Natsugure/furatora/pull/79) を
+  `develop` → `main`（PR #80）にマージ。Vercel のビルドで `0008` が本番に適用済み
 - **依存**: **TASK-5.0 が本番にデプロイされていること。** 同じPRに入れない
 - **内容**: `NOT NULL DEFAULT 0` へ変更し、既存の NULL 行を 0 で埋める
 - **理由**: 可視性の意味を外す。可視性を担う述語が
@@ -1036,48 +1038,146 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
   **新しいコードが公開される前にDBが変わる**（ADR-0008）。TASK-5.0 と同居させると、
   ビルドが終わるまでの間だけ「`displayPriority` で判定する古いコード」が
   「全行が 0 になったDB」を見ることになり、非表示事業者の駅が露出する
-- **前提の確認**: 適用前に `apps/web` から `operators.displayPriority` を
-  読む箇所が消えていることを grep で確かめる
-- **期待結果**: 可視性を担う述語が `stations.publishedAt` の1つだけになる
+- **成果物**: `packages/database/drizzle/0008_purify_display_priority.sql`
+  - drizzle-kit が生成するのは `SET DEFAULT 0` / `SET NOT NULL` の2文のみ。
+    本番に `display_priority IS NULL` が **160行**あり、生成物のままでは `SET NOT NULL`
+    が 23502 で失敗し Vercel のビルドごと落ちる。**生成後に先頭へ
+    `UPDATE "operators" SET "display_priority" = 0 WHERE "display_priority" IS NULL` を
+    手で挿入した**（`0005` / `0007` と同じく冒頭に日本語で背景コメント）
+  - あわせて `apps/admin` の `?? null` 経路（`api/operators` POST/PUT）を `?? 0` へ、
+    `operatorSchema.displayPriority` を `.nullable()` → `.min(0)` の非 nullable へ、
+    `OperatorForm` の「未設定の場合は非表示」表記を削除（旧仕様の説明）
+- **前提の確認（2026-09-06 実測）**: `apps/web` から `operators.displayPriority` を
+  読む実コードは0件（`external/query/visibility.ts` のコメント2箇所のみ）。
+  TASK-5.0 は PR #78 で `main` にデプロイ済み
+- **本番の実測（2026-09-06 / Neon MCP read-only / `main`）**:
+  `display_priority IS NULL` = **0 / 162**、`is_nullable` = NO、`column_default` = 0、
+  0 が160件・正数が2件（東京メトロ・東京都交通局）。
+  **公開駅数は 334 のまま不変**（可視性から切り離した変更が公開範囲に影響していない）
+- **期待結果**: ✅ 可視性を担う述語が `stations.publishedAt` の1つだけになった
 
 ---
 
-## Phase 6: 検証・振り返り
+## Phase 6: 検証・振り返り（完了 2026-09-06）
+
+**結果**: requirements.md の全 REQ を検証（REQ-7.4 のみ「現行定義は充足・Issue #77 で再定義中」、
+他は充足）。`docs/domain/` に `station-master-model.md` / `station-visibility.md` を新設し、
+既存2ファイルの古い適用状況注記を修正。ADR-0007 を `Accepted` に更新（開発者の承認済み）。
+後続Issue #81〜#85 を起票し #56 を close。計測用スクリプトを削除。
 
 ### TASK-6.1: 受け入れ基準の検証
+- **状態**: ✅ 完了 (2026-09-06)
 - **内容**: requirements.md の REQ-1.1〜REQ-8.3 を1件ずつ確認する
-- **成果物**: 検証マトリックス
+- **証拠の種類**: 次の3つのみを認める。
+  - **[T]** 自動テスト（`pnpm run test` — 2026-09-06 実行: admin 395 / frontend 167、全 green）
+  - **[SQL]** 本番DB実測（Neon MCP read-only / project `patient-meadow-13439419` /
+    ブランチ `main` = `br-purple-surf-a169c8ks` / 2026-09-06）
+  - **[記録]** 本 tasks.md に記録済みのリハーサル結果・手動検証節
+
+#### 検証マトリックス
+
+| REQ | 内容（要約） | 判定 | 証拠 |
+|---|---|---|---|
+| REQ-1.1 | 4種CSV を解析し適用前に差分計画を提示 | ✅ | [T] `master-import/route.test.ts`「plan で差分と planToken を返す」/ `plan.test.ts` 群 |
+| REQ-1.2 | 差分計画にテーブルごとの新規・更新・廃止・突合失敗の件数 | ✅ | [T] `route.test.ts`「適用した件数を返す」/ [記録] Phase 2「会員版CSVの実測」表・リハーサル手順4 |
+| REQ-1.3 | 承認された計画をトランザクション内で適用 | ✅ | [T] `applyImport.test.ts` / [記録] TASK-2.4「単一 `withTransaction`」・リハーサル結果手順4 |
+| REQ-1.4 | 必須列欠落時は適用せずファイル名・列名を報告 | ✅ | [T] `route.test.ts`「必須列の欠落を 400 とファイル名・列名で返す」 |
+| REQ-1.5 | 同一CSV再投入で差分0件・無変更（冪等性） | ✅ | [T] `plan.test.ts`「同じCSVを再投入すると差分が0件になる」/ [記録] リハーサル手順6「再試算で 0/0/0」 |
+| REQ-1.6 | `station` CSV が 1.4MB 超でも受け付ける | ✅ | [T] `route.test.ts`「1.7MB の station CSV を受け付け、欠けずに渡す」/ [記録] TASK-2.6「4ファイル合計 約2.05MB は Vercel の 4.5MB/request 以内」 |
+| REQ-2.1 | furatora 固有列（slug/nameEn/code/notes/publishedAt/displayOrder/displayPriority/lineCode）を変更しない | ✅ | [T] `plan.test.ts`「駅の書き込みは ekidata が持つ列だけを含む」「事業者の書き込みは name とコードだけ（displayPriority を触らない）」 |
+| REQ-2.2 | CSV値が空/NULL なら既存値を保持（空値上書きなし） | ✅ | [T] `plan.test.ts`「CSV のカナが空なら既存のカナを保つ」「路線色が空なら既存の色を保つ」/ [記録] TASK-2.4「空値保護は SET 句の `COALESCE(NULLIF(...))`」 |
+| REQ-2.3 | `platforms`/`lineDirections`/`trains`/設備系の行を削除しない | ✅ | [SQL] `platforms`=14 / `line_directions`=50 / `trains`=10 / `station_facilities`=0、孤立 `platforms`・`line_directions` は各0件。[記録] リハーサル手順5「不変」（`line_directions` は TASK-5.4 の丸ノ内線支線畳み込みで 52→50。これは Phase 5 の意図した変更でありインポートによる削除ではない） |
+| REQ-3.1 | 突合で `operators`/`lines`/`stations` に `ekidata*Cd` を設定 | ✅ | [SQL] `ekidata_company_cd` 162/162 / `ekidata_line_cd` 602/602 / `ekidata_station_cd` 10,625/10,625 |
+| REQ-3.2 | 突合できない行は削除せず NULL のまま残し一覧報告 | ✅ | [T] `match.test.ts`「対応表に無い事業者は削除せず未突合として残す」/ [記録] Phase 3「未突合行は削除しない」・TASK-5.4 で残り7行を本線へ畳み未突合を0にした（[SQL] 未突合 駅0 / 路線0） |
+| REQ-3.3 | 駅名突合で括弧内を除去し `ヶ`/`ケ` の揺れを吸収 | ✅ | [T] `match.test.ts`「括弧を除いて一致させる」「ヶ と ケ の揺れを吸収する」/ `normalize.test.ts` |
+| REQ-3.4 | 移行で `stations.id`/`lines.id` を変更しない | ✅ | [SQL] 孤立 `platforms`/`line_directions` 0件（id が変わっていれば FK が切れる）/ [記録] リハーサル手順5「`stations`/`lines` の id も維持」 |
+| REQ-3.5 | 複数既存行が同一 ekidata コードに突合したら適用せず報告 | ✅ | [T] `match.test.ts`「2つの既存路線が同じ line_cd に寄ったら止める」「既に別の行が持っているコードを割り当てようとしたら止める」 |
+| REQ-4.1 | 同一 `station_g_cd` の現役駅の全順序対を乗換接続として生成 | ✅ | [T] `plan.test.ts`「同一グループの現役駅の全順序対を数える」/ [SQL] `station_connections` の `source='ekidata_group'` = 6,946（リハーサル予測値と一致） |
+| REQ-4.2 | 手動追加の乗換接続を `source='manual'` として記録 | ✅ | [記録] TASK-2.8「`ON CONFLICT DO NOTHING` が `source='manual'` の行を守る」/ schema.ts の `source` 列コメント。[SQL] 現在 `manual` は0件（本番でまだ手動追加が無いため。仕組みは存在） |
+| REQ-4.3 | 再インポートで `source='manual'` の行を削除・変更しない | ✅ | [記録] TASK-3.5「削除は `source IS NULL` かつ難易度・メモ全NULL の行だけ」/ TASK-2.8「`ON CONFLICT DO NOTHING`」 |
+| REQ-4.4 | 難易度入力済みの接続はインポートで難易度・メモを保持 | ✅ | [T] `match.test.ts`「難易度が入力済みの乗換接続があれば止める」/ [記録] TASK-3.5「難易度・メモがすべて NULL の行だけを消す」。[SQL] 難易度入力済み接続は現在0件 |
+| REQ-5.1 | 設計が「案内路線」と「運行系統」を別概念として扱う | ✅ | [記録] design.md「`serviceRoutes` を今回は作らない」/ requirements.md US-5「1つの概念に見えていたものが3種類に割れた」。`serviceRoutes`/`serviceRouteSegments` を作らない判断が確定（TASK-1.2） |
+| REQ-5.2 | ekidata `line_cd` を混在概念として扱う | ✅ | [記録] design.md 路線概念の3分類 / TASK-3 手動対応表の確定（分岐線が本線に畳まれている件を `null` エントリで表現） |
+| REQ-6.1 | 駅名を漢字またはカナで入力したとき部分一致する駅を返す | ✅ | [コード] `apps/web/src/external/query/stationSearchQuery.ts`：`ilike(stations.name, %q%)` OR `ilike(stations.nameKana, %q%)`。[記録] TASK-5.0 手動検証「`?q=汐留` が都営大江戸線の汐留を返す」 |
+| REQ-7.1 | 未公開駅の詳細ページは 404 | ✅ | [T] `visibility.test.ts`「`publishedStation` は published_at の非NULL判定を生成する」/ [記録] TASK-5.0 手動検証「`getBySlug('yurikamome-yurikamome-shiodome')` が null → `notFound()`」。**既知の制限**: ページの HTTP ステータスは 200 のまま（[Issue #70](https://github.com/Natsugure/furatora/issues/70)。Phase 5 起因ではない） |
+| REQ-7.2 | 公開駅を1件も持たない路線のページは 404 | ✅ | [T] `visibility.test.ts`「`visibleLine` は slug の非NULL判定と公開駅の EXISTS 判定を両方含む」/ [記録] TASK-5.0 手動検証「`/api/v1/lines/yurikamome-yurikamome/stations` は 404」 |
+| REQ-7.3 | 公開APIは未公開の駅・公開駅0の路線/事業者を返さない | ✅ | [T] `visibility.test.ts`（3ケースすべて）/ [記録] TASK-5.0 手動検証「`/api/v1/operators` は東京メトロ・都営の2件のみ」。[SQL] 公開駅を持つ事業者 = 2 |
+| REQ-7.4 | 駅詳細の乗換接続に未公開駅への接続を含めない | ⚠️ 再定義中 | 現行の字義（未公開駅を含めない）は `getStationConnectionRows` が `publishedStation()` を通すことで満たす（[記録] TASK-5.0）。ただし **[Issue #77](https://github.com/Natsugure/furatora/issues/77)** が REQ-7.4 を 7.4a（リンクありは除外）/ 7.4b（リンクなしの名称表示は許可）へ**分割する方針で起票済み**。requirements.md の書き換えは #77 の実装PRで行うため本Issueでは触れない |
+| REQ-7.5 | 可視性の判定を単一の関数を通して行う | ✅ | [T] `visibility.test.ts` / [記録] TASK-5.0「8つの読み取り経路すべてを単一の述語に通す」「`app/` から drizzle を追い出し `external/query/` に集約」 |
+| REQ-8.1 | 適用中エラー時は一切適用せずエラー内容を報告 | ✅ | [T] `master-import/route.test.ts`「それ以外の失敗は 500 で、原因が分かるメッセージを返す」/ `master-migration/route.test.ts`「適用に失敗したら原因を残して 500」。単一トランザクションのため部分適用は起きない |
+| REQ-8.2 | ダングリング `station_g_cd` はグループを破棄せず所属駅から代表値を決定 | ✅ | [記録] requirements.md「現役駅で 8,782グループ」/ [SQL] `station_groups` = 8,782（ダングリング59件を除いた現役グループ数と一致） |
+| REQ-8.3 | `e_status=2`（廃止）の既存駅・路線は削除せず廃止日を記録 | ✅ | [T] `plan.test.ts`「CSV から消えた駅に実行日で廃止日を立てる。行は削除しない」「CSV に廃止日があればそれを使う」「既に廃止済みの行は上書きしない」「廃止済みの駅が現役として再登場したら廃止を取り消す」。[SQL] 現時点の本番に廃止行は0件（廃止対象が無かったため。仕組みはテストで固定済み） |
+
+- **成果物**: 上表（検証マトリックス）
+- **結論**: REQ-7.4 を除く全件が ✅。REQ-7.4 は現行定義を実装が満たしており、
+  要件の再定義（分割）が [Issue #77](https://github.com/Natsugure/furatora/issues/77) として
+  追跡されている。**「充足 + 追跡中のIssueあり」で TASK-6.3（ADR-0007 の Accepted 化）に進める**
 
 ### TASK-6.2: `docs/domain/` への反映（**省略しない**）
-- **内容**: design.md「恒久知識の振り分け」の表に従って以下を作成・更新する
-  - `docs/domain/station-master-model.md`（新規）:
-    ekidata のコード体系と粒度、`station_cd` 上位桁の例外、ダングリング59件、
-    `e_status` が3値であること、`stationAdjacencies` を片方向1行で持つこと、
-    **現在の粒度が暫定であること**と `unique(stationId)` を付けない理由、
-    乗換接続の由来区分、駅名正規化ルール、
-    ekidata 規約に由来する制約、**`slug` の導出規則**、
-    **`nameEn` は公式表記のみで機械生成しないこと**、
-    **可視性は `stations.publishedAt` が単独で担い、判定は単一の述語を通すこと**、
-    **ekidata は初回シードであり継続同期しないこと**と、
-    以後の維持が Admin での手動編集であること（ADR-0007 決定1）
-  - `docs/domain/README.md` の一覧に2件を追加
-- **確認**: 既存の `platform-coordinate-system.md` / `train-stop-patterns.md` に
-  変更が要るかを確認し、**不要ならその旨を記録する**
+- **状態**: ✅ 完了 (2026-09-06)
+- **新規作成（2件）**:
+  - **`docs/domain/station-master-model.md`**: データ源（ekidata は初回シード・
+    継続同期しない — ADR-0007 決定1/4）、コード体系（`company_cd`/`line_cd`/
+    `station_cd`/`station_g_cd`）、`station_cd` 上位桁の例外137件、ダングリング59件、
+    `e_status` の3値、日付 `0000-00-00`・色 `#` 付与、**粒度が暫定であること**と
+    `stationLines` に `unique(stationId)` を付けない理由、路線概念の3分類、
+    `stationAdjacencies` は無向辺1行・端点昇順正規化・読み取りは両方向、
+    乗換接続の `source` 区分、駅名正規化ルール、**`slug` の導出規則**（お段のみ縮約・
+    撥音 `m` 化しない・形態素境界は判別不能）、**`nameEn` は公式表記のみ機械生成しない**、
+    利用規約 第6条（非加工データの第三者提供は無償に限る）
+  - **`docs/domain/station-visibility.md`**: 可視性は `stations.publishedAt` が単独で担う、
+    粒度は `stations` 単位（`stationGroups`/`lines`/`operators` に公開フラグを持たせない）、
+    `operators.displayPriority` は表示順専用（`0008` で純化）、判定は単一の述語
+    （`publishedStation()`/`visibleLine()`/`visibleOperator()`）を `where` 句で通す、
+    `visibleLine()` が `slug IS NOT NULL` を含む理由（`/lines/null/stations` を不要にする）、
+    `published_requires_slug` の CHECK、`notFound()` の HTTP 200 問題（Issue #70）、
+    **REQ-7.4 の再定義（Issue #77）が未決であることを適用状況に明記**
+- **`docs/domain/README.md`**: 一覧表に上記2件を追加
+- **既存2ファイルの確認結果**:
+  - **`platform-coordinate-system.md`**: 本Issue（ekidata移行）による内容変更は**不要**。
+    ただし適用状況注記が「`docs/spec/tasks.md` の Phase 6 が未実施」「**TASK-6.6** 完了時に外す」
+    と書いており、現行 tasks.md（Issue #56）に TASK-6.6 は存在しない。`docs/spec/` は
+    Issue ごとに全面書き換えされるためタスク番号アンカーは必ず宙に浮く。
+    **参照先を [Issue #29](https://github.com/Natsugure/furatora/issues/29) へ張り替え**、
+    日付を更新した（内容本文は変更なし）
+  - **`train-stop-patterns.md`**: 注記が「**未実装**。`schema.ts` と一致しない」だったが、
+    `trainStopPatterns`/`trainStopPatternCars` はスキーマに実在し、Admin
+    （`features/stop-pattern/`・API・編集ページ）と Web（`features/platform/`）も
+    メートル座標へ追随済み（TASK-3.x/4.x のコミット）。**記述と実コードの乖離**であり、
+    注記を「実装済み・E2E検証未完了」へ上書きし、TASK-6.6 参照を Issue #29 へ張り替えた。
+    本文（モデル・移行手順）は正確なため変更なし
 
 ### TASK-6.3: ADR-0007 を `Accepted` に更新
-- **依存**: TASK-6.1
-- **注意**: ステータス変更は**開発者の承認を得てから**行う（[ADR運用ルール](../../.claude/rules/adr.md)）
+- **状態**: ✅ 完了 (2026-09-06)。開発者の承認済み
+- **依存**: TASK-6.1（検証マトリックスが「全件 ✅ ／ REQ-7.4 のみ充足 + Issue #77 で追跡」で通過）
+- **変更**: `docs/adr/0007-station-master-data-source.md` のステータス行を
+  `Proposed` → `Accepted`。`docs/adr/README.md` の索引も更新。
+  **本文は書き換えない**（[ADR運用ルール](../../.claude/rules/adr.md)）
+- **決定ごとの到達状況**:
+  - 決定1（ekidata 初回シード・以後手動維持）: ✅ 本番投入済み
+  - 決定2（経路探索の方式選定は保留）: 保留のまま。Issue #56 本体で扱う
+  - 決定3（ODPT ID の列を参照キーとして残す）: ✅ 列は残置、同期機構は Phase 4 で削除済み
+  - 決定4（移行機構ごと削除）: **未実施。Phase 7 で行う**（本番投入の完了が前提。
+    その前提は満たされたため Phase 7 は実行可能）
 
 ### TASK-6.4: 後続Issue の起票
-- **必ず含めるもの**: **駅・路線の粒度の確定**。
-  本Issueでは暫定とし不変条件を課さなかったため、実データ投入後に判断する。
-  調査資料は Obsidian `Projects/furatora/駅・路線の粒度 — 設計のための調査メモ`。
-  期限の目安は「ホーム設備の入力が共用ホーム駅（目黒等）に到達したとき」
-- **内容**: 以下を GitHub Issue として起票する
-  - 運行系統のデータ投入と Admin 管理UI（ODPT路線46件が種として使える）。
-    **手動維持が主経路になるため優先度が上がる**（ADR-0007 決定1）
-  - `facilityConnections` の粒度見直し
-  - `operators.displayPriority` の全国運用ルール
+- **状態**: ✅ 完了 (2026-09-06)
+- **起票した Issue（5件）**:
+  - [#81](https://github.com/Natsugure/furatora/issues/81) 経路探索API（乗換案内の方式）の選定
+    — NAVITIME vs 駅すぱあと。**旧 #56 の経路探索パートを切り出したもの**。
+    ADR-0007 決定2「保留」に対応
+  - [#82](https://github.com/Natsugure/furatora/issues/82) 駅・路線マスタの粒度を確定する
+    — 現行の路線×駅粒度は暫定。調査資料は Obsidian
+    `Projects/furatora/駅・路線の粒度 — 設計のための調査メモ`。
+    期限の目安は「ホーム設備の入力が共用ホーム駅（目黒等）に到達したとき」
+  - [#83](https://github.com/Natsugure/furatora/issues/83) 運行系統（serviceRoutes）の
+    データ投入と Admin 管理UI（ODPT路線46件が種）。手動維持が主経路になるため
+    優先度が上がる（ADR-0007 決定1）
+  - [#84](https://github.com/Natsugure/furatora/issues/84) `facilityConnections` の粒度見直し
+  - [#85](https://github.com/Natsugure/furatora/issues/85) `operators.displayPriority` の全国運用ルール
+- **#56 を close した**: マスタソース選定は ADR-0007 で決着・実装は Phase 0〜6 完了、
+  経路探索パートは #81 へ分離。残課題をスコープ限定の Issue に割ったため、
+  #56 は役割を終えた（Phase 7 のみ tasks.md に残る。開発者判断で独立起票せず）
 - **起票しないもの**（初版から削除。理由を残す）:
   - **`ekidataStationCd` の notNull 化。** 「未突合ゼロ達成後」という前提が
     手動運用と両立しない。手動で追加された駅は ekidata コードを持ち得ないため、
@@ -1086,9 +1186,14 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
     機構であり、移行機構を削除する以上、守るべき再取込が存在しない（ADR-0007 決定4）
 
 ### TASK-6.5: ワークスペースの最終化
-- **内容**: 一時ファイル・作業用スクリプトを削除する
-- **対象**: `apps/scripts/src/measure-tx-scale.ts`（TASK-1.1 の計測用）、
-  Neon の計測ブランチとリハーサルブランチ
+- **状態**: ✅ 完了 (2026-09-06)
+- **削除**: `apps/scripts/src/measure-tx-scale.ts`（TASK-1.1 の計測用の捨てスクリプト）。
+  参照していた `masterImportRepository.ts` の `BATCH_SIZE` コメント（`MAX_SAFE_BATCH` への
+  言及）を、計測結果の要約と tasks.md への参照に置き換えた。ほかに参照なし
+  （`apps/scripts/package.json` に script エントリは無く、README への記載も無い）
+- **Neon ブランチ**: 計測ブランチ・リハーサルブランチ（`rehearsal` = `br-proud-shadow-a18el6fk`）は
+  **既に削除済み**。2026-09-06 時点で project `patient-meadow-13439419` に残るのは
+  `main` と `development` のみ（MCP で確認）
 
 ---
 
@@ -1099,6 +1204,11 @@ DATABASE_URL='<rehearsal>' pnpm --filter @furatora/admin dev
 >
 > 初版は「TASK-5.3（未突合解決UI）が完了していること」も依存に含めていたが、
 > TASK-5.4 で未突合を0件にしたため TASK-5.3 自体が欠番になり、この依存は消えた。
+>
+> **前提の充足状況（2026-09-06）**: 本番投入は完了済み（[SQL] 事業者162 / 路線602 /
+> 駅10,625 / 未突合0 / 公開駅334）。突合・取込・公開ガード・`displayPriority` 純化まで
+> 本番で検証済み（Phase 3〜6）。**Phase 7 は実行可能な状態にある。**
+> 本Issue（#56 Phase 6）のスコープ外のため、実行は別途行う。
 
 ### TASK-7.1: `master-import` / `master-migration` を削除
 - **対象**:
