@@ -1,9 +1,9 @@
 # ホームの座標系
 
-> **適用状況**: 2026-08-21 現在、**実装済み・検証未完了**。
+> **適用状況**: 2026-09-06 現在、**実装済み・E2E検証未完了**。
 > スキーマ（`packages/database/src/schema.ts`）・Admin・Web描画はいずれも本書に一致する。
-> ただし [`docs/spec/tasks.md`](../spec/tasks.md) の Phase 6（検証）が未実施のため、
-> 本注記は残す。TASK-6.6 完了時に外すこと。
+> メートル座標化の E2E 検証が [Issue #29](https://github.com/Natsugure/furatora/issues/29)
+> で未完のため本注記を残す。検証完了時に外すこと。
 
 ホーム上の位置は、すべて**メートル単位の1次元連続座標**で表現する。
 設備・車両停車位置・乗り換え帯は、同一のホームについては同一の座標系に乗る。
@@ -35,9 +35,8 @@
 
 ## ホームの物理長
 
-`platforms.physicalLength`（`decimal(6, 2)`、メートル）。管理者が手入力する。
-
-ODPT から取得できないため、`update-odpt` では埋まらない。
+`platforms.physicalLength`（`decimal(6, 2)`、メートル）。管理者が Admin で手入力する
+のが唯一の供給経路である（外部データソースからは取得できない）。
 既存行のために `default('0')` を付けて追加しており、**`'0'` は「未入力」を意味する。**
 `NOT NULL` の default を外す作業は後続Issue。
 

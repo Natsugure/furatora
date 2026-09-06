@@ -24,7 +24,8 @@ export type Station = {
   id: string;
   // 公開駅は CHECK 制約（published_requires_slug）により必ず slug を持つ。
   // ここに現れる Station は可視性述語（publishedStation()）を通った行のみであるため
-  // null を許さない（TASK-5.1: `slug ?? id` フォールバックの整理）。
+  // null を許さない（`slug ?? id` フォールバックは持たない。
+  // docs/domain/station-visibility.md「published_requires_slug の CHECK 制約」）。
   slug: string;
   code: string | null;
   name: string;

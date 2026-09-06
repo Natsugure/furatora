@@ -75,7 +75,8 @@ export function PlatformForm({ stationId, initialData, isEdit = false }: Props) 
     e.preventDefault();
     setErrorMessage(null);
 
-    // physicalLength は既存行の未入力を表す暫定値として 0 を許容しているが（TASK-1.1）、
+    // physicalLength は既存行の未入力を表す暫定値として 0 を許容しているが
+    // （docs/domain/platform-coordinate-system.md「ホームの物理長」。'0' = 未入力）、
     // 新規入力としては受け付けない（features/platform/schema.ts の positive() と揃える）。
     if (physicalLength <= 0) {
       setErrorMessage('ホーム長は0より大きい値を入力してください');

@@ -1,9 +1,13 @@
 # 列車の停車位置パターン
 
-> **適用状況**: 2026-08-15 現在、**未実装**。
-> Issue #29（メートル座標化）で導入する仕様であり、[`docs/spec/tasks.md`](../spec/tasks.md)
-> の Phase 1 以降が未着手のため、本書と `packages/database/src/schema.ts` は一致しない。
-> 実装完了時（TASK-6.6）に本注記を外すこと。
+> **適用状況**: 2026-09-06 現在、**実装済み・E2E検証未完了**。
+> `packages/database/src/schema.ts`（`trainStopPatterns` / `trainStopPatternCars`）、
+> Admin の停車位置パターン編集（`apps/admin/src/features/stop-pattern/`）、
+> Web のホーム描画（`apps/web/src/features/platform/`）はいずれも本書に一致する。
+> メートル座標化の E2E 検証が [Issue #29](https://github.com/Natsugure/furatora/issues/29)
+> で未完のため本注記を残す。検証完了時に外すこと。
+> （2026-08-15 時点の「未実装」表記は、その後の Admin/Web 追随が本書へ反映されて
+> いなかったための古い記述であり、ここで上書きした。）
 
 「あるホームに、ある列車が、どの位置に停まるか」を、
 [ホーム座標系](./platform-coordinate-system.md)上のメートル値で表す。

@@ -28,7 +28,7 @@ export function StationPublishingForm({
 }: Props) {
   const router = useRouter();
   // 公開中は現在の slug を、未公開は候補を初期値にする。管理者はここで確認・編集して確定する
-  // （design.md「slug の候補を提示し、管理者が確認・編集して確定する」）
+  // （slug は自動投入せず公開操作で確定する。docs/domain/station-master-model.md「slug の導出規則」）
   const [slug, setSlug] = useState(station.slug ?? slugCandidate ?? '');
   const [submitting, setSubmitting] = useState(false);
 

@@ -8,7 +8,7 @@ import type { StationPublishingPageQuery } from '@/features/station-publishing/p
 import { LINE_SLUG_ORDER_BY } from '@/external/repository/stationPublishingRepository';
 
 // 設備の入力状況は「入力済みの設備タイプ数 / facilityTypes の総数」で示す。
-// 公開条件にはしない確認材料である（design.md「設備充足度を公開条件にしない判断」）。
+// 公開条件にはしない確認材料である（docs/domain/station-visibility.md）。
 async function countFacilityInput(stationId: string): Promise<{ input: number; total: number }> {
   const [inputRow, totalRow] = await Promise.all([
     db

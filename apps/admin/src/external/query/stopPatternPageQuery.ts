@@ -8,9 +8,9 @@ import type {
   StopPatternListDTO, StopPatternEditContextDTO, TrainOptionDTO,
 } from '@/features/stop-pattern/domain/types';
 
-// TASK-4.5 実施結果参照: ADR-0003 は admin の Query Service 化を後続Issue（#48）としているが、
+// ADR-0003 は admin 全体の Query Service 化を後続Issue（#48）としているが、
 // この新規ページは ESLint の依存ルールにより src/app/** から @furatora/database を
-// 直接 import できないため、この画面2つ分のみ本Issueで先行導入する。
+// 直接 import できないため、この画面2つ分のみ先行導入している。
 
 async function getPlatformWithStation(stationId: string, platformId: string) {
   const [row] = await db

@@ -32,7 +32,7 @@ export default async function StationEditPage({ params }: Props) {
     .map((c) => c.connectedStationId)
     .filter((id): id is string => id !== null);
 
-  // connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列）。
+  // connectedRailwayId 列は廃止済み（ODPT 同期専用の列。ADR-0007 決定3）。
   // 路線名は stationLines 経由で解決する（駅が決まればほぼ1路線に定まる）
   const [connectedStationList, connectedLineRows] = await Promise.all([
     connectedStationIds.length > 0

@@ -31,12 +31,15 @@ import type {
 // apps/admin/src/external/query/stopPatternPageQuery.ts のスタイルを踏襲する。
 // decimal → number の変換はすべてここで完結させる（DTOより上に string を渡さない）。
 
-// connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列であり、ekidata 由来の
-// インポートは書かない）。ekidata は路線ごとに駅を割るモデルであり、接続先の駅が決まれば
-// stationLines 経由で路線が一意に定まる（実測: 駅あたり1路線が10,629駅、2路線が5駅のみ）。
+// connectedRailwayId 列は廃止済み（ODPT 同期専用の列であり、以後 ODPT 同期は行わない。
+// ADR-0007 決定3 / Issue #56）。路線名は connectedStationId → stationLines → lines の
+// join で解決する。駅マスタは路線ごとに駅を割るモデルのため、接続先の駅が決まれば
+// 路線がほぼ一意に定まる（複数路線を持つ駅はごく少数。lineName で重複除去して吸収する）。
+// 詳細: docs/domain/station-master-model.md「乗換接続（stationConnections）」。
 //
-// TASK-5.0: 接続先の駅にも publishedStation() を通す。未公開駅への乗換リンクを
-// 詳細ページに出すと、そこから未公開ページへ到達できてしまう（REQ-7.4）。
+// 接続先の駅にも publishedStation() を通す。未公開駅への乗換リンクを詳細ページに出すと、
+// そこから未公開ページへ到達できてしまう（docs/domain/station-visibility.md
+// 「乗換接続からの到達」。要件の再検討は Issue #77 で進行中）。
 async function getStationConnectionRows(stationId: string) {
   return db
     .select({
@@ -98,8 +101,9 @@ function buildLinesByStation(rows: Awaited<ReturnType<typeof getStationConnectio
 
 export const dbStationDetailQuery: StationDetailQuery = {
   async getBySlug(slug) {
-    // TASK-5.0: 未公開駅は 404（該当なし）にする。CHECK 制約により公開駅は
-    // 必ず slug を持つため、この条件を足しても公開駅の到達性は変わらない。
+    // 未公開駅は 404（該当なし）にする。CHECK 制約 published_requires_slug により
+    // 公開駅は必ず slug を持つため、この条件を足しても公開駅の到達性は変わらない
+    // （docs/domain/station-visibility.md）。
     const [stationRow] = await db
       .select()
       .from(stations)
@@ -168,7 +172,8 @@ export const dbStationDetailQuery: StationDetailQuery = {
     const directionMap = new Map(directionList.map((d) => [d.id, d]));
     const facilityTypeMap = Object.fromEntries(facilityTypeList.map((t) => [t.code, t.name]));
 
-    // 列車の表示判定は「そのホーム・列車の組み合わせに停車位置パターンが登録されているか」のみ（REQ-6.1）
+    // 列車の表示判定は「そのホーム・列車の組み合わせに停車位置パターンが登録されているか」のみ
+    // （docs/domain/train-stop-patterns.md「列車の表示判定」）
     const patternRows = await db
       .select({
         id: trainStopPatterns.id,

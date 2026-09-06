@@ -7,7 +7,7 @@ import { visibleLine, visibleOperator } from './visibility';
 // トップページ（app/page.tsx）と公開API（/api/v1/operators）が共用する。
 // 両者は同じ「表示してよい事業者と路線」を返す必要があり、
 // 可視性の判定を JS 側の絞り込みではなく where 句に置くことで、
-// 詳細ページで判定が抜けた原因（design.md「現行の可視性ガードは一覧にしか無い」）を
+// 詳細ページで判定が抜けた過去のバグ（docs/domain/station-visibility.md）を
 // 繰り返さない。
 export async function getVisibleOperatorsWithLines(): Promise<OperatorWithLines[]> {
   const operatorList = await db

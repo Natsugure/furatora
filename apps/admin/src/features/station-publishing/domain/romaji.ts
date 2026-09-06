@@ -1,24 +1,22 @@
-// TASK-5.1b（Issue #56 / docs/spec/design.md「ローマ字変換規則」）。
-//
 // カナ → 修正ヘボン式ローマ字への変換器。slug 候補の生成に使う。
+// 変換規則の設計・経緯: docs/domain/station-master-model.md「slug の導出規則」（Issue #56）。
 //
-// 【変換元は station_name_k（stations.nameKana）】
-// ekidata の station_name_r は station_name_k の機械転写に過ぎず、
-// `shinnjukusannchoume` のような撥音の誤変換や `echigouuzawa`（エチゴユザワ）
-// `ohanadyaya`（オハナヂャヤ）のような表記揺れを含む。station_name_r を
-// 後から修理するのではなく、揺れの無いカナから決定的に導出する。
+// 【変換元は駅名カナ（stations.nameKana）】
+// 公式の英語表記列を後から修理するのではなく、表記揺れの無いカナから決定的に導出する。
+// カナには「撥音か、n で終わる語＋ナ行か」といった曖昧さが無く、機械転写由来の誤字も
+// 変換元をカナに揃えるだけで消える。
 //
 // 【この規則は furatora の方針であって汎用ユーティリティではない】
-// 長音を縮約する／撥音を m 化しない／`ジェイアール`→`jr` にする、は
-// slug の形を決める furatora の判断である。他プロジェクトへ持ち出す前提を
-// 置いていない（design.md「romaji.ts は master-import に置かない」）。
+// 長音を縮約する／撥音を m 化しない／`ジェイアール`→`jr` にする、は slug の形を決める
+// furatora の判断である。汎用の shared/ には置かず、公開操作の feature に閉じる
+// （feature をまたぐ知識の置き場の考え方は ADR-0001）。
 //
-// 実測（2026-09 実CSV突合。station-publishing/domain/romaji.test.ts の
+// 実測（station-publishing/domain/romaji.test.ts の
 // describe('hepburn: 回帰（実CSV155駅）') 参照）:
 // 決定的規則のみで純粋なローマ字化としての正解率は約86%、
 // 本モジュールが対応する置換辞書・撥音方針を含めると約90%まで上がる。
 // 残る約10%は「原理的に決まらないもの」（後述）であり、
-// 形態素解析器を導入せず、公開時の人の目（TASK-5.2）で拾う。
+// 形態素解析器を導入せず、公開操作時の人の目で拾う。
 
 /**
  * ジェイアール接頭辞。この文字列で始まるカナは `jr-` + 残りの変換に短絡する
@@ -59,7 +57,8 @@ const YOUON: Record<string, string> = {
 };
 
 // 五十音（清音・濁音・半濁音）+ 撥音 + 促音・長音記号。
-// シ/チ/ツ/フ/ジ/ヂ/ヅ はワープロ式を排し修正ヘボン式で書く（design.md 決定的規則）。
+// シ/チ/ツ/フ/ジ/ヂ/ヅ はワープロ式を排し修正ヘボン式で書く
+// （docs/domain/station-master-model.md「slug の導出規則」の決定的規則）。
 const GOJUON: Record<string, string> = {
   ア: 'a', イ: 'i', ウ: 'u', エ: 'e', オ: 'o',
   カ: 'ka', キ: 'ki', ク: 'ku', ケ: 'ke', コ: 'ko',
@@ -87,7 +86,7 @@ const CHOUON_MARK = 'ー';
 const SMALL_KANA = new Set(['ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ャ', 'ュ', 'ョ']);
 
 /**
- * 長音の縮約（design.md「長音の縮約」）。
+ * 長音の縮約（docs/domain/station-master-model.md「slug の導出規則」）。
  * ー記号の削除に加え、お段+ウ／お段+オ（「トウキョウ→tokyo」「オオサカ→osaka」）
  * のように「お段の直前の音を延ばす」カナが続く場合はそのカナを落とす。
  *
@@ -96,8 +95,8 @@ const SMALL_KANA = new Set(['ァ', 'ィ', 'ゥ', 'ェ', 'ォ', 'ャ', 'ュ', '�
  * ように、お段以外は形態素境界であることが多く延ばす表記自体が稀であるのに対し、
  * お段+ウ／オ（長音「オー」）は「トウキョウ→tokyo」のように縮約するのが一般的な
  * 変換規則として広く通用している。お段のみを対象にしても、なお解決できない
- * 境界（タケオ+オンセン→takeonsen 等）は design.md「原理的に決まらないもの」として
- * 許容し、形態素解析器は導入しない。
+ * 境界（タケオ+オンセン→takeonsen 等）は「形態素境界の母音連続は判別不能」として
+ * 許容し、形態素解析器は導入しない（同ドメイン文書）。
  */
 function isChouonContinuation(prevChar: string, kana: string): boolean {
   if (kana === CHOUON_MARK) return true;
