@@ -18,10 +18,9 @@ export interface StopPatternRepository {
 }
 
 // 読み取り: Query Service（ADR-0003）。画面単位でDTOを返す。
-// admin の一覧・編集ページの Query Service 化は ADR-0003 上は後続Issue（#48）だが、
+// admin 全体の Query Service 化は後続Issue（#48）だが、
 // 本 feature の新規ページは ESLint の依存ルールにより src/app/** から
-// @furatora/database を直接 import できないため、この2画面分のみ先行して導入する
-// （docs/spec/tasks.md TASK-4.5 実施結果参照）。
+// @furatora/database を直接 import できないため、この2画面分のみ先行して導入する。
 export interface StopPatternPageQuery {
   getListByPlatform(stationId: string, platformId: string): Promise<StopPatternListDTO | null>;
   getEditContext(

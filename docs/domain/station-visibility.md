@@ -2,7 +2,7 @@
 
 > **適用状況**: 2026-09-06 現在、**実装済み・本番反映済み**。
 > `packages/database/src/schema.ts` および `apps/web/src/external/query/visibility.ts`
-> と一致する。ただし **REQ-7.4（乗換接続に未公開駅を含めない）の要件定義が
+> と一致する。ただし **「乗換接続に未公開駅を含めない」という要件の定義が
 > [Issue #77](https://github.com/Natsugure/furatora/issues/77) で再検討中**であり、
 > 「リンクを伴わない名称のみの参照は許可する」方向で分割される見込み。
 > 本書の「乗換接続からの到達」の記述は #77 の決着で更新する。
@@ -17,12 +17,14 @@
   公開フラグを持たせない（YAGNI。必要になったら足す）。
   - 路線・事業者の可視性は「**公開駅を1件以上持つか**」を `EXISTS` で判定する。
 - `operators.displayPriority` は**表示順専用**であり、可視性の意味を持たない
-  （`0008` で `NOT NULL DEFAULT 0` に純化。かつては「NULL = 非表示」の二役だった）。
+  （マイグレーション `0008` で `NOT NULL DEFAULT 0` に純化。かつては「NULL = 非表示」の
+  二役だった）。全国展開時の `displayPriority` の運用ルール（誰がどう並び順を決めるか）は
+  未定（[Issue #85](https://github.com/Natsugure/furatora/issues/85)）。
 
 ## 判定は単一の述語を通す
 
 `apps/web/src/external/query/visibility.ts` の3関数のみが可視性を表現する。
-読み取り経路ごとに条件を書かない（REQ-7.5）。
+読み取り経路ごとに条件を書かない。
 
 | 関数 | 生成する条件 |
 |---|---|
@@ -49,6 +51,22 @@ published_at IS NULL OR slug IS NOT NULL
 （`apps/web` の型は `string`、`?? id` フォールバックは持たない）。
 `slug` の導出規則は [station-master-model.md](./station-master-model.md#slug-の導出規則)。
 
+## 書き込み側（Admin の公開操作）
+
+可視性は読み取り側の述語が単独で担保するが、書き込み側でも不整合な状態を作らせない。
+`apps/admin` の公開操作（`features/station-publishing/`）は次を守る。
+
+- **所属路線に `slug` が無ければ駅を公開させない**（`LineSlugMissingError` → 422）。
+  `visibleLine()` の `slug IS NOT NULL` 条件と揃え、`slug` の無い路線に公開駅がぶら下がる
+  状態を作らない。
+- **`slug` の重複を弾く**（`SlugTakenError` → 409）。`stations.slug` は一意。
+- **非公開に戻しても `slug` は消さない。** 再公開時に同じ URL を維持するため。
+- **設備の充足度・`nameEn` は公開条件にしない。** 公開操作画面には確認材料として
+  表示するが、条件にすると「とりあえず機械ローマ字を貼る」圧力が生じる。公開の可否は
+  常に人が判断する（充足度から自動導出しない）。
+- **「公開駅を持つのに `slug` が無い路線」をデータ健全性の警告として一覧表示する。**
+  正しさの担保ではなく、`lines.slug` の付け忘れを検知するため。
+
 ## 読み取り経路（`apps/web`）
 
 一覧・路線配下の駅一覧・駅名検索・駅詳細・路線ページ・各公開API
@@ -70,7 +88,7 @@ published_at IS NULL OR slug IS NOT NULL
 
 > この節は [Issue #77](https://github.com/Natsugure/furatora/issues/77) の決着で
 > 更新する。#77 は「リンクを生成する参照は未公開駅を除外／リンクを伴わない
-> 名称のみの参照は許可」へ REQ-7.4 を分割する方針。
+> 名称のみの参照は許可」へ、この要件を分割する方針。
 
 ## 関連
 

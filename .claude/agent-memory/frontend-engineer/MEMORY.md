@@ -6,10 +6,10 @@
 - `packages/database/src/schema.ts` - 全テーブル定義の集約ファイル
 - DBクライアントは `@furatora/database/client` からインポート
 
-## 重要パターン: stationConnections の路線解決（Phase 4 で変更、旧パターンは使わない）
+## 重要パターン: stationConnections の路線解決（旧パターンは使わない）
 
-`stationConnections.connectedRailwayId` と `odptRailwayId` は Issue #56 Phase 4 で
-削除された（ODPT 同期専用の列で、ekidata 由来のインポートは書かないため）。
+`stationConnections.connectedRailwayId` と `odptRailwayId` は Issue #56 で
+削除された（ODPT 同期専用の列で、以後 ODPT 同期は行わないため。ADR-0007 決定3）。
 **「`connectedRailwayId` で試み、失敗したら `odptRailwayId` でフォールバック」という
 旧パターンはもう存在しない。再導入しないこと。**
 
@@ -19,10 +19,9 @@
 重複除去する）。参考実装: `apps/web/src/external/query/stationDetailQuery.ts`
 の `getStationConnectionRows`。
 
-`connectedStationId` は Phase 4 で notNull 化される予定（PR2）。それまでは
-nullable だが、null 行は「未突合」ではなく単に存在しない。
+`connectedStationId` は notNull 化済み。null 行は存在しない。
 
-詳細: `docs/spec/tasks.md` Phase 4 を参照
+詳細: `docs/domain/station-master-model.md`「乗換接続（stationConnections）」/ ADR-0007 決定3
 
 ## TypeScript テストエラーについて
 `apps/admin/src/app/api/operators/[operatorId]/route.test.ts` などのテストファイルに

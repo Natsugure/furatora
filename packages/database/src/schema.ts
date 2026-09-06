@@ -80,9 +80,9 @@ export const stationConnections = pgTable('station_connections', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   stationId: uuid('station_id').references(() => stations.id).notNull(),
 
-  // ODPT 同期の廃止（ADR-0007 決定3）に伴い TASK-4.2 で odptStationId / odptRailwayId /
-  // connectedRailwayId を削除した。路線は connectedStationId → stationLines → lines の
-  // join で解決する（design.md「connectedRailwayId を削除する理由」）
+  // ODPT 同期の廃止（ADR-0007 決定3）に伴い odptStationId / odptRailwayId /
+  // connectedRailwayId は削除済み。路線は connectedStationId → stationLines → lines の
+  // join で解決する（docs/domain/station-master-model.md「乗換接続（stationConnections）」）
   connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
 
   strollerDifficulty: varchar('stroller_difficulty', { length: 20 }).$type<StrollerDifficulty>(),
@@ -266,8 +266,8 @@ export const operators = pgTable('operators', {
   odptOperatorId: varchar('odpt_operator_id', { length: 100 }), // ODPT API の odpt:operator (例: odpt.Operator:TokyoMetro)
   // 【表示順専用。可視性の意味は持たない】小さいほど先に並ぶ。既定 0。
   // 可視性は stations.publishedAt が単独で担う（docs/domain/station-visibility.md /
-  // ADR-0007）。かつては null = 非表示という旧仕様があったが、0008 で NOT NULL DEFAULT 0
-  // に純化し、可視性の判定から切り離した（tasks.md Phase 5b）
+  // ADR-0007）。かつては null = 非表示という旧仕様があったが、マイグレーション 0008 で
+  // NOT NULL DEFAULT 0 に純化し、可視性の判定から切り離した
   displayPriority: integer('display_priority').notNull().default(0),
   ekidataCompanyCd: integer('ekidata_company_cd').unique(),
   createdAt: timestamp('created_at').defaultNow(),

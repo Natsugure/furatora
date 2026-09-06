@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     }
 
     if (connectedFromStationId) {
-      // connectedRailwayId は TASK-4.2 で削除された（ODPT 同期専用の列）。
+      // connectedRailwayId 列は廃止済み（ODPT 同期専用の列。ADR-0007 決定3）。
       // 路線は stationLines 経由で解決する（ekidata は路線ごとに駅を割るため、
       // 駅が決まればほぼ1路線に定まる。実測で複数路線を持つ駅は5件のみ）
       const result = await db

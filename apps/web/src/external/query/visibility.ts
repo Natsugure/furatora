@@ -2,16 +2,15 @@ import { db } from '@furatora/database/client';
 import { lines, operators, stationLines, stations } from '@furatora/database/schema';
 import { and, eq, exists, isNotNull, sql } from 'drizzle-orm';
 
-// TASK-5.0（Issue #56 / docs/spec/design.md「現行の可視性ガードは一覧にしか無い」）。
+// 可視性はこの1ファイルの述語だけが担う。読み取り経路ごとに条件を書かない。
+// かつて可視性は「一覧を組み立てる側」にしか書かれておらず、詳細ページ・公開APIには
+// 判定が無かった（URL 直打ちで非公開駅・非公開路線に到達できた）。その再発を防ぐため、
+// 全ての読み取り経路がここの述語を where 句で通す。
+// 設計と経緯: docs/domain/station-visibility.md「判定は単一の述語を通す」/ ADR-0007（Issue #56）。
 //
-// 可視性はこの1ファイルの述語だけが担う。読み取り経路ごとに条件を書かない（REQ-7.5）。
-// 現行 apps/web の `isNotNull(operators.displayPriority)` は「一覧を組み立てる側」に
-// しか書かれておらず、詳細ページ・6つの公開APIには可視性の判定が無かった
-// （実証済み: /stations/yurikamome-yurikamome-shiodome、
-//  /lines/yurikamome-yurikamome/stations）。
-//
-// `operators.displayPriority` は表示順専用に純化される（Phase 5b, TASK-5b.1）。
-// 移行後、可視性を判定する述語はここだけになる。
+// `operators.displayPriority` はかつて「NULL = 非表示」の二役を担っていたが、
+// マイグレーション 0008 で表示順専用（NOT NULL DEFAULT 0）に純化済みであり、
+// 可視性を判定する述語は `stations.publishedAt`（下記）だけである。
 
 /** 駅が見えるのは publishedAt が設定されているときだけ */
 export function publishedStation() {
@@ -24,7 +23,8 @@ export function publishedStation() {
  * slug を条件に含めるのは `LineAccordion.tsx` が
  * `/lines/${line.slug}/stations` へフォールバック無しでリンクしているため。
  * ekidata 由来の路線は slug が NULL で入るため、対策しなければ
- * `/lines/null/stations` が生成される（design.md「lines.slug の欠落は駅より先に踏む」）。
+ * `/lines/null/stations` が生成される
+ * （docs/domain/station-visibility.md「判定は単一の述語を通す」の `visibleLine()` の項）。
  *
  * 「公開駅を持つ路線は必ず slug を持つ」という不変条件を立てて守る方針は採らない。
  * 不変条件を守るのではなく、不要にする。`LineAccordion` 側にガードは足さない。

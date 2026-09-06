@@ -4,15 +4,15 @@ import { stationPublicationSchema } from '@/features/station-publishing/schema';
 import { LineSlugMissingError, SlugTakenError } from '@/features/station-publishing/ports';
 
 /**
- * 駅の公開・非公開を切り替える（TASK-5.2）。
+ * 駅の公開・非公開を切り替える専用エンドポイント。
  *
  * 既存の `PUT /api/stations/[stationId]` に相乗りさせない。あの route の
  * `stationUpdateSchema` は `publishedAt` を持たず `.set()` が全10列を無条件に
- * 上書きするため、公開切り替えのたびに slug や nameEn を巻き込む
- * （docs/spec/tasks.md TASK-5.2 参照）。
+ * 上書きするため、公開切り替えのたびに slug や nameEn を巻き込んでしまう。
  *
  * `published_requires_slug` の CHECK 違反を実行時の500にしない。
- * slug の有無は repository が書き込み前に検証する。
+ * slug の有無は repository が書き込み前に検証する
+ * （docs/domain/station-visibility.md）。
  */
 export async function PATCH(
   request: Request,
