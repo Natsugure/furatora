@@ -1,17 +1,21 @@
 # 駅・路線マスタのモデル
 
 > **適用状況**: 2026-09-06 現在、**実装済み・本番反映済み**。
-> 駅・路線マスタの同期元は 駅データ.jp（ekidata）会員版CSV であり、
+> 駅・路線マスタの初回シードは 駅データ.jp（ekidata）会員版CSV であり、
 > 本番（Neon `main`）へ投入済み（事業者162 / 路線602 / 駅10,625 / 乗換単位8,782 /
 > 隣接10,040 / 乗換接続6,946）。`packages/database/src/schema.ts` と一致する。
-> 経緯と却下案は [ADR-0007](../adr/0007-station-master-data-source.md)。
+> CSV の取込・突合を行った Admin の機構（`master-import` / `master-migration`）は
+> **投入完了後に削除済み**（ADR-0007 決定4 / tasks.md Phase 7）。以後の維持は
+> Admin での手動編集が主経路になる。経緯と却下案は
+> [ADR-0007](../adr/0007-station-master-data-source.md)。
 
 ## データ源
 
-- **駅・路線・事業者のマスタは ekidata 会員版CSV（`company` / `line` / `station` / `join`）から取り込む。**
+- **駅・路線・事業者のマスタは ekidata 会員版CSV（`company` / `line` / `station` / `join`）を初回シードとして投入した。**
 - **ekidata は初回シードである。継続同期はしない**（[ADR-0007](../adr/0007-station-master-data-source.md) 決定1・決定4）。
-  投入後の維持は Admin での手動編集が主経路になる。定期再取込の機構
-  （旧 `update-odpt.ts` に相当するもの）は設けない。理由は、運行系統粒度で
+  投入後の維持は Admin での手動編集が主経路になる。取込・突合の機構は
+  投入完了後に削除済み（tasks.md Phase 7）。定期再取込の機構
+  （旧 `update-odpt.ts` に相当するもの）も設けない。理由は、運行系統粒度で
   付けた案内名（例: `常磐線快速`）や手入力した `slug` / `nameEn` を
   ekidata の表記（例: `JR常磐線(上野～取手)`）で毎回上書きしてしまうため。
 - ODPT ID（`stations.odptStationId` / `lines.odptRailwayId` / `operators.odptOperatorId`）は
@@ -88,17 +92,19 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
 
 | `source` | 意味 |
 |---|---|
-| `ekidata_group` | インポートが再生成してよい行。同一 `station_g_cd` の現役駅の全順序対（TASK-2.8 の `INSERT ... SELECT`） |
-| `manual` | 管理者が手で追加した行。**インポートは削除・変更しない** |
-| `NULL` | ODPT 時代の行。難易度・メモがすべて NULL の行だけ突合時に削除される |
+| `ekidata_group` | 初回シードで同一 `station_g_cd` の現役駅の全順序対から機械生成された行 |
+| `manual` | 管理者が手で追加した行 |
+| `NULL` | ODPT 時代の行。初回シードの突合時に、難易度・メモがすべて NULL の行だけ削除した |
 
 `station_g_cd` は同一構内の乗り換えしか捉えない。地下通路や連絡改札で繋がる
 別グループ間の乗り換えは、`source = 'manual'` で個別に足す。
+再取込の機構は無いため、この3区分は現在は**由来の記録**として働く。
 
-## 駅名の正規化（突合キー）
+## 駅名の正規化ルール
 
-`apps/admin/src/features/master-import/domain/normalize.ts`。**保存はしない。**
-突合（ODPT 由来の既存行と ekidata の駅の対応づけ）と重複検出のためのキー。
+初回シードの突合（ODPT 由来の既存行と ekidata の駅の対応づけ）で使った正規化キー。
+**正規化した値は保存しない。** 重複検出など、駅名の同一性を機械的に判定する
+場面で同じ規則を使う。
 
 - 括弧とその中身を落とす（`押上〈スカイツリー前〉` = `押上（スカイツリー前）`）。半角丸括弧も対象。
 - `ヶ` を `ケ` に寄せる（`市ケ谷` / `市ヶ谷`）。
