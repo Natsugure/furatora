@@ -31,7 +31,7 @@ test('事業者作成フォームを送信できる（APIモック）', async ({
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
-        body: JSON.stringify({ id: 'mock-id', name: 'テスト事業者', odptOperatorId: null, displayPriority: null }),
+        body: JSON.stringify({ id: 'mock-id', name: 'テスト事業者', odptOperatorId: null, displayPriority: 0 }),
       });
     } else {
       await route.continue();

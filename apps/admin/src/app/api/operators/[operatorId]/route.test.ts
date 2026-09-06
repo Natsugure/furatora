@@ -21,7 +21,7 @@ const mockOperator = {
   id: OPERATOR_ID,
   name: 'JR東日本',
   odptOperatorId: null,
-  displayPriority: null,
+  displayPriority: 0,
 };
 const mockParams = Promise.resolve({ operatorId: OPERATOR_ID });
 

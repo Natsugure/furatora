@@ -20,7 +20,7 @@ const mockOperator = {
   id: '550e8400-e29b-41d4-a716-446655440000',
   name: 'JR東日本',
   odptOperatorId: null,
-  displayPriority: null,
+  displayPriority: 0,
 };
 
 describe('GET /api/operators', () => {
@@ -83,6 +83,20 @@ describe('POST /api/operators', () => {
     const request = new Request('http://localhost/api/operators', {
       method: 'POST',
       body: JSON.stringify({ name: '' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data).toHaveProperty('error');
+  });
+
+  it('displayPriorityにnullを渡すと400を返す（NOT NULL 化後）', async () => {
+    const request = new Request('http://localhost/api/operators', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'JR東日本', displayPriority: null }),
       headers: { 'Content-Type': 'application/json' },
     });
 
