@@ -9,7 +9,7 @@ type Props = {
   initialData?: {
     name: string;
     odptOperatorId: string | null;
-    displayPriority: number | null;
+    displayPriority: number;
   };
 };
 
@@ -18,7 +18,7 @@ export function OperatorForm({ operatorId, initialData }: Props) {
   const [name, setName] = useState(initialData?.name ?? '');
   const [odptOperatorId, setOdptOperatorId] = useState(initialData?.odptOperatorId ?? '');
   const [displayPriority, setDisplayPriority] = useState<number | string>(
-    initialData?.displayPriority ?? ''
+    initialData?.displayPriority ?? 0
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +35,7 @@ export function OperatorForm({ operatorId, initialData }: Props) {
       body: JSON.stringify({
         name,
         odptOperatorId: odptOperatorId || null,
-        displayPriority: typeof displayPriority === 'number' ? displayPriority : null,
+        displayPriority: typeof displayPriority === 'number' ? displayPriority : 0,
       }),
     });
 
@@ -65,8 +65,9 @@ export function OperatorForm({ operatorId, initialData }: Props) {
           onChange={(e) => setOdptOperatorId(e.target.value)}
         />
         <NumberInput
-          label="表示優先度 - 任意"
-          placeholder="未設定の場合は非表示"
+          label="表示順（小さいほど先に表示・既定 0）"
+          description="表示順のみを制御する。公開・非公開は駅ごとの公開操作で決まる"
+          min={0}
           value={displayPriority}
           onChange={setDisplayPriority}
         />

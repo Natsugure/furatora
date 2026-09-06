@@ -38,6 +38,16 @@ describe('operatorSchema', () => {
     const result = operatorSchema.safeParse({ name: 'JR東日本', displayPriority: 'one' });
     expect(result.success).toBe(false);
   });
+
+  it('displayPriorityがnullの場合は失敗する（NOT NULL 化後は 0 以上の整数のみ）', () => {
+    const result = operatorSchema.safeParse({ name: 'JR東日本', displayPriority: null });
+    expect(result.success).toBe(false);
+  });
+
+  it('displayPriorityが負数の場合は失敗する', () => {
+    const result = operatorSchema.safeParse({ name: 'JR東日本', displayPriority: -1 });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('stationUpdateSchema', () => {

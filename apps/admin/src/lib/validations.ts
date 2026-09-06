@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const operatorSchema = z.object({
   name: z.string().min(1),
   odptOperatorId: z.string().nullable().optional(),
-  displayPriority: z.number().int().nullable().optional(),
+  displayPriority: z.number().int().min(0).optional(),
 });
 
 export const stationUpdateSchema = z.object({
