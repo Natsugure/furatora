@@ -11,6 +11,9 @@ import type {
 // 以外の経路で startMeters/endMeters を書き換えてはならない
 // （docs/domain/train-stop-patterns.md）。
 
+/** 号車を潰さない最小幅（m）。moveCarBoundary/moveCarEdge の唯一のクランプ元 */
+export const MIN_CAR_METERS = 0.5;
+
 export type ConcourseDraft = {
   cells: { id: string; xPositionMeters: number | null }[];
 };

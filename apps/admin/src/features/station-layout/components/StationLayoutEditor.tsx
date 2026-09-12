@@ -2,21 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   Badge, Button, Card, ColorSwatch, Group, Modal, Stack, Text,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   computeBounds, layoutConcoursePlates, layoutFacingBanners, exitsLabel, connectionLabels,
 } from '@furatora/platform-diagram/domain';
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { describeError } from '@/features/station-publishing/describeError';
+import { LinkButton } from '@/components/LinkElements';
 import type { LayoutPlatformDetailDTO, LayoutConcourseDTO, LayoutStopPatternDTO } from '@/features/station-layout/ports';
 import {
   createConcourseDraft, createPatternDraft, moveCell, moveCarBoundary, moveCarEdge,
   isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
-  type ConcourseDraft, type PatternDraft,
+  MIN_CAR_METERS, type ConcourseDraft, type PatternDraft,
 } from '@/features/station-layout/domain/editDraft';
 import { DiagramEditLayer } from './DiagramEditLayer';
 
@@ -81,19 +82,27 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
 
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const [confirmOpened, setConfirmOpened] = useState(false);
+  const [confirmOpened, { open: openConfirm, close: closeConfirm }] = useDisclosure(false);
 
   const selectedPatternBaseline = patternBaselines.find((p) => p.patternId === platform.selectedPatternId) ?? null;
 
+  // dirtyの候補になり得るのはdraftを持つ項目だけ（draft未作成＝未編集で必ずclean）
+  // なので、baseline全件ではなくdraftのMapだけを走査すれば十分
   const dirtyConcourseIds = useMemo(
     () => concourseBaselines
-      .filter((c) => isConcourseDirty(c, concourseDrafts.get(c.id) ?? createConcourseDraft(c)))
+      .filter((c) => {
+        const draft = concourseDrafts.get(c.id);
+        return draft && isConcourseDirty(c, draft);
+      })
       .map((c) => c.id),
     [concourseBaselines, concourseDrafts],
   );
   const dirtyPatternIds = useMemo(
     () => patternBaselines
-      .filter((p) => isPatternDirty(p, patternDrafts.get(p.patternId) ?? createPatternDraft(p)))
+      .filter((p) => {
+        const draft = patternDrafts.get(p.patternId);
+        return draft && isPatternDirty(p, draft);
+      })
       .map((p) => p.patternId),
     [patternBaselines, patternDrafts],
   );
@@ -169,7 +178,7 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
     if (!selectedPatternBaseline) return;
     updatePatternDraft(
       selectedPatternBaseline.patternId,
-      (draft) => moveCarBoundary(draft, boundaryIndex, x, { minCarMeters: 0.5 }),
+      (draft) => moveCarBoundary(draft, boundaryIndex, x, { minCarMeters: MIN_CAR_METERS }),
     );
   }
 
@@ -177,86 +186,98 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
     if (!selectedPatternBaseline) return;
     updatePatternDraft(
       selectedPatternBaseline.patternId,
-      (draft) => moveCarEdge(draft, edge, x, { minCarMeters: 0.5 }),
+      (draft) => moveCarEdge(draft, edge, x, { minCarMeters: MIN_CAR_METERS }),
     );
+  }
+
+  /**
+   * 1アグリゲート分の全置換PUTを実行する共通処理。concourse/pattern は
+   * 「対象を特定する・payloadを組み立てる・保存成功後にbaselineへ反映する」点
+   * だけが異なり、fetch・エラー通知・saving中フラグの管理は共通のためここに集約する。
+   */
+  async function saveDraft(opts: {
+    id: string;
+    url: string;
+    payload: unknown;
+    setSavingIds: (mutate: (prev: Set<string>) => Set<string>) => void;
+    onSaved: () => void;
+    successMessage: string;
+  }) {
+    const { id, url, payload, setSavingIds, onSaved, successMessage } = opts;
+    setSavingIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body: unknown = await res.json().catch(() => null);
+        notifications.show({ title: '保存に失敗しました', message: describeError(body), color: 'red' });
+        return;
+      }
+      onSaved();
+      notifications.show({ title: '保存しました', message: successMessage, color: 'green' });
+      router.refresh();
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   async function saveConcourse(concourse: LayoutConcourseDTO) {
     const draft = concourseDrafts.get(concourse.id);
     if (!draft) return;
-    setSavingConcourseIds((prev) => new Set(prev).add(concourse.id));
-    try {
-      const payload = toPlatformLocationPayload(platform.id, concourse, draft);
-      const res = await fetch(`/api/stations/${stationId}/platform-locations/${concourse.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const body: unknown = await res.json().catch(() => null);
-        notifications.show({ title: '保存に失敗しました', message: describeError(body), color: 'red' });
-        return;
-      }
-      const label = exitsLabel(concourse) ?? connectionLabels(concourse)[0] ?? 'コンコース';
-      setConcourseBaselines((prev) => prev.map((c) => (c.id === concourse.id ? mergeConcourse(c, draft) : c)));
-      setConcourseDrafts((prev) => {
-        const next = new Map(prev);
-        next.delete(concourse.id);
-        return next;
-      });
-      notifications.show({ title: '保存しました', message: `${label} の位置を保存しました`, color: 'green' });
-      router.refresh();
-    } finally {
-      setSavingConcourseIds((prev) => {
-        const next = new Set(prev);
-        next.delete(concourse.id);
-        return next;
-      });
-    }
+    const label = exitsLabel(concourse) ?? connectionLabels(concourse)[0] ?? 'コンコース';
+    await saveDraft({
+      id: concourse.id,
+      url: `/api/stations/${stationId}/platform-locations/${concourse.id}`,
+      payload: toPlatformLocationPayload(platform.id, concourse, draft),
+      setSavingIds: setSavingConcourseIds,
+      onSaved: () => {
+        setConcourseBaselines((prev) => prev.map((c) => (c.id === concourse.id ? mergeConcourse(c, draft) : c)));
+        setConcourseDrafts((prev) => {
+          const next = new Map(prev);
+          next.delete(concourse.id);
+          return next;
+        });
+      },
+      successMessage: `${label} の位置を保存しました`,
+    });
   }
 
   async function savePattern(pattern: LayoutStopPatternDTO) {
     const draft = patternDrafts.get(pattern.patternId);
     if (!draft) return;
-    setSavingPatternIds((prev) => new Set(prev).add(pattern.patternId));
-    try {
-      const payload = toStopPatternPayload(platform.id, pattern, draft);
-      const res = await fetch(`/api/stations/${stationId}/train-stop-patterns/${pattern.patternId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const body: unknown = await res.json().catch(() => null);
-        notifications.show({ title: '保存に失敗しました', message: describeError(body), color: 'red' });
-        return;
-      }
-      setPatternBaselines((prev) => prev.map((p) => (p.patternId === pattern.patternId ? mergePattern(p, draft) : p)));
-      setPatternDrafts((prev) => {
-        const next = new Map(prev);
-        next.delete(pattern.patternId);
-        return next;
-      });
-      notifications.show({ title: '保存しました', message: `${pattern.trainLabel} の停車位置を保存しました`, color: 'green' });
-      router.refresh();
-    } finally {
-      setSavingPatternIds((prev) => {
-        const next = new Set(prev);
-        next.delete(pattern.patternId);
-        return next;
-      });
-    }
+    await saveDraft({
+      id: pattern.patternId,
+      url: `/api/stations/${stationId}/train-stop-patterns/${pattern.patternId}`,
+      payload: toStopPatternPayload(platform.id, pattern, draft),
+      setSavingIds: setSavingPatternIds,
+      onSaved: () => {
+        setPatternBaselines((prev) => prev.map((p) => (p.patternId === pattern.patternId ? mergePattern(p, draft) : p)));
+        setPatternDrafts((prev) => {
+          const next = new Map(prev);
+          next.delete(pattern.patternId);
+          return next;
+        });
+      },
+      successMessage: `${pattern.trainLabel} の停車位置を保存しました`,
+    });
   }
 
   function handleTabClick(e: React.MouseEvent, href: string) {
     if (!isAnyDirty) return; // 未保存が無ければ通常のLinkナビゲーションに任せる
     e.preventDefault();
     setPendingHref(href);
-    setConfirmOpened(true);
+    openConfirm();
   }
 
   function confirmDiscardAndNavigate() {
-    setConfirmOpened(false);
+    closeConfirm();
     if (pendingHref) router.push(pendingHref);
     setPendingHref(null);
   }
@@ -265,16 +286,15 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
     <Stack gap="lg">
       <Group gap="xs">
         {platforms.map((p) => (
-          <Button
+          <LinkButton
             key={p.id}
-            component={Link}
             href={layoutHref(stationId, p.id)}
             variant={p.id === platform.id ? 'filled' : 'default'}
             size="sm"
             onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, p.id))}
           >
             {p.platformNumber}番線
-          </Button>
+          </LinkButton>
         ))}
       </Group>
 
@@ -295,9 +315,8 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
         {patternBaselines.length > 1 && (
           <Group gap="xs" mb="md">
             {patternBaselines.map((sp) => (
-              <Button
+              <LinkButton
                 key={sp.patternId}
-                component={Link}
                 href={layoutHref(stationId, platform.id, sp.patternId)}
                 variant={sp.patternId === platform.selectedPatternId ? 'filled' : 'default'}
                 size="compact-sm"
@@ -305,7 +324,7 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
               >
                 {sp.trainLabel}
                 {dirtyPatternIds.includes(sp.patternId) && ' ●'}
-              </Button>
+              </LinkButton>
             ))}
           </Group>
         )}
@@ -389,10 +408,10 @@ export function StationLayoutEditor({ stationId, platforms, platform }: Props) {
         </Card>
       )}
 
-      <Modal opened={confirmOpened} onClose={() => setConfirmOpened(false)} title="未保存の変更があります" centered>
+      <Modal opened={confirmOpened} onClose={closeConfirm} title="未保存の変更があります" centered>
         <Text mb="lg">保存していない変更は失われます。移動しますか？</Text>
         <Group justify="flex-end">
-          <Button variant="default" onClick={() => setConfirmOpened(false)}>キャンセル</Button>
+          <Button variant="default" onClick={closeConfirm}>キャンセル</Button>
           <Button color="red" onClick={confirmDiscardAndNavigate}>変更を破棄して移動</Button>
         </Group>
       </Modal>

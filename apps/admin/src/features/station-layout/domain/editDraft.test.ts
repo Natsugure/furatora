@@ -2,10 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   createConcourseDraft, createPatternDraft, moveCell, moveCarBoundary, moveCarEdge,
   isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
+  MIN_CAR_METERS,
 } from './editDraft';
 import type { LayoutConcourseDTO, LayoutStopPatternDTO } from '@/features/station-layout/ports';
-
-const MIN_CAR_METERS = 0.5;
 
 // 3号車編成。境界は 20 と 40（1-2号車間、2-3号車間）
 const pattern: LayoutStopPatternDTO = {

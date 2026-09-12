@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  useCallback, useEffect, useRef, useState, type RefObject,
+  useCallback, useEffect, useMemo, useRef, useState, type RefObject,
 } from 'react';
 import {
   pxToMeters, snapMeters, roundToDecimal2, snapCandidates,
@@ -16,8 +16,6 @@ import {
 // packages/platform-diagram の snap.ts は純関数のみを提供する。
 
 const HANDLE_SIZE_PX = 24;
-// 号車を潰さない最小幅。グリッド幅を流用する（新たな定数を増やさない）
-const MIN_CAR_METERS = SNAP_GRID_METERS;
 const KEYBOARD_FINE_STEP_METERS = 0.1;
 
 type CarLike = Pick<StopPatternCarDTO, 'carNumber' | 'startMeters' | 'endMeters' | 'doorCount'>;
@@ -66,7 +64,7 @@ export function DiagramEditLayer({
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const rect = useCanvasRect(rootRef);
-  const sortedCars = [...cars].sort((a, b) => a.carNumber - b.carNumber);
+  const sortedCars = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
 
   const cellY = rows.facilityY + FACILITY_ROW_HEIGHT / 2;
   const carY = rows.trainY + TRAIN_ROW_HEIGHT / 2;
@@ -106,10 +104,7 @@ export function DiagramEditLayer({
                 label={`${car.carNumber}号車の先頭（${car.startMeters}m）`}
                 selected={false}
                 candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [car.startMeters] })}
-                onCommit={(x) => onMoveCarEdge(
-                  { carNumber: car.carNumber, side: 'start' },
-                  Math.min(x, car.endMeters - MIN_CAR_METERS),
-                )}
+                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: 'start' }, x)}
               />
             )}
             {!isLast && (
@@ -137,10 +132,7 @@ export function DiagramEditLayer({
                 label={`${car.carNumber}号車の末尾（${car.endMeters}m）`}
                 selected={false}
                 candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [car.endMeters] })}
-                onCommit={(x) => onMoveCarEdge(
-                  { carNumber: car.carNumber, side: 'end' },
-                  Math.max(x, car.startMeters + MIN_CAR_METERS),
-                )}
+                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: 'end' }, x)}
               />
             )}
           </div>
@@ -176,6 +168,10 @@ function DragHandle({
   rootRef, rect, bounds, rows, x, y, label, selected, onFocus, candidates, onCommit,
 }: DragHandleProps) {
   const draggingRef = useRef(false);
+  // ドラッグ中はキャンバスの位置・幅は動かない（bounds凍結と同様、ドロップまで
+  // 再計測しない）。pointermove毎のgetBoundingClientRect()（強制レイアウト）を
+  // 避けるため、ドラッグ開始時に一度だけ計測してキャッシュする
+  const canvasRectRef = useRef({ left: 0, width: 0 });
 
   const commitClamped = useCallback((raw: number) => {
     const clamped = Math.min(Math.max(raw, bounds.minX), bounds.maxX);
@@ -184,15 +180,18 @@ function DragHandle({
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    const root = rootRef.current;
+    if (root) {
+      const r = root.getBoundingClientRect();
+      canvasRectRef.current = { left: r.left, width: r.width };
+    }
     draggingRef.current = true;
     onFocus?.();
-  }, [onFocus]);
+  }, [rootRef, onFocus]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     if (!draggingRef.current) return;
-    const root = rootRef.current;
-    if (!root) return;
-    const canvasRect = root.getBoundingClientRect();
+    const canvasRect = canvasRectRef.current;
     const px = e.clientX - canvasRect.left;
     const raw = pxToMeters(px, bounds, canvasRect.width);
     // Alt/Meta 押下中はグリッド・候補どちらのスナップも無効化し、decimal(6,2)の
@@ -203,7 +202,7 @@ function DragHandle({
       ? raw
       : snapMeters(raw, candidates(), { gridMeters: SNAP_GRID_METERS, toleranceMeters: SNAP_TOLERANCE_METERS });
     commitClamped(roundToDecimal2(snapped));
-  }, [rootRef, bounds, candidates, commitClamped]);
+  }, [bounds, candidates, commitClamped]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.currentTarget.releasePointerCapture?.(e.pointerId);

@@ -1,14 +1,23 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { MouseEventHandler, ReactNode } from 'react';
 import Link from 'next/link';
-import { 
+import {
   Button, type ButtonProps,
-  ActionIcon, type ActionIconProps, 
-  Anchor, type AnchorProps 
+  ActionIcon, type ActionIconProps,
+  Anchor, type AnchorProps
 } from '@mantine/core';
 
-export function LinkButton({ href, children, ...props }: ButtonProps & { href: string; children?: ReactNode }) {
+type LinkButtonProps = ButtonProps & {
+  href: string;
+  children?: ReactNode;
+  // 遷移前の未保存チェックなど、ナビゲーションを一旦横取りしたい呼び出し側向け。
+  // component={Link} でレンダリングされるため実体は<a>。ButtonProps自体はスタイル
+  // propsのみでDOMイベントを含まないため明示的に追加する
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
+};
+
+export function LinkButton({ href, children, ...props }: LinkButtonProps) {
   return (
     <Button component={Link} href={href} {...props}>
       {children}
