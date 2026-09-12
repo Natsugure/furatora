@@ -19,6 +19,21 @@ const pattern: LayoutStopPatternDTO = {
   ],
 };
 
+// 反転編成（3号車編成、x=0に近い側が最終号車。茗荷谷2番線・丸ノ内線相当）。
+// carNumber昇順でstartMetersが減少する。境界共有は非反転と逆側のフィールド
+// （cars[i].startMeters === cars[i+1].endMeters）
+const reversedPattern: LayoutStopPatternDTO = {
+  patternId: 'pattern-2',
+  trainId: 'train-2',
+  trainLabel: '東京メトロ丸ノ内線',
+  carCount: 3,
+  cars: [
+    { carNumber: 1, startMeters: 40, endMeters: 60, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+    { carNumber: 2, startMeters: 20, endMeters: 40, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+    { carNumber: 3, startMeters: 0, endMeters: 20, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+  ],
+};
+
 // 2アクセス点・1設備・1乗換を持つコンコース
 const concourse: LayoutConcourseDTO = {
   id: 'concourse-1',
@@ -135,6 +150,48 @@ describe('moveCarBoundary', () => {
       expect(car1.endMeters).toBe(car2.startMeters);
     }
   });
+
+  describe('反転編成（carNumber昇順でxが減少する編成）', () => {
+    it('境界を動かすと隣接号車のstart/endが同値で連動する（非反転と共有フィールドが逆）', () => {
+      const draft = createPatternDraft(reversedPattern);
+      const next = moveCarBoundary(draft, 0, 35, { minCarMeters: MIN_CAR_METERS });
+
+      const car1 = next.cars.find((c) => c.carNumber === 1)!;
+      const car2 = next.cars.find((c) => c.carNumber === 2)!;
+      expect(car1.startMeters).toBe(35);
+      expect(car2.endMeters).toBe(35);
+      expect(car1.startMeters).toBe(car2.endMeters); // 反転側の不変条件
+      expect(car1.endMeters).toBe(60); // 動かしていない側は不変
+      expect(car2.startMeters).toBe(20);
+    });
+
+    it('他の号車には影響しない', () => {
+      const draft = createPatternDraft(reversedPattern);
+      const next = moveCarBoundary(draft, 0, 35, { minCarMeters: MIN_CAR_METERS });
+      const car3 = next.cars.find((c) => c.carNumber === 3)!;
+      expect(car3).toEqual({ carNumber: 3, startMeters: 0, endMeters: 20 });
+    });
+
+    it('クランプされる（右の号車＝carNumberが大きい側を潰す方向）', () => {
+      const draft = createPatternDraft(reversedPattern);
+      // 境界(40)を19.8へ動かそうとするとcar2が0.2mになってしまう
+      const next = moveCarBoundary(draft, 0, 19.8, { minCarMeters: MIN_CAR_METERS });
+      const car1 = next.cars.find((c) => c.carNumber === 1)!;
+      const car2 = next.cars.find((c) => c.carNumber === 2)!;
+      expect(car2.endMeters).toBe(20 + MIN_CAR_METERS);
+      expect(car1.startMeters).toBe(20 + MIN_CAR_METERS);
+    });
+
+    it('重なりを許容しない: どの入力でも隣接ペアのstart===endが崩れない', () => {
+      const draft = createPatternDraft(reversedPattern);
+      for (const x of [-100, 0, 39.9, 40, 40.1, 100]) {
+        const next = moveCarBoundary(draft, 0, x, { minCarMeters: MIN_CAR_METERS });
+        const car1 = next.cars.find((c) => c.carNumber === 1)!;
+        const car2 = next.cars.find((c) => c.carNumber === 2)!;
+        expect(car1.startMeters).toBe(car2.endMeters);
+      }
+    });
+  });
 });
 
 describe('moveCarEdge', () => {
@@ -164,6 +221,30 @@ describe('moveCarEdge', () => {
     const draft = createPatternDraft(pattern);
     const next = moveCarEdge(draft, { carNumber: 1, side: 'start' }, 19.9, { minCarMeters: MIN_CAR_METERS });
     expect(next.cars.find((c) => c.carNumber === 1)!.startMeters).toBe(20 - MIN_CAR_METERS);
+  });
+
+  describe('反転編成（carNumber昇順でxが減少する編成）', () => {
+    it('1号車のend（編成の右端）を単独で動かせる（非反転と自由端が逆）', () => {
+      const draft = createPatternDraft(reversedPattern);
+      const next = moveCarEdge(draft, { carNumber: 1, side: 'end' }, 65, { minCarMeters: MIN_CAR_METERS });
+      const car1 = next.cars.find((c) => c.carNumber === 1)!;
+      expect(car1.endMeters).toBe(65);
+      expect(car1.startMeters).toBe(40); // start は動かない（内側境界のため）
+    });
+
+    it('最終号車のstart（編成の左端）を単独で動かせる', () => {
+      const draft = createPatternDraft(reversedPattern);
+      const next = moveCarEdge(draft, { carNumber: 3, side: 'start' }, -5, { minCarMeters: MIN_CAR_METERS });
+      const car3 = next.cars.find((c) => c.carNumber === 3)!;
+      expect(car3.startMeters).toBe(-5);
+      expect(car3.endMeters).toBe(20);
+    });
+
+    it('非反転側の自由端（1号車のstart・最終号車のend）を指定すると無変更で返す（反転時は内側境界のため）', () => {
+      const draft = createPatternDraft(reversedPattern);
+      expect(moveCarEdge(draft, { carNumber: 1, side: 'start' }, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
+      expect(moveCarEdge(draft, { carNumber: 3, side: 'end' }, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
+    });
   });
 });
 

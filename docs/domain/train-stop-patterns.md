@@ -30,17 +30,29 @@ trainStopPatterns
 
 ### 隣接号車は境界を共有する
 
-**`carNumber` が隣り合う号車どうしは、`cars[i].endMeters === cars[i+1].startMeters` を保つ。**
+**`carNumber` が隣り合う号車どうしは、境界の座標を共有する。**
 編成に重なり・隙間ができることは物理的に起こり得ないため、この座標系上でも許容しない。
+
+どちらのフィールドが共有側かは、編成の向き（[「号車の向き」](#号車の向き)。
+`isDoorOrderReversed()` が判定する）に依存する:
+
+| 向き | 共有条件 |
+|---|---|
+| 非反転（`carNumber` 昇順で `startMeters` が増加） | `cars[i].endMeters === cars[i+1].startMeters` |
+| 反転（`carNumber` 昇順で `startMeters` が減少） | `cars[i].startMeters === cars[i+1].endMeters` |
 
 これは `startMeters < endMeters` と違い、DB のカラム制約にはまだ現れていない
 （`trainStopPatternCars` の一意な保証は各行の `startMeters < endMeters` のみ）。
 Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft.ts`
-の `moveCarBoundary`）が、境界を動かすときに隣接号車の `end`/`start` を常に
-同値で書き換えることで、この不変条件をクライアント側で構造的に守っている。
-**サーバー側スキーマ（`trainStopPatternSchema`）での強制はまだ入っていない**
-（既存データに不連続な編成が無いことを確認してから追加する。確認作業は
-Issue #95 PR3 の引き継ぎ事項）。
+の `moveCarBoundary`/`moveCarEdge`）が、`isDoorOrderReversed()` で向きを判定した上で
+境界を動かすときに隣接号車の共有フィールドを常に同値で書き換えることで、この
+不変条件をクライアント側で構造的に守っている。
+
+**サーバー側スキーマ（`trainStopPatternSchema`）にも `superRefine` で同じ条件を
+強制している**（Issue #95 PR3引き継ぎ事項として、既存データ（本番含む）に
+不連続な編成が無いことを確認してから追加した。確認には向き非依存の判定が必須で、
+向きを考慮しない単純な `end===start` 比較では、反転編成（例: 茗荷谷2番線・
+丸ノ内線）を不連続と誤検出する）。
 
 ## 標準車両長
 

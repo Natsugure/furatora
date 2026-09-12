@@ -1,3 +1,4 @@
+import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
 import type { PlatformLocationInput } from '@/features/facility/schema';
 import type { TrainStopPatternInput } from '@/features/stop-pattern/schema';
 import type {
@@ -6,9 +7,13 @@ import type {
 
 // 図上編集（StationLayoutEditor）が保持する未保存stateの純関数。
 // Next.js非依存（'use client' に依存しない）なので node 環境でテストできる。
-// この計画で確定した唯一の恒久ドメインルール: 号車境界は隣接号車が共有する
-// （cars[i].endMeters === cars[i+1].startMeters）。この不変条件は moveCarBoundary
-// 以外の経路で startMeters/endMeters を書き換えてはならない
+// この計画で確定した唯一の恒久ドメインルール: 号車境界は隣接号車が共有する。
+// 向き（docs/domain/platform-coordinate-system.md「号車の向き」）によってどちらの
+// フィールドが共有側かが変わる:
+//   非反転（carNumber昇順でxが増加）: cars[i].endMeters === cars[i+1].startMeters
+//   反転（carNumber昇順でxが減少）  : cars[i].startMeters === cars[i+1].endMeters
+// 向きの判定は isDoorOrderReversed()（packages/platform-diagram）を唯一の判定源とする。
+// この不変条件は moveCarBoundary 以外の経路で startMeters/endMeters を書き換えてはならない
 // （docs/domain/train-stop-patterns.md）。
 
 /** 号車を潰さない最小幅（m）。moveCarBoundary/moveCarEdge の唯一のクランプ元 */
@@ -44,8 +49,10 @@ export function moveCell(draft: ConcourseDraft, cellId: string, x: number): Conc
 /**
  * 号車の内側の境界（cars[boundaryIndex] と cars[boundaryIndex+1] の間）を動かす。
  *
- * 重なり・隙間は物理的に起こり得ないため、隣接号車の end/start を常に同値に保つ
- * （このファイル唯一の不変条件）。opts.minCarMeters は号車を潰さない最小幅で、
+ * 重なり・隙間は物理的に起こり得ないため、隣接号車の共有フィールドを常に同値に保つ
+ * （このファイル唯一の不変条件）。どちらのフィールドが共有側かは編成の向きに依存する
+ * （非反転: left.endMeters=right.startMeters、反転: left.startMeters=right.endMeters。
+ * ファイル冒頭コメント参照）。opts.minCarMeters は号車を潰さない最小幅で、
  * 両側の号車がこれより短くならないようクランプする。
  *
  * boundaryIndex が範囲外（両端の外側の境界）のときは無変更で返す。両端は
@@ -62,24 +69,42 @@ export function moveCarBoundary(
 
   const left = cars[boundaryIndex]!;
   const right = cars[boundaryIndex + 1]!;
-  const minX = left.startMeters + opts.minCarMeters;
-  const maxX = right.endMeters - opts.minCarMeters;
-  const clamped = Math.min(Math.max(x, minX), maxX);
+  const reversed = isDoorOrderReversed(cars);
 
+  if (!reversed) {
+    const minX = left.startMeters + opts.minCarMeters;
+    const maxX = right.endMeters - opts.minCarMeters;
+    const clamped = Math.min(Math.max(x, minX), maxX);
+    return {
+      cars: cars.map((car, i) => {
+        if (i === boundaryIndex) return { ...car, endMeters: clamped };
+        if (i === boundaryIndex + 1) return { ...car, startMeters: clamped };
+        return car;
+      }),
+    };
+  }
+
+  // 反転編成: left（carNumberが小さい側）が右寄り、right（carNumberが大きい側）が
+  // 左寄り。共有境界は left.startMeters === right.endMeters
+  const minX = right.startMeters + opts.minCarMeters;
+  const maxX = left.endMeters - opts.minCarMeters;
+  const clamped = Math.min(Math.max(x, minX), maxX);
   return {
     cars: cars.map((car, i) => {
-      if (i === boundaryIndex) return { ...car, endMeters: clamped };
-      if (i === boundaryIndex + 1) return { ...car, startMeters: clamped };
+      if (i === boundaryIndex) return { ...car, startMeters: clamped };
+      if (i === boundaryIndex + 1) return { ...car, endMeters: clamped };
       return car;
     }),
   };
 }
 
 /**
- * 編成の外端（1号車の start、または最終号車の end）を動かす。
+ * 編成の外端（他のどの号車とも境界を共有しない、編成全体としての自由端）を動かす。
  *
- * 外端には連動する隣接号車が無いので単独で動かせる。内側の境界は
- * moveCarBoundary を使うこと（edge が内側の号車を指す場合は無変更で返す）。
+ * 非反転編成では1号車の start・最終号車の end が外端。反転編成ではこれが入れ替わり、
+ * 1号車の end・最終号車の start が外端になる（moveCarBoundary の境界共有規則の裏返し）。
+ * 内側の境界は moveCarBoundary を使うこと（edge が内側の号車・逆側のフィールドを
+ * 指す場合は無変更で返す）。
  */
 export function moveCarEdge(
   draft: PatternDraft,
@@ -91,9 +116,13 @@ export function moveCarEdge(
   const index = cars.findIndex((c) => c.carNumber === edge.carNumber);
   if (index === -1) return draft;
 
-  const isLeftEdge = index === 0 && edge.side === 'start';
-  const isRightEdge = index === cars.length - 1 && edge.side === 'end';
-  if (!isLeftEdge && !isRightEdge) return draft;
+  const reversed = isDoorOrderReversed(cars);
+  const freeSideOfFirst: 'start' | 'end' = reversed ? 'end' : 'start';
+  const freeSideOfLast: 'start' | 'end' = reversed ? 'start' : 'end';
+
+  const isLeadEdge = index === 0 && edge.side === freeSideOfFirst;
+  const isTrailEdge = index === cars.length - 1 && edge.side === freeSideOfLast;
+  if (!isLeadEdge && !isTrailEdge) return draft;
 
   const car = cars[index]!;
   const nextCar = edge.side === 'start'

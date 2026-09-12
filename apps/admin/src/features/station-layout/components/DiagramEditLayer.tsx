@@ -4,7 +4,7 @@ import {
   useCallback, useEffect, useMemo, useRef, useState, type RefObject,
 } from 'react';
 import {
-  pxToMeters, snapMeters, roundToDecimal2, snapCandidates,
+  pxToMeters, snapMeters, roundToDecimal2, snapCandidates, isDoorOrderReversed,
   SNAP_GRID_METERS, SNAP_TOLERANCE_METERS,
   FACILITY_ROW_HEIGHT, TRAIN_ROW_HEIGHT,
   type Bounds, type VerticalLayout, type StopPatternCarDTO,
@@ -65,6 +65,9 @@ export function DiagramEditLayer({
   const rootRef = useRef<HTMLDivElement>(null);
   const rect = useCanvasRect(rootRef);
   const sortedCars = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
+  // 号車番号昇順でxが減少する反転編成（docs/domain/platform-coordinate-system.md「号車の向き」）
+  // では、外端・境界のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
+  const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
 
   const cellY = rows.facilityY + FACILITY_ROW_HEIGHT / 2;
   const carY = rows.trainY + TRAIN_ROW_HEIGHT / 2;
@@ -91,6 +94,13 @@ export function DiagramEditLayer({
       {sortedCars.map((car, i) => {
         const isFirst = i === 0;
         const isLast = i === sortedCars.length - 1;
+        // 非反転: 先頭車のstartが外端、境界はend。反転: これが入れ替わる
+        // （moveCarBoundary/moveCarEdge の境界共有規則の裏返し。editDraft.ts参照）
+        const leadEdgeX = reversed ? car.endMeters : car.startMeters;
+        const leadEdgeSide: 'start' | 'end' = reversed ? 'end' : 'start';
+        const boundaryX = reversed ? car.startMeters : car.endMeters;
+        const trailEdgeX = reversed ? car.startMeters : car.endMeters;
+        const trailEdgeSide: 'start' | 'end' = reversed ? 'start' : 'end';
         return (
           <div key={car.carNumber}>
             {isFirst && (
@@ -99,12 +109,12 @@ export function DiagramEditLayer({
                 rect={rect}
                 bounds={bounds}
                 rows={rows}
-                x={car.startMeters}
+                x={leadEdgeX}
                 y={carY}
-                label={`${car.carNumber}号車の先頭（${car.startMeters}m）`}
+                label={`${car.carNumber}号車の先頭（${leadEdgeX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [car.startMeters] })}
-                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: 'start' }, x)}
+                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [leadEdgeX] })}
+                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
               />
             )}
             {!isLast && (
@@ -113,11 +123,11 @@ export function DiagramEditLayer({
                 rect={rect}
                 bounds={bounds}
                 rows={rows}
-                x={car.endMeters}
+                x={boundaryX}
                 y={carY}
-                label={`${car.carNumber}号車と${car.carNumber + 1}号車の境界（${car.endMeters}m）`}
+                label={`${car.carNumber}号車と${car.carNumber + 1}号車の境界（${boundaryX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [car.endMeters] })}
+                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [boundaryX] })}
                 onCommit={(x) => onMoveCarBoundary(i, x)}
               />
             )}
@@ -127,12 +137,12 @@ export function DiagramEditLayer({
                 rect={rect}
                 bounds={bounds}
                 rows={rows}
-                x={car.endMeters}
+                x={trailEdgeX}
                 y={carY}
-                label={`${car.carNumber}号車の末尾（${car.endMeters}m）`}
+                label={`${car.carNumber}号車の末尾（${trailEdgeX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [car.endMeters] })}
-                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: 'end' }, x)}
+                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [trailEdgeX] })}
+                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
               />
             )}
           </div>

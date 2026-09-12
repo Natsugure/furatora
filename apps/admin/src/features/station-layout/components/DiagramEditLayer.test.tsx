@@ -13,6 +13,13 @@ const cars = [
   { carNumber: 2, startMeters: 50, endMeters: 100, doorCount: 4 },
 ];
 
+// 反転編成（carNumber昇順でxが減少する。茗荷谷2番線・丸ノ内線相当）。
+// 1号車が右側(50-100)、2号車が左側(0-50)
+const reversedCars = [
+  { carNumber: 1, startMeters: 50, endMeters: 100, doorCount: 4 },
+  { carNumber: 2, startMeters: 0, endMeters: 50, doorCount: 4 },
+];
+
 // キャンバス実測幅500px（= 100m × 5px/m PX_PER_METER）。高さはviewHeightに
 // 一致させ、offsetYが0になるようにする（アスペクト比が一致した状態を再現）
 const RECT = {
@@ -151,5 +158,29 @@ describe('号車境界・外端のドラッグ', () => {
     const handle = screen.getByRole('slider', { name: '2号車の末尾（100m）' });
     drag(handle, 500, 450); // 450px→90m
     expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 90);
+  });
+
+  describe('反転編成（carNumber昇順でxが減少する編成）', () => {
+    it('境界ハンドルは共有フィールド（1号車のstart=2号車のend）の座標に立ち、onMoveCarBoundaryが呼ばれる', () => {
+      const { onMoveCarBoundary } = renderLayer({ cars: reversedCars });
+      // 境界の共有座標は50m（非反転と異なりstart側）
+      const handle = screen.getByRole('slider', { name: '1号車と2号車の境界（50m）' });
+      drag(handle, 250, 350); // 350px→70m
+      expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 70);
+    });
+
+    it('1号車の先頭ハンドルは外側の自由端（endフィールド、100m）に立ち、onMoveCarEdgeのsideもendになる', () => {
+      const { onMoveCarEdge } = renderLayer({ cars: reversedCars });
+      const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
+      drag(handle, 500, 450); // 450px→90m
+      expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 90);
+    });
+
+    it('最終号車の末尾ハンドルは外側の自由端（startフィールド、0m）に立ち、onMoveCarEdgeのsideもstartになる', () => {
+      const { onMoveCarEdge } = renderLayer({ cars: reversedCars });
+      const handle = screen.getByRole('slider', { name: '2号車の末尾（0m）' });
+      drag(handle, 0, 50); // 50px→10m
+      expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, 10);
+    });
   });
 });

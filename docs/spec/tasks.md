@@ -281,13 +281,15 @@ PR5: 旧ルート削除・引き渡し
       送った値をそのままbaselineへ取り込む方式にしたため（design.md参照）、
       `(concourseId, xPositionMeters)` による選択復元は不要になった（同一編集セッション内
       ではidが変わらないため選択はそのまま維持される）
-- [ ] **未着手（開発者への引き継ぎ事項）**: `trainStopPatternSchema` へのサーバー側 refine
-      （隣接号車の境界一致を強制）。既存DBに不連続な編成が無いか、以下のSQLで確認してから
-      追加すること（MCPが`org_id`を要求し本セッションから実行できなかった）:
+- [x] **完了（PR4着手時にMCP経由で確認・修正）**: `trainStopPatternSchema` へのサーバー側
+      `superRefine`（隣接号車の境界一致を強制）。
+      **引き継ぎ時のSQLの誤りが判明**: 「0.01mを超えて `end===start` が崩れているペア」
+      という条件は非反転編成しか正しく判定できない。方向非依存の条件で
+      `main`（本番）ブランチに対して再実行したところ、以下の**正しい**SQLで確認できた:
       ```sql
       SELECT p.id AS pattern_id, s.name AS station, pl.platform_number, t.name AS train,
-             a.car_number AS car_a, a.end_meters, b.car_number AS car_b, b.start_meters,
-             (b.start_meters - a.end_meters) AS gap
+             a.car_number AS car_a, a.start_meters AS a_start, a.end_meters AS a_end,
+             b.car_number AS car_b, b.start_meters AS b_start, b.end_meters AS b_end
       FROM train_stop_pattern_cars a
       JOIN train_stop_pattern_cars b
         ON b.train_stop_pattern_id = a.train_stop_pattern_id AND b.car_number = a.car_number + 1
@@ -295,11 +297,22 @@ PR5: 旧ルート削除・引き渡し
       JOIN platforms pl ON pl.id = p.platform_id
       JOIN stations s ON s.id = pl.station_id
       JOIN trains t ON t.id = p.train_id
-      WHERE ABS(b.start_meters - a.end_meters) > 0.01
+      WHERE NOT (
+        ABS(b.start_meters - a.end_meters) <= 0.01   -- 非反転: a.end === b.start
+        OR ABS(a.start_meters - b.end_meters) <= 0.01 -- 反転: a.start === b.end
+      )
       ORDER BY s.name, pl.platform_number, a.car_number;
       ```
-      0件なら refine をそのまま追加してよい。不連続なペアがあれば、意図的な隙間か
-      入力ミスかを確認してから判断する
+      旧SQL（方向非依存化前）は `main` で5件ヒットしたが、いずれも茗荷谷2番線・丸ノ内線
+      （`lastCarNearest` で登録された反転編成）の**誤検出**で、方向非依存の条件では
+      `development`・`main` 両ブランチとも0件だった。データは正常だったため、
+      `trainStopPatternSchema` に `superRefine` を追加した
+      （`docs/domain/train-stop-patterns.md`「隣接号車は境界を共有する」参照）。
+      **この誤検出はSQLだけでなくPR3実装自体にも波及していた**: `editDraft.ts` の
+      `moveCarBoundary`/`moveCarEdge` と `DiagramEditLayer.tsx` のハンドル配置が
+      同じ非反転前提で書かれており、反転編成（実データに存在）で図上編集すると
+      無関係な号車の座標を書き換えて編成を破壊する不具合だった。PR3ブランチ自身に
+      修正を追加済み（`isDoorOrderReversed()` で向きを判定し分岐）
 
 ### Phase 9: PR3 検証
 
@@ -313,13 +326,17 @@ PR5: 旧ルート削除・引き渡し
       （`DiagramEditLayer.test.tsx` 12件、`StationLayoutEditor.test.tsx` 11件。
       jsdomの`getBoundingClientRect`スタブ、bounds凍結の回帰テスト、
       保存fetchのURL・method・ボディ全体の検証を含む）
-- [ ] **未実施（開発者への引き継ぎ事項）**: 保存後に DB の値が期待どおりか SQL で確認。
-      PR2の記録のとおり、赤坂見附・表参道は`platforms`が0件、渋谷の一時停車パターンは
-      削除済みのため、**ドラッグ可能な要素を持つ駅が実DBに存在しない可能性が高い**。
-      渋谷（東京メトロ銀座線1番線、`physicalLength=200`が残っている）に停車パターンを
-      1件作るなどの前処理が必要
+- [x] **PR4着手時にMCP経由で再確認**: `development` ブランチの実データを直接照会した。
+      渋谷（東京メトロ銀座線1番線、`physicalLength=200`）に停車パターン1件（銀座線6両、
+      40〜136m、非反転）が残っており、赤坂見附・表参道は引き続き`platforms`が0件。
+      **`development`にドラッグ可能な要素を持つ駅は渋谷のみ**（前処理は開発者が既に
+      実施済みで、以後の削除は行われていない）。反転編成（茗荷谷2番線・丸ノ内線）は
+      `main`（本番）にのみ存在し、`development`には無い
 - [ ] **未実施（開発者への引き継ぎ事項）**: `e2e/station-layout.spec.ts` へのドラッグ系
-      E2E追加。上記の実データ前提が整ってから着手すること
+      E2E追加。渋谷で非反転編成のドラッグは検証できるが、**反転編成のE2Eケースは
+      `development`にデータが無いため追加できない**。茗荷谷2番線相当のデータを
+      `development`に用意するか、単体テスト（`editDraft.test.ts`/`DiagramEditLayer.test.tsx`）
+      の反転編成ケースで代替するかを判断すること
 
 ---
 
