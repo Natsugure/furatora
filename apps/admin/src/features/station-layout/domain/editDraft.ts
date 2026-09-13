@@ -98,6 +98,10 @@ export function createEmptyConcourseDraft(): ConcourseDraft {
  * ずらした新規未保存draftを作る。座標を持たない（null）セルはそのままnullを保つ
  * （ずらす対象が無いため）。cellのidは makeId() で呼び出し側から発行させる
  * （crypto.randomUUID() 等。関数を純粋に保つため、乱数生成は外側の責務にする）。
+ *
+ * connections の xRangeStart/xRangeEnd（対面乗り換え帯）も cells と同じ自ホーム座標系
+ * のため、同じ offsetMeters でずらす。ここを放置すると、複製後のセルは動くのに
+ * 乗り換え帯だけ元の位置に取り残される。
  */
 export function duplicateConcourseDraft(
   concourse: Pick<LayoutConcourseDTO, 'exits' | 'notes' | 'cells' | 'connections'>,
@@ -112,7 +116,24 @@ export function duplicateConcourseDraft(
       id: makeId(),
       xPositionMeters: cell.xPositionMeters !== null ? cell.xPositionMeters + offsetMeters : null,
     })),
+    connections: draft.connections.map((connection) => ({
+      ...connection,
+      xRangeStart: connection.xRangeStart !== null ? connection.xRangeStart + offsetMeters : null,
+      xRangeEnd: connection.xRangeEnd !== null ? connection.xRangeEnd + offsetMeters : null,
+    })),
   };
+}
+
+/**
+ * 保存不可な状態ならエラーメッセージを返す（旧FacilityForm.tsxのsubmit時アラート相当）。
+ * インスペクタのボタン無効化と、保存実行前のガードの両方から呼ばれる単一の判定源にする。
+ */
+export function concourseDraftValidationError(draft: ConcourseDraft): string | null {
+  if (draft.cells.length === 0) return 'アクセス点を1つ以上追加してください';
+  if (draft.cells.some((cell) => cell.facilities.length === 0)) {
+    return '各アクセス点に設備タイプを1つ以上選択してください';
+  }
+  return null;
 }
 
 export function createPatternDraft(pattern: Pick<LayoutStopPatternDTO, 'cars'>): PatternDraft {

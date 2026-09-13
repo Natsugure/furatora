@@ -7,6 +7,7 @@ import { MantineProvider } from '@mantine/core';
 import { StationLayoutEditor } from './StationLayoutEditor';
 import { createConcourseDraft, moveCell, toPlatformLocationPayload } from '@/features/station-layout/domain/editDraft';
 import type { LayoutPlatformDetailDTO, LayoutConcourseDTO } from '@/features/station-layout/ports';
+import type { FacilityTypeOption } from '@/features/facility/ports';
 
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
@@ -94,7 +95,7 @@ const RECT = {
   width: 550, height: 200, left: 0, top: 0, right: 550, bottom: 200, x: 0, y: 0, toJSON: () => ({}),
 } as DOMRect;
 
-function renderEditor() {
+function renderEditor(overrides: { facilityTypes?: FacilityTypeOption[] } = {}) {
   return render(
     <MantineProvider>
       <StationLayoutEditor
@@ -102,7 +103,7 @@ function renderEditor() {
         platforms={platforms}
         platform={platform}
         lines={[]}
-        facilityTypes={[]}
+        facilityTypes={overrides.facilityTypes ?? []}
         connectedStations={[]}
         trains={[]}
       />
@@ -283,9 +284,13 @@ describe('StationLayoutEditor', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(JSON.stringify({ id: 'new-concourse-id' }), { status: 201 }),
       );
-      renderEditor();
+      // 保存にはアクセス点1件・設備1件以上が必須（concourseDraftValidationError）なので、
+      // 空のまま保存を試みるのではなくアクセス点・設備を追加してから保存する
+      renderEditor({ facilityTypes: [{ code: 'elevator', name: 'エレベーター' }] });
       const user = userEvent.setup();
       await user.click(screen.getByRole('button', { name: '+ コンコースを追加' }));
+      await user.click(screen.getByRole('button', { name: '+ アクセス点を追加' }));
+      await user.click(screen.getByRole('checkbox', { name: 'エレベーター' }));
       await user.click(getUnsavedPanelSaveButton());
 
       await waitFor(() => {

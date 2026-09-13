@@ -115,7 +115,23 @@ describe('duplicateConcourseDraft', () => {
       },
       { id: 'dup-1', xPositionMeters: null, facilities: [] },
     ]);
-    expect(next.connections).toEqual(createConcourseDraft(concourse).connections);
+    expect(next.connections).toEqual([
+      {
+        stationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1', directionId: 'direction-1',
+        exitLabel: 'A3', xRangeStart: 7, xRangeEnd: 17, // 5+2 / 15+2。セルと同じ自ホーム座標系のためずれてはならない
+      },
+    ]);
+  });
+
+  it('xRangeStart/xRangeEndがnullの乗換はnullのままコピーする', () => {
+    const concourseWithoutRange: LayoutConcourseDTO = {
+      ...concourse,
+      connections: [{ ...concourse.connections[0]!, xRangeStart: null, xRangeEnd: null }],
+    };
+    let counter = 0;
+    const next = duplicateConcourseDraft(concourseWithoutRange, 2, () => `dup-${counter++}`);
+    expect(next.connections[0]!.xRangeStart).toBeNull();
+    expect(next.connections[0]!.xRangeEnd).toBeNull();
   });
 });
 

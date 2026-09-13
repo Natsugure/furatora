@@ -9,7 +9,7 @@ import type { FacilityTypeOption, ConnectedStationOption } from '@/features/faci
 import {
   setConcourseField, moveCell, addCell, removeCell,
   addCellFacility, removeCellFacility, updateCellFacility,
-  setConnection, removeConnection,
+  setConnection, removeConnection, concourseDraftValidationError,
   type ConcourseDraft,
 } from '@/features/station-layout/domain/editDraft';
 import { InspectorHeader } from './InspectorHeader';
@@ -41,6 +41,7 @@ export function ConcourseInspector({
     () => new Map(draft.connections.map((c) => [c.stationId, c])),
     [draft.connections],
   );
+  const validationError = concourseDraftValidationError(draft);
 
   function addNewCell() {
     onChange((d) => addCell(d, crypto.randomUUID()));
@@ -273,7 +274,7 @@ export function ConcourseInspector({
         </div>
 
         <Group gap="sm">
-          <Button type="button" loading={saving} onClick={onSave}>
+          <Button type="button" loading={saving} onClick={onSave} disabled={!!validationError}>
             保存
           </Button>
         </Group>

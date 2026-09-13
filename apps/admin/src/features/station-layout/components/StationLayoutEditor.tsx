@@ -26,7 +26,7 @@ import {
   createPatternDraft, createPatternDraftFromPreview,
   moveCell, moveCarBoundary, moveCarEdge,
   isConcourseDirty, isPatternDirty, dirtyIds, toPlatformLocationPayload, toStopPatternPayload,
-  draftToDisplayConcourse,
+  draftToDisplayConcourse, concourseDraftValidationError,
   MIN_CAR_METERS, type ConcourseDraft, type PatternDraft, type ConcourseDisplayLookups,
 } from '@/features/station-layout/domain/editDraft';
 import { DiagramEditLayer } from './DiagramEditLayer';
@@ -191,12 +191,16 @@ export function StationLayoutEditor({
   const plateLayout = useMemo(() => layoutConcoursePlates(displayConcourses, bounds), [displayConcourses, bounds]);
   const facingLayout = useMemo(() => layoutFacingBanners(displayConcourses, bounds), [displayConcourses, bounds]);
 
+  // draftがあればdraft.cellsを見る（インスペクタで追加したセルはbaselineにまだ無いため）
   const cellToConcourseId = useMemo(() => {
     const map = new Map<string, string>();
-    for (const c of concourseBaselines) for (const cell of c.cells) map.set(cell.id, c.id);
+    for (const c of concourseBaselines) {
+      const cells = concourseDrafts.get(c.id)?.cells ?? c.cells;
+      for (const cell of cells) map.set(cell.id, c.id);
+    }
     if (newConcourse) for (const cell of newConcourse.draft.cells) map.set(cell.id, newConcourse.tempId);
     return map;
-  }, [concourseBaselines, newConcourse]);
+  }, [concourseBaselines, concourseDrafts, newConcourse]);
 
   /** 既存コンコースのdraftを更新する。newConcourse.tempId が来た場合はそちらを更新する */
   function updateConcourseDraft(concourseId: string, mutate: (draft: ConcourseDraft) => ConcourseDraft) {
@@ -317,6 +321,11 @@ export function StationLayoutEditor({
   async function saveConcourse(concourse: LayoutConcourseDTO) {
     const draft = concourseDrafts.get(concourse.id);
     if (!draft) return;
+    const validationError = concourseDraftValidationError(draft);
+    if (validationError) {
+      notifications.show({ title: '保存できません', message: validationError, color: 'red' });
+      return;
+    }
     const label = exitsLabel(concourse) ?? connectionLabels(concourse)[0] ?? 'コンコース';
     await saveAggregate({
       id: concourse.id,
@@ -341,6 +350,11 @@ export function StationLayoutEditor({
   async function saveNewConcourse() {
     if (!newConcourse) return;
     const { tempId, draft } = newConcourse;
+    const validationError = concourseDraftValidationError(draft);
+    if (validationError) {
+      notifications.show({ title: '保存できません', message: validationError, color: 'red' });
+      return;
+    }
     await saveAggregate({
       id: tempId,
       method: 'POST',
