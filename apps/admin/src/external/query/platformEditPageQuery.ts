@@ -14,7 +14,7 @@ import type {
 // ホームは駅に停車する路線に属するものなので、それ以外の路線を選択肢に出す意味がない。
 // かつ lines は実測 602 件あり（#49 設計時の想定 62 件は古い）、全件を返すと
 // ホームの新規・編集ページを開くたびに RSC ペイロードへ全路線が載る。
-// PR4で station-layout の stationLayoutPageQuery からも再利用するため export する。
+// station-layout の stationLayoutPageQuery からも再利用するため export する。
 export async function getLinesWithDirections(stationId: string): Promise<LineWithDirections[]> {
   const stationLineIds = db
     .select({ lineId: stationLines.lineId })

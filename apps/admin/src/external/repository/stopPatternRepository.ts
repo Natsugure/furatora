@@ -1,9 +1,10 @@
 import { db } from '@furatora/database/client';
-import { withTransaction, type Tx } from '@furatora/database/tx';
-import { trainStopPatterns, trainStopPatternCars, platforms } from '@furatora/database/schema';
-import { and, eq, exists, sql } from 'drizzle-orm';
+import { withTransaction } from '@furatora/database/tx';
+import { trainStopPatterns, trainStopPatternCars } from '@furatora/database/schema';
+import { and, eq } from 'drizzle-orm';
 import { DuplicateStopPatternError, type StopPatternRepository } from '@/features/stop-pattern/ports';
 import { requireInserted } from '@/external/requireInserted';
+import { isPlatformOfStation, belongsToStation } from '@/external/repository/stationScopeGuard';
 
 // PostgreSQL の一意制約違反（unique_violation）のエラーコード。
 // https://www.postgresql.org/docs/current/errcodes-appendix.html
@@ -15,29 +16,6 @@ function isUniqueViolation(err: unknown): boolean {
     err !== null &&
     'code' in err &&
     (err as { code: unknown }).code === UNIQUE_VIOLATION_CODE
-  );
-}
-
-// 書き込み対象のホームが当該駅のものかを検証する。
-// これを省くと、A駅の管理画面からB駅のホームにパターンを作成・付け替えできてしまう。
-async function isPlatformOfStation(tx: Tx, platformId: string, stationId: string): Promise<boolean> {
-  const [row] = await tx
-    .select({ id: platforms.id })
-    .from(platforms)
-    .where(and(eq(platforms.id, platformId), eq(platforms.stationId, stationId)));
-  return !!row;
-}
-
-// 更新・削除の対象行を当該駅のホームに属するものへ絞り込む相関サブクエリ。
-// 「先に SELECT で確認してから UPDATE」ではなく WHERE 句に含めることで、単一文で完結させる。
-function belongsToStation(stationId: string) {
-  return exists(
-    db
-      .select({ one: sql`1` })
-      .from(platforms)
-      .where(
-        and(eq(platforms.id, trainStopPatterns.platformId), eq(platforms.stationId, stationId))
-      )
   );
 }
 
@@ -84,7 +62,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
         const [updated] = await tx
           .update(trainStopPatterns)
           .set({ platformId: pattern.platformId, trainId: pattern.trainId })
-          .where(and(eq(trainStopPatterns.id, id), belongsToStation(stationId)))
+          .where(and(eq(trainStopPatterns.id, id), belongsToStation(trainStopPatterns.platformId, stationId)))
           .returning();
         if (!updated) return false;
 
@@ -115,7 +93,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
     // trainStopPatternCars は CASCADE で削除される
     const [row] = await db
       .delete(trainStopPatterns)
-      .where(and(eq(trainStopPatterns.id, id), belongsToStation(stationId)))
+      .where(and(eq(trainStopPatterns.id, id), belongsToStation(trainStopPatterns.platformId, stationId)))
       .returning();
     return !!row;
   },

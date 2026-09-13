@@ -13,8 +13,7 @@ type Props = {
  *
  * タブ・図・編集レイヤ・インスペクタ・未保存パネル・「位置未登録の設備・乗換」
  * セクションはすべて StationLayoutEditor（Client Component）に委譲する
- * （未保存確認モーダルがタブ遷移をまたいで単一のdirty stateを共有する必要があり、
- * PR4で「位置を入力」導線が操作を伴うようになったため。design.md参照）。
+ * （未保存確認モーダルがタブ遷移をまたいで単一のdirty stateを共有する必要があるため）。
  * ここに残すのは静的表示のみ: 戻るリンク・駅名・notes。
  */
 export function StationLayoutView({ stationId, context }: Props) {

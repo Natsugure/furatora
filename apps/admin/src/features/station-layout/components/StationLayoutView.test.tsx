@@ -75,8 +75,8 @@ function renderView(platform: LayoutPlatformDetailDTO) {
 
 describe('StationLayoutView', () => {
   // 図を描けない状態でも、座標未入力のデータと備考は見えていなければならない（web の PlatformDisplay と同じ）
-  // 「3番出口」はPR4で追加されたコンコース一覧（StationLayoutEditor）のボタンラベルにも
-  // 出るため、「位置未登録の設備・乗換」セクションにスコープして検証する
+  // 「3番出口」はコンコース一覧（StationLayoutEditor）のボタンラベルにも出るため、
+  // 「位置未登録の設備・乗換」セクションにスコープして検証する
   it('ホーム長が未入力でも、位置未登録の設備と備考を表示する', () => {
     renderView(buildPlatform({ physicalLength: 0 }));
 

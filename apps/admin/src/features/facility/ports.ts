@@ -7,9 +7,10 @@ export type PlatformLocationRecord = {
   notes: string | null;
 };
 
-// すべてのメソッドが stationId を受け取り、対象の platformLocations が当該駅の
-// ホームに属することを検証する（platformRepository/stopPatternRepository と同じ
-// 所有権スコープ。以前はURL直打ちで他駅のコンコースを更新・削除できた）。
+/**
+ * すべてのメソッドが stationId を受け取り、対象の platformLocations が当該駅の
+ * ホームに属することを検証する（platformRepository/stopPatternRepository と同じ所有権スコープ）。
+ */
 export interface PlatformLocationRepository {
   // input.platformId が stationId に属さなければ null
   create(stationId: string, input: PlatformLocationInput): Promise<PlatformLocationRecord | null>;

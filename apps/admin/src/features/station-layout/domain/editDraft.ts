@@ -46,10 +46,9 @@ export type ConnectionDraft = {
 };
 
 /**
- * コンコース（platformLocations 1件）の未保存state。PR3時点では座標のみだったが、
- * PR4のインスペクタ統合でテキストフィールド（exits/notes/facilities/connections）
- * まで含む全体draftへ拡張した。既存コンコースの編集・新規作成・複製のいずれも
- * このdraftを共通の作業単位として扱う（baselineが無ければ新規、あれば編集）。
+ * コンコース（platformLocations 1件）の未保存state。座標に加え、テキストフィールド
+ * （exits/notes/facilities/connections）を含む全体draft。既存コンコースの編集・
+ * 新規作成・複製のいずれもこのdraftを共通の作業単位として扱う（baselineが無ければ新規、あれば編集）。
  */
 export type ConcourseDraft = {
   exits: string | null;
@@ -310,10 +309,17 @@ export function moveCarBoundary(
 }
 
 /**
+ * 編成の向きに応じた自由端の側を返す。非反転編成では1号車の start・最終号車の end、
+ * 反転編成ではこれが入れ替わる（moveCarBoundary の境界共有規則の裏返し）。
+ * moveCarEdge とインスペクタのラベル表示（StopPatternInspector）の両方が
+ * この判定を共有することで、向きの判定を1箇所に閉じる。
+ */
+export function freeEdgeSides(reversed: boolean): { first: 'start' | 'end'; last: 'start' | 'end' } {
+  return reversed ? { first: 'end', last: 'start' } : { first: 'start', last: 'end' };
+}
+
+/**
  * 編成の外端（他のどの号車とも境界を共有しない、編成全体としての自由端）を動かす。
- *
- * 非反転編成では1号車の start・最終号車の end が外端。反転編成ではこれが入れ替わり、
- * 1号車の end・最終号車の start が外端になる（moveCarBoundary の境界共有規則の裏返し）。
  * 内側の境界は moveCarBoundary を使うこと（edge が内側の号車・逆側のフィールドを
  * 指す場合は無変更で返す）。
  */
@@ -328,8 +334,7 @@ export function moveCarEdge(
   if (index === -1) return draft;
 
   const reversed = isDoorOrderReversed(cars);
-  const freeSideOfFirst: 'start' | 'end' = reversed ? 'end' : 'start';
-  const freeSideOfLast: 'start' | 'end' = reversed ? 'start' : 'end';
+  const { first: freeSideOfFirst, last: freeSideOfLast } = freeEdgeSides(reversed);
 
   const isLeadEdge = index === 0 && edge.side === freeSideOfFirst;
   const isTrailEdge = index === cars.length - 1 && edge.side === freeSideOfLast;
@@ -398,11 +403,26 @@ export function isPatternDirty(server: Pick<LayoutStopPatternDTO, 'cars'>, draft
 }
 
 /**
+ * draftを持ち、baselineから変更されている項目のidだけを返す。
+ * draft未作成（未編集）の項目は必ずcleanなので候補にすら入れない。
+ */
+export function dirtyIds<B, D>(
+  baselines: B[],
+  idOf: (baseline: B) => string,
+  drafts: Map<string, D>,
+  isDirty: (baseline: B, draft: D) => boolean,
+): string[] {
+  return baselines
+    .filter((b) => {
+      const draft = drafts.get(idOf(b));
+      return draft !== undefined && isDirty(b, draft);
+    })
+    .map(idOf);
+}
+
+/**
  * PUT/POST の platform-locations ペイロードを組み立てる。
- *
- * PR3時点ではdraftが座標のみだったためserver DTOとのマージが必要だったが、
- * PR4でdraftがテキストフィールドまで含む全体状態になったため、draft単体から
- * 組み立てられる（新規作成でも既存編集でも同じ関数を使える）。
+ * draftが全体状態を持つため、draft単体から組み立てられる（新規作成でも既存編集でも同じ関数を使える）。
  */
 export function toPlatformLocationPayload(
   platformId: string,

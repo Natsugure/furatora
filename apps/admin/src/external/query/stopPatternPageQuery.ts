@@ -25,7 +25,7 @@ async function getPlatformWithStation(stationId: string, platformId: string) {
   return row ?? null;
 }
 
-// PR4で station-layout の stationLayoutPageQuery からも再利用するため export する。
+// station-layout の stationLayoutPageQuery からも再利用するため export する。
 export async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
   const trainRows = await db
     .select({ id: trains.id, name: trains.name, carCount: trains.carCount })
@@ -51,8 +51,7 @@ export async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
       .map((s) => ({
         carNumber: s.carNumber,
         carLength: s.carLength != null ? Number(s.carLength) : null,
-        // PR4: 新規停車パターン作成のプレビュー（インスペクタ）用。既存パターンの
-        // ドア位置解決（本ファイル getStopPatterns）と同じ既定値 4 を使う
+        // ドア位置解決（本ファイル getStopPatterns）と同じ既定値 4 に揃える
         doorCount: s.doorCount,
       }));
     // 号車構成が未登録の場合、carCount 件を標準構成として補う

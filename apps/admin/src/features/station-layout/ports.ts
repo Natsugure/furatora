@@ -58,9 +58,8 @@ export type StationLayoutContext = {
   platforms: LayoutPlatformDTO[];
   /** 選択中ホームの全データ。駅にホームが1件も無ければ null */
   platform: LayoutPlatformDetailDTO | null;
-  // PR4で追加。インスペクタ（テキストフォーム統合）の選択肢データ。
-  // facilityEditPageQuery/platformEditPageQuery/stopPatternPageQuery が
-  // 既に持つ取得ロジックを再利用する（design.md「データフロー」参照）
+  // 以下はインスペクタの選択肢データ。取得は facilityEditPageQuery/platformEditPageQuery/
+  // stopPatternPageQuery の既存ロジックを再利用する。
   /** 当該駅の stationLines に載る路線（方面ネスト済み）。新規ホーム追加フォーム用 */
   lines: LineWithDirections[];
   /** 設備種別一覧（全件） */

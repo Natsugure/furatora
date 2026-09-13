@@ -12,6 +12,7 @@ import {
   setConnection, removeConnection,
   type ConcourseDraft,
 } from '@/features/station-layout/domain/editDraft';
+import { InspectorHeader } from './InspectorHeader';
 
 type Props = {
   draft: ConcourseDraft;
@@ -47,21 +48,12 @@ export function ConcourseInspector({
 
   return (
     <Card withBorder padding="lg">
-      <Group justify="space-between" mb="md">
-        <Title order={4}>{isNew ? '新規コンコース' : 'コンコースを編集'}</Title>
-        <Group gap="xs">
-          {onDiscard && (
-            <Button type="button" variant="subtle" color="red" size="compact-sm" onClick={onDiscard}>
-              取り消す
-            </Button>
-          )}
-          {onDelete && (
-            <Button type="button" variant="subtle" color="red" size="compact-sm" loading={deleting} onClick={onDelete}>
-              削除
-            </Button>
-          )}
-        </Group>
-      </Group>
+      <InspectorHeader
+        title={isNew ? '新規コンコース' : 'コンコースを編集'}
+        onDiscard={onDiscard}
+        onDelete={onDelete}
+        deleting={deleting}
+      />
 
       <Stack gap="lg" maw="42rem">
         <TextInput

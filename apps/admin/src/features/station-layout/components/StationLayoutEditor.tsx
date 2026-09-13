@@ -25,7 +25,7 @@ import {
   createConcourseDraft, createEmptyConcourseDraft, duplicateConcourseDraft,
   createPatternDraft, createPatternDraftFromPreview,
   moveCell, moveCarBoundary, moveCarEdge,
-  isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
+  isConcourseDirty, isPatternDirty, dirtyIds, toPlatformLocationPayload, toStopPatternPayload,
   draftToDisplayConcourse,
   MIN_CAR_METERS, type ConcourseDraft, type PatternDraft, type ConcourseDisplayLookups,
 } from '@/features/station-layout/domain/editDraft';
@@ -75,8 +75,6 @@ function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | unde
  * 含まない）からのみ算出する。新規作成中のコンコース・停車パターン（newConcourse/
  * newPattern）も未保存のうちはboundsに含めない（同じ理由）。
  *
- * PR4での拡張点: 座標のドラッグ（PR3）に加え、テキストフィールド（exits/notes/
- * facilities/connections）の編集・新規作成・複製をこのdraft機構に統合した。
  * ConcourseDraft/PatternDraft の編集はドラッグと数値入力のどちらから来ても
  * editDraft.ts の同じ純関数を通るため、どちらの経路でも同じ不変条件が守られる。
  */
@@ -122,23 +120,12 @@ export function StationLayoutEditor({
     };
   }, [facilityTypes, connectedStations]);
 
-  // dirtyの候補になり得るのはdraftを持つ項目だけ（draft未作成＝未編集で必ずclean）
   const dirtyConcourseIds = useMemo(
-    () => concourseBaselines
-      .filter((c) => {
-        const draft = concourseDrafts.get(c.id);
-        return draft && isConcourseDirty(c, draft);
-      })
-      .map((c) => c.id),
+    () => dirtyIds(concourseBaselines, (c) => c.id, concourseDrafts, isConcourseDirty),
     [concourseBaselines, concourseDrafts],
   );
   const dirtyPatternIds = useMemo(
-    () => patternBaselines
-      .filter((p) => {
-        const draft = patternDrafts.get(p.patternId);
-        return draft && isPatternDirty(p, draft);
-      })
-      .map((p) => p.patternId),
+    () => dirtyIds(patternBaselines, (p) => p.patternId, patternDrafts, isPatternDirty),
     [patternBaselines, patternDrafts],
   );
   const isAnyDirty = dirtyConcourseIds.length > 0 || dirtyPatternIds.length > 0
@@ -551,7 +538,45 @@ export function StationLayoutEditor({
     setPendingHref(null);
   }
 
-  const undrawableConcourses = existingDisplayConcourses.filter((c) => !isDrawable(c) && hasDisplayableInfo(c));
+  /** 表示中の停車パターン（新規プレビュー／既存選択中）に応じた保存・削除・取り消しの導線を組み立てる */
+  function patternActions(): { onSave: () => void; onDelete?: () => void; onDiscard?: () => void } {
+    if (newPattern) {
+      return { onSave: saveNewPattern, onDiscard: () => setNewPattern(null) };
+    }
+    return {
+      onSave: () => { if (selectedPatternBaseline) void savePattern(selectedPatternBaseline); },
+      onDelete: selectedPatternBaseline
+        ? () => requestDelete(
+          `${selectedPatternBaseline.trainLabel} の停車位置`,
+          () => deletePattern(selectedPatternBaseline.patternId, selectedPatternBaseline.trainLabel),
+        )
+        : undefined,
+    };
+  }
+
+  /** 選択中のコンコース（新規作成中を含む）に応じた保存・削除・取り消しの導線を組み立てる */
+  function concourseActions(concourseId: string): { onSave: () => void; onDelete?: () => void; onDiscard?: () => void } {
+    if (newConcourse?.tempId === concourseId) {
+      return { onSave: saveNewConcourse, onDiscard: discardNewConcourse };
+    }
+    return {
+      onSave: () => {
+        const baseline = concourseBaselines.find((c) => c.id === concourseId);
+        if (baseline) void saveConcourse(baseline);
+      },
+      onDelete: () => {
+        const baseline = concourseBaselines.find((c) => c.id === concourseId);
+        if (!baseline) return;
+        const label = exitsLabel(baseline) ?? connectionLabels(baseline)[0] ?? 'コンコース';
+        requestDelete(label, () => deleteConcourse(baseline.id, label));
+      },
+    };
+  }
+
+  const undrawableConcourses = useMemo(
+    () => existingDisplayConcourses.filter((c) => !isDrawable(c) && hasDisplayableInfo(c)),
+    [existingDisplayConcourses],
+  );
 
   return (
     <Stack gap="lg">
@@ -712,14 +737,7 @@ export function StationLayoutEditor({
           cars={displayPattern.cars}
           onMoveCarBoundary={handleMoveCarBoundary}
           onMoveCarEdge={handleMoveCarEdge}
-          onSave={newPattern ? saveNewPattern : () => selectedPatternBaseline && savePattern(selectedPatternBaseline)}
-          onDelete={!newPattern && selectedPatternBaseline
-            ? () => requestDelete(
-              `${selectedPatternBaseline.trainLabel} の停車位置`,
-              () => deletePattern(selectedPatternBaseline.patternId, selectedPatternBaseline.trainLabel),
-            )
-            : undefined}
-          onDiscard={newPattern ? () => setNewPattern(null) : undefined}
+          {...patternActions()}
           saving={newPattern ? savingPatternIds.has('__new_pattern__') : savingPatternIds.has(selectedPatternBaseline?.patternId ?? '')}
           deleting={selectedPatternBaseline ? deletingPatternIds.has(selectedPatternBaseline.patternId) : false}
           isNew={!!newPattern}
@@ -785,17 +803,7 @@ export function StationLayoutEditor({
           facilityTypes={facilityTypes}
           connectedStations={connectedStations}
           onChange={(mutate) => updateConcourseDraft(selectedConcourseId, mutate)}
-          onSave={newConcourse?.tempId === selectedConcourseId ? saveNewConcourse : () => {
-            const baseline = concourseBaselines.find((c) => c.id === selectedConcourseId);
-            if (baseline) void saveConcourse(baseline);
-          }}
-          onDelete={newConcourse?.tempId === selectedConcourseId ? undefined : () => {
-            const baseline = concourseBaselines.find((c) => c.id === selectedConcourseId);
-            if (!baseline) return;
-            const label = exitsLabel(baseline) ?? connectionLabels(baseline)[0] ?? 'コンコース';
-            requestDelete(label, () => deleteConcourse(baseline.id, label));
-          }}
-          onDiscard={newConcourse?.tempId === selectedConcourseId ? discardNewConcourse : undefined}
+          {...concourseActions(selectedConcourseId)}
           saving={savingConcourseIds.has(selectedConcourseId)}
           deleting={deletingConcourseIds.has(selectedConcourseId)}
           isNew={newConcourse?.tempId === selectedConcourseId}

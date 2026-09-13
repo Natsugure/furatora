@@ -7,6 +7,8 @@ import {
 import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
 import { buildCarSegments, type CarNumberOrder, type CarSegment } from '@/features/stop-pattern/domain/carSegments';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
+import { freeEdgeSides } from '@/features/station-layout/domain/editDraft';
+import { InspectorHeader } from './InspectorHeader';
 
 type PatternCar = { carNumber: number; startMeters: number; endMeters: number };
 
@@ -116,33 +118,24 @@ export function StopPatternInspector({
   const sorted = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
   const reversed = useMemo(() => isDoorOrderReversed(sorted), [sorted]);
 
+  const { first: leadEdgeSide, last: trailEdgeSide } = freeEdgeSides(reversed);
+
   return (
     <Card withBorder padding="lg">
-      <Group justify="space-between" mb="md">
-        <Title order={4}>{isNew ? `${trainLabel} の停車位置（新規）` : `${trainLabel} の停車位置を編集`}</Title>
-        <Group gap="xs">
-          {onDiscard && (
-            <Button type="button" variant="subtle" color="red" size="compact-sm" onClick={onDiscard}>
-              取り消す
-            </Button>
-          )}
-          {onDelete && (
-            <Button type="button" variant="subtle" color="red" size="compact-sm" loading={deleting} onClick={onDelete}>
-              削除
-            </Button>
-          )}
-        </Group>
-      </Group>
+      <InspectorHeader
+        title={isNew ? `${trainLabel} の停車位置（新規）` : `${trainLabel} の停車位置を編集`}
+        onDiscard={onDiscard}
+        onDelete={onDelete}
+        deleting={deleting}
+      />
 
       <Stack gap={4} maw="28rem">
         {sorted.map((car, i) => {
           const isFirst = i === 0;
           const isLast = i === sorted.length - 1;
           const leadEdgeX = reversed ? car.endMeters : car.startMeters;
-          const leadEdgeSide: 'start' | 'end' = reversed ? 'end' : 'start';
           const boundaryX = reversed ? car.startMeters : car.endMeters;
           const trailEdgeX = reversed ? car.startMeters : car.endMeters;
-          const trailEdgeSide: 'start' | 'end' = reversed ? 'start' : 'end';
 
           return (
             <Fragment key={car.carNumber}>

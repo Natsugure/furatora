@@ -5,16 +5,15 @@ import type { StopPatternListDTO, StopPatternEditContextDTO } from './domain/typ
 // Drizzle/Next.js 非依存（ADR-0002）。実装は external/repository/stopPatternRepository.ts。
 export class DuplicateStopPatternError extends Error {}
 
-// 書き込み: Repository（ADR-0003）。集約単位で不変条件を守って永続化する。
-//
-// trainStopPatterns は stationId を持たず platformId 経由でしか駅に紐づかないため、
-// 駅スコープは呼び出し側では守れない。全メソッドが stationId を受け取り、
-// 対象（および付け替え先）のホームが当該駅のものであることを実装側で保証する。
-// save の戻り値 null は「当該駅に該当ホームが無い」、update/delete の false も同義で
-// route.ts が404に写像する。
-// save は作成したパターンの id を返す（PR4: 新規作成直後にドラッグ・保存を続けるため
-// StationLayoutEditor がこのidを baseline に反映する必要がある。以前は boolean のみで
-// POSTのレスポンスにidが含まれず、新規パターンの以後の編集・保存対象を特定できなかった）
+/**
+ * 書き込み: Repository（ADR-0003）。集約単位で不変条件を守って永続化する。
+ *
+ * trainStopPatterns は stationId を持たず platformId 経由でしか駅に紐づかないため、
+ * 全メソッドが stationId を受け取り、対象（および付け替え先）のホームが当該駅の
+ * ものであることを実装側で保証する。save の戻り値 null・update/delete の false は
+ * 「当該駅に該当ホームが無い」の意味で、route.ts が404に写像する。
+ * save は作成したパターンの id を返す（新規作成直後の編集継続に使用）。
+ */
 export interface StopPatternRepository {
   save(stationId: string, pattern: TrainStopPatternInput): Promise<{ id: string } | null>;
   update(id: string, stationId: string, pattern: TrainStopPatternInput): Promise<boolean>;

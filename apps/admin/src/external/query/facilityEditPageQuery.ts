@@ -28,8 +28,7 @@ async function getStationPlatformOptions(stationId: string) {
     .orderBy(asc(platforms.platformNumber));
 }
 
-// PR4で station-layout の stationLayoutPageQuery からも再利用するため export する
-// （二重管理を避ける。ADR-0003 の Query Service 方針に反しない範囲での関数共有）
+// station-layout の stationLayoutPageQuery からも再利用するため export する（ADR-0003の範囲内）
 export async function getFacilityTypeOptions() {
   return db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes);
 }

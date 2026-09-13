@@ -227,9 +227,8 @@ async function getStopPatterns(platformId: string): Promise<LayoutStopPatternDTO
 
 export const dbStationLayoutPageQuery: StationLayoutPageQuery = {
   async getContext(stationId, selection) {
-    // インスペクタ（PR4）の選択肢データは選択中ホームに依存しないため、
-    // station/platformList と並列に取得する（既存 facilityEditPageQuery /
-    // platformEditPageQuery / stopPatternPageQuery のロジックをそのまま再利用）
+    // インスペクタの選択肢データは選択中ホームに依存しないため、station/platformList と
+    // 並列に取得する（facilityEditPageQuery/platformEditPageQuery/stopPatternPageQuery を再利用）
     const [
       [stationRow], platformList, linesWithDirections, facilityTypeOptions, connectedStations, trainOptions,
     ] = await Promise.all([
