@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  render, screen, fireEvent, waitFor,
+  render, screen, fireEvent, waitFor, within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { StationLayoutEditor } from './StationLayoutEditor';
-import { toPlatformLocationPayload } from '@/features/station-layout/domain/editDraft';
+import { createConcourseDraft, moveCell, toPlatformLocationPayload } from '@/features/station-layout/domain/editDraft';
 import type { LayoutPlatformDetailDTO, LayoutConcourseDTO } from '@/features/station-layout/ports';
 
 const mockPush = vi.fn();
@@ -97,7 +97,15 @@ const RECT = {
 function renderEditor() {
   return render(
     <MantineProvider>
-      <StationLayoutEditor stationId="station-1" platforms={platforms} platform={platform} />
+      <StationLayoutEditor
+        stationId="station-1"
+        platforms={platforms}
+        platform={platform}
+        lines={[]}
+        facilityTypes={[]}
+        connectedStations={[]}
+        trains={[]}
+      />
     </MantineProvider>,
   );
 }
@@ -109,6 +117,15 @@ function dragCellTo30m() {
   fireEvent.pointerDown(handle, { pointerId: 1, clientX: 150 });
   fireEvent.pointerMove(handle, { pointerId: 1, clientX: 175 });
   fireEvent.pointerUp(handle, { pointerId: 1, clientX: 175 });
+}
+
+/**
+ * 「未保存の変更」パネル内の保存ボタンを取得する。ドラッグでコンコースが選択されると
+ * ConcourseInspector・StopPatternInspectorにも同名「保存」ボタンが現れるため、
+ * パネルにスコープして曖昧さを避ける。
+ */
+function getUnsavedPanelSaveButton() {
+  return within(screen.getByTestId('unsaved-panel')).getByRole('button', { name: '保存' });
 }
 
 beforeEach(() => {
@@ -129,7 +146,7 @@ describe('StationLayoutEditor', () => {
 
     expect(screen.getByRole('slider', { name: 'アクセス点（30m）' })).toBeInTheDocument();
     expect(screen.getByText('未保存の変更')).toBeInTheDocument();
-    expect(screen.getByText('●')).toBeInTheDocument();
+    expect(within(screen.getByTestId('unsaved-panel')).getByText('●')).toBeInTheDocument();
   });
 
   it('ドラッグ中は<svg>のviewBoxが変化しない（bounds凍結）', () => {
@@ -148,9 +165,10 @@ describe('StationLayoutEditor', () => {
     dragCellTo30m();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.click(getUnsavedPanelSaveButton());
 
-    const expectedPayload = toPlatformLocationPayload('platform-1', concourse, { cells: [{ id: 'cell-1', xPositionMeters: 30 }] });
+    const expectedDraft = moveCell(createConcourseDraft(concourse), 'cell-1', 30);
+    const expectedPayload = toPlatformLocationPayload('platform-1', expectedDraft);
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith('/api/stations/station-1/platform-locations/concourse-1', {
         method: 'PUT',
@@ -166,7 +184,7 @@ describe('StationLayoutEditor', () => {
     dragCellTo30m();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.click(getUnsavedPanelSaveButton());
 
     await waitFor(() => {
       expect(mockRefresh).toHaveBeenCalled();
@@ -183,7 +201,7 @@ describe('StationLayoutEditor', () => {
     dragCellTo30m();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.click(getUnsavedPanelSaveButton());
 
     await waitFor(() => {
       expect(notificationsShow).toHaveBeenCalledWith(
@@ -239,5 +257,65 @@ describe('StationLayoutEditor', () => {
     const event = new Event('beforeunload', { cancelable: true });
     const notCancelled = window.dispatchEvent(event);
     expect(notCancelled).toBe(true);
+  });
+
+  describe('新規コンコース（#31 複製・追加）', () => {
+    it('「+ コンコースを追加」で新規コンコースが選択された状態のインスペクタが開く', async () => {
+      renderEditor();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '+ コンコースを追加' }));
+
+      expect(screen.getByRole('heading', { name: '新規コンコース' })).toBeInTheDocument();
+      expect(within(screen.getByTestId('unsaved-panel')).getByText('新規コンコース')).toBeInTheDocument();
+    });
+
+    it('「複製」で既存コンコースの内容をコピーした新規コンコースができる', async () => {
+      renderEditor();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '複製' }));
+
+      // 複製元と同じ出口ラベルの入力欄が新規コンコースのインスペクタに表示される
+      expect(screen.getByDisplayValue('A3出口')).toBeInTheDocument();
+      expect(within(screen.getByTestId('unsaved-panel')).getByText('新規コンコース')).toBeInTheDocument();
+    });
+
+    it('新規コンコースの保存はPOSTで/platform-locationsへ送られる', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(JSON.stringify({ id: 'new-concourse-id' }), { status: 201 }),
+      );
+      renderEditor();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '+ コンコースを追加' }));
+      await user.click(getUnsavedPanelSaveButton());
+
+      await waitFor(() => {
+        expect(fetch).toHaveBeenCalledWith(
+          '/api/stations/station-1/platform-locations',
+          expect.objectContaining({ method: 'POST' }),
+        );
+      });
+    });
+
+    it('「取り消す」で新規コンコースを破棄できる', async () => {
+      renderEditor();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '+ コンコースを追加' }));
+      await user.click(screen.getByRole('button', { name: '取り消す' }));
+
+      expect(screen.queryByText('未保存の変更')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('停車位置パターン（既存）のインスペクタ', () => {
+    it('選択中パターンの境界を数値入力で変更できる', async () => {
+      renderEditor();
+      const user = userEvent.setup();
+      const boundaryInput = screen.getByLabelText('1号車と2号車の境界');
+      await user.clear(boundaryInput);
+      await user.type(boundaryInput, '60');
+      await user.tab();
+
+      expect(within(screen.getByTestId('unsaved-panel')).getByText('テスト列車 の停車位置')).toBeInTheDocument();
+    });
   });
 });

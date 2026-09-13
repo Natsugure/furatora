@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createConcourseDraft, createPatternDraft, moveCell, moveCarBoundary, moveCarEdge,
+  createConcourseDraft, createEmptyConcourseDraft, duplicateConcourseDraft,
+  createPatternDraft, createPatternDraftFromPreview,
+  setConcourseField, moveCell, addCell, removeCell,
+  addCellFacility, removeCellFacility, updateCellFacility,
+  setConnection, removeConnection,
+  moveCarBoundary, moveCarEdge,
   isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
+  draftToDisplayConcourse,
   MIN_CAR_METERS,
 } from './editDraft';
 import type { LayoutConcourseDTO, LayoutStopPatternDTO } from '@/features/station-layout/ports';
@@ -62,13 +68,54 @@ const concourse: LayoutConcourseDTO = {
 };
 
 describe('createConcourseDraft', () => {
-  it('server DTOのcellをid/xPositionMetersだけのdraftに変換する', () => {
+  it('server DTOをexits/notes/cells/connectionsを持つdraftに変換する', () => {
     expect(createConcourseDraft(concourse)).toEqual({
+      exits: 'A3出口',
+      notes: '仮設階段あり',
       cells: [
-        { id: 'cell-1', xPositionMeters: 10 },
-        { id: 'cell-2', xPositionMeters: null },
+        {
+          id: 'cell-1',
+          xPositionMeters: 10,
+          facilities: [
+            { typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可' },
+          ],
+        },
+        { id: 'cell-2', xPositionMeters: null, facilities: [] },
+      ],
+      connections: [
+        {
+          stationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1', directionId: 'direction-1',
+          exitLabel: 'A3', xRangeStart: 5, xRangeEnd: 15,
+        },
       ],
     });
+  });
+});
+
+describe('createEmptyConcourseDraft', () => {
+  it('exits/notesがnull、cells/connectionsが空のdraftを作る', () => {
+    expect(createEmptyConcourseDraft()).toEqual({ exits: null, notes: null, cells: [], connections: [] });
+  });
+});
+
+describe('duplicateConcourseDraft', () => {
+  it('座標を持つセルはoffsetMetersぶんずらし、座標を持たないセルはnullのままコピーする', () => {
+    let counter = 0;
+    const next = duplicateConcourseDraft(concourse, 2, () => `dup-${counter++}`);
+
+    expect(next.exits).toBe('A3出口');
+    expect(next.notes).toBe('仮設階段あり');
+    expect(next.cells).toEqual([
+      {
+        id: 'dup-0',
+        xPositionMeters: 12, // 10 + 2
+        facilities: [
+          { typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可' },
+        ],
+      },
+      { id: 'dup-1', xPositionMeters: null, facilities: [] },
+    ]);
+    expect(next.connections).toEqual(createConcourseDraft(concourse).connections);
   });
 });
 
@@ -84,6 +131,33 @@ describe('createPatternDraft', () => {
   });
 });
 
+describe('createPatternDraftFromPreview', () => {
+  it('buildCarSegments()相当の配列をcarNumber昇順のdraftに変換する', () => {
+    const segments = [
+      { carNumber: 2, startMeters: 20, endMeters: 40 },
+      { carNumber: 1, startMeters: 0, endMeters: 20 },
+    ];
+    expect(createPatternDraftFromPreview(segments)).toEqual({
+      cars: [
+        { carNumber: 1, startMeters: 0, endMeters: 20 },
+        { carNumber: 2, startMeters: 20, endMeters: 40 },
+      ],
+    });
+  });
+});
+
+describe('setConcourseField', () => {
+  it('exitsを更新する', () => {
+    const draft = createConcourseDraft(concourse);
+    expect(setConcourseField(draft, 'exits', 'B2出口').exits).toBe('B2出口');
+  });
+
+  it('notesをnullに戻せる', () => {
+    const draft = createConcourseDraft(concourse);
+    expect(setConcourseField(draft, 'notes', null).notes).toBeNull();
+  });
+});
+
 describe('moveCell', () => {
   it('指定したcellのxPositionMetersだけを更新する', () => {
     const draft = createConcourseDraft(concourse);
@@ -96,6 +170,81 @@ describe('moveCell', () => {
   it('存在しないcellIdを渡しても無変更で返す', () => {
     const draft = createConcourseDraft(concourse);
     expect(moveCell(draft, 'not-exist', 1)).toEqual(draft);
+  });
+});
+
+describe('addCell / removeCell', () => {
+  it('addCellは座標未入力・設備なしのセルを追加する', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = addCell(draft, 'cell-new');
+    expect(next.cells).toHaveLength(3);
+    expect(next.cells.at(-1)).toEqual({ id: 'cell-new', xPositionMeters: null, facilities: [] });
+  });
+
+  it('removeCellは指定したセルだけを取り除く', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = removeCell(draft, 'cell-2');
+    expect(next.cells.map((c) => c.id)).toEqual(['cell-1']);
+  });
+});
+
+describe('addCellFacility / removeCellFacility / updateCellFacility', () => {
+  it('addCellFacilityは既定値（車いす・ベビーカーとも対応、メモなし）で追加する', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = addCellFacility(draft, 'cell-2', 'stairs');
+    const cell2 = next.cells.find((c) => c.id === 'cell-2')!;
+    expect(cell2.facilities).toEqual([
+      { typeCode: 'stairs', isWheelchairAccessible: true, isStrollerAccessible: true, notes: null },
+    ]);
+  });
+
+  it('addCellFacilityは同じtypeCodeが既にあれば無変更で返す', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = addCellFacility(draft, 'cell-1', 'elevator');
+    expect(next).toEqual(draft);
+  });
+
+  it('removeCellFacilityは指定したtypeCodeだけを取り除く', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = removeCellFacility(draft, 'cell-1', 'elevator');
+    expect(next.cells.find((c) => c.id === 'cell-1')?.facilities).toEqual([]);
+  });
+
+  it('updateCellFacilityは指定したフィールドだけをマージする', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = updateCellFacility(draft, 'cell-1', 'elevator', { isStrollerAccessible: false });
+    const facility = next.cells.find((c) => c.id === 'cell-1')?.facilities[0];
+    expect(facility).toEqual({
+      typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: false, notes: '朝は使用不可',
+    });
+  });
+});
+
+describe('setConnection / removeConnection', () => {
+  it('setConnectionは既存のstationIdの内容をpatchでマージする', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = setConnection(draft, 'station-shibuya', { exitLabel: 'A4' });
+    expect(next.connections).toEqual([
+      {
+        stationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1', directionId: 'direction-1',
+        exitLabel: 'A4', xRangeStart: 5, xRangeEnd: 15,
+      },
+    ]);
+  });
+
+  it('setConnectionは未登録のstationIdなら既定値＋patchで新規追加する', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = setConnection(draft, 'station-omotesando', { connectedPlatformId: 'platform-omotesando-1' });
+    expect(next.connections).toContainEqual({
+      stationId: 'station-omotesando', connectedPlatformId: 'platform-omotesando-1', directionId: null,
+      exitLabel: null, xRangeStart: null, xRangeEnd: null,
+    });
+  });
+
+  it('removeConnectionは指定したstationIdだけを取り除く', () => {
+    const draft = createConcourseDraft(concourse);
+    const next = removeConnection(draft, 'station-shibuya');
+    expect(next.connections).toEqual([]);
   });
 });
 
@@ -260,7 +409,42 @@ describe('isConcourseDirty', () => {
 
   it('cell件数が変わるとdirtyになる', () => {
     const draft = createConcourseDraft(concourse);
-    expect(isConcourseDirty(concourse, { cells: draft.cells.slice(0, 1) })).toBe(true);
+    expect(isConcourseDirty(concourse, { ...draft, cells: draft.cells.slice(0, 1) })).toBe(true);
+  });
+
+  it('exitsを変更するとdirtyになる', () => {
+    const draft = setConcourseField(createConcourseDraft(concourse), 'exits', 'B2出口');
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
+  });
+
+  it('notesを変更するとdirtyになる', () => {
+    const draft = setConcourseField(createConcourseDraft(concourse), 'notes', null);
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
+  });
+
+  it('設備の属性を変更するとdirtyになる', () => {
+    const draft = updateCellFacility(createConcourseDraft(concourse), 'cell-1', 'elevator', { notes: '使用可能' });
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
+  });
+
+  it('設備を追加するとdirtyになる', () => {
+    const draft = addCellFacility(createConcourseDraft(concourse), 'cell-2', 'stairs');
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
+  });
+
+  it('乗換先を変更するとdirtyになる', () => {
+    const draft = setConnection(createConcourseDraft(concourse), 'station-shibuya', { exitLabel: 'A4' });
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
+  });
+
+  it('乗換先の件数が変わるとdirtyになる', () => {
+    const draft = removeConnection(createConcourseDraft(concourse), 'station-shibuya');
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
+  });
+
+  it('新規セル（サーバーに存在しないid）を追加するとdirtyになる', () => {
+    const draft = addCell(createConcourseDraft(concourse), 'cell-new');
+    expect(isConcourseDirty(concourse, draft)).toBe(true);
   });
 });
 
@@ -276,9 +460,9 @@ describe('isPatternDirty', () => {
 });
 
 describe('toPlatformLocationPayload', () => {
-  it('draftのxPositionMetersとserver DTOの他フィールドが両方とも往復する（最重要）', () => {
+  it('draft単体からペイロードを組み立てる（exits/notes/facilities/connectionsを含む）', () => {
     const draft = moveCell(createConcourseDraft(concourse), 'cell-1', 12.5);
-    const payload = toPlatformLocationPayload('platform-1', concourse, draft);
+    const payload = toPlatformLocationPayload('platform-1', draft);
 
     expect(payload).toEqual({
       platformId: 'platform-1',
@@ -311,17 +495,33 @@ describe('toPlatformLocationPayload', () => {
     });
   });
 
-  it('未変更のdraftを渡すとxPositionMetersがserver DTOのまま往復する', () => {
-    const draft = createConcourseDraft(concourse);
-    const payload = toPlatformLocationPayload('platform-1', concourse, draft);
-    expect(payload.cells.map((c) => c.xPositionMeters)).toEqual([10, null]);
+  it('新規コンコース（createEmptyConcourseDraft起点）でもペイロードを組み立てられる', () => {
+    let counter = 0;
+    const draft = addCellFacility(
+      addCell(setConcourseField(createEmptyConcourseDraft(), 'exits', 'C1出口'), `new-${counter++}`),
+      'new-0',
+      'elevator',
+    );
+    const payload = toPlatformLocationPayload('platform-1', draft);
+    expect(payload).toEqual({
+      platformId: 'platform-1',
+      exits: 'C1出口',
+      notes: null,
+      cells: [
+        {
+          xPositionMeters: null,
+          facilities: [{ typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: true, notes: null }],
+        },
+      ],
+      connections: [],
+    });
   });
 });
 
 describe('toStopPatternPayload', () => {
   it('platformId・trainId・全号車のcarNumber順ペイロードを組み立てる', () => {
     const draft = moveCarBoundary(createPatternDraft(pattern), 0, 22, { minCarMeters: MIN_CAR_METERS });
-    const payload = toStopPatternPayload('platform-1', pattern, draft);
+    const payload = toStopPatternPayload('platform-1', pattern.trainId, draft);
 
     expect(payload).toEqual({
       platformId: 'platform-1',
@@ -332,5 +532,63 @@ describe('toStopPatternPayload', () => {
         { carNumber: 3, startMeters: 40, endMeters: 60 },
       ],
     });
+  });
+});
+
+describe('draftToDisplayConcourse', () => {
+  const lookups = {
+    facilityTypeName: (code: string) => (code === 'elevator' ? 'エレベーター' : code),
+    connectedStation: (stationId: string) => (
+      stationId === 'station-shibuya'
+        ? {
+          name: '渋谷',
+          lines: [{ name: '田園都市線', color: '#00A650' }],
+          directions: [{ id: 'direction-1', displayName: '渋谷方面' }],
+        }
+        : undefined
+    ),
+  };
+
+  it('既存コンコースのdraftを表示用DTOに戻せる（facilities.idは合成id）', () => {
+    const draft = createConcourseDraft(concourse);
+    const dto = draftToDisplayConcourse('concourse-1', draft, lookups);
+
+    expect(dto).toEqual({
+      id: 'concourse-1',
+      exits: 'A3出口',
+      notes: '仮設階段あり',
+      cells: [
+        {
+          id: 'cell-1',
+          xPositionMeters: 10,
+          facilities: [
+            {
+              id: 'cell-1:elevator', typeCode: 'elevator', typeName: 'エレベーター',
+              isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可',
+            },
+          ],
+        },
+        { id: 'cell-2', xPositionMeters: null, facilities: [] },
+      ],
+      connections: [
+        {
+          connectedStationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1', directionId: 'direction-1',
+          stationName: '渋谷', lineNames: ['田園都市線'], lineColors: ['#00A650'],
+          directionName: '渋谷方面', exitLabel: 'A3', xRangeStart: 5, xRangeEnd: 15,
+        },
+      ],
+    });
+  });
+
+  it('lookupで解決できない接続先はstationName空文字・directionName nullにフォールバックする', () => {
+    const draft = setConnection(createEmptyConcourseDraft(), 'station-unknown', { exitLabel: 'X1' });
+    const dto = draftToDisplayConcourse('concourse-new', draft, lookups);
+    expect(dto.connections).toEqual([
+      {
+        connectedStationId: 'station-unknown', connectedPlatformId: null, directionId: null,
+        stationName: '', lineNames: [], lineColors: [], directionName: null,
+        exitLabel: 'X1', xRangeStart: null, xRangeEnd: null,
+      },
+    ]);
   });
 });
