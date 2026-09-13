@@ -2,8 +2,9 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import {
-  Button, Card, Group, NativeSelect, NumberInput, Radio, Stack, Text, Title,
+  Button, Card, Collapse, Group, NativeSelect, NumberInput, Radio, Stack, Text, Title,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
 import { buildCarSegments, type CarNumberOrder, type CarSegment } from '@/features/stop-pattern/domain/carSegments';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
@@ -117,6 +118,9 @@ export function StopPatternInspector({
 }: EditProps) {
   const sorted = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
   const reversed = useMemo(() => isDoorOrderReversed(sorted), [sorted]);
+  // 新規（未保存）パターンは作成直後に内容を確認・調整したいはずなので展開。
+  // 既存パターンは一覧性を優先しデフォルト折りたたみ
+  const [collapsed, { toggle: toggleCollapsed }] = useDisclosure(!isNew);
 
   const { first: leadEdgeSide, last: trailEdgeSide } = freeEdgeSides(reversed);
 
@@ -127,61 +131,65 @@ export function StopPatternInspector({
         onDiscard={onDiscard}
         onDelete={onDelete}
         deleting={deleting}
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
       />
 
-      <Stack gap={4} maw="28rem">
-        {sorted.map((car, i) => {
-          const isFirst = i === 0;
-          const isLast = i === sorted.length - 1;
-          const leadEdgeX = reversed ? car.endMeters : car.startMeters;
-          const boundaryX = reversed ? car.startMeters : car.endMeters;
-          const trailEdgeX = reversed ? car.startMeters : car.endMeters;
+      <Collapse in={!collapsed} transitionDuration={0}>
+        <Stack gap={4} maw="28rem">
+          {sorted.map((car, i) => {
+            const isFirst = i === 0;
+            const isLast = i === sorted.length - 1;
+            const leadEdgeX = reversed ? car.endMeters : car.startMeters;
+            const boundaryX = reversed ? car.startMeters : car.endMeters;
+            const trailEdgeX = reversed ? car.startMeters : car.endMeters;
 
-          return (
-            <Fragment key={car.carNumber}>
-              {isFirst && (
-                <NumberInput
-                  label={`${car.carNumber}号車の先頭`}
-                  step={0.1}
-                  decimalScale={2}
-                  value={leadEdgeX}
-                  onChange={(v) => typeof v === 'number' && onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, v)}
-                  suffix=" m"
-                  size="sm"
-                />
-              )}
-              <Text size="xs" c="dimmed" ta="center">
-                {car.carNumber}号車（{car.startMeters}m 〜 {car.endMeters}m）
-              </Text>
-              {!isLast ? (
-                <NumberInput
-                  label={`${car.carNumber}号車と${car.carNumber + 1}号車の境界`}
-                  step={0.1}
-                  decimalScale={2}
-                  value={boundaryX}
-                  onChange={(v) => typeof v === 'number' && onMoveCarBoundary(i, v)}
-                  suffix=" m"
-                  size="sm"
-                />
-              ) : (
-                <NumberInput
-                  label={`${car.carNumber}号車の末尾`}
-                  step={0.1}
-                  decimalScale={2}
-                  value={trailEdgeX}
-                  onChange={(v) => typeof v === 'number' && onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, v)}
-                  suffix=" m"
-                  size="sm"
-                />
-              )}
-            </Fragment>
-          );
-        })}
-      </Stack>
+            return (
+              <Fragment key={car.carNumber}>
+                {isFirst && (
+                  <NumberInput
+                    label={`${car.carNumber}号車の先頭`}
+                    step={0.1}
+                    decimalScale={2}
+                    value={leadEdgeX}
+                    onChange={(v) => typeof v === 'number' && onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, v)}
+                    suffix=" m"
+                    size="sm"
+                  />
+                )}
+                <Text size="xs" c="dimmed" ta="center">
+                  {car.carNumber}号車（{car.startMeters}m 〜 {car.endMeters}m）
+                </Text>
+                {!isLast ? (
+                  <NumberInput
+                    label={`${car.carNumber}号車と${car.carNumber + 1}号車の境界`}
+                    step={0.1}
+                    decimalScale={2}
+                    value={boundaryX}
+                    onChange={(v) => typeof v === 'number' && onMoveCarBoundary(i, v)}
+                    suffix=" m"
+                    size="sm"
+                  />
+                ) : (
+                  <NumberInput
+                    label={`${car.carNumber}号車の末尾`}
+                    step={0.1}
+                    decimalScale={2}
+                    value={trailEdgeX}
+                    onChange={(v) => typeof v === 'number' && onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, v)}
+                    suffix=" m"
+                    size="sm"
+                  />
+                )}
+              </Fragment>
+            );
+          })}
+        </Stack>
 
-      <Group gap="sm" mt="lg">
-        <Button type="button" loading={saving} onClick={onSave}>保存</Button>
-      </Group>
+        <Group gap="sm" mt="lg">
+          <Button type="button" loading={saving} onClick={onSave}>保存</Button>
+        </Group>
+      </Collapse>
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import { StationLayoutEditor } from './StationLayoutEditor';
 import { createConcourseDraft, moveCell, toPlatformLocationPayload } from '@/features/station-layout/domain/editDraft';
 import type { LayoutPlatformDetailDTO, LayoutConcourseDTO } from '@/features/station-layout/ports';
 import type { FacilityTypeOption } from '@/features/facility/ports';
+import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
 
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
@@ -95,7 +96,7 @@ const RECT = {
   width: 550, height: 200, left: 0, top: 0, right: 550, bottom: 200, x: 0, y: 0, toJSON: () => ({}),
 } as DOMRect;
 
-function renderEditor(overrides: { facilityTypes?: FacilityTypeOption[] } = {}) {
+function renderEditor(overrides: { facilityTypes?: FacilityTypeOption[]; trains?: TrainOptionDTO[] } = {}) {
   return render(
     <MantineProvider>
       <StationLayoutEditor
@@ -105,7 +106,7 @@ function renderEditor(overrides: { facilityTypes?: FacilityTypeOption[] } = {}) 
         lines={[]}
         facilityTypes={overrides.facilityTypes ?? []}
         connectedStations={[]}
-        trains={[]}
+        trains={overrides.trains ?? []}
       />
     </MantineProvider>,
   );
@@ -315,12 +316,33 @@ describe('StationLayoutEditor', () => {
     it('選択中パターンの境界を数値入力で変更できる', async () => {
       renderEditor();
       const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '展開する' }));
       const boundaryInput = screen.getByLabelText('1号車と2号車の境界');
       await user.clear(boundaryInput);
       await user.type(boundaryInput, '60');
       await user.tab();
 
       expect(within(screen.getByTestId('unsaved-panel')).getByText('テスト列車 の停車位置')).toBeInTheDocument();
+    });
+
+    it('「自動計算してプレビュー」で作成した新規パターンのインスペクタはデフォルトで展開されている', async () => {
+      const newTrain: TrainOptionDTO = {
+        id: 'train-2',
+        name: 'テスト2両編成',
+        carCount: 2,
+        cars: [
+          { carNumber: 1, carLength: 20, doorCount: 4 },
+          { carNumber: 2, carLength: 20, doorCount: 4 },
+        ],
+      };
+      renderEditor({ trains: [newTrain] });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '+ 停車位置を追加' }));
+      await user.selectOptions(screen.getByLabelText('列車', { exact: false }), 'train-2');
+      await user.click(screen.getByRole('button', { name: '自動計算してプレビュー' }));
+
+      expect(screen.getByRole('heading', { name: 'テスト2両編成 の停車位置（新規）' })).toBeInTheDocument();
+      expect(screen.getByLabelText('1号車と2号車の境界')).toBeInTheDocument();
     });
   });
 });

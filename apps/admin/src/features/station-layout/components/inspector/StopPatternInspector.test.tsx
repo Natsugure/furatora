@@ -71,7 +71,7 @@ describe('StopPatternInspector', () => {
     { carNumber: 2, startMeters: 20, endMeters: 40 },
   ];
 
-  it('境界の数値入力を変更するとonMoveCarBoundaryが呼ばれる', () => {
+  it('境界の数値入力を変更するとonMoveCarBoundaryが呼ばれる', async () => {
     const onMoveCarBoundary = vi.fn();
     render(
       <MantineProvider>
@@ -86,11 +86,12 @@ describe('StopPatternInspector', () => {
         />
       </MantineProvider>,
     );
+    await userEvent.setup().click(screen.getByRole('button', { name: '展開する' }));
     fireEvent.change(screen.getByLabelText('1号車と2号車の境界'), { target: { value: '25' } });
     expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 25);
   });
 
-  it('先頭・末尾の数値入力を変更するとonMoveCarEdgeが呼ばれる', () => {
+  it('先頭・末尾の数値入力を変更するとonMoveCarEdgeが呼ばれる', async () => {
     const onMoveCarEdge = vi.fn();
     render(
       <MantineProvider>
@@ -105,6 +106,7 @@ describe('StopPatternInspector', () => {
         />
       </MantineProvider>,
     );
+    await userEvent.setup().click(screen.getByRole('button', { name: '展開する' }));
     fireEvent.change(screen.getByLabelText('1号車の先頭'), { target: { value: '-5' } });
     expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, -5);
 
@@ -112,7 +114,7 @@ describe('StopPatternInspector', () => {
     expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 45);
   });
 
-  it('反転編成では境界・外端のラベルと呼び出しフィールドが入れ替わる', () => {
+  it('反転編成では境界・外端のラベルと呼び出しフィールドが入れ替わる', async () => {
     const onMoveCarBoundary = vi.fn();
     const onMoveCarEdge = vi.fn();
     const reversedCars = [
@@ -132,6 +134,7 @@ describe('StopPatternInspector', () => {
         />
       </MantineProvider>,
     );
+    await userEvent.setup().click(screen.getByRole('button', { name: '展開する' }));
     // 反転編成: 境界の共有座標は1号車のstart（20）
     expect(screen.getByLabelText('1号車と2号車の境界')).toHaveValue('20 m');
     fireEvent.change(screen.getByLabelText('1号車の先頭'), { target: { value: '45' } });
@@ -156,6 +159,7 @@ describe('StopPatternInspector', () => {
       </MantineProvider>,
     );
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '展開する' }));
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(onSave).toHaveBeenCalled();
   });
@@ -177,5 +181,82 @@ describe('StopPatternInspector', () => {
     );
     expect(screen.getByRole('heading', { name: '銀座線 の停車位置（新規）' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '取り消す' })).toBeInTheDocument();
+  });
+
+  it('isNewの場合はデフォルトで展開されており、号車の入力欄が見える', () => {
+    render(
+      <MantineProvider>
+        <StopPatternInspector
+          trainLabel="銀座線"
+          cars={cars}
+          onMoveCarBoundary={vi.fn()}
+          onMoveCarEdge={vi.fn()}
+          onSave={vi.fn()}
+          onDiscard={vi.fn()}
+          saving={false}
+          isNew
+        />
+      </MantineProvider>,
+    );
+    expect(screen.getByLabelText('1号車と2号車の境界')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '折りたたむ' })).toBeInTheDocument();
+  });
+
+  it('デフォルトでは折りたたまれており、号車の入力欄が見えない', () => {
+    render(
+      <MantineProvider>
+        <StopPatternInspector
+          trainLabel="銀座線"
+          cars={cars}
+          onMoveCarBoundary={vi.fn()}
+          onMoveCarEdge={vi.fn()}
+          onSave={vi.fn()}
+          saving={false}
+          isNew={false}
+        />
+      </MantineProvider>,
+    );
+    expect(screen.queryByLabelText('1号車と2号車の境界')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '展開する' })).toBeInTheDocument();
+  });
+
+  it('シェブロンをクリックすると号車の入力欄が現れ、ボタン名が「折りたたむ」に変わる', async () => {
+    const user = userEvent.setup();
+    render(
+      <MantineProvider>
+        <StopPatternInspector
+          trainLabel="銀座線"
+          cars={cars}
+          onMoveCarBoundary={vi.fn()}
+          onMoveCarEdge={vi.fn()}
+          onSave={vi.fn()}
+          saving={false}
+          isNew={false}
+        />
+      </MantineProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: '展開する' }));
+    expect(screen.getByLabelText('1号車と2号車の境界')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '折りたたむ' })).toBeInTheDocument();
+  });
+
+  it('展開した状態で再度クリックすると入力欄が再び隠れる', async () => {
+    const user = userEvent.setup();
+    render(
+      <MantineProvider>
+        <StopPatternInspector
+          trainLabel="銀座線"
+          cars={cars}
+          onMoveCarBoundary={vi.fn()}
+          onMoveCarEdge={vi.fn()}
+          onSave={vi.fn()}
+          saving={false}
+          isNew={false}
+        />
+      </MantineProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: '展開する' }));
+    await user.click(screen.getByRole('button', { name: '折りたたむ' }));
+    expect(screen.queryByLabelText('1号車と2号車の境界')).not.toBeInTheDocument();
   });
 });

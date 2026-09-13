@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Group, Title } from '@mantine/core';
+import { AccordionChevron, ActionIcon, Button, Group, Title } from '@mantine/core';
 
 type Props = {
   title: string;
@@ -9,13 +9,32 @@ type Props = {
   /** 既存項目のみ渡す（サーバーから削除する） */
   onDelete?: () => void;
   deleting?: boolean;
+  /** 渡すとタイトル横に開閉ボタンを出す（未指定時は従来どおりの表示） */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 };
 
 /** インスペクタ（ConcourseInspector/StopPatternInspector）共通のタイトル＋取り消す/削除ボタン */
-export function InspectorHeader({ title, onDiscard, onDelete, deleting }: Props) {
+export function InspectorHeader({
+  title, onDiscard, onDelete, deleting, collapsed, onToggleCollapsed,
+}: Props) {
   return (
     <Group justify="space-between" mb="md">
-      <Title order={4}>{title}</Title>
+      <Group gap="xs">
+        {onToggleCollapsed && (
+          <ActionIcon
+            type="button"
+            variant="subtle"
+            color="gray"
+            size="sm"
+            aria-label={collapsed ? '展開する' : '折りたたむ'}
+            onClick={onToggleCollapsed}
+          >
+            <AccordionChevron style={{ transform: collapsed ? 'rotate(-90deg)' : undefined }} />
+          </ActionIcon>
+        )}
+        <Title order={4}>{title}</Title>
+      </Group>
       <Group gap="xs">
         {onDiscard && (
           <Button type="button" variant="subtle" color="red" size="compact-sm" onClick={onDiscard}>

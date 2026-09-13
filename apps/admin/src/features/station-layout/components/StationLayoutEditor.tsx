@@ -747,6 +747,7 @@ export function StationLayoutEditor({
 
       {displayPattern && (
         <StopPatternInspector
+          key={displayPattern.patternId}
           trainLabel={displayPattern.trainLabel}
           cars={displayPattern.cars}
           onMoveCarBoundary={handleMoveCarBoundary}
