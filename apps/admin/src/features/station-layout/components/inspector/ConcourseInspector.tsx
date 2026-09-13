@@ -144,17 +144,19 @@ export function ConcourseInspector({
                               <Checkbox
                                 label="車いす対応"
                                 checked={selected?.isWheelchairAccessible ?? false}
-                                onChange={(e) => onChange((d) => (
-                                  updateCellFacility(d, cell.id, ft.code, { isWheelchairAccessible: e.currentTarget.checked })
-                                ))}
+                                onChange={(e) => {
+                                  const checked = e.currentTarget.checked;
+                                  onChange((d) => updateCellFacility(d, cell.id, ft.code, { isWheelchairAccessible: checked }));
+                                }}
                                 size="sm"
                               />
                               <Checkbox
                                 label="ベビーカー対応"
                                 checked={selected?.isStrollerAccessible ?? false}
-                                onChange={(e) => onChange((d) => (
-                                  updateCellFacility(d, cell.id, ft.code, { isStrollerAccessible: e.currentTarget.checked })
-                                ))}
+                                onChange={(e) => {
+                                  const checked = e.currentTarget.checked;
+                                  onChange((d) => updateCellFacility(d, cell.id, ft.code, { isStrollerAccessible: checked }));
+                                }}
                                 size="sm"
                               />
                             </Group>
@@ -205,9 +207,10 @@ export function ConcourseInspector({
                   <Group gap="sm" align="flex-start">
                     <Checkbox
                       checked={checked}
-                      onChange={(e) => onChange((d) => (
-                        e.currentTarget.checked ? setConnection(d, station.id, {}) : removeConnection(d, station.id)
-                      ))}
+                      onChange={(e) => {
+                        const nextChecked = e.currentTarget.checked;
+                        onChange((d) => (nextChecked ? setConnection(d, station.id, {}) : removeConnection(d, station.id)));
+                      }}
                       mt={2}
                     />
                     <Stack gap="xs" style={{ flex: 1 }}>
