@@ -1,9 +1,11 @@
 import type {
   PlatformDTO, TrainStopPatternDTO, FacilityDTO, ConcourseCellDTO, FacilityConnectionDTO, ConcourseDTO,
 } from '@furatora/platform-diagram/domain';
+import type { LineWithDirections } from '@/features/platform/ports';
+import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
+import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
 
 // 読み取り: Query Service（ADR-0003）。
-// design.md の lines / facilityTypes / connectedStations / trains はPR4のインスペクタ専用のため、PR4着手時に追加する
 
 /** ホームタブ用の軽量情報 */
 export type LayoutPlatformDTO = {
@@ -56,6 +58,17 @@ export type StationLayoutContext = {
   platforms: LayoutPlatformDTO[];
   /** 選択中ホームの全データ。駅にホームが1件も無ければ null */
   platform: LayoutPlatformDetailDTO | null;
+  // PR4で追加。インスペクタ（テキストフォーム統合）の選択肢データ。
+  // facilityEditPageQuery/platformEditPageQuery/stopPatternPageQuery が
+  // 既に持つ取得ロジックを再利用する（design.md「データフロー」参照）
+  /** 当該駅の stationLines に載る路線（方面ネスト済み）。新規ホーム追加フォーム用 */
+  lines: LineWithDirections[];
+  /** 設備種別一覧（全件） */
+  facilityTypes: FacilityTypeOption[];
+  /** 乗換先候補駅（ホーム・方面ネスト済み） */
+  connectedStations: ConnectedStationOption[];
+  /** 列車一覧（号車構成付き）。停車パターン新規作成のプレビュー用 */
+  trains: TrainOptionDTO[];
 };
 
 export interface StationLayoutPageQuery {

@@ -28,11 +28,13 @@ async function getStationPlatformOptions(stationId: string) {
     .orderBy(asc(platforms.platformNumber));
 }
 
-async function getFacilityTypeOptions() {
+// PR4で station-layout の stationLayoutPageQuery からも再利用するため export する
+// （二重管理を避ける。ADR-0003 の Query Service 方針に反しない範囲での関数共有）
+export async function getFacilityTypeOptions() {
   return db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes);
 }
 
-async function getConnectedStationOptions(stationId: string): Promise<ConnectedStationOption[]> {
+export async function getConnectedStationOptions(stationId: string): Promise<ConnectedStationOption[]> {
   // 現行 GET /api/stations?connectedFrom= と同じ JOIN。
   const stationRows = await db
     .select({
@@ -41,6 +43,7 @@ async function getConnectedStationOptions(stationId: string): Promise<ConnectedS
       code: stations.code,
       lineId: lines.id,
       lineName: lines.name,
+      lineColor: lines.color,
     })
     .from(stationConnections)
     .innerJoin(stations, eq(stationConnections.connectedStationId, stations.id))
@@ -114,7 +117,7 @@ async function getConnectedStationOptions(stationId: string): Promise<ConnectedS
     // leftJoin なので路線を持たない駅では lineId が null になる
     if (row.lineId !== null && row.lineName !== null
         && !option.lines.some((l) => l.id === row.lineId)) {
-      option.lines.push({ id: row.lineId, name: row.lineName });
+      option.lines.push({ id: row.lineId, name: row.lineName, color: row.lineColor });
     }
   }
 

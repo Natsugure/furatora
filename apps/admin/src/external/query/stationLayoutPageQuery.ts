@@ -20,6 +20,9 @@ import {
 import { asc, eq, inArray } from 'drizzle-orm';
 import type { StationLayoutPageQuery, LayoutStopPatternDTO, LayoutConcourseDTO } from '@/features/station-layout/ports';
 import type { StopPatternCarDTO } from '@furatora/platform-diagram/domain';
+import { getLinesWithDirections } from '@/external/query/platformEditPageQuery';
+import { getFacilityTypeOptions, getConnectedStationOptions } from '@/external/query/facilityEditPageQuery';
+import { getAllTrainOptions } from '@/external/query/stopPatternPageQuery';
 
 // apps/web/src/external/query/stationDetailQuery.ts がベース。
 // admin は未公開駅も編集対象のため publishedStation() を通さない。
@@ -224,7 +227,12 @@ async function getStopPatterns(platformId: string): Promise<LayoutStopPatternDTO
 
 export const dbStationLayoutPageQuery: StationLayoutPageQuery = {
   async getContext(stationId, selection) {
-    const [[stationRow], platformList] = await Promise.all([
+    // インスペクタ（PR4）の選択肢データは選択中ホームに依存しないため、
+    // station/platformList と並列に取得する（既存 facilityEditPageQuery /
+    // platformEditPageQuery / stopPatternPageQuery のロジックをそのまま再利用）
+    const [
+      [stationRow], platformList, linesWithDirections, facilityTypeOptions, connectedStations, trainOptions,
+    ] = await Promise.all([
       db.select({ name: stations.name }).from(stations).where(eq(stations.id, stationId)),
       db
         .select({
@@ -240,12 +248,23 @@ export const dbStationLayoutPageQuery: StationLayoutPageQuery = {
         .from(platforms)
         .where(eq(platforms.stationId, stationId))
         .orderBy(asc(platforms.platformNumber)),
+      getLinesWithDirections(stationId),
+      getFacilityTypeOptions(),
+      getConnectedStationOptions(stationId),
+      getAllTrainOptions(),
     ]);
     if (!stationRow) return null;
 
+    const options = {
+      lines: linesWithDirections,
+      facilityTypes: facilityTypeOptions,
+      connectedStations,
+      trains: trainOptions,
+    };
+
     // UUID形式の検証はページ側の parseUuidParam が担い、ここでは駅への所属のみ検証する
     const selected = platformList.find((p) => p.id === selection.platformId) ?? platformList[0];
-    if (!selected) return { stationName: stationRow.name, platforms: [], platform: null };
+    if (!selected) return { stationName: stationRow.name, platforms: [], platform: null, ...options };
 
     const directionIds = [selected.inboundDirectionId, selected.outboundDirectionId].filter((id): id is string => id !== null);
     const [stopPatterns, concourses, [line], directionList] = await Promise.all([
@@ -265,6 +284,7 @@ export const dbStationLayoutPageQuery: StationLayoutPageQuery = {
     return {
       stationName: stationRow.name,
       platforms: platformList.map((p) => ({ id: p.id, platformNumber: p.platformNumber })),
+      ...options,
       platform: {
         id: selected.id,
         platformNumber: selected.platformNumber,
