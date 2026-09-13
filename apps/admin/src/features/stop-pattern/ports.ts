@@ -1,5 +1,4 @@
 import type { TrainStopPatternInput } from './schema';
-import type { StopPatternListDTO, StopPatternEditContextDTO } from './domain/types';
 
 // 一意制約（platformId, trainId）違反を、route.ts が 409 に写像するためのドメインエラー。
 // Drizzle/Next.js 非依存（ADR-0002）。実装は external/repository/stopPatternRepository.ts。
@@ -18,17 +17,4 @@ export interface StopPatternRepository {
   save(stationId: string, pattern: TrainStopPatternInput): Promise<{ id: string } | null>;
   update(id: string, stationId: string, pattern: TrainStopPatternInput): Promise<boolean>;
   delete(id: string, stationId: string): Promise<boolean>;
-}
-
-// 読み取り: Query Service（ADR-0003）。画面単位でDTOを返す。
-// admin 全体の Query Service 化は後続Issue（#48）だが、
-// 本 feature の新規ページは ESLint の依存ルールにより src/app/** から
-// @furatora/database を直接 import できないため、この2画面分のみ先行して導入する。
-export interface StopPatternPageQuery {
-  getListByPlatform(stationId: string, platformId: string): Promise<StopPatternListDTO | null>;
-  getEditContext(
-    stationId: string,
-    platformId: string,
-    patternId?: string,
-  ): Promise<StopPatternEditContextDTO | null>;
 }

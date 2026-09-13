@@ -17,6 +17,9 @@
 - PR4（テキストフォーム統合）: 実装・自動テスト完了。既存の所有権検証漏れ
   （platform-locations系）も合わせて修正。**ブラウザでの手動確認（複製・新規作成・
   削除の一連、「位置を入力」導線）が未実施**（下記 Phase 12 参照）
+- PR5（旧ルート削除・引き渡し）: 実装・自動テスト完了。ADR-0010を`Accepted`に更新。
+  **引き継ぎ事項が2件残る**: 反転編成のE2E追加（PR3から持ち越し）と、
+  ブラウザでの手動確認（PR4から持ち越し）（下記 Phase 14 参照）
 
 ## フェーズ構成
 
@@ -426,28 +429,66 @@ PR5: 旧ルート削除・引き渡し
 
 ## PR5: 旧ルート削除・引き渡し
 
-- [ ] **TASK-13.1** `/stations/[stationId]/facilities` を `/layout` へのリダイレクトに変更
-- [ ] **TASK-13.2** `/facilities/new`、`/facilities/[locationId]/edit`、`/platforms/new`、
-      `/platforms/[platformId]/edit`、`/platforms/[platformId]/stop-patterns/**` を削除
-- [ ] **TASK-13.3** `FacilityForm.tsx` / `PlatformForm.tsx` / `TrainStopPatternForm.tsx` /
-      `FacilityDuplicateButton.tsx` と対応する `duplicate` エンドポイントを削除
-- [ ] **TASK-13.4** `eslint.config.mjs` の `legacyExclusions` から該当エントリを削除
+- [x] **設計訂正（開発者確認済み）**: `/facilities` は**リダイレクトを置かず完全削除**
+      する方針に変更した（当初計画のTASK-13.1はリダイレクト化だったが、admin は
+      認証必須の内部ツールで外部リンク・ブックマークの流入が無いため、中継ファイルを
+      残す利得より恒久的な死にコードの方が高くつくと判断。requirements.md「やること」
+      節も合わせて訂正した）
+- [x] **TASK-13.1/13.2** 旧ルート8ページ（`facilities/page.tsx`・`facilities/new/`・
+      `facilities/[locationId]/edit/`・`platforms/new/`・`platforms/[platformId]/edit/`・
+      `platforms/[platformId]/stop-patterns/{page.tsx,new/,[patternId]/edit/}`）を
+      ディレクトリごと削除。駅一覧の唯一の外部参照（`stations/page.tsx`の「管理」リンク）
+      を `/layout` へ付け替え
+- [x] **TASK-13.3** `FacilityForm.tsx` / `PlatformForm.tsx` / `TrainStopPatternForm.tsx` /
+      `FacilityDuplicateButton.tsx`（いずれも旧ルートページからしか import されておらず、
+      対応する単体テストも存在しなかった）と `duplicate` エンドポイント
+      （`POST .../platform-locations/{id}/duplicate`）を削除。連鎖して
+      `platformLocationRepository.duplicate()`（76行）と
+      `PlatformLocationRepository.duplicate` 宣言も削除した（実装時に追加、
+      死にコード化を確認済み）
+- [x] **設計拡張（実装時に判明。当初のタスク分解には無かった）**: 旧ルート専用の
+      Query Service 3種（`facilityEditPageQuery.ts` / `platformEditPageQuery.ts` /
+      `stopPatternPageQuery.ts`）は**ファイル自体を削除せず**、`stationLayoutPageQuery`
+      が再利用しているヘルパ関数（`getFacilityTypeOptions` / `getConnectedStationOptions` /
+      `getLinesWithDirections` / `getAllTrainOptions`）だけを残し、旧ルート専用の
+      `db*PageQuery` オブジェクト・専用型（`FacilityEditPageQuery`/`PlatformEditPageQuery`/
+      `StopPatternPageQuery`とそのDTO群）・`di.ts` の3配線のみを削除した。
+      各ファイル冒頭のコメントも「stationLayoutPageQueryが再利用する」旨に書き直した
+- [x] **TASK-13.4** `eslint.config.mjs` の `legacyExclusions` から
+      `facilities/page.tsx` の1行のみ削除（同ディレクトリのAPI route 3件は
+      新画面が使い続けるため残した）
+- [x] E2E修正: `station-layout.spec.ts` の `findStationId()` ヘルパが
+      `/facilities` の href を正規表現解析していたため `/layout` に修正
+      （リンク付け替えと同時修正が必須だった）。「管理」リンクが `/layout` を指すこと・
+      旧ルートが404になることの2件を新規追加
 
 ### Phase 14: ドキュメントと引き渡し
 
-- [ ] `docs/domain/platform-coordinate-system.md` の「E2E検証未完了」注記を除去し
-      「レイヤ構成」に編集レイヤを追記
-- [ ] `docs/domain/train-stop-patterns.md` の「E2E検証未完了」注記を除去
-- [ ] ADR-0010 のステータス判断（`Proposed` → `Accepted` はユーザー承認後）
-- [ ] 関連Issueの処理:
+- [x] `docs/domain/platform-coordinate-system.md` の「E2E検証未完了」注記を除去。
+      「レイヤ構成」の編集レイヤ節はPR3/PR4で既に追記済みだったため、
+      本文側の層数表記（「3つの層」）の不整合のみ訂正した
+- [x] `docs/domain/train-stop-patterns.md` の「E2E検証未完了」注記を除去
+- [x] ADR-0010 のステータスを `Proposed` → `Accepted` に更新（ユーザー承認済み）。
+      `docs/adr/README.md` の一覧表も同時更新
+- [ ] 関連Issueの処理（コード変更を伴わないため、マージ後に開発者が実施）:
       - **#32** をクローズ。①は本Issueが吸収、②はclient fetch廃止で解消済み、
         **③は#29のメートル座標化で前提が失われたため取り下げ**、と理由を記録する
       - **#31** をクローズ（本Issueが吸収）
       - **#51** はオープンのまま。本Issueが見える化するだけでスキーマ変更は残ることを追記
-      - **#29** の親Issueがクローズ漏れしている可能性を確認（Phase 6 = #43はCLOSED）
-- [ ] 後続Issueとして起票を検討（起票は開発者判断のため記録に留める）:
+      - **#29** の親Issueがクローズ漏れしている可能性を確認（Phase 6 = #43はCLOSED済みだが
+        #29本体は本タスク作成時点でOPENのまま。他に未完のサブIssueが無ければクローズ）
+- [x] 後続Issueとして起票を検討（起票は開発者判断のため記録に留める）:
       - **[admin] 設備アグリゲートの書き込みを全置換から部分更新へ改める**:
         `platformLocationCells` / `stationFacilities` へ `createdAt`/`updatedAt` 追加、
-        `update` を diff更新へ、`duplicate` の読みをトランザクション内へ、
-        `PlatformLocationRepository` 全メソッドへ `stationId` スコープ検証を追加
-        （現在は他駅のデータをURL直打ちで更新・削除できる）
+        `update` を diff更新へ。
+        **本PRで解消済みのため取り下げた項目**: 「`duplicate` の読みを
+        トランザクション内へ」（`duplicate` 自体を削除したため前提が消滅）、
+        「`PlatformLocationRepository` 全メソッドへ `stationId` スコープ検証を追加」
+        （PR4で対応済み）
+- [ ] **未完了の引き継ぎ事項（開発者への引き継ぎ。Issue化はせず本ファイルに記録）**:
+      - 反転編成のドラッグE2Eは`development`に該当データが無いため追加できていない
+        （PR3から持ち越し）。単体テスト（`editDraft.test.ts`/`DiagramEditLayer.test.tsx`）
+        の反転編成ケースで代替している
+      - ブラウザでの手動確認（複製・新規作成・削除の一連、「位置を入力」導線、
+        ホーム削除モーダル）は未実施（PR4から持ち越し）。MCPが read-only のため
+        私は書き込み検証ができない。PR説明に手動確認チェックリストを記載した

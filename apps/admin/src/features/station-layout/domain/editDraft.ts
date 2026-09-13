@@ -19,7 +19,7 @@ import type {
 /** 号車を潰さない最小幅（m）。moveCarBoundary/moveCarEdge の唯一のクランプ元 */
 export const MIN_CAR_METERS = 0.5;
 
-/** 新規アクセス点に設備を追加したときの既定値（FacilityForm.tsxの既定と同じ） */
+/** 新規アクセス点に設備を追加したときの既定値（旧FacilityForm・PR5で削除、の既定と同じ） */
 const DEFAULT_FACILITY_ACCESSIBILITY = { isWheelchairAccessible: true, isStrollerAccessible: true };
 
 export type FacilityDraft = {

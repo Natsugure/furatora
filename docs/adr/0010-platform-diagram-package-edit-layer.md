@@ -1,6 +1,6 @@
 # ADR-0010: ホーム図を packages に切り出し、閲覧は Server Component・編集は Client Component で層を分ける
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-09-11
 - **決定者**: @Natsugure
 - **関連**: [ADR-0001](./0001-layer-structure.md), [ADR-0006](./0006-diagram-text-in-html-overlay.md),

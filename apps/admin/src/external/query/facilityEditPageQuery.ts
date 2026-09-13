@@ -1,34 +1,13 @@
 import { db } from '@furatora/database/client';
 import {
-  stations, platforms, lines, stationLines, stationConnections, lineDirections,
-  platformLocations, platformLocationCells, stationFacilities, facilityConnections,
-  facilityTypes,
+  stations, platforms, lines, stationLines, stationConnections, lineDirections, facilityTypes,
 } from '@furatora/database/schema';
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm';
-import type {
-  FacilityEditPageQuery, FacilityEditContext, ConnectedStationOption, FacilityLocationDTO,
-} from '@/features/facility/ports';
+import type { ConnectedStationOption } from '@/features/facility/ports';
 
-// admin 全体の Query Service 化は #48。ここは #49 で先行導入したもの。
-//
-// 従来 FacilityForm は接続候補駅ごとに /api/stations/{id}/platforms と
-// /api/stations/{id}/directions を1本ずつ投げていた（N+1、しかも失敗が握り潰されていた）。
-// ここでは接続候補駅の集合に対して platforms / lineDirections を inArray で1本ずつ引き、
-// アプリ側で駅ごとに畳む。
-
-async function getStationPlatformOptions(stationId: string) {
-  return db
-    .select({
-      id: platforms.id,
-      platformNumber: platforms.platformNumber,
-      physicalLength: platforms.physicalLength,
-    })
-    .from(platforms)
-    .where(eq(platforms.stationId, stationId))
-    .orderBy(asc(platforms.platformNumber));
-}
-
-// station-layout の stationLayoutPageQuery からも再利用するため export する（ADR-0003の範囲内）
+// stationLayoutPageQuery が乗換可能な駅・設備種別の選択肢データとして再利用する
+// Query Service。接続候補駅ごとに platforms/directions を1本ずつ投げるN+1を避け、
+// 接続候補駅の集合に対して inArray で1本ずつ引き、アプリ側で駅ごとに畳む。
 export async function getFacilityTypeOptions() {
   return db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes);
 }
@@ -122,107 +101,3 @@ export async function getConnectedStationOptions(stationId: string): Promise<Con
 
   return [...byStationId.values()];
 }
-
-async function getLocationDTO(stationId: string, locationId: string): Promise<FacilityLocationDTO | null> {
-  // 場所が当該駅のホームに属することを検証する（現行 edit ページの所有権チェック）
-  const stationPlatforms = await db
-    .select({ id: platforms.id })
-    .from(platforms)
-    .where(eq(platforms.stationId, stationId));
-  const platformIds = stationPlatforms.map((p) => p.id);
-  if (platformIds.length === 0) return null;
-
-  const [location] = await db
-    .select()
-    .from(platformLocations)
-    .where(eq(platformLocations.id, locationId));
-  if (!location || !platformIds.includes(location.platformId)) return null;
-
-  // cells と connections は互いに独立。facilities は cells の ID が要るので直列のまま
-  const [cells, connections] = await Promise.all([
-    db
-      .select()
-      .from(platformLocationCells)
-      .where(eq(platformLocationCells.platformLocationId, locationId)),
-    db
-      .select()
-      .from(facilityConnections)
-      .where(eq(facilityConnections.platformLocationId, locationId)),
-  ]);
-
-  const facilities = cells.length > 0
-    ? await db
-        .select()
-        .from(stationFacilities)
-        .where(inArray(stationFacilities.platformLocationCellId, cells.map((c) => c.id)))
-    : [];
-
-  return {
-    id: location.id,
-    platformId: location.platformId,
-    exits: location.exits ?? '',
-    notes: location.notes ?? '',
-    cells: cells.map((cell) => ({
-      xPositionMeters: cell.xPositionMeters != null ? Number(cell.xPositionMeters) : null,
-      facilities: facilities
-        .filter((f) => f.platformLocationCellId === cell.id)
-        .map((f) => ({
-          typeCode: f.typeCode,
-          isWheelchairAccessible: f.isWheelchairAccessible ?? true,
-          isStrollerAccessible: f.isStrollerAccessible ?? true,
-          notes: f.notes ?? '',
-        })),
-    })),
-    connections: connections.map((c) => ({
-      stationId: c.connectedStationId,
-      connectedPlatformId: c.connectedPlatformId,
-      directionId: c.directionId,
-      exitLabel: c.exitLabel ?? '',
-      xRangeStart: c.xRangeStart != null ? Number(c.xRangeStart) : null,
-      xRangeEnd: c.xRangeEnd != null ? Number(c.xRangeEnd) : null,
-    })),
-  };
-}
-
-export const dbFacilityEditPageQuery: FacilityEditPageQuery = {
-  async getCreateContext(stationId) {
-    const [station] = await db.select({ name: stations.name }).from(stations).where(eq(stations.id, stationId));
-    if (!station) return null;
-
-    const [platformOptions, facilityTypeOptions, connectedStations] = await Promise.all([
-      getStationPlatformOptions(stationId),
-      getFacilityTypeOptions(),
-      getConnectedStationOptions(stationId),
-    ]);
-
-    return {
-      stationName: station.name,
-      platforms: platformOptions,
-      facilityTypes: facilityTypeOptions,
-      connectedStations,
-    };
-  },
-
-  async getEditContext(stationId, locationId) {
-    const [station] = await db.select({ name: stations.name }).from(stations).where(eq(stations.id, stationId));
-    if (!station) return null;
-
-    const [platformOptions, facilityTypeOptions, connectedStations, location] = await Promise.all([
-      getStationPlatformOptions(stationId),
-      getFacilityTypeOptions(),
-      getConnectedStationOptions(stationId),
-      getLocationDTO(stationId, locationId),
-    ]);
-
-    if (!location) return null;
-
-    const context: FacilityEditContext = {
-      stationName: station.name,
-      platforms: platformOptions,
-      facilityTypes: facilityTypeOptions,
-      connectedStations,
-      location,
-    };
-    return context;
-  },
-};

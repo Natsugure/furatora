@@ -410,8 +410,24 @@ PR2 の時点で、対面乗り換えを持つ駅（赤坂見附・表参道）�
 ## ドキュメント更新（PR5 / Phase 7）
 
 - `docs/domain/platform-coordinate-system.md`: 冒頭の「E2E検証未完了」注記を除去
-  （#43はCLOSED済みで事実と乖離している）。「レイヤ構成」に編集レイヤを追記
+  （#43はCLOSED済みで事実と乖離している）。「レイヤ構成」の編集レイヤ節は
+  PR3/PR4で既に追記済みだったため、本文の層数表記の不整合のみ訂正した
 - `docs/domain/train-stop-patterns.md`: 同じく「E2E検証未完了」注記を除去
-- `docs/adr/0010-*.md`: 実装・検証通過後に `Proposed` → `Accepted` を判断（ユーザー承認後）
-- `apps/admin/eslint.config.mjs`: `legacyExclusions` から `facilities/page.tsx` ほか
-  旧ルート関連ファイルを除去
+- `docs/adr/0010-*.md`: `Proposed` → `Accepted`（ユーザー承認済み）
+- `apps/admin/eslint.config.mjs`: `legacyExclusions` から `facilities/page.tsx` の
+  1行のみ除去。旧ルートが使う API route（`platforms/[platformId]/route.ts` 等）は
+  新画面が使い続けるため、当該3エントリは残す
+
+**実装時の訂正（当初計画には無かった判断）**:
+
+- 旧 `/facilities` は**リダイレクトを置かず完全削除**した（requirements.md「やること」
+  節参照）。中継ファイルを残す利得より恒久的な死にコードの方が高くつくため
+- 旧ルート専用の Query Service（`dbFacilityEditPageQuery` / `dbPlatformEditPageQuery` /
+  `dbStopPatternPageQuery`）は**ファイル自体は削除せず**、`stationLayoutPageQuery` が
+  再利用しているヘルパ関数（`getFacilityTypeOptions` / `getConnectedStationOptions` /
+  `getLinesWithDirections` / `getAllTrainOptions`）だけを残し、旧ルート専用の
+  `db*PageQuery` オブジェクトと専用型のみを削除した
+- `duplicate` API（`POST .../platform-locations/{id}/duplicate`）と
+  `platformLocationRepository.duplicate()` の実装（76行）も、旧ルート削除で
+  参照ゼロになったため同時に削除した。これにより tasks.md Phase 14 の後続Issue案
+  「duplicate の読みをトランザクション内へ」は前提ごと消滅した

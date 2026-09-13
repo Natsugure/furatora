@@ -2,15 +2,14 @@ import { test, expect } from '@playwright/test';
 
 // 実DB（Neon development）に依存する。「東京メトロ」はシード済みの事業者
 
-/** 駅一覧の「管理」リンク（/stations/{id}/facilities）から stationId を得る */
-// 一覧から /layout へのリンク付け替えはPR5で行う。それまでは /facilities の id を流用する
+/** 駅一覧の「管理」リンク（/stations/{id}/layout）から stationId を得る */
 async function findStationId(page: import('@playwright/test').Page, query: string): Promise<string> {
   await page.goto('/stations');
   await page.getByRole('link', { name: /東京メトロ/ }).click();
   await page.getByLabel('検索').fill(query);
   await page.waitForURL(/q=/);
   const href = await page.getByRole('link', { name: '管理' }).first().getAttribute('href');
-  const match = href?.match(/\/stations\/([^/]+)\/facilities/);
+  const match = href?.match(/\/stations\/([^/]+)\/layout/);
   if (!match) throw new Error(`駅「${query}」の管理リンクが見つからない: ${href}`);
   return match[1]!;
 }
@@ -48,5 +47,21 @@ test('存在しない駅IDは404になる', async ({ page }) => {
 test('UUID形式でない駅IDは500にならず404になる', async ({ page }) => {
   const response = await page.goto('/stations/not-a-uuid/layout');
   expect(response?.status()).toBeLessThan(500);
+  await expect(page.getByText('This page could not be found.')).toBeVisible();
+});
+
+test('駅一覧の「管理」リンクは /layout を指す', async ({ page }) => {
+  const stationId = await findStationId(page, '渋谷');
+  const href = await page.getByRole('link', { name: '管理' }).first().getAttribute('href');
+  expect(href).toBe(`/stations/${stationId}/layout`);
+});
+
+test('旧ルート（/facilities、/platforms/new）は削除済みで404になる', async ({ page }) => {
+  const stationId = await findStationId(page, '渋谷');
+
+  await page.goto(`/stations/${stationId}/facilities`);
+  await expect(page.getByText('This page could not be found.')).toBeVisible();
+
+  await page.goto(`/stations/${stationId}/platforms/new`);
   await expect(page.getByText('This page could not be found.')).toBeVisible();
 });

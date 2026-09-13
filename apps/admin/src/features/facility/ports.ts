@@ -16,22 +16,10 @@ export interface PlatformLocationRepository {
   create(stationId: string, input: PlatformLocationInput): Promise<PlatformLocationRecord | null>;
   update(id: string, stationId: string, input: PlatformLocationInput): Promise<PlatformLocationRecord | null>;
   delete(id: string, stationId: string): Promise<boolean>;
-  duplicate(id: string, stationId: string): Promise<PlatformLocationRecord | null>;
 }
 
-// 読み取り: Query Service（ADR-0003）。設備場所の新規・編集ページが必要とする
-// 1画面分の DTO を返す。admin 全体の Query Service 化は #48 だが、
-// フォームのクライアント側 fetch 廃止（#49）に伴い先行導入する。
-//
-// 接続候補駅にホーム・方面をネストして返すのが肝。従来は接続候補駅ごとに
-// 2本の fetch を投げていた（N+1）。ここでサーバー側の inArray クエリ群にまとめる。
-
-export type FacilityPlatformOption = {
-  id: string;
-  platformNumber: string;
-  // decimal をそのまま文字列で返す（フォーム側で Number 化して長さ表示に使う）
-  physicalLength: string;
-};
+// 読み取り: Query Service（ADR-0003）。stationLayoutPageQuery が選択肢データ
+// （設備種別・乗換候補駅）を組み立てる際に再利用する型。
 
 export type FacilityTypeOption = { code: string; name: string };
 
@@ -48,41 +36,3 @@ export type ConnectedStationOption = {
   directions: { id: string; displayName: string }[];
 };
 
-export type FacilityLocationDTO = {
-  id: string;
-  platformId: string;
-  exits: string;
-  notes: string;
-  cells: {
-    xPositionMeters: number | null;
-    facilities: {
-      typeCode: string;
-      isWheelchairAccessible: boolean;
-      isStrollerAccessible: boolean;
-      notes: string;
-    }[];
-  }[];
-  connections: {
-    stationId: string;
-    connectedPlatformId: string | null;
-    directionId: string | null;
-    exitLabel: string;
-    xRangeStart: number | null;
-    xRangeEnd: number | null;
-  }[];
-};
-
-export type FacilityEditContext = {
-  stationName: string;
-  platforms: FacilityPlatformOption[];
-  facilityTypes: FacilityTypeOption[];
-  connectedStations: ConnectedStationOption[];
-  location?: FacilityLocationDTO;
-};
-
-export interface FacilityEditPageQuery {
-  // 駅が無ければ null（ページは notFound() する）
-  getCreateContext(stationId: string): Promise<FacilityEditContext | null>;
-  // 駅・場所が無い、または場所が別駅のホームに属するなら null
-  getEditContext(stationId: string, locationId: string): Promise<FacilityEditContext | null>;
-}

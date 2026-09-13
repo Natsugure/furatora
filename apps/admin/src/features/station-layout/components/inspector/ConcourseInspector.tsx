@@ -30,7 +30,7 @@ type Props = {
 };
 
 /**
- * コンコース（platformLocations 1件）のテキストフォーム。旧 FacilityForm.tsx の
+ * コンコース（platformLocations 1件）のテキストフォーム。旧FacilityForm（PR5で削除）の
  * 入力項目を移植したが、送信は行わずすべて onChange 経由で StationLayoutEditor の
  * draft（座標ドラッグと同じ state）へ反映する。保存ボタンを押すまで確定しない。
  */
