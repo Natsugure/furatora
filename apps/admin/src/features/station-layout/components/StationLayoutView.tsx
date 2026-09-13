@@ -32,6 +32,10 @@ export function StationLayoutView({ stationId, context }: Props) {
       ) : (
         <Stack gap="lg">
           <StationLayoutEditor
+            // platform.id が変わるとコンポーネントが再生成され、useState などがリセットされる
+            // key が無いとホーム切替（同一route内でのsearchParams変更）でもReactが同一インスタンスを再利用し、
+            // 前のホームのstateが残ったままになる
+            key={platform.id}
             stationId={stationId}
             platforms={context.platforms}
             platform={platform}
