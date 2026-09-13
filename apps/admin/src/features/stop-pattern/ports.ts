@@ -10,9 +10,13 @@ export class DuplicateStopPatternError extends Error {}
 // trainStopPatterns は stationId を持たず platformId 経由でしか駅に紐づかないため、
 // 駅スコープは呼び出し側では守れない。全メソッドが stationId を受け取り、
 // 対象（および付け替え先）のホームが当該駅のものであることを実装側で保証する。
-// 戻り値 false は「当該駅に該当ホーム／パターンが無い」を表し、route.ts が404に写像する。
+// save の戻り値 null は「当該駅に該当ホームが無い」、update/delete の false も同義で
+// route.ts が404に写像する。
+// save は作成したパターンの id を返す（PR4: 新規作成直後にドラッグ・保存を続けるため
+// StationLayoutEditor がこのidを baseline に反映する必要がある。以前は boolean のみで
+// POSTのレスポンスにidが含まれず、新規パターンの以後の編集・保存対象を特定できなかった）
 export interface StopPatternRepository {
-  save(stationId: string, pattern: TrainStopPatternInput): Promise<boolean>;
+  save(stationId: string, pattern: TrainStopPatternInput): Promise<{ id: string } | null>;
   update(id: string, stationId: string, pattern: TrainStopPatternInput): Promise<boolean>;
   delete(id: string, stationId: string): Promise<boolean>;
 }

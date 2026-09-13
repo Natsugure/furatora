@@ -25,7 +25,8 @@ async function getPlatformWithStation(stationId: string, platformId: string) {
   return row ?? null;
 }
 
-async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
+// PR4で station-layout の stationLayoutPageQuery からも再利用するため export する。
+export async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
   const trainRows = await db
     .select({ id: trains.id, name: trains.name, carCount: trains.carCount })
     .from(trains)
@@ -38,6 +39,7 @@ async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
       trainId: trainCarStructures.trainId,
       carNumber: trainCarStructures.carNumber,
       carLength: trainCarStructures.carLength,
+      doorCount: trainCarStructures.doorCount,
     })
     .from(trainCarStructures)
     .where(inArray(trainCarStructures.trainId, trainRows.map((t) => t.id)))
@@ -46,12 +48,18 @@ async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
   return trainRows.map((t) => {
     const cars = structureRows
       .filter((s) => s.trainId === t.id)
-      .map((s) => ({ carNumber: s.carNumber, carLength: s.carLength != null ? Number(s.carLength) : null }));
+      .map((s) => ({
+        carNumber: s.carNumber,
+        carLength: s.carLength != null ? Number(s.carLength) : null,
+        // PR4: 新規停車パターン作成のプレビュー（インスペクタ）用。既存パターンの
+        // ドア位置解決（本ファイル getStopPatterns）と同じ既定値 4 を使う
+        doorCount: s.doorCount,
+      }));
     // 号車構成が未登録の場合、carCount 件を標準構成として補う
     // （TrainStopPatternForm 側の buildCarSegments は carLength: null を標準値扱いする）
     const resolvedCars = cars.length > 0
       ? cars
-      : Array.from({ length: t.carCount }, (_, i) => ({ carNumber: i + 1, carLength: null }));
+      : Array.from({ length: t.carCount }, (_, i) => ({ carNumber: i + 1, carLength: null, doorCount: 4 }));
     return { id: t.id, name: t.name, carCount: t.carCount, cars: resolvedCars };
   });
 }

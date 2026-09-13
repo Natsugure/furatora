@@ -47,7 +47,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
   async save(stationId, pattern) {
     try {
       return await withTransaction(async (tx) => {
-        if (!(await isPlatformOfStation(tx, pattern.platformId, stationId))) return false;
+        if (!(await isPlatformOfStation(tx, pattern.platformId, stationId))) return null;
 
         const row = requireInserted(
           await tx
@@ -63,7 +63,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
             endMeters: String(c.endMeters),
           }))
         );
-        return true;
+        return { id: row.id };
       });
     } catch (err) {
       if (isUniqueViolation(err)) {

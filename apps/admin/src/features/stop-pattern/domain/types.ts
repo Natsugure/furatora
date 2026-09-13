@@ -27,6 +27,10 @@ export type StopPatternListDTO = {
 export type TrainOptionCarDTO = {
   carNumber: number;
   carLength: number | null;
+  // PR4: 新規停車パターン作成のプレビュー（インスペクタ）が号車ごとのドア位置を
+  // 表示するために追加。未登録号車は既定値4（stationLayoutPageQueryのgetStopPatterns
+  // と同じ既定値）で補う
+  doorCount: number;
 };
 
 export type TrainOptionDTO = {
