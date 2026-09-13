@@ -6,13 +6,17 @@
 - **ブランチ**: `feature/issue95-phase0-spec`（PR1）以降、子ブランチをスタック
 - **信頼度**: 70%（中）
 
-## 進捗（2026-09-11）
+## 進捗（2026-09-13更新）
 
 - PR1（仕様整備 + ADR-0010 + `packages/platform-diagram` 新設）: 完了
 - PR2（読み取り専用の統合ページ）: 完了
-- PR3（図上編集）: 実装・自動テスト完了。**引き継ぎ事項が2件残る**（下記 Phase 9 参照）:
-  サーバー側 refine 追加前のデータ確認SQL、実データでのSQL確認・E2E追加
-  （ドラッグ可能な要素を持つ駅が実DBに無い可能性が高いため前処理が必要）
+- PR3（図上編集）: 実装・自動テスト完了。PR4着手時に反転編成のバグを発見し
+  PR3ブランチへ修正を追加済み（下記 Phase 9 参照）。サーバー側`superRefine`追加も
+  完了。**引き継ぎ事項が1件残る**: 反転編成のE2E追加は`development`にデータが
+  無いため未着手
+- PR4（テキストフォーム統合）: 実装・自動テスト完了。既存の所有権検証漏れ
+  （platform-locations系）も合わせて修正。**ブラウザでの手動確認（複製・新規作成・
+  削除の一連、「位置を入力」導線）が未実施**（下記 Phase 12 参照）
 
 ## フェーズ構成
 
@@ -342,18 +346,81 @@ PR5: 旧ルート削除・引き渡し
 
 ## PR4: テキストフォーム統合
 
-- [ ] **TASK-10.1〜10.n** インスペクタ（`components/inspector/*.tsx`）を新規作成。
+- [x] **計画時に追加**: PR4着手前にMCP（Neon）経由でPR3引き継ぎSQLを再実行できたため
+      対応。反転編成（`lastCarNearest`、茗荷谷2番線・丸ノ内線）でPR3のドラッグ編集
+      （`editDraft.ts`/`DiagramEditLayer.tsx`）が座標を破壊するバグを発見し、
+      PR3ブランチ（#109、当時未マージ）に修正コミットを追加してから
+      `gh stack rebase --upstack` でPR4に伝播させた。`trainStopPatternSchema` への
+      `superRefine`（隣接号車の境界共有を向き非依存で強制）もこの過程で追加した。
+      詳細はPR3セクション末尾の記録を参照
+- [x] **TASK-10.1〜10.n** インスペクタ（`components/inspector/*.tsx`）を新規作成。
       既存 `FacilityForm.tsx` / `PlatformForm.tsx` / `TrainStopPatternForm.tsx` の
-      入力項目をMantineフォームとして移植する（詳細はPR2〜3完了後にtasks.mdへ追記）
-- [ ] **TASK-11.1** 複製フローをクライアント側コピー方式に刷新（#31）
-- [ ] **TASK-11.2** ホーム追加時の路線自動設定を実装（#32①）
-- [ ] **TASK-11.3** 座標を持たない要素セクションと「位置を入力」導線を実装（#51見える化）
+      入力項目を移植した
+      - `ConcourseInspector.tsx`: 出口・場所メモ・アクセス点（座標は数値入力でも
+        ドラッグと同じ`moveCell`を通す）・設備タイプ・乗換可能な駅
+      - `PlatformInspector.tsx`: ホーム番号・路線・方面・物理長・ホーム位置・備考。
+        ドラッグの即時プレビューを要らないため、座標編集のdraft機構には参加させず
+        自前でfetchする独立フォームとして実装（設計判断。design.mdには明記が無い
+        実装時の単純化）
+      - `StopPatternInspector.tsx`: `StopPatternCreateForm`（列車選択+編成基準位置+
+        向き+プレビュー）と `StopPatternInspector`（境界ベースの数値入力）の2つを
+        export。境界入力は図上ドラッグと同じ`moveCarBoundary`/`moveCarEdge`を呼ぶため
+        入力経路によらず隙間・重なり防止の不変条件が1箇所で守られる
+- [x] **設計拡張（実装時に判明。当初のタスク分解には無かった）**: `ConcourseDraft` を
+      座標のみ（PR3）から `exits`/`notes`/`facilities`/`connections` を含む
+      「そのコンコースの完全な未保存state」に拡張した。これにより
+      `toPlatformLocationPayload` はbaselineとのマージが不要になり、新規作成・
+      複製・既存編集のすべてが同じdraftモデルの上で動く。表示用DTOへの変換は
+      `draftToDisplayConcourse`（選択肢データからtypeName・接続先駅名等をlookupで
+      解決）が担う
+- [x] **TASK-11.1** 複製フローをクライアント側コピー方式に刷新（#31）。
+      `duplicateConcourseDraft`が既存コンコースをコピーしx座標を+2mずらし、
+      通常の新規作成（POST）として保存する。既存の`.../duplicate`エンドポイントは
+      呼ばなくなったが、PR5の旧ルート削除まで削除せず残す
+- [x] **TASK-11.2** ホーム追加時の路線自動設定を実装（#32①）。
+      `PlatformInspector`が新規作成時、この駅の路線候補が1件のみなら自動設定する
+- [x] **TASK-11.3** 座標を持たない要素セクションと「位置を入力」導線を実装（#51見える化）。
+      `StationLayoutView.tsx`（Server Component）にあった読み取り専用の
+      「位置未登録の設備・乗換」セクションを、操作（選択状態・仮配置）を持つ
+      `StationLayoutEditor.tsx`（Client Component）へ移設した
+- [x] **計画時に追加（既存バグの修正）**: `POST/PUT/DELETE /api/stations/{sid}/
+      platform-locations[/{id}]` と `duplicate` エンドポイントが `stationId` を
+      検証しておらず、URL直打ちで他駅のコンコースを作成・更新・削除・複製できる
+      状態だった（`platformRepository`/`stopPatternRepository`には既にあった検証が
+      `platformLocationRepository`のみ欠けていた）。同じパターン
+      （`isPlatformOfStation`/相関サブクエリ`belongsToStation`）で追加した
+- [x] **計画時に追加**: 停車パターンPOSTのレスポンスに作成id を追加した
+      （`StopPatternRepository.save()` の戻り値を `boolean` から `{id: string} | null`
+      に変更）。新規作成直後にそのidをbaselineへ反映し、以後の編集・保存対象を
+      特定できるようにするため。従来はPOSTのレスポンスがidを含まず不可能だった
 
 ### Phase 12: PR4 検証
 
-- [ ] `pnpm run typecheck` / `lint` / `vitest run` / `next build`
-- [ ] 複製 → x をずらす → 保存が1画面で完結すること
-- [ ] 位置未入力のコンコースが警告として出ること
+- [x] `pnpm run typecheck` / `lint` / `vitest run`（admin/web/platform-diagram全体）
+      → 全パッケージでエラー0。admin 443件（新規: editDraft拡張分・
+      ConcourseInspector 5件・PlatformInspector 6件・StopPatternInspector 8件・
+      StationLayoutEditor拡張分を含む）、platform-diagram 182件、web 13件、すべてpass
+- [x] `pnpm --filter @furatora/admin build` → 成功
+- [ ] 複製 → x をずらす → 保存が1画面で完結すること（自動テストでPOST呼び出しまで
+      確認済み。ブラウザでの手動確認は未実施）
+- [x] 位置未入力のコンコースが警告として出ること（自動テストで確認。「位置を入力」
+      導線のブラウザ手動確認は未実施）
+- [ ] Neon `development` で実際に新規コンコース作成・複製・保存・削除の一連を確認
+      （MCPが引き続きread-onlyのため、書き込み確認はブラウザ操作が必要。開発者への
+      引き継ぎ事項）
+
+### PR4での既知の簡略化・未対応（開発者への引き継ぎ事項）
+
+- 新規停車パターンの保存後、URLの`patternId`を新しいidへ自動で切り替えることは
+  行わない。`patternBaselines`に追加されタブとして選択可能になるが、選択には
+  ユーザーがそのタブをクリックする必要がある
+- 「位置を入力」は、対象コンコースの`xPositionMeters === null`なセルすべてを
+  同じ中央値へ一括で仮置きする（個別に別の座標へ動かすのは通常のドラッグ・
+  数値入力で行う）
+- 新規コンコース・新規停車パターンの作成は同時に1件のみ保持する（複数の
+  新規作成を並行して編集する用途は想定していない。保存または取り消し後に
+  次の新規作成に進む）
+- ホーム削除ボタンを追加したが、削除確認モーダルからの手動確認は未実施
 
 ---
 

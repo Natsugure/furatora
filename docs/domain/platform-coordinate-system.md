@@ -156,6 +156,15 @@ Admin 側は、保存が確定した値（baseline）が変わったとき（マ
 だけ bounds を再計算する（`StationLayoutEditor` の該当コメント参照）。
 ドラッグ中の未保存値（draft）は bounds の算出に含めない。
 
+**座標編集の入力経路は2つあるが、状態は1つ（PR4）**: アクセス点・号車境界の座標は
+図上ドラッグ（本節）と、インスペクタの数値入力
+（`components/inspector/ConcourseInspector.tsx`/`StopPatternInspector.tsx`）の
+どちらからも編集できる。両方とも `apps/admin/src/features/station-layout/domain/
+editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）を呼ぶため、
+どちらの経路で編集しても未保存state・不変条件（号車境界の隙間・重なり防止、
+向き非依存の判定）は1箇所に閉じたまま保たれる。数値入力専用の別ロジックを
+作らないこと。
+
 ### コンコースの表現
 
 コンコース（`platformLocations`）は座標を持たない。**その位置は、属するアクセス点
