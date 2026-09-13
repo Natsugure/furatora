@@ -34,7 +34,7 @@ export async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
         doorCount: s.doorCount,
       }));
     // 号車構成が未登録の場合、carCount 件を標準構成として補う
-    // （TrainStopPatternForm 側の buildCarSegments は carLength: null を標準値扱いする）
+    // （stop-pattern/domain/carSegments.ts の buildCarSegments は carLength: null を標準値扱いする）
     const resolvedCars = cars.length > 0
       ? cars
       : Array.from({ length: t.carCount }, (_, i) => ({ carNumber: i + 1, carLength: null, doorCount: 4 }));
