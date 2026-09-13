@@ -3,7 +3,7 @@ import { platforms } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
 import type { PlatformRepository, PlatformRecord } from '@/features/platform/ports';
 
-// platforms は子テーブル（旧 platformCarStopPositions）を持たない単一テーブルのため、
+// platforms は子テーブルを持たない単一テーブルのため、
 // withTransaction は使わず db のままでよい（ADR-0005「単一テーブルの単純な書き込み」）。
 export const dbPlatformRepository: PlatformRepository = {
   async create(stationId, input) {

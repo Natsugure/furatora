@@ -48,7 +48,7 @@ function buildOrderBy(sort: LineListSort, order: 'asc' | 'desc') {
     case 'operator':
       // operators.name も同じ collation 制約を受けるが、operators に name_kana は無く
       // 既存コード（stationCreatePageQuery 等）も name でソートしている。
-      // 本 Issue はこの既存の制約を継承し、新規に解決しない（requirements.md 参照）
+      // 五十音順にならない既知の制約として未解決のまま残す。
       return [dir(operators.name), asc(lines.id)];
     case 'displayOrder':
     default:

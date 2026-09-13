@@ -1,10 +1,5 @@
 # ホームの座標系
 
-> **適用状況**: 2026-09-06 現在、**実装済み・E2E検証未完了**。
-> スキーマ（`packages/database/src/schema.ts`）・Admin・Web描画はいずれも本書に一致する。
-> メートル座標化の E2E 検証が [Issue #29](https://github.com/Natsugure/furatora/issues/29)
-> で未完のため本注記を残す。検証完了時に外すこと。
-
 ホーム上の位置は、すべて**メートル単位の1次元連続座標**で表現する。
 設備・車両停車位置・乗り換え帯は、同一のホームについては同一の座標系に乗る。
 
@@ -106,7 +101,8 @@ SVGの高さは `layoutRows().viewHeight` で決まり、**22（束ね線あり�
 
 ### レイヤ構成 — SVG と HTML オーバーレイ
 
-図は**3つの層**でできており、すべてが1つのキャンバス（`min-width` = 描画範囲 × `PX_PER_METER`）
+図は**3つの層**でできており（Admin はこの上にさらに編集レイヤを重ねる。後述）、
+すべてが1つのキャンバス（`min-width` = 描画範囲 × `PX_PER_METER`）
 の上に、`layoutRows().stripOrder` の順で積まれる。
 
 | 層 | 実体 | 内容 |
@@ -131,6 +127,39 @@ grid item は全員が行の高さに寄与するので、レーンの高さが�
 
 **レーン0は常に図に接する側に置く。** 図の上下どちらにプレートが来るかは
 `stripOrder` から導き、上に来る場合は段を逆順に描く。
+
+### 編集レイヤ（Admin、絶対配置の4層目）
+
+Admin の駅レイアウトページ（`/stations/[stationId]/layout`）は、上記3層の上に
+**ドラッグ可能なハンドル**を絶対配置で重ねる（`packages/platform-diagram` の
+`PlatformDiagram` が公開する `diagramOverlay` render prop、
+`apps/admin/src/features/station-layout/components/DiagramEditLayer.tsx`）。
+SVGの再レイアウトは行わない。
+
+**x と y で位置の取り方が非対称である**点が上記3層と異なる:
+
+- **x はここでも割合で取る**（`xFraction(x, bounds) * 100%`）。上記の規約と同じ。
+- **y は実測ピクセルで取る**。`<svg>` は `height` を指定しない前提（上記）だが、
+  `preserveAspectRatio="xMidYMid meet"` は要素ボックスが viewBox より**高い**とき
+  `min(rw/vw, rh/vh) = rw/vw`（幅律速）になり、x は正しいまま y だけ
+  `(要素の高さ - viewHeight × scale) / 2` だけずれる。アスペクト比が一致していれば
+  このオフセットは0になるが、「一致している」こと自体は実測でしか確認できない
+  ため、y はハンドル配置のたびに `getBoundingClientRect()` から計算する。
+
+**bounds の凍結**: `computeBounds()` は全座標から算出するため、ドラッグ中に
+座標が動くと bounds も動き、図全体がスケールし直してドラッグが暴れる。
+Admin 側は、保存が確定した値（baseline）が変わったとき（マウント時・保存成功時）
+だけ bounds を再計算する（`StationLayoutEditor` の該当コメント参照）。
+ドラッグ中の未保存値（draft）は bounds の算出に含めない。
+
+**座標編集の入力経路は2つあるが、状態は1つ**: アクセス点・号車境界の座標は
+図上ドラッグ（本節）と、インスペクタの数値入力
+（`components/inspector/ConcourseInspector.tsx`/`StopPatternInspector.tsx`）の
+どちらからも編集できる。両方とも `apps/admin/src/features/station-layout/domain/
+editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）を呼ぶため、
+どちらの経路で編集しても未保存state・不変条件（号車境界の隙間・重なり防止、
+向き非依存の判定）は1箇所に閉じたまま保たれる。数値入力専用の別ロジックを
+作らないこと。
 
 ### コンコースの表現
 

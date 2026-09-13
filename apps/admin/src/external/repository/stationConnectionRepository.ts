@@ -25,8 +25,6 @@ export const dbStationConnectionRepository: StationConnectionRepository = {
           { stationId: connectedStationId, connectedStationId: stationId, ...shared },
         ])
         // unique_station_connection(station_id, connected_station_id) を衝突対象にする。
-        // 既存の onConflict は seed-master-data.ts の単一カラム target のみで、
-        // 複合ユニーク制約を配列で渡すのはリポジトリ初（design.md）。
         .onConflictDoNothing({
           target: [stationConnections.stationId, stationConnections.connectedStationId],
         });

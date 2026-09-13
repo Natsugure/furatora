@@ -1,14 +1,5 @@
 # 列車の停車位置パターン
 
-> **適用状況**: 2026-09-06 現在、**実装済み・E2E検証未完了**。
-> `packages/database/src/schema.ts`（`trainStopPatterns` / `trainStopPatternCars`）、
-> Admin の停車位置パターン編集（`apps/admin/src/features/stop-pattern/`）、
-> Web のホーム描画（`apps/web/src/features/platform/`）はいずれも本書に一致する。
-> メートル座標化の E2E 検証が [Issue #29](https://github.com/Natsugure/furatora/issues/29)
-> で未完のため本注記を残す。検証完了時に外すこと。
-> （2026-08-15 時点の「未実装」表記は、その後の Admin/Web 追随が本書へ反映されて
-> いなかったための古い記述であり、ここで上書きした。）
-
 「あるホームに、ある列車が、どの位置に停まるか」を、
 [ホーム座標系](./platform-coordinate-system.md)上のメートル値で表す。
 
@@ -27,6 +18,31 @@ trainStopPatterns
 号車ごとに区間 `[startMeters, endMeters]` を持つ。
 **`order` によらず、どの号車も `startMeters < endMeters` を保つ**
 （号車番号の向きが反転しても、区間そのものの向きは反転しない）。
+
+### 隣接号車は境界を共有する
+
+**`carNumber` が隣り合う号車どうしは、境界の座標を共有する。**
+編成に重なり・隙間ができることは物理的に起こり得ないため、この座標系上でも許容しない。
+
+どちらのフィールドが共有側かは、編成の向き（[「号車の向き」](#号車の向き)。
+`isDoorOrderReversed()` が判定する）に依存する:
+
+| 向き | 共有条件 |
+|---|---|
+| 非反転（`carNumber` 昇順で `startMeters` が増加） | `cars[i].endMeters === cars[i+1].startMeters` |
+| 反転（`carNumber` 昇順で `startMeters` が減少） | `cars[i].startMeters === cars[i+1].endMeters` |
+
+これは `startMeters < endMeters` と違い、DB のカラム制約にはまだ現れていない
+（`trainStopPatternCars` の一意な保証は各行の `startMeters < endMeters` のみ）。
+Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft.ts`
+の `moveCarBoundary`/`moveCarEdge`）が、`isDoorOrderReversed()` で向きを判定した上で
+境界を動かすときに隣接号車の共有フィールドを常に同値で書き換えることで、この
+不変条件をクライアント側で構造的に守っている。
+
+**サーバー側スキーマ（`trainStopPatternSchema`）にも `superRefine` で同じ条件を
+強制している**（既存データ（本番含む）に不連続な編成が無いことを確認してから
+追加した。確認には向き非依存の判定が必須で、向きを考慮しない単純な
+`end===start` 比較では、反転編成（例: 茗荷谷2番線・丸ノ内線）を不連続と誤検出する）。
 
 ## 標準車両長
 

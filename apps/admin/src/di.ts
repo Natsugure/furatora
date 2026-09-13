@@ -2,7 +2,6 @@
 import { dbPlatformRepository } from '@/external/repository/platformRepository';
 import { dbPlatformLocationRepository } from '@/external/repository/platformLocationRepository';
 import { dbStopPatternRepository } from '@/external/repository/stopPatternRepository';
-import { dbStopPatternPageQuery } from '@/external/query/stopPatternPageQuery';
 import { dbStationPublishingRepository } from '@/external/repository/stationPublishingRepository';
 import { dbStationPublishingPageQuery } from '@/external/query/stationPublishingPageQuery';
 import { dbTrainEditPageQuery } from '@/external/query/trainEditPageQuery';
@@ -15,15 +14,13 @@ import { dbStationConnectionRepository } from '@/external/repository/stationConn
 import { dbStationConnectionCreatePageQuery } from '@/external/query/stationConnectionCreatePageQuery';
 import { dbStationAdjacencyRepository } from '@/external/repository/stationAdjacencyRepository';
 import { dbStationAdjacencyPageQuery } from '@/external/query/stationAdjacencyPageQuery';
-import { dbPlatformEditPageQuery } from '@/external/query/platformEditPageQuery';
-import { dbFacilityEditPageQuery } from '@/external/query/facilityEditPageQuery';
 import { dbStationListPageQuery } from '@/external/query/stationListPageQuery';
 import { dbLineListPageQuery } from '@/external/query/lineListPageQuery';
+import { dbStationLayoutPageQuery } from '@/external/query/stationLayoutPageQuery';
 
 export const platformRepository = dbPlatformRepository;
 export const platformLocationRepository = dbPlatformLocationRepository;
 export const stopPatternRepository = dbStopPatternRepository;
-export const stopPatternPageQuery = dbStopPatternPageQuery;
 export const stationPublishingRepository = dbStationPublishingRepository;
 export const stationPublishingPageQuery = dbStationPublishingPageQuery;
 
@@ -41,9 +38,10 @@ export const stationConnectionCreatePageQuery = dbStationConnectionCreatePageQue
 export const stationAdjacencyRepository = dbStationAdjacencyRepository;
 export const stationAdjacencyPageQuery = dbStationAdjacencyPageQuery;
 export const stationEditPageQuery = dbStationEditPageQuery;
-export const platformEditPageQuery = dbPlatformEditPageQuery;
-export const facilityEditPageQuery = dbFacilityEditPageQuery;
 
 // 一覧の事業者スコープ化（#94）
 export const stationListPageQuery = dbStationListPageQuery;
 export const lineListPageQuery = dbLineListPageQuery;
+
+// 駅レイアウト統合ページ
+export const stationLayoutPageQuery = dbStationLayoutPageQuery;
