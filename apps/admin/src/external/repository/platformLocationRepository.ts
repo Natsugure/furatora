@@ -5,14 +5,39 @@ import {
   platformLocationCells,
   stationFacilities,
   facilityConnections,
+  platforms,
 } from '@furatora/database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, exists, inArray, sql } from 'drizzle-orm';
 import type { PlatformLocationInput } from '@/features/facility/schema';
 import type { PlatformLocationRepository, PlatformLocationRecord } from '@/features/facility/ports';
 import { requireInserted } from '@/external/requireInserted';
 
 // platformLocations → platformLocationCells → stationFacilities / facilityConnections
 // の複数テーブルにまたがる書き込みのため withTransaction で原子化する（ADR-0005）。
+
+// 書き込み対象・付け替え先のホームが当該駅のものかを検証する。
+// これを省くと、A駅の管理画面からB駅のホームにコンコースを作成・付け替えできてしまう
+// （stopPatternRepository.ts の isPlatformOfStation と同じ形）。
+async function isPlatformOfStation(tx: Tx, platformId: string, stationId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: platforms.id })
+    .from(platforms)
+    .where(and(eq(platforms.id, platformId), eq(platforms.stationId, stationId)));
+  return !!row;
+}
+
+// 更新・削除・複製の対象行を当該駅のホームに属するものへ絞り込む相関サブクエリ
+// （stopPatternRepository.ts の belongsToStation と同じ形）。
+function belongsToStation(stationId: string) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(platforms)
+      .where(
+        and(eq(platforms.id, platformLocations.platformId), eq(platforms.stationId, stationId))
+      )
+  );
+}
 
 async function insertCellsAndFacilities(
   tx: Tx,
@@ -68,8 +93,10 @@ async function insertConnections(
 }
 
 export const dbPlatformLocationRepository: PlatformLocationRepository = {
-  async create(input) {
+  async create(stationId, input) {
     return withTransaction(async (tx) => {
+      if (!(await isPlatformOfStation(tx, input.platformId, stationId))) return null;
+
       const location = requireInserted(
         await tx
           .insert(platformLocations)
@@ -88,8 +115,11 @@ export const dbPlatformLocationRepository: PlatformLocationRepository = {
     });
   },
 
-  async update(id, input) {
+  async update(id, stationId, input) {
     return withTransaction(async (tx) => {
+      // 付け替え先ホームが他駅のものであれば、更新対象が当該駅のものでも拒否する
+      if (!(await isPlatformOfStation(tx, input.platformId, stationId))) return null;
+
       const [updated] = await tx
         .update(platformLocations)
         .set({
@@ -97,7 +127,7 @@ export const dbPlatformLocationRepository: PlatformLocationRepository = {
           exits: input.exits ?? null,
           notes: input.notes ?? null,
         })
-        .where(eq(platformLocations.id, id))
+        .where(and(eq(platformLocations.id, id), belongsToStation(stationId)))
         .returning();
 
       if (!updated) return null;
@@ -124,14 +154,20 @@ export const dbPlatformLocationRepository: PlatformLocationRepository = {
     });
   },
 
-  async delete(id) {
+  async delete(id, stationId) {
     // 子テーブルは CASCADE で削除されるため、単一の DELETE 文で原子的に完結する
-    const [row] = await db.delete(platformLocations).where(eq(platformLocations.id, id)).returning();
+    const [row] = await db
+      .delete(platformLocations)
+      .where(and(eq(platformLocations.id, id), belongsToStation(stationId)))
+      .returning();
     return !!row;
   },
 
-  async duplicate(id) {
-    const [original] = await db.select().from(platformLocations).where(eq(platformLocations.id, id));
+  async duplicate(id, stationId) {
+    const [original] = await db
+      .select()
+      .from(platformLocations)
+      .where(and(eq(platformLocations.id, id), belongsToStation(stationId)));
     if (!original) return null;
 
     const originalCells = await db

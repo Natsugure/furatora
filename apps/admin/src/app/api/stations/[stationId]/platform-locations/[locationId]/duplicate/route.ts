@@ -6,9 +6,9 @@ export async function POST(
   { params }: { params: Promise<{ stationId: string; locationId: string }> }
 ) {
   try {
-    const { locationId } = await params;
+    const { stationId, locationId } = await params;
 
-    const duplicated = await platformLocationRepository.duplicate(locationId);
+    const duplicated = await platformLocationRepository.duplicate(locationId, stationId);
     if (!duplicated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
