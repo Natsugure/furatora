@@ -18,7 +18,7 @@ export type LayoutStopPatternDTO = TrainStopPatternDTO & {
   patternId: string;
 };
 
-// PR3で追加した編集専用フィールド。PUT platform-locations がコンコース全体を
+// 編集専用フィールド。PUT platform-locations がコンコース全体を
 // delete→insertする全置換のため、往復に必要な値をパッケージのDTOより広く持たせる。
 // packages/platform-diagram の types.ts には足さない（web への供給義務が生じ、
 // パッケージが編集用フィールドを抱え込むことになる。ADR-0010「レビュー」節参照）。

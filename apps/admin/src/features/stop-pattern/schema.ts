@@ -25,7 +25,7 @@ export const trainStopPatternSchema = z
   // 共有する」）。どちらのフィールドが共有側かは編成の向きに依存するため、
   // isDoorOrderReversed() を admin の図上編集（editDraft.ts）と同じ唯一の判定源として使う。
   // 向きを考慮しない単純な end===start 比較では、反転編成を不連続と誤検出する
-  // （Issue #95 PR3引き継ぎ事項の確認時に、茗荷谷2番線・丸ノ内線で実際に誤検出した）。
+  // （実データの茗荷谷2番線・丸ノ内線で実際に誤検出した）。
   .superRefine((v, ctx) => {
     const sorted = [...v.cars].sort((a, b) => a.carNumber - b.carNumber);
     if (sorted.length < 2) return;

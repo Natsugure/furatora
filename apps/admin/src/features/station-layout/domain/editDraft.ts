@@ -19,7 +19,7 @@ import type {
 /** 号車を潰さない最小幅（m）。moveCarBoundary/moveCarEdge の唯一のクランプ元 */
 export const MIN_CAR_METERS = 0.5;
 
-/** 新規アクセス点に設備を追加したときの既定値（旧FacilityForm・PR5で削除、の既定と同じ） */
+/** 新規アクセス点に設備を追加したときの既定値 */
 const DEFAULT_FACILITY_ACCESSIBILITY = { isWheelchairAccessible: true, isStrollerAccessible: true };
 
 export type FacilityDraft = {
@@ -125,7 +125,7 @@ export function duplicateConcourseDraft(
 }
 
 /**
- * 保存不可な状態ならエラーメッセージを返す（旧FacilityForm.tsxのsubmit時アラート相当）。
+ * 保存不可な状態ならエラーメッセージを返す。
  * インスペクタのボタン無効化と、保存実行前のガードの両方から呼ばれる単一の判定源にする。
  */
 export function concourseDraftValidationError(draft: ConcourseDraft): string | null {
@@ -191,7 +191,7 @@ export function removeCell(draft: ConcourseDraft, cellId: string): ConcourseDraf
 }
 
 /**
- * アクセス点に設備タイプを追加する（既存FacilityFormのチェックボックスON相当）。
+ * アクセス点に設備タイプを追加する。
  * 既に同じtypeCodeがあれば何もしない（トグルの対になる removeCellFacility を使うこと）。
  */
 export function addCellFacility(draft: ConcourseDraft, cellId: string, typeCode: string): ConcourseDraft {
@@ -239,7 +239,7 @@ export function updateCellFacility(
 }
 
 /**
- * 乗換可能な駅を1件登録・更新する（既存FacilityFormのチェックボックスON＋詳細入力相当）。
+ * 乗換可能な駅を1件登録・更新する。
  * 同じstationIdが既にあれば内容をpatchで更新、無ければ既定値＋patchで新規追加する。
  */
 export function setConnection(

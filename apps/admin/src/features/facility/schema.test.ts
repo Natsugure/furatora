@@ -50,8 +50,8 @@ describe('platformLocationSchema', () => {
   });
 
   it('isWheelchairAccessible/isStrollerAccessibleがnullでも正常にパースされる', () => {
-    // Issue #95 の図上編集はコンコース全体を再送する全置換PUTのため、未設定(null)を
-    // そのまま送れる必要がある（true に丸められるとアクセシビリティ属性が黙って変わる）
+    // コンコース全体を再送する全置換PUTのため、未設定(null)をそのまま送れる必要が
+    // ある（true に丸められるとアクセシビリティ属性が黙って変わる）
     const result = platformLocationSchema.safeParse({
       platformId: VALID_UUID,
       cells: [{

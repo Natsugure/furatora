@@ -158,8 +158,7 @@ describe('layoutConcoursePlates', () => {
       expect(groups[0]!.anchorX).toBe(50);
     });
 
-    // 旧実装は labelX を viewBox 内へクランプしていたが、プレートがHTMLになり
-    // 実幅がサーバ側で分からなくなったため、アンカーは動かさず align ヒントで寄せる
+    // プレートはHTMLで実幅がサーバ側で分からないため、アンカーは動かさず align ヒントで寄せる
     it('端に寄せる場合でもアンカーは動かさない', () => {
       const { groups } = layoutConcoursePlates([concourse('c1', { cells: cellsAt(-20) })], BOUNDS);
 

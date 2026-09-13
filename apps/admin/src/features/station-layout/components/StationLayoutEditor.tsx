@@ -70,7 +70,7 @@ function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | unde
  * インスペクタ・未保存パネルを1つのツリーにまとめる（ADR-0010 決定2）。DTOはpropsで
  * 受け取り、関数propsは渡さない。
  *
- * bounds凍結（design.md「編集レイヤの座標変換」）: computeBounds は
+ * bounds凍結（docs/domain/platform-coordinate-system.md「bounds の凍結」）: computeBounds は
  * concourseBaselines/patternBaselines（保存が確定した値。ドラッグ中のdraftは
  * 含まない）からのみ算出する。新規作成中のコンコース・停車パターン（newConcourse/
  * newPattern）も未保存のうちはboundsに含めない（同じ理由）。

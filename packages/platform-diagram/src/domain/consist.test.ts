@@ -7,7 +7,6 @@ const car = { startMeters: 0, endMeters: 20, doorCount: 4 };
 
 describe('doorCenterX', () => {
   it('スロットの左端ではなく中心を返す', () => {
-    // 旧実装は start + (d / doorCount) * width でスロット左端（0, 5, 10, 15）を返していた
     expect(doorCenterX(car, 1, false)).toBe(2.5);
     expect(doorCenterX(car, 4, false)).toBe(17.5);
   });

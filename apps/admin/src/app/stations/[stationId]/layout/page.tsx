@@ -3,7 +3,10 @@ import { parseUuidParam } from '@/shared/list/params';
 import { StationLayoutView } from '@/features/station-layout/components/StationLayoutView';
 import { stationLayoutPageQuery } from '@/di';
 
-/** 駅レイアウト統合ページ（読み取り専用）。URL契約は docs/spec/design.md「URL契約」 */
+/**
+ * 駅レイアウト統合ページ。ホームタブ・図・設備編集を1画面に統合する。
+ * `?platformId=&patternId=` は選択中のホーム・停車パターンを指す。
+ */
 export default async function StationLayoutPage({
   params,
   searchParams,

@@ -6,8 +6,8 @@ import { StationLayoutView } from './StationLayoutView';
 import type { LayoutPlatformDetailDTO, LayoutConcourseDTO, StationLayoutContext } from '@/features/station-layout/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
 
-// StationLayoutView は StationLayoutEditor（Client Component、Issue #95 PR3）を
-// 常に描画するようになった。useRouter() が App Router のコンテキストを要求するためモックする
+// StationLayoutView は StationLayoutEditor（Client Component）を常に描画する。
+// useRouter() が App Router のコンテキストを要求するためモックする
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));

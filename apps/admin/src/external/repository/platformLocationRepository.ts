@@ -38,8 +38,8 @@ async function insertCellsAndFacilities(
           typeCode: f.typeCode,
           // undefined（フィールド省略）のみ既定値 true を補う。明示的な null は
           // そのまま保存する（?? だと null も true に書き換わってしまう。
-          // Issue #95 の図上編集は全置換PUTのため、座標だけ動かす保存でも
-          // 未設定(null)のアクセシビリティ属性を保つ必要がある）
+          // 全置換PUTのため、座標だけ動かす保存でも未設定(null)の
+          // アクセシビリティ属性を保つ必要がある）
           isWheelchairAccessible: f.isWheelchairAccessible === undefined ? true : f.isWheelchairAccessible,
           isStrollerAccessible: f.isStrollerAccessible === undefined ? true : f.isStrollerAccessible,
           notes: f.notes ?? null,

@@ -1,7 +1,7 @@
 # @furatora/platform-diagram
 
 ホーム図（SVG + HTML オーバーレイ）の domain 純関数と描画コンポーネント。
-`apps/web`（公開表示）と `apps/admin`（編集ビュー、Issue #95）の両方から使われる。
+`apps/web`（公開表示）と `apps/admin`（編集ビュー）の両方から使われる。
 
 詳細な設計・座標系の定義は以下を参照:
 
@@ -44,7 +44,7 @@ elevator.png, escalator.png, stairs.png, wheelchair_ramp.png, stair_lift.png, wh
 ```
 
 `apps/web/public/icons/` にあるものと同一のファイルを `apps/admin/public/icons/` にも
-複製している（2026-09、Issue #95）。将来アイコンを更新するときは両方を更新すること。
+複製している。将来アイコンを更新するときは両方を更新すること。
 
 ## CSS変数について
 

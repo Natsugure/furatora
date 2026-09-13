@@ -43,5 +43,5 @@ export const stationEditPageQuery = dbStationEditPageQuery;
 export const stationListPageQuery = dbStationListPageQuery;
 export const lineListPageQuery = dbLineListPageQuery;
 
-// 駅レイアウト統合ページ（#95）
+// 駅レイアウト統合ページ
 export const stationLayoutPageQuery = dbStationLayoutPageQuery;
