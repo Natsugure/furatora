@@ -7,14 +7,14 @@ export async function PUT(
   { params }: { params: Promise<{ stationId: string; locationId: string }> }
 ) {
   try {
-    const { locationId } = await params;
+    const { stationId, locationId } = await params;
     const body = await request.json();
     const parsed = platformLocationSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
 
-    const updated = await platformLocationRepository.update(locationId, parsed.data);
+    const updated = await platformLocationRepository.update(locationId, stationId, parsed.data);
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -30,8 +30,8 @@ export async function DELETE(
   { params }: { params: Promise<{ stationId: string; locationId: string }> }
 ) {
   try {
-    const { locationId } = await params;
-    const deleted = await platformLocationRepository.delete(locationId);
+    const { stationId, locationId } = await params;
+    const deleted = await platformLocationRepository.delete(locationId, stationId);
     if (!deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }

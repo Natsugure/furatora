@@ -141,7 +141,7 @@ export default async function StationsPage({
                           </LinkAnchor>
                         </TableTd>
                         <TableTd>
-                          <LinkAnchor href={`/stations/${stn.id}/facilities`} size="sm">
+                          <LinkAnchor href={`/stations/${stn.id}/layout`} size="sm">
                             管理
                           </LinkAnchor>
                         </TableTd>

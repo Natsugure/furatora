@@ -6,10 +6,11 @@ import {
   stationFacilities,
   facilityConnections,
 } from '@furatora/database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { PlatformLocationInput } from '@/features/facility/schema';
 import type { PlatformLocationRepository, PlatformLocationRecord } from '@/features/facility/ports';
 import { requireInserted } from '@/external/requireInserted';
+import { isPlatformOfStation, belongsToStation } from '@/external/repository/stationScopeGuard';
 
 // platformLocations → platformLocationCells → stationFacilities / facilityConnections
 // の複数テーブルにまたがる書き込みのため withTransaction で原子化する（ADR-0005）。
@@ -35,8 +36,12 @@ async function insertCellsAndFacilities(
         cell.facilities.map((f) => ({
           platformLocationCellId: insertedCell.id,
           typeCode: f.typeCode,
-          isWheelchairAccessible: f.isWheelchairAccessible ?? true,
-          isStrollerAccessible: f.isStrollerAccessible ?? true,
+          // undefined（フィールド省略）のみ既定値 true を補う。明示的な null は
+          // そのまま保存する（?? だと null も true に書き換わってしまう。
+          // 全置換PUTのため、座標だけ動かす保存でも未設定(null)の
+          // アクセシビリティ属性を保つ必要がある）
+          isWheelchairAccessible: f.isWheelchairAccessible === undefined ? true : f.isWheelchairAccessible,
+          isStrollerAccessible: f.isStrollerAccessible === undefined ? true : f.isStrollerAccessible,
           notes: f.notes ?? null,
         }))
       );
@@ -64,8 +69,10 @@ async function insertConnections(
 }
 
 export const dbPlatformLocationRepository: PlatformLocationRepository = {
-  async create(input) {
+  async create(stationId, input) {
     return withTransaction(async (tx) => {
+      if (!(await isPlatformOfStation(tx, input.platformId, stationId))) return null;
+
       const location = requireInserted(
         await tx
           .insert(platformLocations)
@@ -84,8 +91,11 @@ export const dbPlatformLocationRepository: PlatformLocationRepository = {
     });
   },
 
-  async update(id, input) {
+  async update(id, stationId, input) {
     return withTransaction(async (tx) => {
+      // 付け替え先ホームが他駅のものであれば、更新対象が当該駅のものでも拒否する
+      if (!(await isPlatformOfStation(tx, input.platformId, stationId))) return null;
+
       const [updated] = await tx
         .update(platformLocations)
         .set({
@@ -93,7 +103,7 @@ export const dbPlatformLocationRepository: PlatformLocationRepository = {
           exits: input.exits ?? null,
           notes: input.notes ?? null,
         })
-        .where(eq(platformLocations.id, id))
+        .where(and(eq(platformLocations.id, id), belongsToStation(platformLocations.platformId, stationId)))
         .returning();
 
       if (!updated) return null;
@@ -120,85 +130,12 @@ export const dbPlatformLocationRepository: PlatformLocationRepository = {
     });
   },
 
-  async delete(id) {
+  async delete(id, stationId) {
     // 子テーブルは CASCADE で削除されるため、単一の DELETE 文で原子的に完結する
-    const [row] = await db.delete(platformLocations).where(eq(platformLocations.id, id)).returning();
+    const [row] = await db
+      .delete(platformLocations)
+      .where(and(eq(platformLocations.id, id), belongsToStation(platformLocations.platformId, stationId)))
+      .returning();
     return !!row;
-  },
-
-  async duplicate(id) {
-    const [original] = await db.select().from(platformLocations).where(eq(platformLocations.id, id));
-    if (!original) return null;
-
-    const originalCells = await db
-      .select()
-      .from(platformLocationCells)
-      .where(eq(platformLocationCells.platformLocationId, id));
-
-    const originalFacilities = originalCells.length > 0
-      ? await db
-          .select()
-          .from(stationFacilities)
-          .where(inArray(stationFacilities.platformLocationCellId, originalCells.map((c) => c.id)))
-      : [];
-
-    const originalConnections = await db
-      .select()
-      .from(facilityConnections)
-      .where(eq(facilityConnections.platformLocationId, id));
-
-    return withTransaction(async (tx) => {
-      const duplicated = requireInserted(
-        await tx
-          .insert(platformLocations)
-          .values({
-            platformId: original.platformId,
-            exits: original.exits,
-            notes: original.notes,
-          })
-          .returning()
-      );
-
-      for (const cell of originalCells) {
-        const duplicatedCell = requireInserted(
-          await tx
-            .insert(platformLocationCells)
-            .values({
-              platformLocationId: duplicated.id,
-              xPositionMeters: cell.xPositionMeters,
-            })
-            .returning()
-        );
-
-        const cellFacilities = originalFacilities.filter((f) => f.platformLocationCellId === cell.id);
-        if (cellFacilities.length > 0) {
-          await tx.insert(stationFacilities).values(
-            cellFacilities.map((f) => ({
-              platformLocationCellId: duplicatedCell.id,
-              typeCode: f.typeCode,
-              isWheelchairAccessible: f.isWheelchairAccessible,
-              isStrollerAccessible: f.isStrollerAccessible,
-              notes: f.notes,
-            }))
-          );
-        }
-      }
-
-      if (originalConnections.length > 0) {
-        await tx.insert(facilityConnections).values(
-          originalConnections.map((c) => ({
-            platformLocationId: duplicated.id,
-            connectedStationId: c.connectedStationId,
-            connectedPlatformId: c.connectedPlatformId,
-            directionId: c.directionId,
-            exitLabel: c.exitLabel,
-            xRangeStart: c.xRangeStart,
-            xRangeEnd: c.xRangeEnd,
-          }))
-        );
-      }
-
-      return duplicated as PlatformLocationRecord;
-    });
   },
 };

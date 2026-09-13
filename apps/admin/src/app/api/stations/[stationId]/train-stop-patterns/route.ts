@@ -74,7 +74,7 @@ export async function POST(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json({ success: true, id: saved.id }, { status: 201 });
   } catch (err) {
     if (err instanceof DuplicateStopPatternError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
