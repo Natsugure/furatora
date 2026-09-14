@@ -1,6 +1,7 @@
 import { Stack, Text, Title } from '@mantine/core';
 import { LinkAnchor } from '@/components/LinkElements';
 import type { StationLayoutContext } from '@/features/station-layout/ports';
+import { NewPlatformPrompt } from './NewPlatformPrompt';
 import { StationLayoutEditor } from './StationLayoutEditor';
 
 type Props = {
@@ -14,7 +15,9 @@ type Props = {
  * タブ・図・編集レイヤ・インスペクタ・未保存パネル・「位置未登録の設備・乗換」
  * セクションはすべて StationLayoutEditor（Client Component）に委譲する
  * （未保存確認モーダルがタブ遷移をまたいで単一のdirty stateを共有する必要があるため）。
- * ここに残すのは静的表示のみ: 戻るリンク・駅名・notes。
+ * ここに残すのは静的表示（戻るリンク・駅名・notes）と、ホームが1件も無い駅向けの
+ * 新規ホーム追加導線（NewPlatformPrompt。StationLayoutEditor は platform.id 前提の
+ * props を要求するためホーム0件時は描画できない）。
  */
 export function StationLayoutView({ stationId, context }: Props) {
   const { platform } = context;
@@ -28,7 +31,7 @@ export function StationLayoutView({ stationId, context }: Props) {
       <Title order={2} mb="lg">{context.stationName}</Title>
 
       {!platform ? (
-        <Text c="dimmed">ホームがまだ登録されていません。</Text>
+        <NewPlatformPrompt stationId={stationId} lines={context.lines} />
       ) : (
         <Stack gap="lg">
           <StationLayoutEditor
