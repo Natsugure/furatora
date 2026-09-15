@@ -2,11 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { notifications } from '@mantine/notifications';
 import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import { strollerDifficultyOptions, wheelchairDifficultyOptions } from '@/constants/difficulty';
 import type { ConnectionRow, OperatorOption } from '@/features/station/ports';
 import { DeleteButton } from '@/components/DeleteButton';
 import { LinkAnchor } from '@/components/LinkElements';
+import { describeError } from '@/features/station-publishing/describeError';
 import {
   Button, Card, Group, NativeSelect, SimpleGrid, Stack, Text, TextInput, Textarea, Title,
 } from '@mantine/core';
@@ -41,6 +43,8 @@ type Props = {
   };
   connections: ConnectionRow[];
   operators: OperatorOption[];
+  /** 「駅一覧に戻る」と同じ、直前の一覧の絞り込み状態を保持したhref */
+  backHref: string;
 };
 
 function displayName(conn: ConnectionRow): string {
@@ -52,7 +56,7 @@ function displayName(conn: ConnectionRow): string {
   return '(不明)';
 }
 
-export function StationEditForm({ stationId, initialData, connections, operators }: Props) {
+export function StationEditForm({ stationId, initialData, connections, operators, backHref }: Props) {
   const router = useRouter();
   const [name, setName] = useState(initialData.name);
   const [nameKana, setNameKana] = useState(initialData.nameKana ?? '');
@@ -113,15 +117,16 @@ export function StationEditForm({ stationId, initialData, connections, operators
     );
 
     const results = await Promise.all([stationReq, ...connectionReqs]);
-    const allOk = results.every((r) => r.ok);
+    const failed = results.find((r) => !r.ok);
 
-    if (allOk) {
-      router.push('/stations');
+    if (!failed) {
+      notifications.show({ title: '保存しました', message: '駅情報を更新しました', color: 'green' });
       router.refresh();
     } else {
-      setSubmitting(false);
-      alert('保存に失敗しました');
+      const body: unknown = await failed.json().catch(() => null);
+      notifications.show({ title: '保存に失敗しました', message: describeError(body), color: 'red' });
     }
+    setSubmitting(false);
   }
 
   const operatorOptions = operators.map((op) => ({ value: op.id, label: op.name }));
@@ -204,6 +209,9 @@ export function StationEditForm({ stationId, initialData, connections, operators
           <Title order={4}>
             乗り換え接続 ({connections.length}件)
           </Title>
+          {/* connections/new は ?operatorId=&lineId= を乗換候補の絞り込みに使っており、
+              一覧の状態と同名で衝突するため一覧の状態は渡さない。
+              connections/new からの「駅の編集に戻る」は素の /stations/:id/edit になる */}
           <LinkAnchor href={`/stations/${stationId}/connections/new`} size="sm">
             + 接続を追加
           </LinkAnchor>
@@ -280,7 +288,7 @@ export function StationEditForm({ stationId, initialData, connections, operators
         <Button loading={submitting} onClick={handleSave}>
           保存
         </Button>
-        <Button variant="default" onClick={() => router.push('/stations')}>
+        <Button variant="default" onClick={() => router.push(backHref)}>
           キャンセル
         </Button>
       </Group>

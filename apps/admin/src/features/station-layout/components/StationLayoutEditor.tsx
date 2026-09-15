@@ -14,6 +14,7 @@ import {
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { describeError } from '@/features/station-publishing/describeError';
 import { LinkButton } from '@/components/LinkElements';
+import { buildListHref, type ListHrefState } from '@/shared/list/href';
 import type { LineWithDirections } from '@/features/platform/ports';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
@@ -42,15 +43,19 @@ type Props = {
   facilityTypes: FacilityTypeOption[];
   connectedStations: ConnectedStationOption[];
   trains: TrainOptionDTO[];
+  /** 一覧から遷移してきた際の絞り込み状態。ホーム切替・保存後の遷移先URLに載せて保持する */
+  listState: ListHrefState;
 };
 
 /** 複製時に座標をずらす量（m）。0だと元と完全に重なって見分けがつかない */
 const DUPLICATE_OFFSET_METERS = 2;
 
-function layoutHref(stationId: string, platformId: string, patternId?: string) {
-  const params = new URLSearchParams({ platformId });
-  if (patternId) params.set('patternId', patternId);
-  return `/stations/${stationId}/layout?${params.toString()}`;
+function layoutHref(stationId: string, listState: ListHrefState, platformId: string, patternId?: string) {
+  return buildListHref(
+    `/stations/${stationId}/layout`,
+    listState,
+    { platformId, patternId: patternId ?? null },
+  );
 }
 
 function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | undefined): LayoutStopPatternDTO {
@@ -79,7 +84,7 @@ function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | unde
  * editDraft.ts の同じ純関数を通るため、どちらの経路でも同じ不変条件が守られる。
  */
 export function StationLayoutEditor({
-  stationId, platforms, platform, lines, facilityTypes, connectedStations, trains,
+  stationId, platforms, platform, lines, facilityTypes, connectedStations, trains, listState,
 }: Props) {
   const router = useRouter();
 
@@ -498,7 +503,7 @@ export function StationLayoutEditor({
         return;
       }
       notifications.show({ title: '削除しました', message: `${platform.platformNumber}番ホームを削除しました`, color: 'green' });
-      router.push(`/stations/${stationId}/layout`);
+      router.push(buildListHref(`/stations/${stationId}/layout`, listState, {}));
       router.refresh();
     } finally {
       setDeletingPlatform(false);
@@ -599,10 +604,10 @@ export function StationLayoutEditor({
           {platforms.map((p) => (
             <LinkButton
               key={p.id}
-              href={layoutHref(stationId, p.id)}
+              href={layoutHref(stationId, listState, p.id)}
               variant={p.id === platform.id ? 'filled' : 'default'}
               size="sm"
-              onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, p.id))}
+              onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, listState, p.id))}
             >
               {p.platformNumber}番線
             </LinkButton>
@@ -618,7 +623,12 @@ export function StationLayoutEditor({
       </Group>
 
       {creatingPlatform && (
-        <PlatformInspector stationId={stationId} lines={lines} onCancel={() => setCreatingPlatform(false)} />
+        <PlatformInspector
+          stationId={stationId}
+          lines={lines}
+          onCancel={() => setCreatingPlatform(false)}
+          listState={listState}
+        />
       )}
 
       <Card withBorder padding="lg">
@@ -666,6 +676,7 @@ export function StationLayoutEditor({
               notes: platform.notes,
             }}
             onCancel={() => setEditingPlatform(false)}
+            listState={listState}
           />
         )}
 
@@ -675,10 +686,10 @@ export function StationLayoutEditor({
               {patternBaselines.map((sp) => (
                 <LinkButton
                   key={sp.patternId}
-                  href={layoutHref(stationId, platform.id, sp.patternId)}
+                  href={layoutHref(stationId, listState, platform.id, sp.patternId)}
                   variant={!newPattern && sp.patternId === platform.selectedPatternId ? 'filled' : 'default'}
                   size="compact-sm"
-                  onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, platform.id, sp.patternId))}
+                  onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, listState, platform.id, sp.patternId))}
                 >
                   {sp.trainLabel}
                   {dirtyPatternIds.includes(sp.patternId) && ' ●'}

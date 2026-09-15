@@ -74,7 +74,9 @@ test('UUID形式でない駅IDは500にならず404になる', async ({ page }) 
 test('駅一覧の「管理」リンクは /layout を指す', async ({ page }) => {
   const stationId = await findStationId(page, '渋谷');
   const href = await page.getByRole('link', { name: '管理' }).first().getAttribute('href');
-  expect(href).toBe(`/stations/${stationId}/layout`);
+  // 一覧の絞り込み状態（この経路では operatorId・q）を戻り先復元用にクエリで運ぶため、
+  // パス部分だけを比較する（stations-list.spec.ts が状態保持そのものを検証する）
+  expect(href).toMatch(new RegExp(`^/stations/${stationId}/layout(\\?|$)`));
 });
 
 test('旧ルート（/facilities、/platforms/new）は削除済みで404になる', async ({ page }) => {

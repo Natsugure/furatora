@@ -34,7 +34,7 @@ describe('PlatformInspector', () => {
   it('路線候補が1件のみなら新規作成時に自動設定される（#32①）', () => {
     render(
       <MantineProvider>
-        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} />
+        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} listState={{}} />
       </MantineProvider>,
     );
     expect(screen.getByLabelText('路線', { exact: false })).toHaveValue('line-1');
@@ -44,7 +44,7 @@ describe('PlatformInspector', () => {
   it('路線候補が複数ある場合は自動設定せず選択を求める', () => {
     render(
       <MantineProvider>
-        <PlatformInspector stationId="station-1" lines={twoLines} onCancel={vi.fn()} />
+        <PlatformInspector stationId="station-1" lines={twoLines} onCancel={vi.fn()} listState={{}} />
       </MantineProvider>,
     );
     expect(screen.getByLabelText('路線', { exact: false })).toHaveValue('');
@@ -56,7 +56,7 @@ describe('PlatformInspector', () => {
     );
     render(
       <MantineProvider>
-        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} />
+        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} listState={{}} />
       </MantineProvider>,
     );
     const user = userEvent.setup();
@@ -81,7 +81,7 @@ describe('PlatformInspector', () => {
   it('ホーム長が0以下だとエラー通知が出てfetchは呼ばれない', async () => {
     render(
       <MantineProvider>
-        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} />
+        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} listState={{}} />
       </MantineProvider>,
     );
     const user = userEvent.setup();
@@ -107,6 +107,7 @@ describe('PlatformInspector', () => {
             physicalLength: 100, platformSide: null, notes: null,
           }}
           onCancel={vi.fn()}
+          listState={{}}
         />
       </MantineProvider>,
     );
@@ -125,7 +126,7 @@ describe('PlatformInspector', () => {
     const onCancel = vi.fn();
     render(
       <MantineProvider>
-        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={onCancel} />
+        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={onCancel} listState={{}} />
       </MantineProvider>,
     );
     const user = userEvent.setup();

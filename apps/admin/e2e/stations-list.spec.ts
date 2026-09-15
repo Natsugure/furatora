@@ -66,3 +66,48 @@ test('不正なクエリパラメータでも500にならず既定値にフォ�
   expect(response?.status()).toBeLessThan(500);
   await expect(page.getByRole('heading', { name: '駅' })).toBeVisible();
 });
+
+// 詳細ページ間の遷移で一覧の絞り込み状態を保持する。
+test('事業者・路線で絞り込んだ状態で編集へ遷移し、「駅一覧に戻る」で絞り込みが復元される', async ({ page }) => {
+  await page.goto('/stations');
+  await page.getByRole('link', { name: /JR東日本/ }).click();
+  await page.getByLabel('路線', { exact: true }).selectOption({ label: 'JR山手線' });
+  await expect(page).toHaveURL(/lineId=/);
+
+  await page.locator('tbody tr').first().getByRole('link', { name: '編集' }).click();
+  await expect(page).toHaveURL(/\/stations\/.+\/edit/);
+  await expect(page).toHaveURL(/operatorId=/);
+  await expect(page).toHaveURL(/lineId=/);
+
+  await page.getByRole('link', { name: /駅一覧に戻る/ }).click();
+  await expect(page).toHaveURL(/\/stations\?/);
+  await expect(page).toHaveURL(/lineId=/);
+  await expect(page.getByText(/JR山手線\s*\(\d+駅\)/)).toBeVisible();
+});
+
+test('絞り込んだ状態でホーム管理へ遷移し、「駅一覧に戻る」で絞り込みが復元される', async ({ page }) => {
+  await page.goto('/stations');
+  await page.getByRole('link', { name: /JR東日本/ }).click();
+  await page.getByLabel('路線', { exact: true }).selectOption({ label: 'JR山手線' });
+  await expect(page).toHaveURL(/lineId=/);
+
+  await page.locator('tbody tr').first().getByRole('link', { name: '管理' }).click();
+  await expect(page).toHaveURL(/\/stations\/.+\/layout/);
+  await expect(page).toHaveURL(/lineId=/);
+
+  await page.getByRole('link', { name: /駅一覧に戻る/ }).click();
+  await expect(page).toHaveURL(/\/stations\?/);
+  await expect(page).toHaveURL(/lineId=/);
+});
+
+test('編集画面で保存すると、一覧へ遷移せずその場に留まり保存完了が通知される', async ({ page }) => {
+  await page.goto('/stations');
+  await page.getByRole('link', { name: /JR東日本/ }).click();
+  await page.locator('tbody tr').first().getByRole('link', { name: '編集' }).click();
+  await expect(page).toHaveURL(/\/stations\/.+\/edit/);
+  const editUrl = page.url();
+
+  await page.getByRole('button', { name: '保存' }).click();
+  await expect(page.getByText('保存しました')).toBeVisible();
+  expect(page.url()).toBe(editUrl);
+});
