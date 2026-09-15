@@ -40,3 +40,12 @@ export function LinkAnchor({ href, children, ...props }: AnchorProps & { href: s
     </Anchor>
   );
 }
+
+/** 詳細ページ上部の「〜に戻る」リンク。一覧ページ群で見た目を揃えるための薄いラッパ */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <LinkAnchor href={href} size="sm" mb="lg" style={{ display: 'block' }}>
+      &larr; {children}
+    </LinkAnchor>
+  );
+}

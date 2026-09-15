@@ -107,6 +107,7 @@ function renderEditor(overrides: { facilityTypes?: FacilityTypeOption[]; trains?
         facilityTypes={overrides.facilityTypes ?? []}
         connectedStations={[]}
         trains={overrides.trains ?? []}
+        listState={{}}
       />
     </MantineProvider>,
   );

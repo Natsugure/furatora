@@ -1,11 +1,17 @@
 import { Stack, Text, Title } from '@mantine/core';
-import { LinkAnchor } from '@/components/LinkElements';
+import { BackLink } from '@/components/LinkElements';
 import type { StationLayoutContext } from '@/features/station-layout/ports';
+import type { ListHrefState } from '@/shared/list/href';
+import { NewPlatformPrompt } from './NewPlatformPrompt';
 import { StationLayoutEditor } from './StationLayoutEditor';
 
 type Props = {
   stationId: string;
   context: StationLayoutContext;
+  /** 一覧から遷移してきた際の絞り込み状態。「駅一覧に戻る」・タブ遷移・保存後のURLに載せて保持する */
+  listState: ListHrefState;
+  /** 「駅一覧に戻る」のhref。listStateから組み立て済みのものを渡す */
+  backHref: string;
 };
 
 /**
@@ -14,21 +20,21 @@ type Props = {
  * タブ・図・編集レイヤ・インスペクタ・未保存パネル・「位置未登録の設備・乗換」
  * セクションはすべて StationLayoutEditor（Client Component）に委譲する
  * （未保存確認モーダルがタブ遷移をまたいで単一のdirty stateを共有する必要があるため）。
- * ここに残すのは静的表示のみ: 戻るリンク・駅名・notes。
+ * ここに残すのは静的表示（戻るリンク・駅名・notes）と、ホームが1件も無い駅向けの
+ * 新規ホーム追加導線（NewPlatformPrompt。StationLayoutEditor は platform.id 前提の
+ * props を要求するためホーム0件時は描画できない）。
  */
-export function StationLayoutView({ stationId, context }: Props) {
+export function StationLayoutView({ stationId, context, listState, backHref }: Props) {
   const { platform } = context;
 
   return (
     <div>
-      <LinkAnchor href="/stations" size="sm" mb="lg" style={{ display: 'block' }}>
-        &larr; 駅一覧に戻る
-      </LinkAnchor>
+      <BackLink href={backHref}>駅一覧に戻る</BackLink>
 
       <Title order={2} mb="lg">{context.stationName}</Title>
 
       {!platform ? (
-        <Text c="dimmed">ホームがまだ登録されていません。</Text>
+        <NewPlatformPrompt stationId={stationId} lines={context.lines} listState={listState} />
       ) : (
         <Stack gap="lg">
           <StationLayoutEditor
@@ -43,6 +49,7 @@ export function StationLayoutView({ stationId, context }: Props) {
             facilityTypes={context.facilityTypes}
             connectedStations={context.connectedStations}
             trains={context.trains}
+            listState={listState}
           />
           {platform.notes && (
             <Text size="sm" c="yellow.8" bg="yellow.0" p="sm" style={{ borderRadius: 8 }}>

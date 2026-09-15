@@ -14,6 +14,8 @@ import {
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { describeError } from '@/features/station-publishing/describeError';
 import { LinkButton } from '@/components/LinkElements';
+import type { ListHrefState } from '@/shared/list/href';
+import { stationLayoutHref } from '@/features/station/listState';
 import type { LineWithDirections } from '@/features/platform/ports';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
@@ -42,16 +44,12 @@ type Props = {
   facilityTypes: FacilityTypeOption[];
   connectedStations: ConnectedStationOption[];
   trains: TrainOptionDTO[];
+  /** 一覧から遷移してきた際の絞り込み状態。ホーム切替・保存後の遷移先URLに載せて保持する */
+  listState: ListHrefState;
 };
 
 /** 複製時に座標をずらす量（m）。0だと元と完全に重なって見分けがつかない */
 const DUPLICATE_OFFSET_METERS = 2;
-
-function layoutHref(stationId: string, platformId: string, patternId?: string) {
-  const params = new URLSearchParams({ platformId });
-  if (patternId) params.set('patternId', patternId);
-  return `/stations/${stationId}/layout?${params.toString()}`;
-}
 
 function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | undefined): LayoutStopPatternDTO {
   if (!draft) return baseline;
@@ -79,7 +77,7 @@ function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | unde
  * editDraft.ts の同じ純関数を通るため、どちらの経路でも同じ不変条件が守られる。
  */
 export function StationLayoutEditor({
-  stationId, platforms, platform, lines, facilityTypes, connectedStations, trains,
+  stationId, platforms, platform, lines, facilityTypes, connectedStations, trains, listState,
 }: Props) {
   const router = useRouter();
 
@@ -498,7 +496,7 @@ export function StationLayoutEditor({
         return;
       }
       notifications.show({ title: '削除しました', message: `${platform.platformNumber}番ホームを削除しました`, color: 'green' });
-      router.push(`/stations/${stationId}/layout`);
+      router.push(stationLayoutHref(stationId, listState));
       router.refresh();
     } finally {
       setDeletingPlatform(false);
@@ -596,17 +594,20 @@ export function StationLayoutEditor({
     <Stack gap="lg">
       <Group gap="xs" justify="space-between">
         <Group gap="xs">
-          {platforms.map((p) => (
-            <LinkButton
-              key={p.id}
-              href={layoutHref(stationId, p.id)}
-              variant={p.id === platform.id ? 'filled' : 'default'}
-              size="sm"
-              onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, p.id))}
-            >
-              {p.platformNumber}番線
-            </LinkButton>
-          ))}
+          {platforms.map((p) => {
+            const href = stationLayoutHref(stationId, listState, { platformId: p.id });
+            return (
+              <LinkButton
+                key={p.id}
+                href={href}
+                variant={p.id === platform.id ? 'filled' : 'default'}
+                size="sm"
+                onClick={(e: React.MouseEvent) => handleTabClick(e, href)}
+              >
+                {p.platformNumber}番線
+              </LinkButton>
+            );
+          })}
         </Group>
         <Button
           variant="default"
@@ -618,7 +619,12 @@ export function StationLayoutEditor({
       </Group>
 
       {creatingPlatform && (
-        <PlatformInspector stationId={stationId} lines={lines} onCancel={() => setCreatingPlatform(false)} />
+        <PlatformInspector
+          stationId={stationId}
+          lines={lines}
+          onCancel={() => setCreatingPlatform(false)}
+          listState={listState}
+        />
       )}
 
       <Card withBorder padding="lg">
@@ -666,24 +672,28 @@ export function StationLayoutEditor({
               notes: platform.notes,
             }}
             onCancel={() => setEditingPlatform(false)}
+            listState={listState}
           />
         )}
 
         <Group gap="xs" mb="md" justify="space-between">
           {patternBaselines.length > 0 && (
             <Group gap="xs">
-              {patternBaselines.map((sp) => (
-                <LinkButton
-                  key={sp.patternId}
-                  href={layoutHref(stationId, platform.id, sp.patternId)}
-                  variant={!newPattern && sp.patternId === platform.selectedPatternId ? 'filled' : 'default'}
-                  size="compact-sm"
-                  onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, platform.id, sp.patternId))}
-                >
-                  {sp.trainLabel}
-                  {dirtyPatternIds.includes(sp.patternId) && ' ●'}
-                </LinkButton>
-              ))}
+              {patternBaselines.map((sp) => {
+                const href = stationLayoutHref(stationId, listState, { platformId: platform.id, patternId: sp.patternId });
+                return (
+                  <LinkButton
+                    key={sp.patternId}
+                    href={href}
+                    variant={!newPattern && sp.patternId === platform.selectedPatternId ? 'filled' : 'default'}
+                    size="compact-sm"
+                    onClick={(e: React.MouseEvent) => handleTabClick(e, href)}
+                  >
+                    {sp.trainLabel}
+                    {dirtyPatternIds.includes(sp.patternId) && ' ●'}
+                  </LinkButton>
+                );
+              })}
             </Group>
           )}
           {!newPattern && (

@@ -58,13 +58,16 @@ function buildPlatform(overrides: Partial<LayoutPlatformDetailDTO>): LayoutPlatf
   };
 }
 
-function buildContext(platform: LayoutPlatformDetailDTO, trains: TrainOptionDTO[] = []): StationLayoutContext {
+function buildContext(
+  platform: LayoutPlatformDetailDTO | null,
+  trains: TrainOptionDTO[] = [],
+): StationLayoutContext {
   return {
     stationName: '渋谷',
-    platforms: [
+    platforms: platform ? [
       { id: 'platform-1', platformNumber: '1' },
       { id: 'platform-2', platformNumber: '2' },
-    ],
+    ] : [],
     platform,
     lines: [],
     facilityTypes: [],
@@ -76,7 +79,12 @@ function buildContext(platform: LayoutPlatformDetailDTO, trains: TrainOptionDTO[
 function renderView(platform: LayoutPlatformDetailDTO, trains: TrainOptionDTO[] = []) {
   return render(
     <MantineProvider>
-      <StationLayoutView stationId="station-1" context={buildContext(platform, trains)} />
+      <StationLayoutView
+        stationId="station-1"
+        context={buildContext(platform, trains)}
+        listState={{}}
+        backHref="/stations"
+      />
     </MantineProvider>,
   );
 }
@@ -137,7 +145,12 @@ describe('StationLayoutView', () => {
 
     const { rerender } = render(
       <MantineProvider>
-        <StationLayoutView stationId="station-1" context={buildContext(platform1, trains)} />
+        <StationLayoutView
+          stationId="station-1"
+          context={buildContext(platform1, trains)}
+          listState={{}}
+          backHref="/stations"
+        />
       </MantineProvider>,
     );
     expect(screen.getAllByText('列車A').length).toBeGreaterThan(0);
@@ -145,12 +158,36 @@ describe('StationLayoutView', () => {
     // ホーム2へ切替。実際のアプリではURL遷移でStationLayoutViewごと再レンダーされる
     rerender(
       <MantineProvider>
-        <StationLayoutView stationId="station-1" context={buildContext(platform2, trains)} />
+        <StationLayoutView
+          stationId="station-1"
+          context={buildContext(platform2, trains)}
+          listState={{}}
+          backHref="/stations"
+        />
       </MantineProvider>,
     );
 
     await user.click(screen.getByRole('button', { name: '+ 停車位置を追加' }));
     const trainSelect = screen.getByRole('combobox', { name: '列車' });
     expect(within(trainSelect).getByRole('option', { name: '列車A（1両）' })).toBeInTheDocument();
+  });
+
+  // バグ報告: ホームが1件も登録されていない駅では「ホームがまだ登録されていません」の
+  // みが表示され、StationLayoutEditor が描画されないため新規ホームを追加する導線が無かった
+  it('ホームが1件も登録されていない駅では、新規ホーム追加フォームを開ける', async () => {
+    const user = userEvent.setup();
+    render(
+      <MantineProvider>
+        <StationLayoutView stationId="station-1" context={buildContext(null)} listState={{}} backHref="/stations" />
+      </MantineProvider>,
+    );
+
+    expect(screen.getByText('ホームがまだ登録されていません。')).toBeInTheDocument();
+
+    const addButton = screen.getByRole('button', { name: '+ ホームを追加' });
+    await user.click(addButton);
+
+    expect(screen.getByText('新しいホームを追加')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'ホーム番号' })).toBeInTheDocument();
   });
 });
