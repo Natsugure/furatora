@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDebouncedValue } from '@mantine/hooks';
 import { Group, NativeSelect, TextInput } from '@mantine/core';
 import { buildListHref, type ListHrefState } from '@/shared/list/href';
+import { useUrlSyncedSearchInput } from '@/shared/list/useUrlSyncedSearchInput';
 import type { LineOption, OperatorOption } from '@/features/station/ports';
 
-// 駅一覧のツールバー（Issue #94）。状態は URL クエリに置き、useState はこの
-// コンポーネント内の入力途中の値（検索語のデバウンス）にのみ使う。
+// 駅一覧のツールバー（Issue #94）。状態は URL クエリに置き、検索語の入力途中の
+// 値は useUrlSyncedSearchInput（shared/list）にのみ持たせる。
 // 事業者・路線の変更は router.push（履歴に残す）、検索語の変更は入力のたびに
 // 履歴を汚さないよう router.replace で反映する。
 
@@ -26,23 +25,14 @@ type Props = {
 
 export function StationListToolbar({ current, defaults, operatorId, lineId, q, operators, lines }: Props) {
   const router = useRouter();
-  const [searchInput, setSearchInput] = useState(q);
-  const [debounced] = useDebouncedValue(searchInput, 400);
-
-  // ブラウザの戻る/進むなど、自分の入力以外の経路で q が変わったら入力欄に反映する。
-  useEffect(() => {
-    setSearchInput(q);
-  }, [q]);
-
-  useEffect(() => {
-    if (debounced === q) return;
+  const search = useUrlSyncedSearchInput(q, (next) => {
     router.replace(
-      buildListHref('/stations', current, { q: debounced || null }, {
+      buildListHref('/stations', current, { q: next || null }, {
         defaults,
         resetPageOn: RESET_PAGE_ON,
       }),
     );
-  }, [debounced, q, current, defaults, router]);
+  });
 
   function handleOperatorChange(next: string) {
     router.push(
@@ -92,9 +82,8 @@ export function StationListToolbar({ current, defaults, operatorId, lineId, q, o
       <TextInput
         label="検索"
         placeholder="駅名・英名・駅番号"
-        value={searchInput}
-        onChange={(e) => setSearchInput(e.target.value)}
         w={260}
+        {...search}
       />
     </Group>
   );
