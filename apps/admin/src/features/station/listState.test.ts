@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseStationListState, stationDetailHref, stationListHref } from './listState';
+import { parseStationListState, stationDetailHref, stationLayoutHref, stationListHref } from './listState';
 
 describe('parseStationListState', () => {
   it('事業者・路線・検索語・ソート・ページを取り出す', () => {
@@ -51,5 +51,17 @@ describe('stationDetailHref', () => {
   it('状態が空ならbaseのみを返す', () => {
     const href = stationDetailHref('/stations/abc/edit', {});
     expect(href).toBe('/stations/abc/edit');
+  });
+});
+
+describe('stationLayoutHref', () => {
+  it('既定値（sort=line, order=asc, page=1）はクエリに出さない', () => {
+    const href = stationLayoutHref('abc', { operatorId: 'X', sort: 'line', order: 'asc', page: 1 });
+    expect(href).toBe('/stations/abc/layout?operatorId=X');
+  });
+
+  it('patchを一覧の状態に重ねてクエリにする', () => {
+    const href = stationLayoutHref('abc', { operatorId: 'X', sort: 'name', order: 'desc', page: 2 }, { platformId: 'p1' });
+    expect(href).toBe('/stations/abc/layout?operatorId=X&sort=name&order=desc&page=2&platformId=p1');
   });
 });

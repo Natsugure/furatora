@@ -63,5 +63,5 @@ export function stationLayoutHref(
   state: ListHrefState,
   patch: ListHrefState = {},
 ): string {
-  return buildListHref(`/stations/${stationId}/layout`, state, patch);
+  return buildListHref(`/stations/${stationId}/layout`, state, patch, { defaults: STATION_LIST_DEFAULTS });
 }

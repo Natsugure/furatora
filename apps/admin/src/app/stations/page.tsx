@@ -7,7 +7,7 @@ import { ListPagination } from '@/shared/list/ListPagination';
 import { SortableTh } from '@/shared/list/SortableTh';
 import { parseListParams, parseUuidParam } from '@/shared/list/params';
 import type { ListHrefState } from '@/shared/list/href';
-import { STATION_LIST_DEFAULTS, STATION_LIST_PER_PAGE, stationDetailHref } from '@/features/station/listState';
+import { STATION_LIST_DEFAULTS, STATION_LIST_PER_PAGE, parseStationListState, stationDetailHref } from '@/features/station/listState';
 import { stationListPageQuery } from '@/di';
 
 const PER_PAGE = STATION_LIST_PER_PAGE;
@@ -32,9 +32,7 @@ export default async function StationsPage({
     params,
   );
 
-  const current: ListHrefState = {
-    operatorId, lineId, q: params.q, sort: params.sort, order: params.order, page: params.page,
-  };
+  const current: ListHrefState = parseStationListState(raw);
 
   // 路線が確定している（lineId 選択済み）ときだけ「路線」列を隠して見出しに出す。
   // 事業者すら未選択（全国横断検索）のときは「事業者」列も出す。
