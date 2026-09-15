@@ -8,7 +8,8 @@ import {
 import { notifications } from '@mantine/notifications';
 import type { LineWithDirections } from '@/features/platform/ports';
 import { describeError } from '@/features/station-publishing/describeError';
-import { buildListHref, type ListHrefState } from '@/shared/list/href';
+import type { ListHrefState } from '@/shared/list/href';
+import { stationLayoutHref } from '@/features/station/listState';
 
 type PlatformData = {
   id: string;
@@ -100,7 +101,7 @@ export function PlatformInspector({ stationId, lines, initialData, onCancel, lis
     notifications.show({ title: '保存しました', message: isEdit ? 'ホーム情報を更新しました' : '新しいホームを追加しました', color: 'green' });
     onCancel();
     if (savedId) {
-      router.push(buildListHref(`/stations/${stationId}/layout`, listState, { platformId: savedId }));
+      router.push(stationLayoutHref(stationId, listState, { platformId: savedId }));
     }
     router.refresh();
   }

@@ -14,7 +14,8 @@ import {
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { describeError } from '@/features/station-publishing/describeError';
 import { LinkButton } from '@/components/LinkElements';
-import { buildListHref, type ListHrefState } from '@/shared/list/href';
+import type { ListHrefState } from '@/shared/list/href';
+import { stationLayoutHref } from '@/features/station/listState';
 import type { LineWithDirections } from '@/features/platform/ports';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
@@ -49,14 +50,6 @@ type Props = {
 
 /** 複製時に座標をずらす量（m）。0だと元と完全に重なって見分けがつかない */
 const DUPLICATE_OFFSET_METERS = 2;
-
-function layoutHref(stationId: string, listState: ListHrefState, platformId: string, patternId?: string) {
-  return buildListHref(
-    `/stations/${stationId}/layout`,
-    listState,
-    { platformId, patternId: patternId ?? null },
-  );
-}
 
 function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | undefined): LayoutStopPatternDTO {
   if (!draft) return baseline;
@@ -503,7 +496,7 @@ export function StationLayoutEditor({
         return;
       }
       notifications.show({ title: '削除しました', message: `${platform.platformNumber}番ホームを削除しました`, color: 'green' });
-      router.push(buildListHref(`/stations/${stationId}/layout`, listState, {}));
+      router.push(stationLayoutHref(stationId, listState));
       router.refresh();
     } finally {
       setDeletingPlatform(false);
@@ -601,17 +594,20 @@ export function StationLayoutEditor({
     <Stack gap="lg">
       <Group gap="xs" justify="space-between">
         <Group gap="xs">
-          {platforms.map((p) => (
-            <LinkButton
-              key={p.id}
-              href={layoutHref(stationId, listState, p.id)}
-              variant={p.id === platform.id ? 'filled' : 'default'}
-              size="sm"
-              onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, listState, p.id))}
-            >
-              {p.platformNumber}番線
-            </LinkButton>
-          ))}
+          {platforms.map((p) => {
+            const href = stationLayoutHref(stationId, listState, { platformId: p.id });
+            return (
+              <LinkButton
+                key={p.id}
+                href={href}
+                variant={p.id === platform.id ? 'filled' : 'default'}
+                size="sm"
+                onClick={(e: React.MouseEvent) => handleTabClick(e, href)}
+              >
+                {p.platformNumber}番線
+              </LinkButton>
+            );
+          })}
         </Group>
         <Button
           variant="default"
@@ -683,18 +679,21 @@ export function StationLayoutEditor({
         <Group gap="xs" mb="md" justify="space-between">
           {patternBaselines.length > 0 && (
             <Group gap="xs">
-              {patternBaselines.map((sp) => (
-                <LinkButton
-                  key={sp.patternId}
-                  href={layoutHref(stationId, listState, platform.id, sp.patternId)}
-                  variant={!newPattern && sp.patternId === platform.selectedPatternId ? 'filled' : 'default'}
-                  size="compact-sm"
-                  onClick={(e: React.MouseEvent) => handleTabClick(e, layoutHref(stationId, listState, platform.id, sp.patternId))}
-                >
-                  {sp.trainLabel}
-                  {dirtyPatternIds.includes(sp.patternId) && ' ●'}
-                </LinkButton>
-              ))}
+              {patternBaselines.map((sp) => {
+                const href = stationLayoutHref(stationId, listState, { platformId: platform.id, patternId: sp.patternId });
+                return (
+                  <LinkButton
+                    key={sp.patternId}
+                    href={href}
+                    variant={!newPattern && sp.patternId === platform.selectedPatternId ? 'filled' : 'default'}
+                    size="compact-sm"
+                    onClick={(e: React.MouseEvent) => handleTabClick(e, href)}
+                  >
+                    {sp.trainLabel}
+                    {dirtyPatternIds.includes(sp.patternId) && ' ●'}
+                  </LinkButton>
+                );
+              })}
             </Group>
           )}
           {!newPattern && (

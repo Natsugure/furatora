@@ -36,12 +36,32 @@ export function parseStationListState(
   };
 }
 
-/** 詳細ページから駅一覧へ戻る href。state は parseStationListState() の戻り値を渡す */
-export function stationListHref(state: ListHrefState): string {
-  return buildListHref(STATION_LIST_BASE_PATH, state, {}, { defaults: STATION_LIST_DEFAULTS });
-}
-
 /** 一覧の行から詳細ページ（edit / layout / publish）へ飛ぶ href。一覧の状態を載せる */
 export function stationDetailHref(base: string, state: ListHrefState): string {
   return buildListHref(base, state, {}, { defaults: STATION_LIST_DEFAULTS });
+}
+
+/** 詳細ページから駅一覧へ戻る href。state は parseStationListState() の戻り値を渡す */
+export function stationListHref(state: ListHrefState): string {
+  return stationDetailHref(STATION_LIST_BASE_PATH, state);
+}
+
+/**
+ * edit / publish page の定型処理: searchParams から一覧状態を取り出し、
+ * 「駅一覧に戻る」href を組み立てるところまでを1回で行う。
+ */
+export function resolveStationListBack(
+  raw: Record<string, string | string[] | undefined>,
+): { listState: ListHrefState; backHref: string } {
+  const listState = parseStationListState(raw);
+  return { listState, backHref: stationListHref(listState) };
+}
+
+/** 駅レイアウトページ（タブ切替・保存後リダイレクト等）へのhref。一覧の状態を載せる */
+export function stationLayoutHref(
+  stationId: string,
+  state: ListHrefState,
+  patch: ListHrefState = {},
+): string {
+  return buildListHref(`/stations/${stationId}/layout`, state, patch);
 }

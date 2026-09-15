@@ -1,5 +1,5 @@
 import { Stack, Text, Title } from '@mantine/core';
-import { LinkAnchor } from '@/components/LinkElements';
+import { BackLink } from '@/components/LinkElements';
 import type { StationLayoutContext } from '@/features/station-layout/ports';
 import type { ListHrefState } from '@/shared/list/href';
 import { NewPlatformPrompt } from './NewPlatformPrompt';
@@ -29,9 +29,7 @@ export function StationLayoutView({ stationId, context, listState, backHref }: P
 
   return (
     <div>
-      <LinkAnchor href={backHref} size="sm" mb="lg" style={{ display: 'block' }}>
-        &larr; 駅一覧に戻る
-      </LinkAnchor>
+      <BackLink href={backHref}>駅一覧に戻る</BackLink>
 
       <Title order={2} mb="lg">{context.stationName}</Title>
 

@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { Title, Text } from '@mantine/core';
-import { LinkAnchor } from '@/components/LinkElements';
+import { BackLink } from '@/components/LinkElements';
 import { StationEditForm } from '@/components/StationEditForm';
-import { parseStationListState, stationListHref } from '@/features/station/listState';
+import { resolveStationListBack } from '@/features/station/listState';
 import { stationEditPageQuery } from '@/di';
 
 type Props = {
@@ -12,19 +12,17 @@ type Props = {
 
 export default async function StationEditPage({ params, searchParams }: Props) {
   const { stationId } = await params;
-  const context = await stationEditPageQuery.getEditContext(stationId);
+  const [context, { backHref }] = await Promise.all([
+    stationEditPageQuery.getEditContext(stationId),
+    searchParams.then(resolveStationListBack),
+  ]);
   if (!context) {
     notFound();
   }
 
-  const listState = parseStationListState(await searchParams);
-  const backHref = stationListHref(listState);
-
   return (
     <div>
-      <LinkAnchor href={backHref} size="sm" mb="lg" style={{ display: 'block' }}>
-        &larr; 駅一覧に戻る
-      </LinkAnchor>
+      <BackLink href={backHref}>駅一覧に戻る</BackLink>
 
       <Title order={2} mb="xs">{context.station.name} — 編集</Title>
       {context.station.nameEn && (

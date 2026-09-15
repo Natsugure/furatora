@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { parseUuidParam } from '@/shared/list/params';
 import { StationLayoutView } from '@/features/station-layout/components/StationLayoutView';
-import { parseStationListState, stationListHref } from '@/features/station/listState';
+import { resolveStationListBack } from '@/features/station/listState';
 import { stationLayoutPageQuery } from '@/di';
 
 /**
@@ -27,14 +27,14 @@ export default async function StationLayoutPage({
   const context = await stationLayoutPageQuery.getContext(stationId, { platformId, patternId });
   if (!context) notFound();
 
-  const listState = parseStationListState(raw);
+  const { listState, backHref } = resolveStationListBack(raw);
 
   return (
     <StationLayoutView
       stationId={stationId}
       context={context}
       listState={listState}
-      backHref={stationListHref(listState)}
+      backHref={backHref}
     />
   );
 }
