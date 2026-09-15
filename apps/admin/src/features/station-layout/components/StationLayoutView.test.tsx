@@ -79,7 +79,12 @@ function buildContext(
 function renderView(platform: LayoutPlatformDetailDTO, trains: TrainOptionDTO[] = []) {
   return render(
     <MantineProvider>
-      <StationLayoutView stationId="station-1" context={buildContext(platform, trains)} />
+      <StationLayoutView
+        stationId="station-1"
+        context={buildContext(platform, trains)}
+        listState={{}}
+        backHref="/stations"
+      />
     </MantineProvider>,
   );
 }
@@ -140,7 +145,12 @@ describe('StationLayoutView', () => {
 
     const { rerender } = render(
       <MantineProvider>
-        <StationLayoutView stationId="station-1" context={buildContext(platform1, trains)} />
+        <StationLayoutView
+          stationId="station-1"
+          context={buildContext(platform1, trains)}
+          listState={{}}
+          backHref="/stations"
+        />
       </MantineProvider>,
     );
     expect(screen.getAllByText('列車A').length).toBeGreaterThan(0);
@@ -148,7 +158,12 @@ describe('StationLayoutView', () => {
     // ホーム2へ切替。実際のアプリではURL遷移でStationLayoutViewごと再レンダーされる
     rerender(
       <MantineProvider>
-        <StationLayoutView stationId="station-1" context={buildContext(platform2, trains)} />
+        <StationLayoutView
+          stationId="station-1"
+          context={buildContext(platform2, trains)}
+          listState={{}}
+          backHref="/stations"
+        />
       </MantineProvider>,
     );
 
@@ -163,7 +178,7 @@ describe('StationLayoutView', () => {
     const user = userEvent.setup();
     render(
       <MantineProvider>
-        <StationLayoutView stationId="station-1" context={buildContext(null)} />
+        <StationLayoutView stationId="station-1" context={buildContext(null)} listState={{}} backHref="/stations" />
       </MantineProvider>,
     );
 

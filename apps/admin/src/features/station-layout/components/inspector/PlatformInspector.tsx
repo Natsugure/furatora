@@ -8,6 +8,8 @@ import {
 import { notifications } from '@mantine/notifications';
 import type { LineWithDirections } from '@/features/platform/ports';
 import { describeError } from '@/features/station-publishing/describeError';
+import type { ListHrefState } from '@/shared/list/href';
+import { stationLayoutHref } from '@/features/station/listState';
 
 type PlatformData = {
   id: string;
@@ -26,6 +28,8 @@ type Props = {
   /** 既存ホームの編集なら渡す。省略時は新規作成 */
   initialData?: PlatformData;
   onCancel: () => void;
+  /** 一覧から遷移してきた際の絞り込み状態。保存後の遷移先URLに載せて保持する */
+  listState: ListHrefState;
 };
 
 /**
@@ -36,7 +40,7 @@ type Props = {
  * StationLayoutEditor の draft/dirty 機構には参加せず、自前で fetch する
  * 独立したミニフォームとして実装する。
  */
-export function PlatformInspector({ stationId, lines, initialData, onCancel }: Props) {
+export function PlatformInspector({ stationId, lines, initialData, onCancel, listState }: Props) {
   const router = useRouter();
   const isEdit = !!initialData;
 
@@ -96,7 +100,9 @@ export function PlatformInspector({ stationId, lines, initialData, onCancel }: P
     const savedId = isEdit ? initialData!.id : (saved as { id?: string } | null)?.id;
     notifications.show({ title: '保存しました', message: isEdit ? 'ホーム情報を更新しました' : '新しいホームを追加しました', color: 'green' });
     onCancel();
-    if (savedId) router.push(`/stations/${stationId}/layout?platformId=${savedId}`);
+    if (savedId) {
+      router.push(stationLayoutHref(stationId, listState, { platformId: savedId }));
+    }
     router.refresh();
   }
 

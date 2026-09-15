@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDebouncedValue } from '@mantine/hooks';
 import { Group, NativeSelect, TextInput } from '@mantine/core';
 import { buildListHref, type ListHrefState } from '@/shared/list/href';
+import { useUrlSyncedSearchInput } from '@/shared/list/useUrlSyncedSearchInput';
 import type { OperatorOption } from '@/features/line/ports';
 
 // 路線一覧のツールバー（Issue #94）。駅一覧（StationListToolbar）と同じ作法。
@@ -22,18 +21,14 @@ type Props = {
 
 export function LineListToolbar({ current, operatorId, q, operators }: Props) {
   const router = useRouter();
-  const [searchInput, setSearchInput] = useState(q);
-  const [debounced] = useDebouncedValue(searchInput, 400);
-
-  useEffect(() => {
-    if (debounced === q) return;
+  const search = useUrlSyncedSearchInput(q, (next) => {
     router.replace(
-      buildListHref('/lines', current, { q: debounced || null }, {
+      buildListHref('/lines', current, { q: next || null }, {
         defaults: DEFAULTS,
         resetPageOn: RESET_PAGE_ON,
       }),
     );
-  }, [debounced, q, current, router]);
+  });
 
   function handleOperatorChange(next: string) {
     router.push(
@@ -61,9 +56,8 @@ export function LineListToolbar({ current, operatorId, q, operators }: Props) {
       <TextInput
         label="検索"
         placeholder="路線名・コード・事業者名"
-        value={searchInput}
-        onChange={(e) => setSearchInput(e.target.value)}
         w={260}
+        {...search}
       />
     </Group>
   );

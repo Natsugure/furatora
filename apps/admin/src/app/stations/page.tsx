@@ -7,10 +7,11 @@ import { ListPagination } from '@/shared/list/ListPagination';
 import { SortableTh } from '@/shared/list/SortableTh';
 import { parseListParams, parseUuidParam } from '@/shared/list/params';
 import type { ListHrefState } from '@/shared/list/href';
+import { STATION_LIST_DEFAULTS, STATION_LIST_PER_PAGE, parseStationListState, stationDetailHref } from '@/features/station/listState';
 import { stationListPageQuery } from '@/di';
 
-const PER_PAGE = 50;
-const DEFAULTS: ListHrefState = { sort: 'line', order: 'asc' };
+const PER_PAGE = STATION_LIST_PER_PAGE;
+const DEFAULTS = STATION_LIST_DEFAULTS;
 
 export default async function StationsPage({
   searchParams,
@@ -31,9 +32,7 @@ export default async function StationsPage({
     params,
   );
 
-  const current: ListHrefState = {
-    operatorId, lineId, q: params.q, sort: params.sort, order: params.order, page: params.page,
-  };
+  const current: ListHrefState = parseStationListState(raw);
 
   // 路線が確定している（lineId 選択済み）ときだけ「路線」列を隠して見出しに出す。
   // 事業者すら未選択（全国横断検索）のときは「事業者」列も出す。
@@ -134,19 +133,19 @@ export default async function StationsPage({
                           </TableTd>
                         )}
                         <TableTd>
-                          <LinkAnchor href={`/stations/${stn.id}/publish`} size="sm">
+                          <LinkAnchor href={stationDetailHref(`/stations/${stn.id}/publish`, current)} size="sm">
                             <Badge color={stn.publishedAt ? 'green' : 'gray'} size="sm">
                               {stn.publishedAt ? '公開中' : '非公開'}
                             </Badge>
                           </LinkAnchor>
                         </TableTd>
                         <TableTd>
-                          <LinkAnchor href={`/stations/${stn.id}/layout`} size="sm">
+                          <LinkAnchor href={stationDetailHref(`/stations/${stn.id}/layout`, current)} size="sm">
                             管理
                           </LinkAnchor>
                         </TableTd>
                         <TableTd>
-                          <LinkAnchor href={`/stations/${stn.id}/edit`} size="sm" c="dimmed">
+                          <LinkAnchor href={stationDetailHref(`/stations/${stn.id}/edit`, current)} size="sm" c="dimmed">
                             編集
                           </LinkAnchor>
                         </TableTd>
