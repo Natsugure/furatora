@@ -177,16 +177,23 @@
 
   /* 日本語のサイン用書体。駅名・路線名・出口名は公共サインでの判読性に優れた
      UD ゴシック（BIZ UDPGothic）を図・サイン内に優先適用。
-     next/font/google により全端末で統一表示。 */
-  --font-sign: var(--font-biz-udpgothic), "BIZ UDPGothic", "BIZ UDGothic",
+     next/font/google により全端末で統一表示。
+     この --font-sign は :root で宣言されており、中の var() は :root 時点で解決される。
+     next/font の変数クラス（--font-biz-udpgothic 等）は layout.tsx で <html> に
+     付けること。<body> に付けると :root では未定義となりこの宣言全体が無効になる
+     （Issue #107）。var() の第2引数はその保険で、変数クラスの位置を間違えても
+     宣言全体を無効にせず後続のフォールバックへ処理を継続させる。 */
+  --font-sign: var(--font-biz-udpgothic, "BIZ UDPGothic"), "BIZ UDPGothic", "BIZ UDGothic",
                "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "YuGothic",
-               var(--font-noto-sans-jp), system-ui, sans-serif;
+               var(--font-noto-sans-jp, "Noto Sans JP"), system-ui, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--color-bg-app);
   --color-foreground: var(--color-text-primary);
-  --font-sans: var(--font-noto-sans-jp), system-ui, sans-serif;
+  /* Tailwind v4 はこの変数を :root に出力する。--font-noto-sans-jp が未定義だと
+     宣言全体が無効になる点は --font-sign と同じ（Issue #107）。 */
+  --font-sans: var(--font-noto-sans-jp, "Noto Sans JP"), system-ui, sans-serif;
 }
 
 *,

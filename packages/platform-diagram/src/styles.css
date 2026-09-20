@@ -58,8 +58,15 @@
      variable: '--font-biz-udpgothic' で各アプリの layout.tsx が読み込む前提。
      web の元定義から var(--font-noto-sans-jp) だけ外している
      （admin はこの変数を定義しないため。CSSのvar()はフォールバック無しで
-     未定義だとプロパティ全体が無効になるので、汎用フォント名に差し替えた） */
-  --font-sign: var(--font-biz-udpgothic), "BIZ UDPGothic", "BIZ UDGothic",
-    "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "YuGothic", system-ui,
-    sans-serif;
+     未定義だとプロパティ全体が無効になるので、汎用フォント名に差し替えた）。
+
+     この --font-sign は :root で宣言されており、中の var() は :root 時点で
+     解決される。next/font の変数クラス（--font-biz-udpgothic）は必ず layout.tsx で
+     <html> に付けること。<body> に付けると :root では未定義となりこの宣言全体が
+     無効になる（Issue #107。admin は layout.tsx で対応済み）。
+     var(--font-biz-udpgothic, "BIZ UDPGothic") の第2引数はその保険で、変数クラスの
+     位置を間違えても宣言全体を無効にせず後続のフォールバックへ処理を継続させる。 */
+  --font-sign: var(--font-biz-udpgothic, "BIZ UDPGothic"), "BIZ UDPGothic",
+    "BIZ UDGothic", "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "YuGothic",
+    system-ui, sans-serif;
 }
