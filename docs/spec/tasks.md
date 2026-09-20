@@ -16,11 +16,16 @@
       事実・導出する値・持たないもの）と、決定記録9件（却下案とその根拠を含む）を執筆
 - [x] **TASK-3** `docs/spec/design.md`「この定義の引き継ぎ先」節: 実装Issueのフェーズ5で
       `docs/domain/station-master-model.md` に反映すべき内容を明示
-- [ ] **TASK-4** GitHub Issue 起票: 先送りした将来作業（design.md 参照）4件
-      - 経路探索における乗換駅の選択（推奨度・折返し乗車の禁止制約）
-      - 時間帯制約の構造化
-      - `station_facilities` からの `stepFreeVia` 導出
-      - 本モデルの実装Issue（下記フェーズ6で分割する4件そのもの）
+- [x] **TASK-4** GitHub Issue 起票（commit 24ce1c5 を参照）:
+      - 先送りした将来作業: [#119](https://github.com/Natsugure/furatora/issues/119)
+        経路探索における乗換駅の選択、
+        [#120](https://github.com/Natsugure/furatora/issues/120) 時間帯制約の構造化、
+        [#121](https://github.com/Natsugure/furatora/issues/121)
+        `station_facilities` からの `stepFreeVia` 導出
+      - 実装Issue: [#122](https://github.com/Natsugure/furatora/issues/122) スキーマ実装、
+        [#123](https://github.com/Natsugure/furatora/issues/123) 既存16行のデータ移行、
+        [#124](https://github.com/Natsugure/furatora/issues/124) Admin入力フォーム、
+        [#125](https://github.com/Natsugure/furatora/issues/125) Web表示
 
 ## フェーズ4: 検証（机上）
 
@@ -67,23 +72,16 @@
 
 ## フェーズ6: 引き渡し
 
-- [ ] 変更ファイル: `docs/spec/requirements.md` / `docs/spec/design.md` /
-      `docs/spec/tasks.md`（本ファイル）
-- [ ] 恒久知識の取り残し確認: `docs/spec/` は次のIssueで全面書き換えられる。
-      次も有効な内容（モデル定義・決定記録9件）が `design.md` に残ること自体は
-      `docs/spec/` のルール上失われる。実装Issue起票時に、本Issueのコミットハッシュ
-      付きで `design.md` を参照させ、実装Issueのフェーズ5で `docs/domain/` へ
-      正式に移すことを確実にする（引き継ぎ先が明示されていることをTASK-3で確認済み）。
-- [ ] **実装Issueの分割案**（GitHub Issue 起票時の下敷き）:
-      1. スキーマ実装（`packages/database/src/schema.ts` / `enums.ts`。方面×方面の
-         正規化テーブル、`stepFreeVia` 用の名義尺度型、3フラグ、時分2種、備考2種）
-      2. 既存16行の移行（新モデルへの書き換え。決定9により経路上の選好は
-         備考から除去する）
-      3. Admin入力フォーム（`apps/admin/src/features/station-connection/`。
-         方面選択、ペルソナ別コピー機能の検討 — 決定3「レビュー」参照）
-      4. Web表示（`apps/web/src/components/TransferDifficultySection.tsx`。
-         REQ-11〜14 の変換関数、5分類表示 — 決定8）
-      - **各分割Issueのフェーズ5に、`docs/domain/station-master-model.md` への
-        反映タスクを必須項目として含めること**（design.md「この定義の引き継ぎ先」を
-        そのまま反映する）。
+- [x] 変更ファイル: `docs/spec/requirements.md` / `docs/spec/design.md` /
+      `docs/spec/tasks.md`（本ファイル）。commit 24ce1c5。
+- [x] 恒久知識の取り残し確認: `docs/spec/` は次のIssueで全面書き換えられる。
+      次も有効な内容（モデル定義・決定記録9件）は、上記7件のGitHub Issueすべてに
+      commit 24ce1c5 へのハッシュ付き参照を入れたことで、実装Issueのフェーズ5で
+      `docs/domain/` へ移す経路を確保した（TASK-3の引き継ぎ先明示と対応）。
+- [x] **実装Issueの分割**: [#122](https://github.com/Natsugure/furatora/issues/122)
+      スキーマ実装 → [#123](https://github.com/Natsugure/furatora/issues/123)
+      データ移行 → [#124](https://github.com/Natsugure/furatora/issues/124)
+      Admin → [#125](https://github.com/Natsugure/furatora/issues/125) Web表示
+      （この順に依存する）。各Issueの本文に、`docs/domain/
+      station-master-model.md` への反映をフェーズ5の必須タスクとして明記済み。
 - [ ] PR作成・レビュー依頼（開発者判断）
