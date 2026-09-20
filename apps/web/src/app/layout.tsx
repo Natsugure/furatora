@@ -10,6 +10,10 @@ import '@mantine/core/styles.css';
 import './globals.css';
 import iconSvg from './icon.svg';
 
+// 本文書体（Noto Sans JP）・ホーム図のサイン用書体（BIZ UDPGothic）。
+// 変数クラスは <html> に付けること。globals.css の --font-sans / --font-sign は
+// :root で宣言されており、中の var() は :root 時点で解決される。<body> に付けると
+// :root では未定義となり宣言全体が無効になる（Issue #107）
 const notoSansJP = Noto_Sans_JP({
   subsets: ['latin'],
   weight: ['400', '500', '700'],
@@ -35,8 +39,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja">
-      <body className={`${notoSansJP.variable} ${bizUdpGothic.variable} font-sans antialiased flex flex-col min-h-screen`}>
+    <html lang="ja" className={`${notoSansJP.variable} ${bizUdpGothic.variable}`}>
+      <body className="font-sans antialiased flex flex-col min-h-screen">
         <Providers>
           {/* Header */}
           <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">

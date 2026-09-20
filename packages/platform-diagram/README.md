@@ -32,6 +32,24 @@ import '@furatora/platform-diagram/styles.css'; // layout.tsx で1回だけ impo
 @source "../../../../packages/platform-diagram/src";
 ```
 
+**`next/font` の変数クラスは `<body>` ではなく `<html>` に付けること。** `styles.css` の
+`--font-sign` は `:root` で宣言されており、中の `var(--font-biz-udpgothic)` は `:root`
+時点で解決される。変数クラスを `<body>` に付けると `:root` では未定義のままになり、
+`--font-sign` 宣言全体が無効値になる（サイン書体が無言で既定フォントにフォールバック
+する。Issue #107）。
+
+```tsx
+// layout.tsx
+<html lang="ja" className={bizUdpGothic.variable}>
+  <body>{/* ... */}</body>
+</html>
+```
+
+**web はこの `styles.css` を import していない。** `--sign-*` 等5トークンは
+`apps/web/src/app/globals.css` に web 全体の基盤トークンとして既に定義されており
+（下記「CSS変数について」参照）、`--font-sign` も web 側で自前定義している。
+`styles.css` を実際に import して恩恵を受けるのは admin のみ。
+
 ## アイコンの複製について
 
 `DiagramSvg` は設備アイコンを `<img>`/`<image>` の `href` で参照する。Next.js の
