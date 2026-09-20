@@ -1,79 +1,89 @@
-# 実装タスク: web のフォント変数クラス位置を修正する (Issue #107)
+# 実装タスク: 乗り換え難易度定義の改善 (Issue #30)
 
-- **対象**: `apps/web`、`packages/platform-diagram`
+- **対象**: ドメイン定義のみ（`docs/spec/`）
 - **参照**: [requirements.md](./requirements.md) / [design.md](./design.md)
-- **作成日**: 2026-09-18
-- **ブランチ**: `fix/issue107-font-variable-class-on-html`
+- **作成日**: 2026-09-20
+- **ブランチ**: `docs/issue30-transfer-difficulty-model`
 
-## フェーズ3: 実装
+本Issueはスキーマ変更・実装を伴わない。フェーズ3「実装」はドキュメント執筆のみで、
+フェーズ4「検証」は机上検証で行う。
 
-- [x] **TASK-1** `apps/web/src/app/layout.tsx`: `notoSansJP.variable` /
-      `bizUdpGothic.variable` を `<body>` から `<html>` へ移動。`font-sans antialiased
-      flex flex-col min-h-screen` は `<body>` に残した。フォント定義の直前に
-      admin と揃えた理由コメントを追加
-- [x] **TASK-2** `apps/web/src/app/globals.css`: `--font-sign`（`var(--font-biz-udpgothic)`
-      / `var(--font-noto-sans-jp)`）と `@theme inline` の `--font-sans`
-      （`var(--font-noto-sans-jp)`）に第2引数（汎用フォント名フォールバック）を追加。
-      `<html>` に付けることを既存コメントに追記
-- [x] **TASK-3** `packages/platform-diagram/src/styles.css`: `--font-sign` に同様の
-      フォールバックを追加し、`<html>` に付けることをコメントに追記
-- [x] **TASK-4** `packages/platform-diagram/README.md`: 「公開面」節に
-      「`next/font` の変数クラスは `<html>` に付けること」を利用側の必須手順として追記。
-      web はこの `styles.css` を import していない旨（`--font-sign` は web 側の
-      `globals.css` で自前定義）も追記
+## フェーズ3: 実装（ドキュメント執筆）
 
-## フェーズ4: 検証
+- [x] **TASK-1** `docs/spec/requirements.md`: 現行モデルの欠陥（軸の混在・接続外の
+      情報の混入・軸不足・粒度不足）をEARS記法の要件として全面書き換え
+- [x] **TASK-2** `docs/spec/design.md`: モデル定義（評価の単位・解決規則・保持する
+      事実・導出する値・持たないもの）と、決定記録9件（却下案とその根拠を含む）を執筆
+- [x] **TASK-3** `docs/spec/design.md`「この定義の引き継ぎ先」節: 実装Issueのフェーズ5で
+      `docs/domain/station-master-model.md` に反映すべき内容を明示
+- [ ] **TASK-4** GitHub Issue 起票: 先送りした将来作業（design.md 参照）4件
+      - 経路探索における乗換駅の選択（推奨度・折返し乗車の禁止制約）
+      - 時間帯制約の構造化
+      - `station_facilities` からの `stepFreeVia` 導出
+      - 本モデルの実装Issue（下記フェーズ6で分割する4件そのもの）
 
-- [x] `pnpm run typecheck` → 全パッケージでエラー0（5 successful）
-- [x] `pnpm run lint` → 全パッケージでエラー0（3 successful）
-- [x] `pnpm run test`（リポジトリ全体）→ platform-diagram 182件 / web 13件 /
-      admin 465件、すべて pass（既存テストへの回帰なし）
-- [x] `pnpm run build`（リポジトリ全体）→ web・admin ともに成功。生成CSSを確認:
-      ```
-      --font-sans:var(--font-noto-sans-jp,"Noto Sans JP"),system-ui,sans-serif
-      --font-sign:var(--font-biz-udpgothic,"BIZ UDPGothic"),"BIZ UDPGothic",...
-      ```
-      フォールバック引数を含めて意図どおり出力されていることを確認
-- [x] **ブラウザでの手動確認**（issue 記載の確認方法 + `document.fonts.check`）:
-      `pnpm --filter @furatora/frontend dev` を起動し、Chrome DevTools MCP で
-      `/stations/tokyometro-ginza-shibuya`（銀座線渋谷。1番線に実データあり）を確認
-      - `document.documentElement.className` に両フォント変数クラスが付与されていることを確認
-      - 号車番号（1〜6号車、`fontFamily: var(--font-sign)` を持つ `<text>` 要素）の
-        `getComputedStyle().fontFamily` が全件 `"BIZ UDPGothic"` から始まることを確認
-        （修正前は継承により無効値・ブラウザ既定フォントだった）
-      - `document.body` の `getComputedStyle().fontFamily` が `"Noto Sans JP"` から
-        始まることを確認
-      - `document.fonts.check('400 16px "BIZ UDPGothic"')` /
-        `document.fonts.check('400 16px "Noto Sans JP"')` がともに `true`
-        （next/font の webfont が実際にロードされていることを確認）
-      - トップページ・駅詳細ページをフルページスクリーンショットで確認し、
-        レイアウト崩れが無いことを目視確認
-      - 確認後、dev server は停止した
-- [x] **回帰の観点**: 本文フォントがブラウザ既定フォント → Noto Sans JP に変わる
-      （修正前は `body { font-family: var(--font-sans) }` の `var()` が無効値になり
-      `unset` 継承でブラウザ既定フォントに落ちていたため、Mantine の既定フォント指定
-      すら効いていなかった。design.md「原因」参照）。意図した変化であり、
-      スクリーンショット確認でレイアウト崩れは無かった
+## フェーズ4: 検証（机上）
+
+- [x] **実データでの書き下し**: main の難易度入り16行（重複除去後8組の接続:
+      池袋×2種／後楽園↔後楽園／後楽園↔春日／本郷三丁目／御茶ノ水／
+      淡路町↔小川町／淡路町↔新御茶ノ水。`mcp__plugin_neon_neon__run_sql`、
+      branch `br-purple-surf-a169c8ks`、read-only）を新モデルで書き下し、
+      すべて表現可能なことを確認した。
+      - **御茶ノ水**: 現行 `optimal`/`optimal` なのに備考が「屋根のない地上の公道を
+        通る必要がある」という矛盾を、`stepFreeVia=elevator` + `isOutdoor=true` +
+        `requiresExitGate=true` で矛盾なく表現できることを確認
+      - **淡路町↔小川町**: 方面別の条件差を、方面粒度（決定4）による2行分解
+        （池袋方面/荻窪方面）で備考に依存せず表現できることを確認
+      - **淡路町↔新御茶ノ水**: 備考「隣の大手町駅のほうが便利です」が決定1
+        違反の実例であることを確認。移行時に当該記述を削除する対象として
+        design.md の決定9「影響」に記録済み
+      - **本郷三丁目**: 後楽園/春日との比較備考は両論併記（「一長一短」）で
+        断定的な推奨を含まないため、決定1の対象外情報ではなく備考として残せると判断
+- [x] **設計中に洗い出したケースの再確認**: 三田（ペルソナ間の逆転。REQ-4・11）、
+      赤坂見附（対面乗換。`same_floor`）、後楽園↔春日（改札外だが屋内。REQ-6の
+      3フラグが独立に立つ）はいずれも要件で表現できることを確認。要町
+      （属性は良好だが折返しで案内不可）は決定1により意図的に対象外
+      （経路探索側の責務）であることを確認。
+- [x] **備考に落ちるケースの整合確認**: 方向依存（上り専用エスカレーター）・
+      設備の質（EVサイズ）・時間帯制約・工事中の仮設ルート・方面粒度で救えない分は
+      いずれも「軸を増やしても解決しない別次元」（design.md 決定9）であることを
+      requirements.md「対象外」と design.md「持たないもの」で確認した。
+- [x] **EARS要件のテスト可能性**: REQ-1〜17 を通読し、各要件が具体的な入力
+      （接続・ペルソナ・値）と期待される出力（保持できること／解釈すること／
+      拒否すること）を持ち、単一の解釈しかできない形で書かれていることを確認した。
+- [x] **決定記録の自己点検**: 決定1〜9すべてに却下した選択肢が2件以上あり、
+      各選択肢に却下理由が明記されていることを確認した。「TBD」等のプレースホルダ、
+      決定間の矛盾は見つからなかった。
 
 ## フェーズ5: 振り返り
 
-- [x] `docs/domain/` の確認: 書体の適用先はドメインルールではなく、
-      `platform-coordinate-system.md` 等の既存ファイルにも該当記述が無い。
-      **変更なし**（確認した上での判断）
-- [x] `docs/adr/` の確認: 新規決定・ステータス変更なし。既存 ADR（ADR-0006 / ADR-0010）
-      に反する設計をしていないため対象外
-- [x] issue 本文の修正方針3（`--font-sign` の二重定義統合）について: 調査の結果
-      `apps/web` は `packages/platform-diagram/styles.css` を import しておらず
-      import 順の衝突が実際には発生していないことを確認し、開発者に提示した。
-      統合はスコープ外とし、両ファイルのコメント整備のみで対応する方針に確定した
-      （requirements.md「対象外」/ design.md 参照）
+- [x] `docs/domain/` の確認: 本Issueでは更新しない（実装を伴わないため）。
+      design.md「この定義の引き継ぎ先」に反映対象を明示済みであることを確認し、
+      **確認した上での判断**として記録する。
+- [x] `docs/adr/` の確認: 新規ADRは作成しない（決定記録の判定基準に照らし、
+      本Issueの決定はドメインのモデル化であり、覆すときに明示的な意思決定を要する
+      アーキテクチャ決定ではないと判断した）。既存ADR（ADR-0003）に反する設計を
+      していないことを確認済み。
 
 ## フェーズ6: 引き渡し
 
-- [x] 変更ファイル: `apps/web/src/app/layout.tsx` /
-      `apps/web/src/app/globals.css` / `packages/platform-diagram/src/styles.css` /
-      `packages/platform-diagram/README.md` / `docs/spec/requirements.md` /
-      `docs/spec/design.md` / `docs/spec/tasks.md`（本ファイル）
-- [x] 恒久知識の取り残し確認: 本件はバグ修正であり、`docs/domain/` /
-      `docs/adr/` に昇格すべき恒久知識は発生しなかった（フェーズ5で確認済み）
+- [ ] 変更ファイル: `docs/spec/requirements.md` / `docs/spec/design.md` /
+      `docs/spec/tasks.md`（本ファイル）
+- [ ] 恒久知識の取り残し確認: `docs/spec/` は次のIssueで全面書き換えられる。
+      次も有効な内容（モデル定義・決定記録9件）が `design.md` に残ること自体は
+      `docs/spec/` のルール上失われる。実装Issue起票時に、本Issueのコミットハッシュ
+      付きで `design.md` を参照させ、実装Issueのフェーズ5で `docs/domain/` へ
+      正式に移すことを確実にする（引き継ぎ先が明示されていることをTASK-3で確認済み）。
+- [ ] **実装Issueの分割案**（GitHub Issue 起票時の下敷き）:
+      1. スキーマ実装（`packages/database/src/schema.ts` / `enums.ts`。方面×方面の
+         正規化テーブル、`stepFreeVia` 用の名義尺度型、3フラグ、時分2種、備考2種）
+      2. 既存16行の移行（新モデルへの書き換え。決定9により経路上の選好は
+         備考から除去する）
+      3. Admin入力フォーム（`apps/admin/src/features/station-connection/`。
+         方面選択、ペルソナ別コピー機能の検討 — 決定3「レビュー」参照）
+      4. Web表示（`apps/web/src/components/TransferDifficultySection.tsx`。
+         REQ-11〜14 の変換関数、5分類表示 — 決定8）
+      - **各分割Issueのフェーズ5に、`docs/domain/station-master-model.md` への
+        反映タスクを必須項目として含めること**（design.md「この定義の引き継ぎ先」を
+        そのまま反映する）。
 - [ ] PR作成・レビュー依頼（開発者判断）
