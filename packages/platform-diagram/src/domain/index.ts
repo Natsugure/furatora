@@ -8,3 +8,4 @@ export * from './doorOrder';
 export * from './concourse';
 export * from './concourseLayout';
 export * from './snap';
+export * from './leaderRoute';

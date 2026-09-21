@@ -1,5 +1,7 @@
 import {
   CONCOURSE_TICK_HEIGHT,
+  FACILITY_ICON_PITCH,
+  FACILITY_ICON_SIZE,
   FACILITY_ROW_HEIGHT,
   PLATFORM_BAR_HEIGHT,
   PLATFORM_LABEL_FONT_SIZE,
@@ -26,7 +28,6 @@ const FACILITY_ICON_FILES: Record<string, string> = {
   sameFloor: 'wheelchair.png',
 };
 
-const ICON_SIZE = 6;
 const NOSE_INSET_RATIO = 0.15;
 /** 号車どうしの間に空ける隙間（片側）。境目をはっきりさせる */
 const CAR_INSET = 0.4;
@@ -118,16 +119,16 @@ export function DiagramSvg({
         .filter((cell) => cell.xPositionMeters !== null)
         .map((cell, idx) =>
           cell.facilities.map((facility, fIdx) => {
-            const x = cell.xPositionMeters! + (fIdx - (cell.facilities.length - 1) / 2) * (ICON_SIZE + 1);
+            const x = cell.xPositionMeters! + (fIdx - (cell.facilities.length - 1) / 2) * FACILITY_ICON_PITCH;
             const iconFile = FACILITY_ICON_FILES[facility.typeCode];
             return iconFile ? (
               <image
                 key={`${cell.concourseId}-${idx}-${fIdx}`}
                 href={`${iconBasePath}/${iconFile}`}
-                x={x - ICON_SIZE / 2}
-                y={rows.facilityY + (FACILITY_ROW_HEIGHT - ICON_SIZE) / 2}
-                width={ICON_SIZE}
-                height={ICON_SIZE}
+                x={x - FACILITY_ICON_SIZE / 2}
+                y={rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2}
+                width={FACILITY_ICON_SIZE}
+                height={FACILITY_ICON_SIZE}
               >
                 <title>{facility.typeName}</title>
               </image>
@@ -136,7 +137,7 @@ export function DiagramSvg({
                 key={`${cell.concourseId}-${idx}-${fIdx}`}
                 x={x}
                 y={rows.facilityY + FACILITY_ROW_HEIGHT / 2 + 1}
-                fontSize={ICON_SIZE}
+                fontSize={FACILITY_ICON_SIZE}
                 textAnchor="middle"
               >
                 📍

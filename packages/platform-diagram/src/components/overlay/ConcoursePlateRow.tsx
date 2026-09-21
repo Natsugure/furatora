@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { transferNote, type ConcoursePlateGroup } from '../../domain/concourseLayout';
 import type { TransferEntry } from '../../domain/concourse';
 import { xFraction, type Bounds } from '../../domain/geometry';
+import { LEADER_WIDTH_PX } from '../../domain/leaderRoute';
 
 // 出口・乗換のプレート。SVGではなくHTMLなので、文字は折り返すだけで一切切り詰めない。
 //
@@ -21,6 +22,32 @@ type Props = {
 /** アンカーのx割合をCSSのパーセントに写す */
 function percentOf(x: number, bounds: Bounds): string {
   return `${xFraction(x, bounds) * 100}%`;
+}
+
+/** 描画範囲に対する割合（0..1）をCSSのパーセントに写す。経路の値はすでに割合 */
+function fractionPct(fraction: number): string {
+  return `${fraction * 100}%`;
+}
+
+/** 全幅・行高いっぱいの空レイヤ。grid item なので行の高さには寄与しない */
+const layerStyle: CSSProperties = {
+  gridArea: '1 / 1',
+  position: 'relative',
+  alignSelf: 'stretch',
+  pointerEvents: 'none',
+};
+
+/**
+ * このレーンの余白帯を走る横線の区間。
+ *
+ * 通過するレーンでは enter→exit、自レーンでは最後の到達位置→anchor（プレート中心）。
+ * 手前のレーンを通らない（lane 0）プレートは、線が最初から anchor にあるので横線は要らない。
+ */
+function jogAt(group: ConcoursePlateGroup, lane: number, bounds: Bounds): { from: number; to: number } | null {
+  const segment = group.route.segments[lane];
+  if (segment) return { from: segment.enterFraction, to: segment.exitFraction };
+  if (lane === group.lane) return { from: group.route.arrivalFraction, to: xFraction(group.anchorX, bounds) };
+  return null;
 }
 
 /**
@@ -46,23 +73,57 @@ export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: P
     <div className="flex flex-col" style={{ fontFamily: 'var(--font-sign)' }}>
       {lanes.map((lane) => (
         <div key={lane} className="grid">
-          {/* 支柱: このレーンより深いプレートへ垂線を通す。
-              高さ0の要素を stretch させるので行サイズには影響しない */}
-          {groups
-            .filter((group) => group.lane > lane)
-            .map((group) => (
-              <div
-                key={`stem-${group.concourseId}`}
-                aria-hidden
-                className="w-0.5 self-stretch"
-                style={{
-                  gridArea: '1 / 1',
-                  marginInlineStart: percentOf(group.anchorX, bounds),
-                  transform: 'translateX(-50%)',
-                  backgroundColor: 'var(--sign-leader)',
-                }}
-              />
-            ))}
+          {/* ガイド線は3枚のレイヤに分ける。いずれも全幅・行高いっぱいに伸ばした空の
+              grid item なので、行の高さには寄与しない（プレートだけが高さを決める）。
+              中の線は left の割合で置くため、SVGの束ね線と同じ xFraction に乗る。
+
+              重なり順は transform の有無に左右されないよう z-index で明示する:
+              縦線(0) < プレート(1) < 余白帯の横線(2)。迂回しきれなかった場合でも
+              線がプレートの文字を覆うことはない */}
+          <div aria-hidden style={{ ...layerStyle, zIndex: 0 }}>
+            {groups.map((group) => {
+              const segment = group.route.segments[lane];
+              if (!segment) return null;
+              return (
+                <span
+                  key={`stem-${group.concourseId}`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: fractionPct(segment.exitFraction),
+                    width: LEADER_WIDTH_PX,
+                    marginLeft: -LEADER_WIDTH_PX / 2,
+                    backgroundColor: 'var(--sign-leader)',
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* 横線は、そのレーンの図に近い側の余白帯（プレート箱の外）だけを走る。
+              自レーンでは、迂回で anchor からずれた線をプレートの中心へ戻す */}
+          <div aria-hidden style={{ ...layerStyle, zIndex: 2 }}>
+            {groups.flatMap((group) => {
+              const jog = jogAt(group, lane, bounds);
+              if (jog === null || jog.from === jog.to) return [];
+              return [
+                <span
+                  key={`jog-${group.concourseId}`}
+                  style={{
+                    position: 'absolute',
+                    ...(reverseLanes ? { bottom: 0 } : { top: 0 }),
+                    left: fractionPct(Math.min(jog.from, jog.to)),
+                    // 縦線の太さぶん両端を延ばし、角に欠けを作らない
+                    width: `calc(${fractionPct(Math.abs(jog.to - jog.from))} + ${LEADER_WIDTH_PX}px)`,
+                    height: LEADER_WIDTH_PX,
+                    marginLeft: -LEADER_WIDTH_PX / 2,
+                    backgroundColor: 'var(--sign-leader)',
+                  }}
+                />,
+              ];
+            })}
+          </div>
 
           {groups
             .filter((group) => group.lane === lane)
@@ -72,6 +133,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: P
                 className={`flex flex-col gap-1 ${reverseLanes ? 'pb-1.5' : 'pt-1.5'}`}
                 style={{
                   gridArea: '1 / 1',
+                  zIndex: 1,
                   justifySelf: 'start',
                   // max-content の明示は必須。省略すると fit-content になり、
                   // 右寄りのプレートが「残り幅」に潰されて過剰に折り返す
