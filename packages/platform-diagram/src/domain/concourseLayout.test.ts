@@ -17,7 +17,6 @@ const CANVAS_PX = (BOUNDS.maxX - BOUNDS.minX) * PX_PER_METER;
 
 function connection(overrides: Partial<FacilityConnectionDTO> = {}): FacilityConnectionDTO {
   return {
-    stationName: '新宿',
     lineNames: ['小田急線'],
     lineColors: ['#0072BC'],
     directionName: null,
@@ -57,7 +56,6 @@ describe('transferNote', () => {
     expect(
       transferNote({
         lines: [{ name: '丸ノ内線', color: '#F62E36' }],
-        stationName: '新宿三丁目',
         directionName: '池袋',
         exitLabel: 'A3出口',
       }),
@@ -68,24 +66,20 @@ describe('transferNote', () => {
     expect(
       transferNote({
         lines: [{ name: '丸ノ内線', color: '#F62E36' }],
-        stationName: '赤坂見附',
         directionName: '東京・池袋方面',
         exitLabel: null,
       }),
     ).toBe('東京・池袋方面');
   });
 
-  it('路線が引けない場合は駅名を出す', () => {
-    expect(
-      transferNote({ lines: [], stationName: '赤坂見附', directionName: null, exitLabel: null }),
-    ).toBe('赤坂見附');
+  it('路線が引けなくても駅名で代替しない', () => {
+    expect(transferNote({ lines: [], directionName: null, exitLabel: null })).toBeNull();
   });
 
   it('添えるものが何も無ければ null', () => {
     expect(
       transferNote({
         lines: [{ name: '小田急線', color: '#0072BC' }],
-        stationName: '新宿',
         directionName: null,
         exitLabel: null,
       }),
@@ -212,7 +206,7 @@ describe('layoutConcoursePlates', () => {
         [
           concourse('c1', {
             cells: cellsAt(50),
-            connections: [connection(), connection({ stationName: '代々木' })],
+            connections: [connection(), connection({ lineNames: ['京王線'] })],
           }),
         ],
         BOUNDS,
@@ -271,6 +265,43 @@ describe('layoutConcoursePlates', () => {
     });
   });
 
+  describe('引き出し線の経路', () => {
+    it('route.segments の長さは lane と等しい', () => {
+      const { groups } = layoutConcoursePlates(
+        [
+          concourse('c1', { cells: cellsAt(100) }),
+          concourse('c2', { cells: cellsAt(102) }),
+          concourse('c3', { cells: cellsAt(104) }),
+        ],
+        BOUNDS,
+      );
+      for (const group of groups) {
+        expect(group.route.segments).toHaveLength(group.lane);
+      }
+    });
+
+    it('近接して段が分かれたとき、深いレーンの線は手前のプレート箱を避ける', () => {
+      const { groups } = layoutConcoursePlates(
+        [concourse('c1', { cells: cellsAt(100) }), concourse('c2', { cells: cellsAt(102) })],
+        BOUNDS,
+      );
+      const shallow = groups.find((g) => g.lane === 0)!;
+      const deep = groups.find((g) => g.lane === 1)!;
+      const segment = deep.route.segments[0]!;
+
+      // 見積り幅は 南口(2字) = 26 + 20 = 46 → 最小幅 96px
+      const half = PLATE_MIN_WIDTH_PX / 2 / CANVAS_PX;
+      const center = (shallow.anchorX - BOUNDS.minX) / (BOUNDS.maxX - BOUNDS.minX);
+      expect(segment.enterFraction).not.toBe(segment.exitFraction);
+      expect(Math.abs(segment.exitFraction - center)).toBeGreaterThanOrEqual(half);
+    });
+
+    it('lane 0 のグループは通過区間を持たない', () => {
+      const { groups } = layoutConcoursePlates([concourse('c1', { cells: cellsAt(100) })], BOUNDS);
+      expect(groups[0]!.route.segments).toEqual([]);
+    });
+  });
+
   describe('端寄せ', () => {
     it('描画範囲の中ほどでは中央寄せ', () => {
       const { groups } = layoutConcoursePlates([concourse('c1', { cells: cellsAt(150) })], BOUNDS);
@@ -325,6 +356,19 @@ describe('layoutFacingBanners', () => {
     expect(banners[0]!.color).toBe('#F62E36');
   });
 
+  it('路線が引けない接続はバナーにしない', () => {
+    const { banners } = layoutFacingBanners(
+      [
+        concourse('c1', {
+          connections: [facing({ lineNames: [], lineColors: [], xRangeStart: 40, xRangeEnd: 120 })],
+        }),
+      ],
+      BOUNDS,
+    );
+
+    expect(banners).toHaveLength(0);
+  });
+
   it('範囲が逆順に登録されていても正規化する', () => {
     const { banners } = layoutFacingBanners(
       [concourse('c1', { connections: [facing({ xRangeStart: 120, xRangeEnd: 40 })] })],
@@ -339,7 +383,7 @@ describe('layoutFacingBanners', () => {
     const { banners, laneCount } = layoutFacingBanners(
       [
         concourse('c1', {
-          connections: [facing(), facing({ stationName: '代々木', xRangeStart: 60, xRangeEnd: 200 })],
+          connections: [facing(), facing({ lineNames: ['京王線'], xRangeStart: 60, xRangeEnd: 200 })],
         }),
       ],
       BOUNDS,
@@ -355,7 +399,7 @@ describe('layoutFacingBanners', () => {
         concourse('c1', {
           connections: [
             facing({ xRangeStart: 200, xRangeEnd: 260 }),
-            facing({ stationName: '代々木', xRangeStart: 10, xRangeEnd: 60 }),
+            facing({ lineNames: ['京王線'], xRangeStart: 10, xRangeEnd: 60 }),
           ],
         }),
       ],

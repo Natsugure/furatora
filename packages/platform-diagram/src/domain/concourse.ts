@@ -5,7 +5,15 @@ import type { ConcourseDTO, FacilityConnectionDTO } from './types';
  * 設備が1件も無くても、出口名や乗換先だけで利用者にとって意味のある情報になる。
  */
 export function hasDisplayableInfo(concourse: Pick<ConcourseDTO, 'cells' | 'exits' | 'connections'>): boolean {
-  return concourse.cells.length > 0 || exitsLabel(concourse) !== null || concourse.connections.length > 0;
+  return concourse.cells.length > 0 || exitsLabel(concourse) !== null || connectionLabels(concourse).length > 0;
+}
+
+/**
+ * 路線名が1件も引けない接続は図にもテキストにも出さない。
+ * 乗換の主語は路線であり、駅名で代替すると「池袋」だけが並ぶ不自然な表示になる。
+ */
+export function hasLines(conn: Pick<FacilityConnectionDTO, 'lineNames'>): boolean {
+  return conn.lineNames.length > 0;
 }
 
 /** 図に描けるコンコースか。座標を持つアクセス点が1つでもあれば束ね線を引ける */
@@ -29,11 +37,10 @@ export function exitsLabel(concourse: Pick<ConcourseDTO, 'exits'>): string | nul
   return concourse.exits?.trim() || null;
 }
 
-/** 乗換先の表示ラベル。接続1件につき1要素を返す */
+/** 乗換先の表示ラベル。表示対象の接続1件につき1要素を返す */
 export function connectionLabels(concourse: Pick<ConcourseDTO, 'connections'>): string[] {
-  return concourse.connections.map((conn) => {
-    // 路線が引けない接続でも空文字にならないよう駅名で代替する
-    const lineLabel = conn.lineNames.length > 0 ? conn.lineNames.join('・') : conn.stationName;
+  return concourse.connections.filter(hasLines).map((conn) => {
+    const lineLabel = conn.lineNames.join('・');
     const base = conn.directionName
       ? `${lineLabel}（${directionPhrase(conn.directionName)}）`
       : lineLabel;
@@ -52,14 +59,12 @@ export type TransferLine = { name: string; color: string };
 export type TransferEntry = {
   /** 接続先駅に乗り入れる全路線。1件も省略しない */
   lines: TransferLine[];
-  /** 路線が1件も引けないときに代わりに見出しへ出す駅名 */
-  stationName: string;
   directionName: string | null;
   exitLabel: string | null;
 };
 
 /**
- * 乗換プレート用の構造化データ。接続1件につき1要素を返す。
+ * 乗換プレート用の構造化データ。表示対象の接続1件につき1要素を返す。
  *
  * 路線名を「・」で連結した1本の文字列にせず、路線ごとに分けて返すのは、
  * 描画側が路線カラーのチップを添えて折り返せるようにするため。
@@ -67,14 +72,13 @@ export type TransferEntry = {
  * 6路線以上になるが、**畳まずに全件返す**（図の中で折り返して見せる）。
  */
 export function transferEntries(concourse: Pick<ConcourseDTO, 'connections'>): TransferEntry[] {
-  return concourse.connections.map((conn) => ({
+  return concourse.connections.filter(hasLines).map((conn) => ({
     // lineNames と lineColors は同じ並びで組み立てられている（external/query）。
     // 万一長さがずれても路線名を落とさないよう、名前を基準に添字で引く
     lines: conn.lineNames.map((name, i) => ({
       name,
       color: conn.lineColors[i] ?? DEFAULT_LINE_COLOR,
     })),
-    stationName: conn.stationName,
     directionName: conn.directionName,
     exitLabel: conn.exitLabel,
   }));
@@ -94,11 +98,9 @@ export function primaryLineColor(
  * 文言をJSXに埋めるとテストできないため、ここで組み立てる。
  */
 export function facingTransferText(
-  connection: Pick<FacilityConnectionDTO, 'stationName' | 'lineNames' | 'directionName'>,
+  connection: Pick<FacilityConnectionDTO, 'lineNames' | 'directionName'>,
 ): string {
-  // 路線が引けない接続でも空文字にならないよう駅名で代替する（connectionLabels と同じ）
-  const lineLabel =
-    connection.lineNames.length > 0 ? connection.lineNames.join('・') : connection.stationName;
+  const lineLabel = connection.lineNames.join('・');
   const subject = connection.directionName
     ? `${lineLabel}（${directionPhrase(connection.directionName)}）`
     : lineLabel;

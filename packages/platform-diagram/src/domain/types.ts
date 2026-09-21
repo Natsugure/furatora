@@ -18,7 +18,6 @@ export type ConcourseCellDTO = {
 
 // xRangeStart/xRangeEnd が両方非nullのときのみ、自ホーム座標系での対面乗換帯を表す
 export type FacilityConnectionDTO = {
-  stationName: string;
   lineNames: string[];
   lineColors: (string | null)[];
   directionName: string | null;

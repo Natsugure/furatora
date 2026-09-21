@@ -60,7 +60,7 @@ const concourse: LayoutConcourseDTO = {
   ],
   connections: [
     {
-      stationName: '渋谷', connectedStationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1',
+      connectedStationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1',
       directionId: 'direction-1', lineNames: ['田園都市線'], lineColors: ['#00A650'],
       directionName: '渋谷方面', exitLabel: 'A3', xRangeStart: 5, xRangeEnd: 15,
     },
@@ -589,20 +589,20 @@ describe('draftToDisplayConcourse', () => {
       connections: [
         {
           connectedStationId: 'station-shibuya', connectedPlatformId: 'platform-shibuya-1', directionId: 'direction-1',
-          stationName: '渋谷', lineNames: ['田園都市線'], lineColors: ['#00A650'],
+          lineNames: ['田園都市線'], lineColors: ['#00A650'],
           directionName: '渋谷方面', exitLabel: 'A3', xRangeStart: 5, xRangeEnd: 15,
         },
       ],
     });
   });
 
-  it('lookupで解決できない接続先はstationName空文字・directionName nullにフォールバックする', () => {
+  it('lookupで解決できない接続先はlineNames空・directionName nullにフォールバックする', () => {
     const draft = setConnection(createEmptyConcourseDraft(), 'station-unknown', { exitLabel: 'X1' });
     const dto = draftToDisplayConcourse('concourse-new', draft, lookups);
     expect(dto.connections).toEqual([
       {
         connectedStationId: 'station-unknown', connectedPlatformId: null, directionId: null,
-        stationName: '', lineNames: [], lineColors: [], directionName: null,
+        lineNames: [], lineColors: [], directionName: null,
         exitLabel: 'X1', xRangeStart: null, xRangeEnd: null,
       },
     ]);

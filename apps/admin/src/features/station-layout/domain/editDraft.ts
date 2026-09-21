@@ -534,7 +534,6 @@ export function draftToDisplayConcourse(
         connectedStationId: c.stationId,
         connectedPlatformId: c.connectedPlatformId,
         directionId: c.directionId,
-        stationName: station?.name ?? '',
         lineNames: station?.lines.map((l) => l.name) ?? [],
         lineColors: station?.lines.map((l) => l.color) ?? [],
         directionName: station?.directions.find((d) => d.id === c.directionId)?.displayName ?? null,

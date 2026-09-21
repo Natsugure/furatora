@@ -32,6 +32,24 @@ import '@furatora/platform-diagram/styles.css'; // layout.tsx で1回だけ impo
 @source "../../../../packages/platform-diagram/src";
 ```
 
+**`next/font` の変数クラスは `<body>` ではなく `<html>` に付けること。** `styles.css` の
+`--font-sign` は `:root` で宣言されており、中の `var(--font-biz-udpgothic)` は `:root`
+時点で解決される。変数クラスを `<body>` に付けると `:root` では未定義のままになり、
+`--font-sign` 宣言全体が無効値になる（サイン書体が無言で既定フォントにフォールバック
+する。Issue #107）。
+
+```tsx
+// layout.tsx
+<html lang="ja" className={bizUdpGothic.variable}>
+  <body>{/* ... */}</body>
+</html>
+```
+
+**web はこの `styles.css` を import していない。** `--sign-*` 等5トークンは
+`apps/web/src/app/globals.css` に web 全体の基盤トークンとして既に定義されており
+（下記「CSS変数について」参照）、`--font-sign` も web 側で自前定義している。
+`styles.css` を実際に import して恩恵を受けるのは admin のみ。
+
 ## アイコンの複製について
 
 `DiagramSvg` は設備アイコンを `<img>`/`<image>` の `href` で参照する。Next.js の
@@ -57,6 +75,14 @@ elevator.png, escalator.png, stairs.png, wheelchair_ramp.png, stair_lift.png, wh
 `--color-text-primary` / `--color-text-secondary`）は web 全体の基盤トークンでもあり
 （`body` の背景色・文字色に使われる）、`globals.css` からは削除していない。値が
 完全に一致する解決済みコピーとして両方に存在する。
+
+## 引き出し線の経路
+
+`layoutConcoursePlates()` が返す `ConcoursePlateGroup.route` は、深いレーンのプレートへ
+降りる引き出し線が手前のレーンをどう通るかを持つ（`domain/leaderRoute.ts`）。
+`segments` は lane 0..lane-1 の通過区間、`arrivalFraction` は自レーン上端への到達位置で、
+値はすべて描画範囲に対する割合（`xFraction()` と同じ）。`ConcoursePlateRow` が
+縦線（z 0）・プレート（z 1）・余白帯の横線（z 2）の3レイヤに描き分ける。
 
 ## テスト
 
