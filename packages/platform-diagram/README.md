@@ -76,6 +76,14 @@ elevator.png, escalator.png, stairs.png, wheelchair_ramp.png, stair_lift.png, wh
 （`body` の背景色・文字色に使われる）、`globals.css` からは削除していない。値が
 完全に一致する解決済みコピーとして両方に存在する。
 
+## 引き出し線の経路
+
+`layoutConcoursePlates()` が返す `ConcoursePlateGroup.route` は、深いレーンのプレートへ
+降りる引き出し線が手前のレーンをどう通るかを持つ（`domain/leaderRoute.ts`）。
+`segments` は lane 0..lane-1 の通過区間、`arrivalFraction` は自レーン上端への到達位置で、
+値はすべて描画範囲に対する割合（`xFraction()` と同じ）。`ConcoursePlateRow` が
+縦線（z 0）・プレート（z 1）・余白帯の横線（z 2）の3レイヤに描き分ける。
+
 ## テスト
 
 `src/domain/*.test.ts` は Vitest（`pnpm --filter @furatora/platform-diagram test`）。

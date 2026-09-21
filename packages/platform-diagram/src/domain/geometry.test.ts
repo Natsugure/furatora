@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeBounds,
+  facilityIconHalfExtent,
   layoutRows,
   xFraction,
+  FACILITY_ICON_SIZE,
   FACILITY_ROW_HEIGHT,
   GAP_Y,
   MARGIN_METERS,
@@ -25,14 +27,22 @@ function pattern(cars: { carNumber: number; startMeters: number; endMeters: numb
 }
 
 function concourse(
-  cells: { xPositionMeters: number | null }[],
+  cells: { xPositionMeters: number | null; facilityCount?: number }[],
   connections: { xRangeStart: number | null; xRangeEnd: number | null }[] = [],
 ): Pick<ConcourseDTO, 'cells' | 'connections'> {
   return {
-    cells: cells.map((c) => ({ ...c, facilities: [] })),
+    cells: cells.map(({ xPositionMeters, facilityCount = 0 }) => ({
+      xPositionMeters,
+      facilities: Array.from({ length: facilityCount }, (_, i) => ({
+        id: `f${i}`,
+        typeCode: 'elevator',
+        typeName: 'エレベーター',
+        isWheelchairAccessible: null,
+        isStrollerAccessible: null,
+      })),
+    })),
     connections: connections.map((c) => ({
       ...c,
-      stationName: '',
       lineNames: [],
       lineColors: [],
       directionName: null,
@@ -115,6 +125,41 @@ describe('computeBounds', () => {
       [concourse([{ xPositionMeters: 120 }, { xPositionMeters: 3 }])],
     );
     expect(bounds).toEqual({ minX: -5 - MARGIN_METERS, maxX: 120 + MARGIN_METERS });
+  });
+});
+
+describe('設備アイコンの張り出し', () => {
+  it('facilityIconHalfExtent は件数ごとに扇状配置の半幅を返す', () => {
+    expect(facilityIconHalfExtent(0)).toBe(0);
+    expect(facilityIconHalfExtent(1)).toBe(FACILITY_ICON_SIZE / 2);
+    expect(facilityIconHalfExtent(2)).toBeCloseTo(6.5);
+    expect(facilityIconHalfExtent(3)).toBeCloseTo(10);
+  });
+
+  it('設備1件のアクセス点はアイコン半幅ぶん範囲が広がる', () => {
+    const bounds = computeBounds(100, [], [concourse([{ xPositionMeters: 150, facilityCount: 1 }])]);
+    expect(bounds.maxX).toBeCloseTo(150 + 3 + MARGIN_METERS);
+  });
+
+  it('設備2件のアクセス点は ±6.5m 広がり、MARGIN_METERS を超える', () => {
+    const bounds = computeBounds(100, [], [concourse([{ xPositionMeters: 150, facilityCount: 2 }])]);
+    expect(bounds.maxX).toBeCloseTo(150 + 6.5 + MARGIN_METERS);
+    expect(6.5).toBeGreaterThan(MARGIN_METERS);
+  });
+
+  it('左端（負座標）のアクセス点も張り出しぶん広がる', () => {
+    const bounds = computeBounds(100, [], [concourse([{ xPositionMeters: -20, facilityCount: 3 }])]);
+    expect(bounds.minX).toBeCloseTo(-20 - 10 - MARGIN_METERS);
+  });
+
+  it('設備0件のアクセス点は従来どおり座標そのもの', () => {
+    const bounds = computeBounds(100, [], [concourse([{ xPositionMeters: 150, facilityCount: 0 }])]);
+    expect(bounds.maxX).toBe(150 + MARGIN_METERS);
+  });
+
+  it('xPositionMeters が null のセルは設備があっても範囲計算の対象外', () => {
+    const bounds = computeBounds(100, [], [concourse([{ xPositionMeters: null, facilityCount: 3 }])]);
+    expect(bounds).toEqual({ minX: 0 - MARGIN_METERS, maxX: 100 + MARGIN_METERS });
   });
 });
 

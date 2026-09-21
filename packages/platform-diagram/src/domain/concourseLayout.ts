@@ -3,11 +3,13 @@ import {
   directionPhrase,
   exitsLabel,
   facingTransferText,
+  hasLines,
   primaryLineColor,
   transferEntries,
 } from './concourse';
 import { PX_PER_METER, type Bounds, xFraction } from './geometry';
 import { assignLanes, laneCount } from './lanes';
+import { routeLeaders, type LeaderRoute } from './leaderRoute';
 import type { ConcourseDTO } from './types';
 
 // 出口・乗換プレートと対面乗換バナーを、ホーム座標系のどこに置くかを決める。
@@ -45,6 +47,11 @@ export type ConcoursePlateGroup = {
   /** 段番号。0 が図に最も近い */
   lane: number;
   align: PlateAlign;
+  /**
+   * 引き出し線が手前のレーンをどう通るか。lane 0 では segments が空。
+   * 幅の見積り（startPx/endPx）から導いた結果だけを持ち、見積り自体は出さない
+   */
+  route: LeaderRoute;
   /** 出口名。全文（省略しない）。未入力なら null */
   exit: string | null;
   /** 乗換先。全件（省略しない） */
@@ -113,9 +120,10 @@ export function layoutConcoursePlates(
     .filter((group): group is BuiltGroup => group !== null);
 
   const placed = assignLanes(candidates, PLATE_GAP_PX);
+  const routes = routePlates(placed, bounds, canvasWidthPx);
   // startPx / endPx はレーン割り当てのための内部値なので、外へは出さない
   const groups: ConcoursePlateGroup[] = placed
-    .map((group) => ({
+    .map((group, index) => ({
       concourseId: group.concourseId,
       tickXs: group.tickXs,
       bracketStartX: group.bracketStartX,
@@ -123,6 +131,7 @@ export function layoutConcoursePlates(
       anchorX: group.anchorX,
       lane: group.lane,
       align: group.align,
+      route: routes[index]!,
       exit: group.exit,
       transfers: group.transfers,
       facilityTypeNames: group.facilityTypeNames,
@@ -132,7 +141,42 @@ export function layoutConcoursePlates(
   return { groups, laneCount: laneCount(placed) };
 }
 
-type BuiltGroup = Omit<ConcoursePlateGroup, 'lane'> & { startPx: number; endPx: number };
+type BuiltGroup = Omit<ConcoursePlateGroup, 'lane' | 'route'> & { startPx: number; endPx: number };
+
+/**
+ * 引き出し線の経路を決める。同一レーンの間隔(PLATE_GAP_PX)の半分を線の逃げ幅にすると、
+ * 隣り合うプレートの隙間のちょうど中央を通る。
+ */
+function routePlates(
+  placed: (BuiltGroup & { lane: number })[],
+  bounds: Bounds,
+  canvasWidthPx: number,
+): LeaderRoute[] {
+  if (canvasWidthPx <= 0) {
+    // 縮退した描画範囲では割合が定まらない。迂回せず直進させる
+    return placed.map((group) => {
+      const x = xFraction(group.anchorX, bounds);
+      return {
+        segments: Array.from({ length: group.lane }, () => ({
+          enterFraction: x,
+          exitFraction: x,
+          passesBehindPlate: false,
+        })),
+        arrivalFraction: x,
+      };
+    });
+  }
+
+  return routeLeaders(
+    placed.map((group) => ({
+      lane: group.lane,
+      anchorFraction: xFraction(group.anchorX, bounds),
+      boxStartFraction: group.startPx / canvasWidthPx,
+      boxEndFraction: group.endPx / canvasWidthPx,
+    })),
+    PLATE_GAP_PX / 2 / canvasWidthPx,
+  );
+}
 
 function buildGroup(
   concourse: ConcourseDTO,
@@ -214,15 +258,9 @@ function estimatePlateWidth(exit: string | null, transfers: TransferEntry[]): nu
   );
 }
 
-/**
- * 乗換プレートの補助行。路線名の下に添える「駅名・方面・備考」。
- *
- * 路線が1件も引けない接続では駅名が唯一の手掛かりになるので必ず出す。
- * 引ける場合は駅名を省き、方面と備考だけを添える（路線名で駅は察しがつく）。
- */
+/** 乗換プレートの補助行。路線名の下に添える「方面・備考」 */
 export function transferNote(transfer: TransferEntry): string | null {
   const parts = [
-    transfer.lines.length === 0 ? transfer.stationName : null,
     transfer.directionName ? directionPhrase(transfer.directionName) : null,
     transfer.exitLabel,
   ].filter((part): part is string => part !== null && part !== '');
@@ -244,7 +282,7 @@ export function layoutFacingBanners(
 
   const candidates = concourses.flatMap((concourse) =>
     concourse.connections
-      .filter((conn) => conn.xRangeStart !== null && conn.xRangeEnd !== null)
+      .filter((conn) => hasLines(conn) && conn.xRangeStart !== null && conn.xRangeEnd !== null)
       .map((conn, index) => {
         const startX = Math.min(conn.xRangeStart!, conn.xRangeEnd!);
         const endX = Math.max(conn.xRangeStart!, conn.xRangeEnd!);

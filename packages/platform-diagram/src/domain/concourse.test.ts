@@ -14,7 +14,6 @@ import type { ConcourseDTO, FacilityConnectionDTO } from './types';
 
 function connection(overrides: Partial<FacilityConnectionDTO> = {}): FacilityConnectionDTO {
   return {
-    stationName: '新宿',
     lineNames: ['小田急線'],
     lineColors: ['#0072BC'],
     directionName: null,
@@ -56,6 +55,12 @@ describe('hasDisplayableInfo', () => {
 
   it('出口名が未設定でも乗換先だけで表示する', () => {
     expect(hasDisplayableInfo(concourse({ connections: [connection()] }))).toBe(true);
+  });
+
+  it('乗換先が路線名を引けない接続だけなら乗換先とみなさない', () => {
+    expect(
+      hasDisplayableInfo(concourse({ connections: [connection({ lineNames: [], lineColors: [] })] })),
+    ).toBe(false);
   });
 
   it('出口名も乗換先も未設定でも設備があれば表示する', () => {
@@ -110,11 +115,13 @@ describe('connectionLabels', () => {
     expect(labels).toEqual(['小田急線［西口地下］']);
   });
 
-  it('路線が引けない接続は駅名で代替し、空ラベルにしない', () => {
+  it('路線が引けない接続はラベルを返さない（駅名で代替しない）', () => {
     const labels = connectionLabels(
-      concourse({ connections: [connection({ lineNames: [], stationName: '新宿三丁目' })] }),
+      concourse({
+        connections: [connection({ lineNames: [] }), connection({ lineNames: ['京王線'] })],
+      }),
     );
-    expect(labels).toEqual(['新宿三丁目']);
+    expect(labels).toEqual(['京王線']);
   });
 
   it('複数の接続をそれぞれ1要素として返す', () => {
@@ -193,15 +200,14 @@ describe('transferEntries', () => {
     ]);
   });
 
-  it('方面名・備考・駅名を保持する', () => {
+  it('方面名・備考を保持する', () => {
     const entries = transferEntries(
       concourse({
-        connections: [connection({ stationName: '新宿三丁目', directionName: '池袋', exitLabel: 'A3出口' })],
+        connections: [connection({ directionName: '池袋', exitLabel: 'A3出口' })],
       }),
     );
 
     expect(entries[0]).toMatchObject({
-      stationName: '新宿三丁目',
       directionName: '池袋',
       exitLabel: 'A3出口',
     });
@@ -209,10 +215,18 @@ describe('transferEntries', () => {
 
   it('接続1件につき1要素を返す', () => {
     const entries = transferEntries(
-      concourse({ connections: [connection(), connection({ stationName: '代々木' })] }),
+      concourse({ connections: [connection(), connection({ lineNames: ['京王線'] })] }),
     );
 
     expect(entries).toHaveLength(2);
+  });
+
+  it('路線が引けない接続は含めない', () => {
+    const entries = transferEntries(
+      concourse({ connections: [connection({ lineNames: [], lineColors: [] }), connection()] }),
+    );
+
+    expect(entries).toHaveLength(1);
   });
 });
 
@@ -255,9 +269,4 @@ describe('facingTransferText', () => {
     );
   });
 
-  it('路線が引けなければ駅名で代替する', () => {
-    expect(facingTransferText(connection({ lineNames: [], stationName: '赤坂見附' }))).toBe(
-      '赤坂見附は同じホームの向かい側に到着',
-    );
-  });
 });

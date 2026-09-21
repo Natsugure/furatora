@@ -81,13 +81,11 @@ async function getConcourses(platformId: string): Promise<LayoutConcourseDTO[]> 
         connectedStationId: facilityConnections.connectedStationId,
         connectedPlatformId: facilityConnections.connectedPlatformId,
         directionId: facilityConnections.directionId,
-        stationName: stations.name,
         directionName: lineDirections.displayName,
         xRangeStart: facilityConnections.xRangeStart,
         xRangeEnd: facilityConnections.xRangeEnd,
       })
       .from(facilityConnections)
-      .innerJoin(stations, eq(facilityConnections.connectedStationId, stations.id))
       .leftJoin(lineDirections, eq(facilityConnections.directionId, lineDirections.id))
       .where(inArray(facilityConnections.platformLocationId, locationIds)),
   ]);
@@ -127,7 +125,6 @@ async function getConcourses(platformId: string): Promise<LayoutConcourseDTO[]> 
       })),
     })),
     connections: (connectionsByLocation.get(loc.id) ?? []).map((c) => ({
-      stationName: c.stationName,
       connectedStationId: c.connectedStationId,
       connectedPlatformId: c.connectedPlatformId,
       directionId: c.directionId,

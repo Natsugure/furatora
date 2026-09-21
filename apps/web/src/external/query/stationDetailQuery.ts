@@ -37,9 +37,11 @@ import type {
 // 路線がほぼ一意に定まる（複数路線を持つ駅はごく少数。lineName で重複除去して吸収する）。
 // 詳細: docs/domain/station-master-model.md「乗換接続（stationConnections）」。
 //
-// 接続先の駅にも publishedStation() を通す。未公開駅への乗換リンクを詳細ページに出すと、
-// そこから未公開ページへ到達できてしまう（docs/domain/station-visibility.md
-// 「乗換接続からの到達」。要件の再検討は Issue #77 で進行中）。
+// 接続先の駅には publishedStation() を通さない。ここが供給するのは「乗換先の路線名」と
+// 「バリアフリー難易度」だけで、接続先の駅ページへのリンクは一切生成しない。
+// 未公開駅を除外すると路線名が丸ごと引けなくなり、図の乗換プレートが空になる
+// （docs/domain/station-visibility.md「乗換接続からの到達」/ Issue #77 REQ-7.4b）。
+// リンクを伴う参照を後から足す場合は、そのとき publishedStation() を通すこと。
 async function getStationConnectionRows(stationId: string) {
   return db
     .select({
@@ -52,10 +54,9 @@ async function getStationConnectionRows(stationId: string) {
       notesAboutWheelchair: stationConnections.notesAboutWheelchair,
     })
     .from(stationConnections)
-    .innerJoin(stations, eq(stations.id, stationConnections.connectedStationId))
     .innerJoin(stationLines, eq(stationLines.stationId, stationConnections.connectedStationId))
     .innerJoin(lines, eq(lines.id, stationLines.lineId))
-    .where(and(eq(stationConnections.stationId, stationId), publishedStation()));
+    .where(eq(stationConnections.stationId, stationId));
 }
 
 function buildTransferConnections(
@@ -280,18 +281,19 @@ export const dbStationDetailQuery: StationDetailQuery = {
     const [cellList, connectionRows] = locationIds.length > 0
       ? await Promise.all([
           db.select().from(platformLocationCells).where(inArray(platformLocationCells.platformLocationId, locationIds)),
+          // 接続先駅の公開状態では絞らない（stations を join しないのも同じ理由）。
+          // ここで返すのはリンクを伴わない表示用の情報のみ（Issue #77 REQ-7.4b）。
+          // "修正"して publishedStation() を足さないこと。
           db
             .select({
               platformLocationId: facilityConnections.platformLocationId,
               exitLabel: facilityConnections.exitLabel,
               connectedStationId: facilityConnections.connectedStationId,
-              stationName: stations.name,
               directionName: lineDirections.displayName,
               xRangeStart: facilityConnections.xRangeStart,
               xRangeEnd: facilityConnections.xRangeEnd,
             })
             .from(facilityConnections)
-            .innerJoin(stations, eq(facilityConnections.connectedStationId, stations.id))
             .leftJoin(lineDirections, eq(facilityConnections.directionId, lineDirections.id))
             .where(inArray(facilityConnections.platformLocationId, locationIds)),
         ])
@@ -328,7 +330,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
           })),
         })),
         connections: (connectionsByLocation.get(loc.id) ?? []).map((c) => ({
-          stationName: c.stationName,
           lineNames: linesByStation.get(c.connectedStationId)?.names ?? [],
           lineColors: linesByStation.get(c.connectedStationId)?.colors ?? [],
           directionName: c.directionName ?? null,

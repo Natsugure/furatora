@@ -5,6 +5,22 @@ export const MARGIN_METERS = 5;
 
 export type Bounds = { minX: number; maxX: number };
 
+/** 設備アイコンの1辺（メートル）。DiagramSvg が描く実寸であり、描画範囲の算出にも使う */
+export const FACILITY_ICON_SIZE = 6;
+/** 同一アクセス点に設備が複数あるとき、アイコン中心どうしを離す間隔 */
+export const FACILITY_ICON_PITCH = FACILITY_ICON_SIZE + 1;
+
+/**
+ * アクセス点1件が設備アイコンで占める、中心からの張り出し（片側・メートル）。
+ *
+ * computeBounds() と DiagramSvg が同じ値を使うことで、
+ * 「描いたのに viewBox の外だった」が構造的に起きなくなる。
+ */
+export function facilityIconHalfExtent(facilityCount: number): number {
+  if (facilityCount === 0) return 0;
+  return ((facilityCount - 1) / 2) * FACILITY_ICON_PITCH + FACILITY_ICON_SIZE / 2;
+}
+
 /**
  * メートル → 画面ピクセルの換算率。
  *
@@ -56,7 +72,9 @@ export function computeBounds(
   for (const concourse of concourses) {
     for (const cell of concourse.cells) {
       if (cell.xPositionMeters !== null) {
-        candidates.push(cell.xPositionMeters);
+        // アイコンは扇状に張り出すので、座標そのものではなくその両端を範囲に含める
+        const half = facilityIconHalfExtent(cell.facilities.length);
+        candidates.push(cell.xPositionMeters - half, cell.xPositionMeters + half);
       }
     }
     for (const connection of concourse.connections) {
