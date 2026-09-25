@@ -7,7 +7,8 @@ const FACILITY_TYPES = [
   { code: 'stairs', name: '階段' },
   { code: 'ramp', name: 'スロープ'},
   { code: 'stairLift', name: '階段昇降機' },
-  { code: 'sameFloor', name: '同一階層'}
+  { code: 'sameFloor', name: '同一階層'},
+  { code: 'wheelchairEscalator', name: '車いす対応エスカレーター' },
 ];
 
 const OPERATORS = [

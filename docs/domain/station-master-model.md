@@ -123,7 +123,13 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
   （[Issue #88](https://github.com/Natsugure/furatora/issues/88)）。
   Repository は端点が対象路線の `stationLines` に属することも検証する。
 
-## 乗換接続（`stationConnections`）
+## 乗換接続（`stationConnections`）— 接続一覧
+
+`stationConnections` は「どの駅からどの駅へ乗り換えられるか」を持つ**接続一覧**であり、
+Web の駅詳細・Admin の駅編集・設備編集・レイアウト画面が読んでいる。
+乗換難易度の新モデル（次節）が入っても、この表は接続一覧として残る。
+乗換難易度を持つ `strollerDifficulty` / `wheelchairDifficulty` / `notesAbout*` の4列は、
+新モデルへの移行（#123〜#125）が済んだ**あとの別デプロイ**で落とす。
 
 | `source` | 意味 |
 |---|---|
@@ -141,9 +147,100 @@ Admin の駅編集画面の「接続を追加」から
 作成・削除はいずれも `(A→B)` と `(B→A)` を対で扱う。作成は
 `unique_station_connection`（`stationId, connectedStationId`）を衝突対象にした
 `onConflictDoNothing` で冪等（`external/repository/stationConnectionRepository.ts`）。
-難易度・備考は両方向に同じ値が入る。向きで難易度が異なる場合は既存の
-`PUT /api/station-connections/[connectionId]` で個別に直す。
 再取込の機構は無いため、この3区分は現在は**由来の記録**として働く。
+現行の難易度4列は有向2行の両方に同じ値が入り、向きで異なる場合は既存の
+`PUT /api/station-connections/[connectionId]` で個別に直す。この運用は4列とともに廃止される。
+
+## 乗換難易度（`transferConnections` ほか4表）
+
+> **適用状況**: 2026-09-25 現在、**スキーマのみ実装済み**（[Issue #122](https://github.com/Natsugure/furatora/issues/122)。
+> development に適用・制約の動作確認済み。全テーブル0件）。**読み書きするコードはまだ無い**。
+> 現行の Admin・Web は前節の `stationConnections` の難易度4列を読み書きしている。
+> データ移行は [#123](https://github.com/Natsugure/furatora/issues/123)、Admin 入力は
+> [#124](https://github.com/Natsugure/furatora/issues/124)、Web 表示は
+> [#125](https://github.com/Natsugure/furatora/issues/125)。3件が完了したら、この注記を外す。
+
+### 4層構造
+
+```
+transfer_connections        接続（無向1行。端点は 駅×方面、方面は必須）
+  └─ connection_routes      接続とルートの紐付け（多対多。label・isBaseline をここに持つ）
+       └─ transfer_routes   ルート（1本の物理経路。接続に従属せず、共有されうる）
+            └─ transfer_route_facilities  設備（直列に通る順。seq）→ facility_types.code
+```
+
+- **ペルソナ（ベビーカー・車いす）は層ではない。** ペルソナ別の可否・必要な行為・所要時分は
+  保存せず、設備から表示層で導出する。「通れる」と「バリアフリーで通れる」は別の述語である
+  （階段を持ち上げれば通れるが、バリアフリールートは無い、という状態がありうる）。
+- **ルートは接続に従属しない。** 方面によって条件が変わらない駅は、方面の組み合わせ分
+  （最大4行）の接続を持つ。それらが同じ物理経路を使うときは、ルート行を複製せず
+  1本を複数の接続から共有する。「全方面共通」を `NULL` では表さない。
+- **`label` と `isBaseline` は `transfer_routes` ではなく `connection_routes` に属する。**
+  「その接続でこのルートがどう機能するか」は接続とルートの組の事実であり、ルートが共有される以上、
+  ルート側には置けない。
+- 接続が無い駅対は「未評価」であり、「バリアフリールートが無い」とは別の状態である。
+
+### 接続の端点
+
+- 端点は `(stationId, direction_type)`。`direction_type` は `'inbound' | 'outbound'` の2値で、
+  両端点とも必須。`line_directions.id` は参照しない。
+- **解決は完全一致の1行を引くだけ。** 優先順位規則もタイブレークも無い。
+  `NULLS NOT DISTINCT` も要らない（方面が `NOT NULL` のため）。
+- **無向1行で持ち、端点を `(stationId, direction_type)` の昇順に正規化して格納する。**
+  読み取り側は端点の両順序（A,B）と（B,A）を見ること。
+  正規化は `apps/admin/src/features/transfer-connection/domain/normalize.ts` の
+  `normalizeTransferEndpoints()`。`stationAdjacencies` と違い、順序は DB の CHECK も守る。
+  比較は `stationId` を小文字にしてから行う（PostgreSQL の uuid 比較は小文字16進のバイト順）。
+- **比較キーに `direction_type` を含めること。** `stations` が物理駅粒度に統合されると
+  （[Issue #82](https://github.com/Natsugure/furatora/issues/82)）`stationId` だけでは端点が
+  定まらず、同一駅・方面違いの接続が正当になる。そのため `station_a_id <> station_b_id` の
+  CHECK は無い。
+- **`direction_type` は乗換単位（ホーム）を一意に決めない。** 分岐駅・同一駅を2回通る路線・
+  直通運転を伴う分岐では、同じ `(stationId, direction_type)` に複数のホームが対応しうる。
+  中野坂上型は [Issue #128](https://github.com/Natsugure/furatora/issues/128)
+  （丸ノ内線支線の復元）を前提とした既知の制約。実害は現状中野坂上1駅に閉じている。
+  なお、上の「乗換単位（ホーム）」は物理ホームを指し、`stationGroups` の乗換単位
+  （物理駅。ekidata `station_g_cd`）とは別の概念である。
+
+### 不変条件
+
+| 不変条件 | 守り方 | 外そうとする人へ |
+|---|---|---|
+| 同じ端点対の行が2つない | `unique_transfer_connection (stationA, directionA, stationB, directionB)` | — |
+| 端点が正規化順で、両端点が同一でない | `transfer_connection_endpoints_ordered`（CHECK。行値比較） | 逆向きの重複行が一意制約をすり抜ける |
+| 基準ルートは接続あたり高々1本 | `unique_connection_baseline`（`connection_routes` への部分ユニーク `(connectionId) where is_baseline`） | 外すと迂回度（基準ルートとの所要時分の差）の分母が一意に定まらない。0本は許容 |
+| 同一接続内でルート名が重複しない | `unique_connection_route_label (connectionId, label)` | 属性（フラグ等）を一意キーに含めない。事実の訂正が制約に阻まれる |
+| 同じルートを同じ接続に2回結ばない | `unique_connection_route (connectionId, routeId)` | — |
+| 設備の並びが壊れない | `unique_transfer_route_facility_seq (routeId, seq)` | — |
+| 設備の並びと4フラグが既存ルートと完全に一致するルートを作らない | **アプリ層**（#124）。**接続をまたいで**検出し、一致すれば新規作成せず紐付けを提案する | 集合の一意性は DB 制約で書けない |
+| 基準ルートの付け替えが中途半端に終わらない | Repository + `withTransaction`（[ADR-0005](../adr/0005-write-atomicity-driver.md)） | 降格と昇格の2文になる |
+| 接続を消したあとに孤立ルートが残らない | **アプリ層**（#124）。`connection_routes` は接続の削除で cascade するが、ルートは共有されうるため DB では消さない | — |
+
+**行数の上限は制約で表現しない**（PostgreSQL の制約は行数を数えられない）。
+
+### ルートと設備
+
+- ルートは `minutes`（nullable。不明な所要時分を許す）と、独立した4つの真偽値
+  （`isOutdoor` / `requiresExitGate` / `requiresStaff` / `isOfficiallyGuided`。既定 false）、
+  `notes` を持つ。
+- 設備は `facility_types` の7値: `sameFloor` / `elevator` / `ramp` / `wheelchairEscalator` /
+  `escalator` / `stairLift` / `stairs`。**コードはキャメルケース**で、`wheelchairEscalator` は
+  車いす対応・係員操作のエスカレーター。
+- **`seq` は直列の並びだけを表す。** 同じ段差に対する代替手段（階段と階段昇降機が並んでいる箇所）は
+  同一ルートに並べず、別のルート行にする。ペルソナごとの「必要な行為」の判定
+  （階段昇降機のルートはベビーカーが通れない等）がこの規則に依存する。
+
+### 備考の役割
+
+`transferConnections.notes` / `transferRoutes.notes` は、モデルが構造的に表現しない次元
+（設備の質・時間帯制約・工事中の仮設ルート・方向依存の設備）の受け皿である。
+**出発地・目的地に依存する経路上の選好（「〇〇駅のほうが便利」）は書かない。**
+接続は出発地に依存しない事実だけを持つ。
+
+### `source`
+
+`transferConnections.source`（`ekidata_group` / `manual` / `NULL`）は
+`stationConnections.source` と同じ意味で、1つのホーム対に対する行の由来を表す。
 
 ## 駅名の正規化ルール
 

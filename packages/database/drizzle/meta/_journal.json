@@ -64,6 +64,20 @@
       "when": 1788654285421,
       "tag": "0008_purify_display_priority",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790304484383,
+      "tag": "0009_add_transfer_route_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790304493847,
+      "tag": "0010_add_wheelchair_escalator_facility_type",
+      "breakpoints": true
     }
   ]
 }
