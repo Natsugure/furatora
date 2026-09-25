@@ -1,11 +1,7 @@
 # 駅・路線・事業者の公開状態
 
-> **適用状況**: 2026-09-06 現在、**実装済み・本番反映済み**。
-> `packages/database/src/schema.ts` および `apps/web/src/external/query/visibility.ts`
-> と一致する。ただし **「乗換接続に未公開駅を含めない」という要件の定義が
-> [Issue #77](https://github.com/Natsugure/furatora/issues/77) で再検討中**であり、
-> 「リンクを伴わない名称のみの参照は許可する」方向で分割される見込み。
-> 本書の「乗換接続からの到達」の記述は #77 の決着で更新する。
+> **適用状況**: 実装済み。`packages/database/src/schema.ts` および
+> `apps/web/src/external/query/visibility.ts` と一致する。
 
 ## 可視性は `stations.publishedAt` が単独で担う
 
@@ -91,13 +87,21 @@ CHECK 制約 `published_requires_slug` は `publishedAt = NULL` により自然�
 
 ## 乗換接続からの到達
 
-`stationDetailQuery.getStationConnectionRows` は未公開駅への接続を除外する
-（`publishedStation()` を通す）。concourse の `facilityConnections` クエリは
-接続駅名を**リンクを伴わないプレーンな文字列**として返すのみ。
+未公開駅の可視性は「**リンクを伴う参照は除外／リンクを伴わない名称・路線名のみの
+表示は除外しない**」で扱う（[Issue #77](https://github.com/Natsugure/furatora/issues/77)）。
+非公開フラグが守るのは「その駅を目的地として案内すること」であり、
+他駅の乗換文脈での言及ではない。
 
-> この節は [Issue #77](https://github.com/Natsugure/furatora/issues/77) の決着で
-> 更新する。#77 は「リンクを生成する参照は未公開駅を除外／リンクを伴わない
-> 名称のみの参照は許可」へ、この要件を分割する方針。
+- `stationDetailQuery` の `getStationConnectionRows`（乗換先の路線名・難易度）と
+  concourse の `facilityConnections` クエリは、**どちらも接続先駅の公開状態で絞らない**。
+  両者が供給するのは路線名・方面名・出口ラベル・難易度の文字列のみで、
+  接続先の駅ページへのリンクは生成しない。
+- 片方だけ絞ると、乗換プレートの「行」は出るのに「路線名」だけ消える。
+  池袋のように、乗換先の事業者が公開駅を1件も持たない場合に顕在化する。
+- **乗換接続から駅ページへのリンクを足すときは、そのリンクを生成する経路で
+  `publishedStation()` を通すこと。**
+- 路線名が1件も引けない接続は、図（乗換プレート・対面乗換バナー）にもテキストにも
+  出さない。駅名での代替表示はしない（`platform-diagram` の `hasLines()`）。
 
 ## 関連
 
