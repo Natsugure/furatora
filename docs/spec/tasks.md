@@ -2,7 +2,7 @@
 
 - **対象**: ドメイン定義のみ（`docs/spec/`）
 - **参照**: [requirements.md](./requirements.md) / [design.md](./design.md)
-- **作成日**: 2026-09-20 / **改訂**: 2026-09-21
+- **作成日**: 2026-09-20 / **改訂**: 2026-09-21 / **再改訂**: 2026-09-21
 - **ブランチ**: `docs/issue30-transfer-difficulty-model`
 
 本Issueはスキーマ変更・実装を伴わない。フェーズ3「実装」はドキュメント執筆のみで、
@@ -33,6 +33,27 @@
 - [x] **TASK-6**（改訂）2案の比較資料を作成し、ドメイン構成・DBスキーマ・
       8シチュエーションの当てはめを図示した（レビュー用。恒久知識は本3点セットが正）
 - [x] **TASK-7**（改訂）Issue #120〜#125 の本文を改訂版モデルに更新
+- [x] **TASK-8**（再改訂・2026-09-21）方面モデルのレビュー指摘（住吉型の解決規則の穴、
+      `NULLS NOT DISTINCT` の必要性、正規化キーへの `directionId` 混入）を検討する過程で、
+      方面キー自体の欠陥（`line_directions` が602路線中14路線にしか無く、同一
+      `(line, direction_type)` に複数の同義行がある）が判明。方面キーを `direction_type`
+      に変更したうえで4案（現行案・全展開案・適用条件案・ルート共有案）を比較し、
+      実データ（淡路町・住吉・中野坂上）で行レベルまで書き下ろして採用案を決定した。
+      `requirements.md` の REQ-2・3・6・7・18・22・23・用語・対象外を、
+      `design.md` のモデル図・接続の単位・方面の展開規則・保持する事実・不変条件・
+      持たないもの・決定4・6・10・11・引き継ぎ先・将来作業を、それぞれ改訂した
+- [x] **TASK-9**（2026-09-25）TASK-8 で「対象外」に記録した3件のうち、中野坂上型の
+      解決先について開発者に確認した結果、Issue #83 とは無関係（#83 は案内路線と
+      運行系統の分離、本件は ekidata が畳んだ支線の粒度問題）と判明。
+      [#128](https://github.com/Natsugure/furatora/issues/128)（中野坂上型）・
+      [#129](https://github.com/Natsugure/furatora/issues/129)
+      （`representativeStationId`/`terminalStationIds` 除去）・
+      [#130](https://github.com/Natsugure/furatora/issues/130)
+      （`line_directions.isDefault` 追加）を新規起票し、`requirements.md`・
+      `design.md` の該当箇所を実際の Issue 番号で更新した。あわせて、既存
+      Issue #122〜#125 の本文が再改訂前（`line_directions.id` / `NULL` 前提）の
+      記述のまま残っており、現行の `design.md` と直接矛盾していたため、
+      4件とも本文を再改訂版モデルに同期した。
 
 ## フェーズ4: 検証（机上）
 
@@ -100,20 +121,34 @@
       design.md「この定義の引き継ぎ先」に反映対象を明示済みであることを確認し、
       **確認した上での判断**として記録する。改訂で反映対象が増えたため
       （3層構造・不変条件の表・帰属規則・2段の述語）、同節も更新済み。
+      再改訂でさらに増えた（4層構造・方面キーの値域・全方面共通の表現・`label`/`isBaseline`
+      の置き場所・`direction_type`が物理ホームを一意に決めないこと）ため、同節を再度更新済み。
 - [x] `docs/adr/` の確認: 新規ADRは作成しない（決定記録の判定基準に照らし、
       本Issueの決定はドメインのモデル化であり、覆すときに明示的な意思決定を要する
       アーキテクチャ決定ではないと判断した）。既存ADR（ADR-0003 / ADR-0005）に
       反する設計をしていないことを確認済み。改訂で ADR-0005 への依存が増えた
       （基準ルートの付け替えが複数文の書き込みになる）ため、design.md の参照に追加した。
+      再改訂で ADR-0007（駅・路線マスタ）との関係を確認した。`0007_fold_branch_lines.sql`
+      による丸ノ内線支線の畳み込みは ADR-0007 決定1〜4のいずれにも明記されておらず、
+      実装判断（ヘッダに留保あり）であることを確認したため、supersede は不要と判断した。
 
 ## フェーズ6: 引き渡し
 
 - [x] 変更ファイル: `docs/spec/requirements.md` / `docs/spec/design.md` /
-      `docs/spec/tasks.md`（本ファイル）。初版 commit 24ce1c5、改訂は本コミット。
+      `docs/spec/tasks.md`（本ファイル）。初版 commit 24ce1c5、改訂は commit 18b3e49、
+      再改訂は本コミット。
 - [x] 恒久知識の取り残し確認: `docs/spec/` は次のIssueで全面書き換えられる。
       次も有効な内容（モデル定義・決定記録12件）は、Issue #119〜#125 すべてに
       commit 参照を入れたことで、実装Issueのフェーズ5で `docs/domain/` へ移す経路を
-      確保した（TASK-3の引き継ぎ先明示と対応）。
+      確保した（TASK-3の引き継ぎ先明示と対応）。再改訂で新たに生じた恒久知識の
+      行き先として、[#128](https://github.com/Natsugure/furatora/issues/128)
+      （中野坂上型: 丸ノ内線支線の復元。Issue #83とは別の話であることを開発者確認済み）、
+      [#129](https://github.com/Natsugure/furatora/issues/129)
+      （`representativeStationId`/`terminalStationIds` の除去）、
+      [#130](https://github.com/Natsugure/furatora/issues/130)
+      （`line_directions.isDefault` の追加）を新規起票し、design.md「先送りした将来作業」を
+      番号付きに更新した。あわせて、方面モデルの変更が直接矛盾する内容を含んでいた
+      既存Issue #122〜#125 の本文を、再改訂版モデルに同期した。
 - [x] **実装Issueの分割**: [#122](https://github.com/Natsugure/furatora/issues/122)
       スキーマ実装 → [#123](https://github.com/Natsugure/furatora/issues/123)
       データ移行 → [#124](https://github.com/Natsugure/furatora/issues/124)
