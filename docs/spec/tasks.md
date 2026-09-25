@@ -1,158 +1,81 @@
-# 実装タスク: 乗り換え難易度定義の改善 (Issue #30)
+# 実装タスク: 乗換難易度 新モデルのスキーマ実装 (Issue #122)
 
-- **対象**: ドメイン定義のみ（`docs/spec/`）
 - **参照**: [requirements.md](./requirements.md) / [design.md](./design.md)
-- **作成日**: 2026-09-20 / **改訂**: 2026-09-21 / **再改訂**: 2026-09-21
-- **ブランチ**: `docs/issue30-transfer-difficulty-model`
+- **ブランチ**: `feat/issue122-transfer-difficulty-schema`
+- **前提**: Issue #30 のドメイン定義（commit 3c2fa0c）。#30 のブランチは未マージのため、
+  本ブランチのPRは #30 のコミットを含む（#30 を先にマージするか、ベースを
+  `docs/issue30-transfer-difficulty-model` にする）
 
-本Issueはスキーマ変更・実装を伴わない。フェーズ3「実装」はドキュメント執筆のみで、
-フェーズ4「検証」は机上検証で行う。
+## フェーズ1〜2: 分析・設計
 
-## フェーズ3: 実装（ドキュメント執筆）
+- [x] **TASK-1** 現行スキーマ・読み手（Web / Admin）・`facility_types` の実データを確認
+      （Neon main: 既存6値、`station_facilities` に `sameFloor` 3件）
+- [x] **TASK-2** `docs/spec/` 3点セットを本Issue用に全面書き換え
+- [x] **TASK-3** 開発者確認: 新テーブル追加 / `wheelchairEscalator` / 端点CHECKを付ける
 
-- [x] **TASK-1** `docs/spec/requirements.md`: 現行モデルの欠陥（軸の混在・接続外の
-      情報の混入・軸不足・粒度不足）をEARS記法の要件として全面書き換え
-- [x] **TASK-2** `docs/spec/design.md`: モデル定義（評価の単位・解決規則・保持する
-      事実・導出する値・持たないもの）と、決定記録（却下案とその根拠を含む）を執筆
-- [x] **TASK-3** `docs/spec/design.md`「この定義の引き継ぎ先」節: 実装Issueのフェーズ5で
-      `docs/domain/station-master-model.md` に反映すべき内容を明示
-- [x] **TASK-4** GitHub Issue 起票（commit 24ce1c5 を参照）:
-      - 先送りした将来作業: [#119](https://github.com/Natsugure/furatora/issues/119)
-        経路探索における乗換駅の選択、
-        [#120](https://github.com/Natsugure/furatora/issues/120) 時間帯制約の構造化、
-        [#121](https://github.com/Natsugure/furatora/issues/121)
-        設備データからのルート設備の導出
-      - 実装Issue: [#122](https://github.com/Natsugure/furatora/issues/122) スキーマ実装、
-        [#123](https://github.com/Natsugure/furatora/issues/123) 既存16行のデータ移行、
-        [#124](https://github.com/Natsugure/furatora/issues/124) Admin入力フォーム、
-        [#125](https://github.com/Natsugure/furatora/issues/125) Web表示
-- [x] **TASK-5**（改訂・2026-09-21）実在8シチュエーションのレビュー結果を反映し、
-      モデルを**ルート単位**に作り直した。`requirements.md` を REQ-1〜23 に全面書き換え、
-      `design.md` の決定3を撤回・差し替え、決定10〜12を追加、決定2・4・6・7・8・9の
-      「影響」を改訂内容に合わせて更新
-- [x] **TASK-6**（改訂）2案の比較資料を作成し、ドメイン構成・DBスキーマ・
-      8シチュエーションの当てはめを図示した（レビュー用。恒久知識は本3点セットが正）
-- [x] **TASK-7**（改訂）Issue #120〜#125 の本文を改訂版モデルに更新
-- [x] **TASK-8**（再改訂・2026-09-21）方面モデルのレビュー指摘（住吉型の解決規則の穴、
-      `NULLS NOT DISTINCT` の必要性、正規化キーへの `directionId` 混入）を検討する過程で、
-      方面キー自体の欠陥（`line_directions` が602路線中14路線にしか無く、同一
-      `(line, direction_type)` に複数の同義行がある）が判明。方面キーを `direction_type`
-      に変更したうえで4案（現行案・全展開案・適用条件案・ルート共有案）を比較し、
-      実データ（淡路町・住吉・中野坂上）で行レベルまで書き下ろして採用案を決定した。
-      `requirements.md` の REQ-2・3・6・7・18・22・23・用語・対象外を、
-      `design.md` のモデル図・接続の単位・方面の展開規則・保持する事実・不変条件・
-      持たないもの・決定4・6・10・11・引き継ぎ先・将来作業を、それぞれ改訂した
-- [x] **TASK-9**（2026-09-25）TASK-8 で「対象外」に記録した3件のうち、中野坂上型の
-      解決先について開発者に確認した結果、Issue #83 とは無関係（#83 は案内路線と
-      運行系統の分離、本件は ekidata が畳んだ支線の粒度問題）と判明。
-      [#128](https://github.com/Natsugure/furatora/issues/128)（中野坂上型）・
-      [#129](https://github.com/Natsugure/furatora/issues/129)
-      （`representativeStationId`/`terminalStationIds` 除去）・
-      [#130](https://github.com/Natsugure/furatora/issues/130)
-      （`line_directions.isDefault` 追加）を新規起票し、`requirements.md`・
-      `design.md` の該当箇所を実際の Issue 番号で更新した。あわせて、既存
-      Issue #122〜#125 の本文が再改訂前（`line_directions.id` / `NULL` 前提）の
-      記述のまま残っており、現行の `design.md` と直接矛盾していたため、
-      4件とも本文を再改訂版モデルに同期した。
+## フェーズ3: 実装
 
-## フェーズ4: 検証（机上）
+- [x] **TASK-4** `packages/database/src/schema.ts` に4テーブルを追加
+      （制約・コメントは design.md「データモデル」。REQ-1〜12）
+- [x] **TASK-5** `drizzle-kit generate` で `0009_add_transfer_route_model.sql` を生成し、
+      部分ユニークインデックスの `WHERE`・CHECK・既存表への差分が無いことを確認。
+      `generate` は DB に接続しないため、`drizzle.config.ts` の要求を満たすダミーの
+      `MIGRATION_DATABASE_URL` を環境変数で渡した
+- [x] **TASK-6** `drizzle-kit generate --custom` で `wheelchairEscalator` の
+      INSERT マイグレーション `0010_*.sql` を作成（REQ-11）。`seed-master-data.ts` にも追加
+- [x] **TASK-7** `apps/admin/src/features/transfer-connection/domain/normalize.ts` と
+      `normalize.test.ts`（REQ-3・4）
 
-### 初版（2026-09-20）の検証
+## フェーズ4: 検証
 
-- [x] **実データでの書き下し**: main の難易度入り16行（重複除去後8組の接続:
-      池袋×2種／後楽園↔後楽園／後楽園↔春日／本郷三丁目／御茶ノ水／
-      淡路町↔小川町／淡路町↔新御茶ノ水。`mcp__plugin_neon_neon__run_sql`、
-      branch `br-purple-surf-a169c8ks`、read-only）を新モデルで書き下し、
-      すべて表現可能なことを確認した。
-      - **御茶ノ水**: 現行 `optimal`/`optimal` なのに備考が「屋根のない地上の公道を
-        通る必要がある」という矛盾を、設備 `elevator` + `isOutdoor` +
-        `requiresExitGate` で矛盾なく表現できることを確認
-      - **淡路町↔小川町**: 方面別の条件差を、方面粒度（決定4）による2行分解
-        （池袋方面/荻窪方面）で備考に依存せず表現できることを確認
-      - **淡路町↔新御茶ノ水**: 備考「隣の大手町駅のほうが便利です」が決定1
-        違反の実例であることを確認。移行時に当該記述を削除する対象として
-        design.md の決定9「影響」に記録済み
-      - **本郷三丁目**: 後楽園/春日との比較備考は両論併記（「一長一短」）で
-        断定的な推奨を含まないため、決定1の対象外情報ではなく備考として残せると判断
-
-### 改訂版（2026-09-21）の検証
-
-- [x] **実在8シチュエーションの当てはめ**（開発者提示）。初版（ペルソナ別の列）と
-      改訂版（ルート行）の両方に書き下ろし、差を確認した。
-
-  | # | シチュエーション | 代表例 | 初版 | 改訂版 |
-  |---|---|---|---|---|
-  | 1 | シンプルにEVルートがある | 明治神宮前・池袋 | ○（同じ値を2回書く） | ○（1行） |
-  | 2 | 方面別で難易度が変わる | 淡路町・住吉 | △ | △（解決規則の穴は共通） |
-  | 3 | 一般は屋内・公式EVが屋外 | 高田馬場・飯田橋・新橋 | △（4と同じ行になる） | ○ |
-  | 4 | 一般もEVも屋外 | 御茶ノ水・銀座 | △（3と同じ行になる） | ○ |
-  | 5 | 公式案内のない改札外・屋内 | 後楽園↔春日 | ○−（公式案内が持てない） | ○ |
-  | 6 | 同一ペルソナに2択がある | 西日暮里 | **✕** | ○ |
-  | 7 | 改札外・係員の介在が必要 | 北千住・後楽園・日比谷 | ○（決定7の裏付け） | ○ |
-  | 8 | 階段昇降機のみ・BFルート無し | 霞ケ関・三田・上野広小路・門前仲町 | △ | ○ |
-
-- [x] **接続行の存在確認**（read-only、branch `br-purple-surf-a169c8ks`）。
-      8シチュエーションの駅対のうち、三田・西日暮里・銀座↔銀座一丁目・
-      上野広小路↔上野御徒町・霞ケ関・門前仲町・住吉・明治神宮前の接続行は
-      `ekidata_group` 由来で**既に存在**し、難易度は未入力であることを確認した。
-      後楽園↔春日のみ `manual` で難易度入り。移行対象8組（#123）とは別に、
-      新規入力の対象として整理が必要。
-- [x] **無向1行化の効果**: 有向行数が 池袋56→28組、新橋42→21組、
-      飯田橋・北千住20→10組、御茶ノ水・日比谷・霞ケ関・高田馬場6→3組に減ることを確認。
-- [x] **一意制約の実現可能性**: Neon `furatora-db` は PG17 のため
-      `UNIQUE ... NULLS NOT DISTINCT` が使えることを確認した（`list_projects` の
-      `pg_version: 17`）。部分ユニークインデックスは drizzle-orm 0.45.1 の
-      `uniqueIndex().on().where()` で表現する（生成SQLの確認は #122）。
-- [x] **要件の内部整合**: 「通れる」と「バリアフリーで通れる」を分けないと、
-      霞ケ関のベビーカー（階段を持ち上げれば通れる）が「バリアフリールートなし」に
-      ならないことを検出し、REQ-15 に2段の述語として明文化した。
-- [x] **決定記録の自己点検**: 決定1〜12すべてに却下した選択肢が2件以上あり、
-      各選択肢に却下理由が明記されていることを確認した。「TBD」等のプレースホルダ、
-      決定間の矛盾は見つからなかった。撤回した初版の決定3は、却下案(b)として
-      内容と却下理由を残した。
-- [x] **備考に落ちるケースの整合確認**: 方向依存（上り専用エスカレーター）・
-      設備の質（EVサイズ）・時間帯制約・工事中の仮設ルート・改札外ルートの運賃上の扱いは
-      いずれも「軸を増やしても解決しない別次元」であることを
-      requirements.md「対象外」と design.md「持たないもの」で確認した。
+- [x] **TASK-8** database / admin / scripts の `tsc --noEmit` はエラー0。
+      admin の vitest は 35 ファイル・473 テスト成功（正規化テスト8件を含む）。
+      `pnpm run build` は 2/2 成功（DB に触れない）
+- [x] **TASK-9** 生成SQLの目視確認: 4表・FK の onDelete（紐付け・設備は cascade、
+      stations / facility_types は no action）・unique 4種・
+      `CREATE UNIQUE INDEX ... WHERE "connection_routes"."is_baseline"`・
+      CHECK は行値比較。既存テーブルへの変更なし（REQ-14）
+- [x] **TASK-10** 開発者が development に `db:migrate` を実行（2026-09-25）。
+      `drizzle.__drizzle_migrations` に 0009・0010 の2件が追加されたことを確認
+- [x] **TASK-11** Neon MCP（read-only）で development を確認: 新4表が存在し行数0、
+      `unique_connection_baseline` は `... USING btree (connection_id) WHERE is_baseline`、
+      CHECK は `ROW(station_a_id, direction_a) < ROW(station_b_id, direction_b)`（方面は text
+      にキャストされて比較される。`'inbound' < 'outbound'` は照合順序に依らず成立）、
+      unique 4本が定義どおり、`facility_types` は7値。main は新表0・設備6値のまま（影響なし）
+- [x] **TASK-12** 制約の動作確認SQL（`BEGIN … ROLLBACK`）を開発者が Neon コンソールで実行。
+      NOTICE 17件がすべて OK（NG 0件）。内訳: 接続6（正規化済み通過・重複拒否・逆順拒否・
+      完全同一拒否・同一駅方面違い通過・方面NULL拒否）／紐付け6（基準1本目通過・2本目拒否・
+      同一label拒否・同一ルート2回拒否・非基準は複数可・別接続との共有）／設備4（seq=1通過・
+      同一seq拒否・`wheelchairEscalator` 通過・未定義コード拒否）／cascade1（接続を消すと紐付けは
+      消え、ルートは残る）。実行後に development の4表が0行であることを確認（ROLLBACK 済み）。
+      **メモ**: `neonctl` に `psql` サブコマンドは無い。コンソールの SQL Editor は NOTICE を
+      トーストで出すため、コピーできず件数の取りこぼしも分かりにくい。次回は結果を
+      `SELECT` で返す形にするとよい
 
 ## フェーズ5: 振り返り
 
-- [x] `docs/domain/` の確認: 本Issueでは更新しない（実装を伴わないため）。
-      design.md「この定義の引き継ぎ先」に反映対象を明示済みであることを確認し、
-      **確認した上での判断**として記録する。改訂で反映対象が増えたため
-      （3層構造・不変条件の表・帰属規則・2段の述語）、同節も更新済み。
-      再改訂でさらに増えた（4層構造・方面キーの値域・全方面共通の表現・`label`/`isBaseline`
-      の置き場所・`direction_type`が物理ホームを一意に決めないこと）ため、同節を再度更新済み。
-- [x] `docs/adr/` の確認: 新規ADRは作成しない（決定記録の判定基準に照らし、
-      本Issueの決定はドメインのモデル化であり、覆すときに明示的な意思決定を要する
-      アーキテクチャ決定ではないと判断した）。既存ADR（ADR-0003 / ADR-0005）に
-      反する設計をしていないことを確認済み。改訂で ADR-0005 への依存が増えた
-      （基準ルートの付け替えが複数文の書き込みになる）ため、design.md の参照に追加した。
-      再改訂で ADR-0007（駅・路線マスタ）との関係を確認した。`0007_fold_branch_lines.sql`
-      による丸ノ内線支線の畳み込みは ADR-0007 決定1〜4のいずれにも明記されておらず、
-      実装判断（ヘッダに留保あり）であることを確認したため、supersede は不要と判断した。
+- [x] **TASK-13** `docs/domain/station-master-model.md` を更新した（上書き）。
+      旧「乗換接続」節を「接続一覧」に改題し、新節「乗換難易度」を追加（適用状況の注記、
+      4層構造、端点、不変条件の表、ルートと設備、備考の役割、`source`）。
+      `docs/domain/README.md` の一覧も更新。design.md「フェーズ5で `docs/domain/` へ移す内容」
+      の全項目が反映されたことを確認した。
+      **設計からの調整**: 「難易度・備考は両方向に同じ値が入る」の記述は、design.md では
+      削除する予定だった。実際は旧4列がまだ現行の読み書き対象（#125 まで）のため、
+      「4列とともに廃止される」という現在の事実として書き換えて残した
+- [x] **TASK-14** `docs/adr/` の確認: 新規ADRなし（決定1〜5はこの作業限りの判断）。
+      ADR-0005（基準ルート付け替えは Repository + `withTransaction`。#124 の責務として
+      記載）・ADR-0008（環境とDBブランチの対応。development で検証し main は変更なし）に
+      反しない。ステータスを更新すべき `Proposed` の ADR は本Issueに無い
+- [x] **TASK-15** スキーマ内コメントの確認: 部分ユニーク・CHECK・`connectionId` を持たない理由・
+      `seq` の帰属規則に理由を添え、冒頭コメントから `docs/domain/station-master-model.md`
+      を参照している
 
 ## フェーズ6: 引き渡し
 
-- [x] 変更ファイル: `docs/spec/requirements.md` / `docs/spec/design.md` /
-      `docs/spec/tasks.md`（本ファイル）。初版 commit 24ce1c5、改訂は commit 18b3e49、
-      再改訂は本コミット。
-- [x] 恒久知識の取り残し確認: `docs/spec/` は次のIssueで全面書き換えられる。
-      次も有効な内容（モデル定義・決定記録12件）は、Issue #119〜#125 すべてに
-      commit 参照を入れたことで、実装Issueのフェーズ5で `docs/domain/` へ移す経路を
-      確保した（TASK-3の引き継ぎ先明示と対応）。再改訂で新たに生じた恒久知識の
-      行き先として、[#128](https://github.com/Natsugure/furatora/issues/128)
-      （中野坂上型: 丸ノ内線支線の復元。Issue #83とは別の話であることを開発者確認済み）、
-      [#129](https://github.com/Natsugure/furatora/issues/129)
-      （`representativeStationId`/`terminalStationIds` の除去）、
-      [#130](https://github.com/Natsugure/furatora/issues/130)
-      （`line_directions.isDefault` の追加）を新規起票し、design.md「先送りした将来作業」を
-      番号付きに更新した。あわせて、方面モデルの変更が直接矛盾する内容を含んでいた
-      既存Issue #122〜#125 の本文を、再改訂版モデルに同期した。
-- [x] **実装Issueの分割**: [#122](https://github.com/Natsugure/furatora/issues/122)
-      スキーマ実装 → [#123](https://github.com/Natsugure/furatora/issues/123)
-      データ移行 → [#124](https://github.com/Natsugure/furatora/issues/124)
-      Admin → [#125](https://github.com/Natsugure/furatora/issues/125) Web表示
-      （この順に依存する）。各Issueの本文に、`docs/domain/
-      station-master-model.md` への反映をフェーズ5の必須タスクとして明記済み。
-- [ ] PR作成・レビュー依頼（開発者判断）
+- [x] **TASK-16** 恒久知識の取り残し確認: design.md の移送リスト全項目が
+      `docs/domain/station-master-model.md` に反映済み。予定された将来作業は
+      #123〜#125・#82・#128 として起票済みで、現在の制約は同文書に記載した
+- [ ] **TASK-17** PR 作成（開発者判断）。PR 本文に `docs/domain/` の変更点
+      （`station-master-model.md` の節の改題と新節の追加、`README.md` の一覧）を書く。
+      #30 のコミットを含むため、#30 を先にマージするか、ベースを
+      `docs/issue30-transfer-difficulty-model` にする
