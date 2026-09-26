@@ -8,6 +8,11 @@ import { TransferPairEditor } from './TransferPairEditor';
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
 
+const notificationsShow = vi.fn();
+vi.mock('@mantine/notifications', () => ({
+  notifications: { show: (...args: unknown[]) => notificationsShow(...args) },
+}));
+
 const fetchMock = vi.fn();
 
 const candidate: CandidateRoute = {
@@ -171,5 +176,65 @@ describe('TransferPairEditor: 保存と重複検出', () => {
     await userEvent.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it('通信に失敗したら通知を出し、保存ボタンを押せる状態に戻す', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    renderEditor(context({ candidates: [] }));
+    await addRouteWith('地上経由', 'エレベーター');
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => expect(notificationsShow).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'red', message: expect.stringContaining('通信できませんでした') }),
+    ));
+    expect(screen.getByRole('button', { name: '保存' })).toBeEnabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('TransferPairEditor: 接続の備考', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  // 既存のルートが2組み合わせにだけ適用され、両方の備考が同じ（全方面共通の欄で表示される）
+  const partial = () => context({
+    candidates: [],
+    connections: [
+      { combo: 'inbound:inbound', notes: '一長一短です' },
+      { combo: 'inbound:outbound', notes: '一長一短です' },
+    ],
+    routes: [{
+      routeId: 'route-1',
+      minutes: null,
+      isOutdoor: false,
+      requiresExitGate: false,
+      requiresStaff: false,
+      isOfficiallyGuided: false,
+      notes: null,
+      facilities: ['elevator'],
+      links: [
+        { combo: 'inbound:inbound', label: 'エレベーター経由', isBaseline: true },
+        { combo: 'inbound:outbound', label: 'エレベーター経由', isBaseline: true },
+      ],
+      sharedWith: [],
+    }],
+  });
+
+  it('全方面共通の欄のまま組み合わせを足すと、足した組み合わせにも表示中の備考を保存する', async () => {
+    renderEditor(partial());
+    expect(screen.getByRole('textbox', { name: '全方面共通の備考' })).toHaveValue('一長一短です');
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '池袋（丸ノ内線） outbound × 池袋（有楽町線） inbound' }));
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(sentBody().connectionNotes).toEqual({
+      'inbound:inbound': '一長一短です',
+      'inbound:outbound': '一長一短です',
+      'outbound:inbound': '一長一短です',
+    });
   });
 });

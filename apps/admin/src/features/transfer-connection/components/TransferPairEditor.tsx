@@ -26,11 +26,11 @@ type Props = {
 
 export function TransferPairEditor({ context }: Props) {
   const router = useRouter();
-  const [draft, setDraft] = useState<PairDraft>(() => draftFromContext(context));
+  const [draft, setDraft] = useState<PairDraft>(() => loadDraft(context));
   const [submitting, setSubmitting] = useState(false);
   // 保存を1回押すまでは検証エラーを出さない（入力途中で赤く塗らない）
   const [showErrors, setShowErrors] = useState(false);
-  const [splitNotes, setSplitNotes] = useState(() => hasDifferentNotes(draftFromContext(context)));
+  const [splitNotes, setSplitNotes] = useState(() => hasDifferentNotes(loadDraft(context)));
   // 保存時の重複候補（DuplicateRouteModal に出す）。「別ルートとして作る」を選んだ検出は、
   // 次の保存でもう一度聞かない（保存すると内容が既存ルートになり、検査の対象から外れる）
   const [pending, setPending] = useState<DuplicateMatch[] | null>(null);
@@ -40,7 +40,7 @@ export function TransferPairEditor({ context }: Props) {
   // 【state の宣言をすべて済ませてから書くこと】setter を宣言前に呼ぶと実行時エラーになる
   const [loadedContext, setLoadedContext] = useState(context);
   if (loadedContext !== context) {
-    const next = draftFromContext(context);
+    const next = loadDraft(context);
     setLoadedContext(context);
     setDraft(next);
     setShowErrors(false);
@@ -67,10 +67,7 @@ export function TransferPairEditor({ context }: Props) {
   const pairLevelWarnings = warnings.filter((w) => w.routeIndex === undefined);
 
   function setAllNotes(value: string) {
-    setDraft((d) => ({
-      ...d,
-      connectionNotes: Object.fromEntries(COMBO_KEYS.map((c) => [c, value])) as PairDraft['connectionNotes'],
-    }));
+    setDraft((d) => ({ ...d, connectionNotes: sameNotes(value) }));
   }
 
   // 保存する。呼び出し時点の下書き（重複の選択を反映した直後は state がまだ古いため、引数で受ける）を
@@ -79,11 +76,23 @@ export function TransferPairEditor({ context }: Props) {
     const targetInput = toSaveInput(target);
     if (rejectIfInvalid(validateSaveInput(targetInput))) return;
     setSubmitting(true);
-    const res = await fetch(
-      `/api/stations/${context.stationId}/connections/${context.connectedStationId}/transfer`,
-      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(targetInput) },
-    );
-    setSubmitting(false);
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/stations/${context.stationId}/connections/${context.connectedStationId}/transfer`,
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(targetInput) },
+      );
+    } catch {
+      // 通信の失敗（オフライン等）。下書きは残っているので、そのまま保存し直せる
+      notifications.show({
+        title: '保存に失敗しました',
+        message: '通信できませんでした。接続を確認して、もう一度保存してください',
+        color: 'red',
+      });
+      return;
+    } finally {
+      setSubmitting(false);
+    }
     if (res.ok) {
       notifications.show({ title: '保存しました', message: '乗換難易度を保存しました', color: 'green' });
       router.refresh();
@@ -261,6 +270,20 @@ export function TransferPairEditor({ context }: Props) {
       )}
     </Stack>
   );
+}
+
+// 【全方面共通の欄で表示するときは、未適用の組み合わせにも同じ備考を持たせる】
+// draftFromContext は接続行の無い組み合わせを '' にするため、そのままだと、あとから適用した組み合わせだけ
+// 画面に見えている備考と違う値（null）で保存される。共通の欄は setAllNotes と同じく「4つとも同じ値」を保つ
+function loadDraft(context: TransferPairEditContext): PairDraft {
+  const draft = draftFromContext(context);
+  if (hasDifferentNotes(draft)) return draft;
+  const [first] = coveredCombos(draft);
+  return { ...draft, connectionNotes: sameNotes(first ? draft.connectionNotes[first] : '') };
+}
+
+function sameNotes(value: string): PairDraft['connectionNotes'] {
+  return Object.fromEntries(COMBO_KEYS.map((c) => [c, value])) as PairDraft['connectionNotes'];
 }
 
 // ルートが適用されている組み合わせの備考が、組み合わせごとに異なるか（異なるなら分けた欄で表示する）
