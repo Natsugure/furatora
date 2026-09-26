@@ -10,7 +10,7 @@ type Props = {
   // 省略時は削除後にページ遷移せず router.refresh() のみ（一覧内の行削除向け）。
   redirectTo?: string;
   label?: string;
-  // 確認モーダルの本文。既定は「本当に削除しますか？」。一緒に消えるものがあるときに具体的に示す
+  // 確認モーダルの本文。一緒に消えるものがあるときに具体的に示す
   description?: string;
 };
 

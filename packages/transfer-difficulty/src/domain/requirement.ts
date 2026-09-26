@@ -58,10 +58,7 @@ const REQUIREMENT_BY_FACILITY: Record<FacilityTypeCode, Record<Persona, Requirem
 };
 
 // ルート上の設備すべてを見て、そのペルソナにとって最も重い行為を返す。設備は集合なので順序に依存しない。
-//
-// 【空集合は null を返す】設備0件のルートは「設備未入力」を表す（ADR-0012）。
-// 空集合に「最も重いものを選ぶ」を素直に適用すると「そのまま通れる」と読めるため、
-// 導出せず null を返し、呼び出し側が「設備が未入力」と表示する。as_is に丸めないこと
+// 【空集合は null を返す。as_is に丸めないこと】設備0件は「設備未入力」で、呼び出し側が未入力と表示する（ADR-0012）
 export function requirementFor(
   persona: Persona,
   facilities: readonly FacilityTypeCode[],

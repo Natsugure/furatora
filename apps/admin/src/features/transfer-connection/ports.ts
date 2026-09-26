@@ -1,6 +1,6 @@
-import type { DirectionType, StationConnectionSource } from '@furatora/database/enums';
+import type { DirectionType } from '@furatora/database/enums';
 import type { FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
-import type { ComboKey, PairSaveInput } from './domain/types';
+import type { ComboKey, PairSaveInput, RouteBody } from './domain/types';
 
 // 乗換難易度の駅対編集（Issue #124）。読み取りは Query Service、書き込みは Repository（ADR-0003）。
 // usecases 層は作らない（route が Repository を直接呼ぶ。station-publishing と同じ）。
@@ -12,40 +12,24 @@ export type PairRouteLink = {
 };
 
 /** この駅対の接続に結ばれたルート */
-export type PairRouteRecord = {
+export type PairRouteRecord = RouteBody & {
   routeId: string;
-  minutes: number | null;
-  isOutdoor: boolean;
-  requiresExitGate: boolean;
-  requiresStaff: boolean;
-  isOfficiallyGuided: boolean;
-  notes: string | null;
-  facilities: FacilityTypeCode[];
   links: PairRouteLink[];
   /** 駅対の外の接続からも参照されている場合の共有先（編集が共有先にも反映される） */
   sharedWith: { stationName: string; connectedStationName: string }[];
 };
 
 /** 重複検出の比較対象。S か T を端点に持つ接続のルートのうち、この駅対に結ばれていないもの */
-export type CandidateRoute = {
+export type CandidateRoute = RouteBody & {
   routeId: string;
   label: string;
-  minutes: number | null;
-  isOutdoor: boolean;
-  requiresExitGate: boolean;
-  requiresStaff: boolean;
-  isOfficiallyGuided: boolean;
-  notes: string | null;
-  facilities: FacilityTypeCode[];
   /** 「池袋（丸ノ内線）↔ 池袋（副都心線）」のような表示用の文字列 */
   usedBy: string;
 };
 
 export type TransferPairConnection = {
   combo: ComboKey;
-  connectionId: string;
   notes: string | null;
-  source: StationConnectionSource | null;
 };
 
 export type TransferPairEditContext = {
@@ -72,12 +56,8 @@ export interface TransferPairEditPageQuery {
 }
 
 export interface TransferConnectionRepository {
-  /** 駅対の最終状態を1トランザクションで書き込む。駅対が無ければ null */
-  savePair(
-    stationId: string,
-    connectedStationId: string,
-    input: PairSaveInput,
-  ): Promise<{ ok: true } | null>;
+  /** 駅対の最終状態を1トランザクションで書き込む。駅対が無ければ false */
+  savePair(stationId: string, connectedStationId: string, input: PairSaveInput): Promise<boolean>;
 }
 
 /** routeId が、この駅対に結ばれておらず候補の範囲（S か T を端点に持つ接続のルート）にも無い */

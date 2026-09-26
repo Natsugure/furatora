@@ -48,7 +48,7 @@ describe('PUT /api/stations/[stationId]/connections/[connectedStationId]/transfe
   });
 
   it('正常な入力で保存し、成功を返す', async () => {
-    savePair.mockResolvedValue({ ok: true });
+    savePair.mockResolvedValue(true);
 
     const response = await PUT(request(validBody()), params());
 
@@ -58,7 +58,7 @@ describe('PUT /api/stations/[stationId]/connections/[connectedStationId]/transfe
   });
 
   it('ルート0本（未評価に戻す）も保存できる', async () => {
-    savePair.mockResolvedValue({ ok: true });
+    savePair.mockResolvedValue(true);
 
     const response = await PUT(request({ routes: [], connectionNotes: {} }), params());
 
@@ -111,7 +111,7 @@ describe('PUT /api/stations/[stationId]/connections/[connectedStationId]/transfe
   });
 
   it('駅対が無い（Repository が null）と 404', async () => {
-    savePair.mockResolvedValue(null);
+    savePair.mockResolvedValue(false);
 
     const response = await PUT(request(validBody()), params());
 

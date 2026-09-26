@@ -20,8 +20,14 @@ import type {
   TransferPairEditContext,
   TransferPairEditPageQuery,
 } from '@/features/transfer-connection/ports';
-import { comboOfConnection } from '@/features/transfer-connection/domain/draft';
-import { pairConnectionCondition, touchesStationsCondition } from '@/external/transferPairSql';
+import { comboOfConnection } from '@/features/transfer-connection/domain/normalize';
+import { withLine } from '@/features/transfer-connection/domain/label';
+import type { RouteBody } from '@/features/transfer-connection/domain/types';
+import {
+  pairConnectionCondition,
+  stationPairCondition,
+  touchesStationsCondition,
+} from '@/external/transferPairSql';
 
 // 駅対（自駅 S・相手駅 T）の乗換難易度の編集画面 1 枚ぶんの読み取り（ADR-0003。Query は画面ごとに1つ）。
 // DTO はルートと設備をそのまま運び、ペルソナごとの必要な行為は含めない（導出は表示層。docs/domain）。
@@ -31,115 +37,104 @@ const isFacilityCode = (code: string): code is FacilityTypeCode =>
 
 export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
   async getContext(stationId, connectedStationId) {
-    const [pair] = await db
-      .select({ id: stationConnections.id })
-      .from(stationConnections)
-      .where(and(
-        eq(stationConnections.stationId, stationId),
-        eq(stationConnections.connectedStationId, connectedStationId),
-      ));
+    const pairCondition = pairConnectionCondition(stationId, connectedStationId);
+    // neon-http は await ごとに HTTP 往復になるため、依存の無いものは Promise.all でまとめる
+    const [[pair], pairConnections, nearbyConnections, facilityTypeRows, directionRows] = await Promise.all([
+      db.select({ id: stationConnections.id }).from(stationConnections)
+        .where(stationPairCondition(stationId, connectedStationId)),
+      db.select().from(transferConnections).where(pairCondition),
+      // S か T を端点に持つ、この駅対以外の接続（候補ルートの元）
+      db.select().from(transferConnections).where(and(
+        touchesStationsCondition([stationId, connectedStationId]),
+        pairCondition && not(pairCondition),
+      )),
+      db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes),
+      db
+        .select({
+          stationId: stationLines.stationId,
+          directionType: lineDirections.directionType,
+          displayName: lineDirections.displayName,
+        })
+        .from(lineDirections)
+        .innerJoin(stationLines, eq(stationLines.lineId, lineDirections.lineId))
+        .where(inArray(stationLines.stationId, [stationId, connectedStationId]))
+        .orderBy(asc(lineDirections.displayName)),
+    ]);
     if (!pair) return null;
 
-    const pairConnections = await db.select().from(transferConnections)
-      .where(pairConnectionCondition(stationId, connectedStationId));
     const pairConnectionIds = pairConnections.map((c) => c.id);
-
-    // この駅対の接続に結ばれた紐付け → ルート
-    const pairLinks = pairConnectionIds.length === 0
-      ? []
-      : await db.select().from(connectionRoutes).where(inArray(connectionRoutes.connectionId, pairConnectionIds));
-    const pairRouteIds = [...new Set(pairLinks.map((l) => l.routeId))];
-
-    // S か T を端点に持つ、この駅対以外の接続（共有先と候補ルートの元）
-    const nearbyConnections = await db.select().from(transferConnections).where(
+    const nearbyConnectionIds = nearbyConnections.map((c) => c.id);
+    const [pairLinks, nearbyLinks] = await Promise.all([
       pairConnectionIds.length === 0
-        ? touchesStationsCondition([stationId, connectedStationId])
-        : and(
-            touchesStationsCondition([stationId, connectedStationId]),
-            not(inArray(transferConnections.id, pairConnectionIds)),
-          ),
-    );
-    const nearbyLinks = nearbyConnections.length === 0
-      ? []
-      : await db.select().from(connectionRoutes)
-          .where(inArray(connectionRoutes.connectionId, nearbyConnections.map((c) => c.id)));
-
-    // 共有先の判定は「この駅対の外の接続」すべてが対象（S・T に触れない接続からの共有も拾う）
-    const sharedLinks = pairRouteIds.length === 0
-      ? []
-      : pairConnectionIds.length === 0
         ? []
-        : await db.select({
-            routeId: connectionRoutes.routeId,
-            connectionId: connectionRoutes.connectionId,
-          })
-          .from(connectionRoutes)
-          .where(and(
-            inArray(connectionRoutes.routeId, pairRouteIds),
-            not(inArray(connectionRoutes.connectionId, pairConnectionIds)),
-          ));
-    const sharedConnectionIds = [...new Set(sharedLinks.map((l) => l.connectionId))];
-    const sharedConnections = sharedConnectionIds.length === 0
-      ? []
-      : await db.select().from(transferConnections).where(inArray(transferConnections.id, sharedConnectionIds));
-
+        : db.select().from(connectionRoutes).where(inArray(connectionRoutes.connectionId, pairConnectionIds)),
+      nearbyConnectionIds.length === 0
+        ? []
+        : db.select().from(connectionRoutes).where(inArray(connectionRoutes.connectionId, nearbyConnectionIds)),
+    ]);
+    const pairRouteIds = [...new Set(pairLinks.map((l) => l.routeId))];
     const candidateRouteIds = [
       ...new Set(nearbyLinks.map((l) => l.routeId).filter((id) => !pairRouteIds.includes(id))),
     ];
-    const allRouteIds = [...new Set([...pairRouteIds, ...candidateRouteIds])];
-    const [routeRows, facilityRows] = allRouteIds.length === 0
-      ? [[], []]
-      : await Promise.all([
-          db.select().from(transferRoutes).where(inArray(transferRoutes.id, allRouteIds)),
-          db.select().from(transferRouteFacilities).where(inArray(transferRouteFacilities.routeId, allRouteIds)),
-        ]);
+    const allRouteIds = [...pairRouteIds, ...candidateRouteIds];
 
-    // 表示名の解決（駅名＋路線名）と補助表示の方面文言
+    const [sharedLinks, routeRows, facilityRows] = await Promise.all([
+      // 共有先の判定は「この駅対の外の接続」すべてが対象（S・T に触れない接続からの共有も拾う）
+      pairRouteIds.length === 0
+        ? []
+        : db
+            .select({
+              routeId: connectionRoutes.routeId,
+              stationAId: transferConnections.stationAId,
+              stationBId: transferConnections.stationBId,
+            })
+            .from(connectionRoutes)
+            .innerJoin(transferConnections, eq(transferConnections.id, connectionRoutes.connectionId))
+            .where(and(
+              inArray(connectionRoutes.routeId, pairRouteIds),
+              not(inArray(connectionRoutes.connectionId, pairConnectionIds)),
+            )),
+      allRouteIds.length === 0
+        ? []
+        : db.select().from(transferRoutes).where(inArray(transferRoutes.id, allRouteIds)),
+      allRouteIds.length === 0
+        ? []
+        : db.select().from(transferRouteFacilities).where(inArray(transferRouteFacilities.routeId, allRouteIds)),
+    ]);
+
+    // 表示名の解決（駅名＋路線名）
     const stationIds = new Set<string>([stationId, connectedStationId]);
-    for (const c of [...nearbyConnections, ...sharedConnections]) {
+    for (const c of [...nearbyConnections, ...sharedLinks]) {
       stationIds.add(c.stationAId);
       stationIds.add(c.stationBId);
     }
-    const [stationRows, stationLineRows, facilityTypeRows] = await Promise.all([
+    const [stationRows, stationLineRows] = await Promise.all([
       db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, [...stationIds])),
       db
-        .select({ stationId: stationLines.stationId, lineId: lines.id, lineName: lines.name })
+        .select({ stationId: stationLines.stationId, lineName: lines.name })
         .from(stationLines)
         .innerJoin(lines, eq(lines.id, stationLines.lineId))
         .where(inArray(stationLines.stationId, [...stationIds])),
-      db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes),
     ]);
     const stationName = new Map(stationRows.map((s) => [s.id, s.name]));
-    const linesOf = new Map<string, { lineId: string; lineName: string }[]>();
+    const firstLineNameOf = new Map<string, string>();
     for (const row of stationLineRows) {
-      const list = linesOf.get(row.stationId) ?? [];
-      list.push({ lineId: row.lineId, lineName: row.lineName });
-      linesOf.set(row.stationId, list);
+      if (!firstLineNameOf.has(row.stationId)) firstLineNameOf.set(row.stationId, row.lineName);
     }
-    const firstLineName = (id: string) => linesOf.get(id)?.[0]?.lineName ?? null;
-    const label = (id: string) => {
-      const name = stationName.get(id) ?? '（不明な駅）';
-      const line = firstLineName(id);
-      return line ? `${name}（${line}）` : name;
-    };
+    const firstLineName = (id: string) => firstLineNameOf.get(id) ?? null;
+    const label = (id: string) => withLine(stationName.get(id) ?? '（不明な駅）', firstLineName(id));
     const connectionLabel = (c: { stationAId: string; stationBId: string }) =>
       `${label(c.stationAId)} ↔ ${label(c.stationBId)}`;
 
-    const hints = async (id: string): Promise<Record<DirectionType, string[]>> => {
-      const lineIds = (linesOf.get(id) ?? []).map((l) => l.lineId);
+    // 入力の補助表示の方面文言
+    const hints = (id: string): Record<DirectionType, string[]> => {
       const result: Record<DirectionType, string[]> = { inbound: [], outbound: [] };
-      if (lineIds.length === 0) return result;
-      const rows = await db
-        .select({ directionType: lineDirections.directionType, displayName: lineDirections.displayName })
-        .from(lineDirections)
-        .where(inArray(lineDirections.lineId, lineIds))
-        .orderBy(asc(lineDirections.displayName));
-      for (const row of rows) {
+      for (const row of directionRows) {
+        if (row.stationId !== id) continue;
         if (!result[row.directionType].includes(row.displayName)) result[row.directionType].push(row.displayName);
       }
       return result;
     };
-    const [stationHints, connectedHints] = await Promise.all([hints(stationId), hints(connectedStationId)]);
 
     const facilitiesOf = new Map<string, FacilityTypeCode[]>();
     for (const row of facilityRows) {
@@ -149,11 +144,18 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       facilitiesOf.set(row.routeId, list);
     }
     const routeById = new Map(routeRows.map((r) => [r.id, r]));
+    const routeBody = (route: (typeof routeRows)[number]): RouteBody => ({
+      minutes: route.minutes,
+      isOutdoor: route.isOutdoor,
+      requiresExitGate: route.requiresExitGate,
+      requiresStaff: route.requiresStaff,
+      isOfficiallyGuided: route.isOfficiallyGuided,
+      notes: route.notes,
+      facilities: facilitiesOf.get(route.id) ?? [],
+    });
     const comboOfPairConnection = new Map(
       pairConnections.map((c) => [c.id, comboOfConnection(c, stationId)]),
     );
-    const sharedConnectionById = new Map(sharedConnections.map((c) => [c.id, c]));
-
     const routes: PairRouteRecord[] = [];
     for (const routeId of pairRouteIds) {
       const route = routeById.get(routeId);
@@ -162,8 +164,6 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
         ...new Map(
           sharedLinks
             .filter((l) => l.routeId === routeId)
-            .map((l) => sharedConnectionById.get(l.connectionId))
-            .filter((c): c is NonNullable<typeof c> => c !== undefined)
             .map((c) => {
               const value = { stationName: label(c.stationAId), connectedStationName: label(c.stationBId) };
               return [`${value.stationName}|${value.connectedStationName}`, value] as const;
@@ -171,14 +171,8 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
         ).values(),
       ];
       routes.push({
+        ...routeBody(route),
         routeId,
-        minutes: route.minutes,
-        isOutdoor: route.isOutdoor,
-        requiresExitGate: route.requiresExitGate,
-        requiresStaff: route.requiresStaff,
-        isOfficiallyGuided: route.isOfficiallyGuided,
-        notes: route.notes,
-        facilities: facilitiesOf.get(routeId) ?? [],
         links: pairLinks
           .filter((l) => l.routeId === routeId)
           .flatMap((l) => {
@@ -205,14 +199,8 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       ].join('、');
       candidates.push({
         routeId,
+        ...routeBody(route),
         label: links[0]?.label ?? '',
-        minutes: route.minutes,
-        isOutdoor: route.isOutdoor,
-        requiresExitGate: route.requiresExitGate,
-        requiresStaff: route.requiresStaff,
-        isOfficiallyGuided: route.isOfficiallyGuided,
-        notes: route.notes,
-        facilities: facilitiesOf.get(routeId) ?? [],
         usedBy,
       });
     }
@@ -224,16 +212,11 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       connectedStationName: stationName.get(connectedStationId) ?? '',
       lineName: firstLineName(stationId),
       connectedLineName: firstLineName(connectedStationId),
-      directionHints: { station: stationHints, connected: connectedHints },
+      directionHints: { station: hints(stationId), connected: hints(connectedStationId) },
       facilityTypes: facilityTypeRows
         .filter((row): row is { code: FacilityTypeCode; name: string } => isFacilityCode(row.code))
         .sort((x, y) => FACILITY_TYPE_CODES.indexOf(x.code) - FACILITY_TYPE_CODES.indexOf(y.code)),
-      connections: pairConnections.map((c) => ({
-        combo: comboOfConnection(c, stationId),
-        connectionId: c.id,
-        notes: c.notes,
-        source: c.source,
-      })),
+      connections: pairConnections.map((c) => ({ combo: comboOfConnection(c, stationId), notes: c.notes })),
       routes,
       candidates,
     };

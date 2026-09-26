@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { transferConnectionRepository } from '@/di';
 import { pairSaveInputSchema } from '@/features/transfer-connection/schema';
 import { validateSaveInput } from '@/features/transfer-connection/domain/validate';
 import { RouteLabelTakenError, RouteOutOfScopeError } from '@/features/transfer-connection/ports';
-
-const uuid = z.string().uuid();
+import { parseUuidParam } from '@/shared/list/params';
 
 /**
- * 駅対（自駅 S・相手駅 T）の乗換難易度を、最終状態でまとめて保存する（Issue #124）。
- * 操作単位の API にしない。基準ルートの付け替えなどの不変条件を Repository が1トランザクションで守る
- * （docs/spec の決定5・ADR-0005）。
+ * 駅対（自駅 S・相手駅 T）の乗換難易度を、最終状態でまとめて保存する。
+ * 操作単位の API にしない。基準ルートの付け替えなどの不変条件を Repository が1トランザクションで守る（ADR-0005）。
  */
 export async function PUT(
   request: Request,
@@ -19,7 +16,7 @@ export async function PUT(
   try {
     const { stationId, connectedStationId } = await params;
     // 不正な id を 500 にしない（#108）。UUID でなければ駅対は存在しない
-    if (!uuid.safeParse(stationId).success || !uuid.safeParse(connectedStationId).success) {
+    if (!parseUuidParam(stationId) || !parseUuidParam(connectedStationId)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -35,8 +32,7 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
 
-    // クライアントと同じ検証。違反は { code, message, routeIndex?, combo? } の配列で返す
-    // （describeError が message を連結して通知に出せる形）
+    // クライアントと同じ検証。describeError が各 message を連結して通知に出す
     const issues = validateSaveInput(parsed.data);
     if (issues.length > 0) {
       return NextResponse.json({ error: issues }, { status: 422 });

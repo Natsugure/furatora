@@ -36,7 +36,7 @@ export function validateSaveInput(input: PairSaveInput): ValidationIssue[] {
 
   // 同じ routeId のカードが複数ある = 統合し忘れ。unique_connection_route と、
   // 同じルートへの互いに食い違う UPDATE の両方を避ける
-  const seenRouteIds = new Map<string, number>();
+  const seenRouteIds = new Set<string>();
   input.routes.forEach((route, routeIndex) => {
     if (route.routeId === null) return;
     if (seenRouteIds.has(route.routeId)) {
@@ -46,7 +46,7 @@ export function validateSaveInput(input: PairSaveInput): ValidationIssue[] {
         routeIndex,
       });
     }
-    seenRouteIds.set(route.routeId, routeIndex);
+    seenRouteIds.add(route.routeId);
   });
 
   // label の重複と基準ルートの2本は、組み合わせ（＝接続）単位で判定する。
@@ -99,8 +99,7 @@ export function collectWarnings(input: PairSaveInput): ValidationIssue[] {
     }
   }
 
-  // 階段と階段昇降機は「同じ段差に対する代替手段」の代表例。集合は「すべて通る」を意味するので、
-  // 同居させるとベビーカーが通れないルートと判定される。別ルートにすること。
+  // 代替手段（階段と階段昇降機）は同一ルートに入れない（docs/domain「ルートと設備」・ADR-0011）。
   // 階段と車いす対応エスカレーターは、重い方の記録を省略できるため警告しない
   input.routes.forEach((route, routeIndex) => {
     if (route.facilities.includes('stairs') && route.facilities.includes('stairLift')) {

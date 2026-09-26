@@ -1,22 +1,20 @@
 import { notFound } from 'next/navigation';
-import { z } from 'zod';
 import { Text, Title } from '@mantine/core';
 import { BackLink } from '@/components/LinkElements';
 import { transferPairEditPageQuery } from '@/di';
 import { TransferPairEditor } from '@/features/transfer-connection/components/TransferPairEditor';
+import { parseUuidParam } from '@/shared/list/params';
 
 type Props = {
   params: Promise<{ stationId: string; connectedStationId: string }>;
 };
-
-const uuid = z.string().uuid();
 
 // 駅対（自駅 S・相手駅 T）の乗換難易度の編集（Issue #124）。
 // 方面の組み合わせ4通りの接続とそのルートを、1画面でまとめて編集する。
 export default async function TransferPairEditPage({ params }: Props) {
   const { stationId, connectedStationId } = await params;
   // 不正な id を DB に渡すと uuid のパースエラーで 500 になる（#108）。存在しない駅対として扱う
-  if (!uuid.safeParse(stationId).success || !uuid.safeParse(connectedStationId).success) {
+  if (!parseUuidParam(stationId) || !parseUuidParam(connectedStationId)) {
     notFound();
   }
 

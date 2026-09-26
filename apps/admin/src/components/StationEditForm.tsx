@@ -59,7 +59,8 @@ export function StationEditForm({ stationId, initialData, connections, operators
   async function handleSave() {
     setSubmitting(true);
 
-    const stationReq = fetch(`/api/stations/${stationId}`, {
+    // 乗換難易度はこの画面では保存しない（駅対の編集画面で入力する）
+    const res = await fetch(`/api/stations/${stationId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -75,9 +76,6 @@ export function StationEditForm({ stationId, initialData, connections, operators
         notes: notes || null,
       }),
     });
-
-    // 乗換難易度はこの画面では保存しない。接続ごとの「乗換難易度を編集」から駅対の編集画面で入力する（#124）
-    const res = await stationReq;
 
     if (res.ok) {
       notifications.show({ title: '保存しました', message: '駅情報を更新しました', color: 'green' });

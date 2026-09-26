@@ -148,11 +148,8 @@ export const transferConnections = pgTable('transfer_connections', {
 // 1本の物理経路。接続に従属しない。
 // 【connectionId を持たせないこと】方面差の無い駅は最大4行の接続を持ち、それらが同じ物理経路を
 // 使う。ルート行を複製せず1本を共有するため、接続との関係は connection_routes が担う。
-// 設備の種類の集合と4フラグが一致するルートの二重登録は、Admin が保存時に「提示」する
-// （features/transfer-connection/domain/duplicates.ts）。範囲は S か T を端点に持つ接続のルートと
-// 同じ画面のカードで、選択は「共有する」か「別ルートとして作る」か。**保存は止めない**
-// （中身が一致しても別の物理経路でありうる。例: 池袋の各線のエレベーター経由）。設備0件は対象外（ADR-0012）。
-// 集合の一意性は DB 制約で書けないため、DB は一致するルートを拒否しない
+// 設備の種類の集合と4フラグが一致するルートも DB は拒否しない（集合の一意性は制約で書けず、中身が一致しても
+// 別の物理経路でありうる）。二重登録は Admin が保存時に提示する（apps/admin の domain/duplicates.ts）
 export const transferRoutes = pgTable('transfer_routes', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   // 所要時分が不明なルートを許容する（迂回度は minutes が揃うときだけ導出する）
@@ -172,9 +169,7 @@ export const transferRoutes = pgTable('transfer_routes', {
 // 【label と isBaseline は transfer_routes ではなくこの表に持つこと】ルートが複数の接続から
 // 共有されるため、「その接続でこのルートがどう機能するか」は組に属する事実である。
 // 接続を消すと紐付けは cascade で消えるが、ルート行は他の接続から共有されうるので消えない。
-// 孤立したルートの掃除はアプリ層の責務で、接続や紐付けを消す書き込み
-// （apps/admin の transferConnectionRepository.savePair と stationConnectionRepository.deletePair）が、
-// 同じトランザクションで external/transferPairSql.ts の deleteOrphanRoutes を呼ぶ
+// 孤立したルートの掃除はアプリ層の責務（apps/admin の external/transferPairSql.ts の deleteOrphanRoutes。docs/domain「不変条件」）
 export const connectionRoutes = pgTable('connection_routes', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   connectionId: uuid('connection_id').references(() => transferConnections.id, { onDelete: 'cascade' }).notNull(),

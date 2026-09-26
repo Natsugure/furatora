@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import { Copy, Trash2 } from 'lucide-react';
 import type { FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
-import { comboKeyOf } from '../domain/draft';
+import { comboKeyOf } from '../domain/normalize';
 import { DIRECTIONS, type Direction, type RouteDraft } from '../domain/types';
 import type { ValidationIssue } from '../domain/validate';
 import { RoutePreview } from './RoutePreview';

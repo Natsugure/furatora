@@ -44,7 +44,7 @@ const routes = [route('a', '新しいルート'), route('b', '北改札経由'),
 function renderModal(matches: DuplicateMatch[], handlers = { onConfirm: vi.fn(), onCancel: vi.fn() }) {
   render(
     <MantineProvider>
-      <DuplicateRouteModal opened matches={matches} routes={routes} {...handlers} />
+      <DuplicateRouteModal matches={matches} routes={routes} {...handlers} />
     </MantineProvider>,
   );
   return handlers;

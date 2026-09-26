@@ -1,19 +1,11 @@
-import type { FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
 import type { CandidateRoute, PairRouteRecord } from '../ports';
 import { mergeCards, mergeIntoCandidate } from './draft';
-import type { PairDraft, RouteDraft } from './types';
+import type { PairDraft, RouteBody, RouteDraft } from './types';
 
-// 重複ルートの検出（docs/spec の決定2。#30 REQ-23 の改訂）。
-// 「設備の種類の集合＋4フラグ」が一致するルートを見つけ、入力者に「共有する」か「別ルートとして作る」かを
-// 選ばせる。**保存は止めない**（検出は提示であり、中断ではない）。
-//
-// 【中身が一致しても別の物理経路でありうる】例えば池袋の各線のエレベーター経由は、設備 {elevator}・
-// フラグ全部 ✕ で完全に一致するが、別々の物理経路で別ルートとして持つ（#123 Q2）。
-// このため範囲は、候補ルート（S か T を端点に持つ接続のルートで、この駅対に結ばれていないもの）と、
-// 同じ画面のカードに限る。
-//
-// 【設備0件のルートは対象外】設備0件は「設備未入力」（ADR-0012）で、中身が分からない。未入力どうしを
-// 「一致」と判定すると、無関係なルートを同一と見なして統合を提案してしまう。
+// 重複ルートの検出。「設備の種類の集合＋4フラグ」が一致するルートを見つけ、「共有する」か「別ルートとして作る」かを
+// 選ばせる。**保存は止めない**（中身が一致しても別の物理経路でありうる。例: 池袋の各線のエレベーター経由）。
+// 範囲は候補ルート（S か T を端点に持つ接続のルートで、この駅対に結ばれていないもの）と同じ画面のカード。
+// 設備0件（未入力）のルートは対象外（ADR-0012）。docs/domain/station-master-model.md「不変条件」参照。
 
 export type DuplicateChoice = 'share' | 'separate';
 
@@ -23,13 +15,7 @@ export type DuplicateMatch =
   /** key のカードが、otherKey のカードと一致する（統合するときは key を otherKey に畳む） */
   | { kind: 'card'; key: string; otherKey: string };
 
-type Shape = {
-  facilities: readonly FacilityTypeCode[];
-  isOutdoor: boolean;
-  requiresExitGate: boolean;
-  requiresStaff: boolean;
-  isOfficiallyGuided: boolean;
-};
+type Shape = Pick<RouteBody, 'facilities' | 'isOutdoor' | 'requiresExitGate' | 'requiresStaff' | 'isOfficiallyGuided'>;
 
 // 一致判定の形。所要時分・備考・label は含めない（同じ経路でも書き方が違いうる）
 function signature(shape: Shape): string {

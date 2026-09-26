@@ -2,12 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { CandidateRoute, PairRouteRecord, TransferPairEditContext } from '../ports';
 import {
   addRoute,
-  comboKeyOf,
-  comboOfConnection,
   detachFromSharedRoute,
   draftFromContext,
   duplicateRoute,
-  endpointsOfCombo,
   hasDivergentLinks,
   mergeCards,
   mergeIntoCandidate,
@@ -78,50 +75,6 @@ function card(over: Partial<RouteDraft> = {}): RouteDraft {
 
 const emptyNotes = () => Object.fromEntries(COMBO_KEYS.map((c) => [c, ''])) as PairDraft['connectionNotes'];
 
-describe('comboKeyOf', () => {
-  it('S の方面 : T の方面 の順でキーを作る', () => {
-    expect(comboKeyOf('inbound', 'outbound')).toBe('inbound:outbound');
-  });
-});
-
-describe('endpointsOfCombo / comboOfConnection（S/T と DB の A/B の変換）', () => {
-  it('S が T より大きい uuid のとき、A = T・B = S になる', () => {
-    const { a, b } = endpointsOfCombo(S, T, 'inbound:outbound');
-    expect(a).toEqual({ stationId: T, directionType: 'outbound' });
-    expect(b).toEqual({ stationId: S, directionType: 'inbound' });
-  });
-
-  it('S が T より小さい uuid のとき、A = S・B = T のまま', () => {
-    const { a, b } = endpointsOfCombo(T, S, 'inbound:outbound');
-    expect(a).toEqual({ stationId: T, directionType: 'inbound' });
-    expect(b).toEqual({ stationId: S, directionType: 'outbound' });
-  });
-
-  it('DB の行から S 基準の組み合わせに戻せる（往復で一致）', () => {
-    for (const combo of COMBO_KEYS) {
-      const { a, b } = endpointsOfCombo(S, T, combo);
-      const row = {
-        stationAId: a.stationId,
-        directionA: a.directionType,
-        stationBId: b.stationId,
-        directionB: b.directionType,
-      };
-      expect(comboOfConnection(row, S)).toBe(combo);
-    }
-  });
-
-  it('大文字の uuid でも S を判定できる', () => {
-    const { a, b } = endpointsOfCombo(S, T, 'outbound:inbound');
-    const row = {
-      stationAId: a.stationId.toUpperCase(),
-      directionA: a.directionType,
-      stationBId: b.stationId.toUpperCase(),
-      directionB: b.directionType,
-    };
-    expect(comboOfConnection(row, S)).toBe('outbound:inbound');
-  });
-});
-
 describe('draftFromContext', () => {
   it('御茶ノ水型: 4通り全部に結ばれた1本のルートは、組み合わせ4つの1枚のカードになる', () => {
     const draft = draftFromContext(context({ routes: [record({ sharedWith: [{ stationName: 'a', connectedStationName: 'b' }] })] }));
@@ -173,7 +126,7 @@ describe('draftFromContext', () => {
   it('接続の備考は組み合わせごとに読み込む（無ければ空文字）', () => {
     const draft = draftFromContext(
       context({
-        connections: [{ combo: 'inbound:inbound', connectionId: 'c1', notes: '一長一短です', source: 'ekidata_group' }],
+        connections: [{ combo: 'inbound:inbound', notes: '一長一短です' }],
       }),
     );
     expect(draft.connectionNotes['inbound:inbound']).toBe('一長一短です');

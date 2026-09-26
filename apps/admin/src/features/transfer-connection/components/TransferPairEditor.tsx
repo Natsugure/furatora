@@ -14,6 +14,7 @@ import {
 import {
   applyDuplicateChoices, findDuplicates, matchKey, type DuplicateChoice, type DuplicateMatch,
 } from '../domain/duplicates';
+import { withLine } from '../domain/label';
 import { COMBO_KEYS, type ComboKey, type PairDraft } from '../domain/types';
 import { collectWarnings, validateSaveInput, type ValidationIssue } from '../domain/validate';
 import { DuplicateRouteModal } from './DuplicateRouteModal';
@@ -76,12 +77,7 @@ export function TransferPairEditor({ context }: Props) {
   // もう一度検証してから送る
   async function save(target: PairDraft) {
     const targetInput = toSaveInput(target);
-    const issues = validateSaveInput(targetInput);
-    if (issues.length > 0) {
-      setShowErrors(true);
-      notifications.show({ title: '保存できません', message: issues[0]?.message ?? '入力を確認してください', color: 'red' });
-      return;
-    }
+    if (rejectIfInvalid(validateSaveInput(targetInput))) return;
     setSubmitting(true);
     const res = await fetch(
       `/api/stations/${context.stationId}/connections/${context.connectedStationId}/transfer`,
@@ -97,12 +93,15 @@ export function TransferPairEditor({ context }: Props) {
     notifications.show({ title: '保存に失敗しました', message: describeError(body), color: 'red' });
   }
 
-  async function handleSave() {
+  function rejectIfInvalid(issues: ValidationIssue[]): boolean {
     setShowErrors(true);
-    if (errors.length > 0) {
-      notifications.show({ title: '保存できません', message: errors[0]?.message ?? '入力を確認してください', color: 'red' });
-      return;
-    }
+    if (issues.length === 0) return false;
+    notifications.show({ title: '保存できません', message: issues[0]?.message ?? '入力を確認してください', color: 'red' });
+    return true;
+  }
+
+  async function handleSave() {
+    if (rejectIfInvalid(errors)) return;
     // 重複候補があれば、保存の前に「共有する」か「別ルートとして作る」かを選ばせる。保存は止めない
     const matches = findDuplicates(draft, context.routes, context.candidates)
       .filter((m) => !dismissed.has(matchKey(m)));
@@ -134,7 +133,6 @@ export function TransferPairEditor({ context }: Props) {
     return candidate ? [candidate.usedBy] : [];
   };
 
-  // 同名の駅どうし（池袋↔池袋）でも見出しを区別できるよう、路線名を添える
   const stationAxis = {
     stationName: withLine(context.stationName, context.lineName),
     hints: context.directionHints.station,
@@ -144,6 +142,10 @@ export function TransferPairEditor({ context }: Props) {
     hints: context.directionHints.connected,
   };
   const notesSingleValue = covered[0] ? draft.connectionNotes[covered[0]] : '';
+  const describeCombo = (combo: ComboKey) => {
+    const [s, t] = combo.split(':');
+    return `${stationAxis.stationName} ${s} × ${connectedAxis.stationName} ${t}`;
+  };
 
   return (
     <Stack gap="lg" maw="56rem">
@@ -192,7 +194,7 @@ export function TransferPairEditor({ context }: Props) {
         <Alert color="yellow" title="確認してください">
           {pairLevelWarnings.map((w, i) => (
             <Text key={`${w.code}-${i}`} size="sm">
-              {w.combo ? `${describeCombo(w.combo, context)}: ` : ''}{w.message}
+              {w.combo ? `${describeCombo(w.combo)}: ` : ''}{w.message}
             </Text>
           ))}
         </Alert>
@@ -218,7 +220,7 @@ export function TransferPairEditor({ context }: Props) {
               covered.map((combo) => (
                 <Textarea
                   key={combo}
-                  label={describeCombo(combo, context)}
+                  label={describeCombo(combo)}
                   autosize
                   minRows={2}
                   value={draft.connectionNotes[combo]}
@@ -251,7 +253,6 @@ export function TransferPairEditor({ context }: Props) {
       {/* 開くたびに作り直し、前回の選択を持ち越さない */}
       {pending && (
         <DuplicateRouteModal
-          opened
           matches={pending}
           routes={draft.routes}
           onConfirm={handleConfirmDuplicates}
@@ -270,13 +271,4 @@ function hasDifferentNotes(draft: PairDraft): boolean {
 function coveredCombos(draft: PairDraft): ComboKey[] {
   const set = new Set(draft.routes.flatMap((r) => r.combos));
   return COMBO_KEYS.filter((c) => set.has(c));
-}
-
-function withLine(stationName: string, lineName: string | null): string {
-  return lineName ? `${stationName}（${lineName}）` : stationName;
-}
-
-function describeCombo(combo: ComboKey, context: TransferPairEditContext): string {
-  const [s, t] = combo.split(':');
-  return `${withLine(context.stationName, context.lineName)} ${s} × ${withLine(context.connectedStationName, context.connectedLineName)} ${t}`;
 }

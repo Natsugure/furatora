@@ -12,25 +12,23 @@ import {
   RouteOutOfScopeError,
   type TransferConnectionRepository,
 } from '@/features/transfer-connection/ports';
-import { comboOfConnection, endpointsOfCombo } from '@/features/transfer-connection/domain/draft';
+import { comboOfConnection, endpointsOfCombo } from '@/features/transfer-connection/domain/normalize';
 import { COMBO_KEYS, type ComboKey } from '@/features/transfer-connection/domain/types';
 import { isPgErrorCode, pgConstraintName, PG_UNIQUE_VIOLATION } from '@/external/pgError';
 import { requireInserted } from '@/external/requireInserted';
 import {
   deleteOrphanRoutes,
   pairConnectionCondition,
+  routeIdsOfConnections,
+  stationPairCondition,
   touchesStationsCondition,
 } from '@/external/transferPairSql';
 
 const LABEL_CONSTRAINT = 'unique_connection_route_label';
 
-// 駅対（自駅 S・相手駅 T）の乗換難易度を「最終状態」で書き込む（Issue #124。docs/spec の決定5）。
-// 複数テーブルを1つの不変条件のもとで書くので withTransaction を使う（ADR-0005）。
-//
-// 【紐付け（connection_routes）は全部消してから入れ直す】基準ルートの付け替えは
-// 「既存の降格」と「新規の昇格」の2文になり、順序を誤ると unique_connection_baseline に違反する。
-// 先に全部消せば順序の問題が無くなる。connection_routes.id は保存のたびに変わるが、
-// この id を参照する表は無い。
+// 駅対（自駅 S・相手駅 T）の乗換難易度を「最終状態」で1トランザクションに書き込む（ADR-0005）。
+// 【紐付け（connection_routes）は全部消してから入れ直す】基準ルートの降格と昇格の順序を誤ると
+// unique_connection_baseline に違反するため。connection_routes.id は保存のたびに変わるが、参照する表は無い。
 export const dbTransferConnectionRepository: TransferConnectionRepository = {
   async savePair(stationId, connectedStationId, input) {
     try {
@@ -39,11 +37,8 @@ export const dbTransferConnectionRepository: TransferConnectionRepository = {
         const [pair] = await tx
           .select({ id: stationConnections.id })
           .from(stationConnections)
-          .where(and(
-            eq(stationConnections.stationId, stationId),
-            eq(stationConnections.connectedStationId, connectedStationId),
-          ));
-        if (!pair) return null;
+          .where(stationPairCondition(stationId, connectedStationId));
+        if (!pair) return false;
 
         // 2. 既存の接続と、それに結ばれているルート
         const existing = await tx
@@ -54,13 +49,7 @@ export const dbTransferConnectionRepository: TransferConnectionRepository = {
           existing.map((row) => [comboOfConnection(row, stationId), row.id]),
         );
         const existingIds = existing.map((row) => row.id);
-        const previousRouteIds = existingIds.length === 0
-          ? []
-          : (await tx
-              .select({ routeId: connectionRoutes.routeId })
-              .from(connectionRoutes)
-              .where(inArray(connectionRoutes.connectionId, existingIds))
-            ).map((row) => row.routeId);
+        const previousRouteIds = await routeIdsOfConnections(tx, existingIds);
 
         // 3. 指定された routeId が、この駅対に結ばれているか候補の範囲にあること
         await assertRoutesInScope(tx, stationId, connectedStationId, input, new Set(previousRouteIds));
@@ -151,7 +140,7 @@ export const dbTransferConnectionRepository: TransferConnectionRepository = {
         // 8. 紐付けから外れて、どの接続からも参照されなくなったルートを消す
         await deleteOrphanRoutes(tx, previousRouteIds);
 
-        return { ok: true as const };
+        return true;
       });
     } catch (err) {
       // 同じ 23505 でも、label の重複だけを入力者に返せるエラーにする。

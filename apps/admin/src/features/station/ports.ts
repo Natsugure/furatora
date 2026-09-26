@@ -37,7 +37,6 @@ export interface StationRepository {
 // 乗り換え接続の1行（接続一覧）。駅名/路線名は表示用に解決済み。
 // connectedStationId は接続の削除（#88）と、乗換難易度の編集画面（#124）への遷移で使う。
 // 有向2行の削除は (stationId, connectedStationId) を渡す DELETE エンドポイントが担う。
-// 乗換難易度は新モデル（transfer_connections 以下）にあり、この行には持たない。
 export type ConnectionRow = {
   id: string;
   connectedStationId: string;

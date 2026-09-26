@@ -6,7 +6,6 @@ import { matchKey, type DuplicateChoice, type DuplicateMatch } from '../domain/d
 import type { RouteDraft } from '../domain/types';
 
 type Props = {
-  opened: boolean;
   matches: DuplicateMatch[];
   /** ルート番号・名前の表示に使う、いまの下書きのカード */
   routes: RouteDraft[];
@@ -14,9 +13,9 @@ type Props = {
   onCancel: () => void;
 };
 
-// 保存時の重複候補の提示（docs/spec の決定2）。保存は止めない: 既定は「別ルートとして作る」で、
+// 保存時の重複候補の提示（判定は domain/duplicates.ts）。保存は止めない: 既定は「別ルートとして作る」で、
 // 中身が同じでも別の物理経路でありうること（池袋の各線のエレベーター経由）を前提にする。
-export function DuplicateRouteModal({ opened, matches, routes, onConfirm, onCancel }: Props) {
+export function DuplicateRouteModal({ matches, routes, onConfirm, onCancel }: Props) {
   const [choices, setChoices] = useState<Record<string, DuplicateChoice>>({});
 
   const describeRoute = (key: string) => {
@@ -27,7 +26,7 @@ export function DuplicateRouteModal({ opened, matches, routes, onConfirm, onCanc
   const choiceOf = (match: DuplicateMatch): DuplicateChoice => choices[matchKey(match)] ?? 'separate';
 
   return (
-    <Modal opened={opened} onClose={onCancel} title="同じ内容のルートがあります" size="lg" centered>
+    <Modal opened onClose={onCancel} title="同じ内容のルートがあります" size="lg" centered>
       <Stack gap="md">
         <Text size="sm">
           通る設備の種類と経路の性質（屋外・改札外・係員・公式案内）が一致するルートがあります。

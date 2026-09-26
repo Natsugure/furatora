@@ -1,7 +1,5 @@
-import type { DirectionType } from '@furatora/database/enums';
 import { FACILITY_TYPE_CODES, type FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
 import type { CandidateRoute, PairRouteRecord, TransferPairEditContext } from '../ports';
-import { normalizeTransferEndpoints, type TransferEndpoint } from './normalize';
 import {
   COMBO_KEYS,
   type ComboKey,
@@ -13,35 +11,6 @@ import {
 // 駅対の編集画面（TransferPairEditor）が保持する未保存 state の純関数。
 // Next.js・DB 非依存なので node 環境でテストできる。操作はすべてイミュータブル。
 
-export function comboKeyOf(stationDirection: DirectionType, connectedDirection: DirectionType): ComboKey {
-  return `${stationDirection}:${connectedDirection}`;
-}
-
-// 方面の組み合わせ（S 基準）を、DB の正規化順（A < B）の端点対に変換する。
-// 書き込み側が INSERT 前に必ず通すこと（check transfer_connection_endpoints_ordered が逆順を拒否する）
-export function endpointsOfCombo(
-  stationId: string,
-  connectedStationId: string,
-  combo: ComboKey,
-): { a: TransferEndpoint; b: TransferEndpoint } {
-  const [stationDirection, connectedDirection] = combo.split(':') as [DirectionType, DirectionType];
-  return normalizeTransferEndpoints(
-    { stationId, directionType: stationDirection },
-    { stationId: connectedStationId, directionType: connectedDirection },
-  );
-}
-
-// DB の接続行（端点は正規化順）を、S 基準の組み合わせに戻す。
-// 【同一駅どうしの接続（#82 で正当になりうる）は扱わない】stationId の一致だけで A/B を判定する
-export function comboOfConnection(
-  row: { stationAId: string; directionA: DirectionType; stationBId: string; directionB: DirectionType },
-  stationId: string,
-): ComboKey {
-  return row.stationAId.toLowerCase() === stationId.toLowerCase()
-    ? comboKeyOf(row.directionA, row.directionB)
-    : comboKeyOf(row.directionB, row.directionA);
-}
-
 const comboIndex = (combo: ComboKey) => COMBO_KEYS.indexOf(combo);
 const sortCombos = (combos: readonly ComboKey[]): ComboKey[] =>
   [...new Set(combos)].sort((x, y) => comboIndex(x) - comboIndex(y));
@@ -50,8 +19,8 @@ const facilityIndex = (code: FacilityTypeCode) => FACILITY_TYPE_CODES.indexOf(co
 const sortFacilities = (facilities: readonly FacilityTypeCode[]): FacilityTypeCode[] =>
   [...new Set(facilities)].sort((x, y) => facilityIndex(x) - facilityIndex(y));
 
-// 同じルートの紐付けで label / isBaseline が組み合わせごとに違う（Admin は駅対の中でそろえて書く規約。
-// 読み込みは許容し、最初の組み合わせの値を採る）。画面はこれが true のとき警告を出す
+// 同じルートの紐付けで label / isBaseline が組み合わせごとに違うか（docs/domain「Admin の書き込み規約」）。
+// 画面はこれが true のとき警告を出す
 export function hasDivergentLinks(record: PairRouteRecord): boolean {
   const first = record.links[0];
   if (!first) return false;
