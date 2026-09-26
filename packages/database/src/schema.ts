@@ -190,17 +190,11 @@ export const connectionRoutes = pgTable('connection_routes', {
   uniqueIndex('unique_connection_baseline').on(t.connectionId).where(sql`${t.isBaseline}`),
 ]);
 
-// ルートが通る設備の種類の集合。順序も回数も持たない。
-// 【1行 = 「このルートは、この種類の設備をすべて通る」】ペルソナごとの「必要な行為」は、
-// ルート上の設備すべてから最も重いものを選んで導出する（順序に依存しない）。
-// 【同じ段差に対する代替手段（階段と階段昇降機が並んでいる箇所）は同一ルートに入れず、
-// 別のルート行にする】集合は「すべて通る」を意味するため、代替手段を同居させると
+// ルートが通る設備の種類の集合（順序・回数は持たない。ADR-0011）。1行 = 「この種類をすべて通る」。
+// 【代替手段（階段と階段昇降機など）は同一ルートに入れず別ルートにすること】同居させると
 // 「階段昇降機のルートはベビーカーが通れない」等の判定が壊れる。
-// 【unique (routeId, typeCode)】同じ種類は1行。同種の設備が何か所あっても1行になる
-// （回数が必要になったら count 列を足す。追加なので非破壊）。順序を持たない理由と却下案は
-// docs/adr/0011-transfer-route-facilities-as-set.md を参照。
-// 【行が0件のルートは「設備未入力」】「設備が無い」ではない。段差の無いルートは sameFloor を明示する。
-// 0件から必要な行為を導出してはならない（docs/adr/0012-zero-facility-route-as-not-entered.md）
+// 【行が0件のルートは「設備未入力」】段差無しは sameFloor を明示する。0件から必要な行為を
+// 導出しないこと（ADR-0012。#124・#125 の制約）
 export const transferRouteFacilities = pgTable('transfer_route_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   routeId: uuid('route_id').references(() => transferRoutes.id, { onDelete: 'cascade' }).notNull(),

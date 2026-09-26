@@ -1,44 +1,18 @@
--- 旧 station_connections の評価済み17行を、乗換難易度の新モデルへ書き直す（Issue #123。移行データ表は Issue #123 時点の docs/spec/design.md。git 履歴で参照する）
+-- 旧 station_connections の評価済み17行を、乗換難易度の新モデルへ書き直す（Issue #123）
+-- 旧行の難易度4列から設備の種類・所要時分は導出できないため、開発者が確定した値を埋め込む。
+-- 駅は slug で引く（環境ごとに id が違いうる。0007 の前例）。対象の駅・設備の種類が揃わない環境や、
+-- 接続が既にある環境では何もしない（0005 の方針）。
 --
--- 【なぜスキーマ差分ではなく手書きのデータ移行なのか】
--- 新4表（0009）は全環境で0行である。旧行の難易度4列は設備の種類・所要時分を持たず、
--- 旧行から機械的に導出できないため、開発者が確定した値（移行データ表）をここへ埋め込む。
--- Vercel のビルドがマイグレーションを流すので、この文を置くことで development / preview /
--- production のすべてが同じ手順で移行される（手で本番に流さない。CLAUDE.md）。
---
--- 【旧表は変更しない】旧4列（strollerDifficulty 等）は #125 まで現行の Admin・Web が読む。
--- 落とすのは #125 のあとの別デプロイである。
---
--- 【駅は slug で引く】環境ごとに stations.id が違いうる（0007 の前例）。丸ノ内線の方面は
--- outbound = 池袋方面、inbound = 荻窪方面。
---
--- 【2つのガードでビルドを落とさない】対象20駅の slug が揃わない環境（駅データが無い新規環境）と、
--- 使う設備の種類が facility_types に無い環境（マスタ未投入）では、何も投入せず終了する（0005 の方針）。
--- 対象の接続が既にある場合も、二重投入を避けるため何もしない。
---
--- 【自己検証】投入後に件数と、基準ルートを持たない接続・孤立ルートが無いことを検査する。
--- 外れたら例外でロールバックし、ビルドが止まる。移行データ表を編集するときは、この件数も更新すること。
---
--- 【設備0件のルートは「設備未入力」】旧評価から設備の種類が言えない基準ルートは、設備0件で移す。
--- 0件を「そのまま通れる」と読んではならない（docs/adr/0012-zero-facility-route-as-not-entered.md）。#124・#125 の制約になる。
---
--- 【備考の扱い】淡路町↔新御茶ノ水の「隣の大手町駅のほうが便利です」は、出発地に依存する経路上の選好であり
--- 移さない（docs/domain/station-master-model.md「備考の役割」）。本郷三丁目の「隣の後楽園・春日駅の乗り換えであれば…一長一短です」は、
--- 開発者判断で接続の notes に残した（docs/domain/station-master-model.md「備考の役割」の既知の例外）。ほかの備考は、フラグ・設備の種類で表せるものは
--- 備考に重複して残さず、ルートの notes に必要なものだけを移した。
---
--- 【値を書き換えようとする人へ】移行後の訂正は Admin（#124）で行う。適用済みのこのファイルは編集しない。
--- 未適用の環境に別の値を流したいときは、新しいマイグレーションを足すこと。
+-- 【旧表は変更しない】旧4列は #125 まで現行の Admin・Web が読む。落とすのは #125 のあとの別デプロイ。
+-- 【設備0件で移すルートがある】「設備未入力」であり、#124・#125 はそこから必要な行為を導出しないこと（ADR-0012）
 DO $$
 DECLARE
   v_missing text;
   v_count integer;
 BEGIN
-  -- ------------------------------------------------------------------
   -- 1. 移行データ表（一時テーブルに置く。実テーブルへの書き込みはガードを通ってから）
-  -- ------------------------------------------------------------------
 
-  -- ルート（21本）。id は route_key から実テーブルへ引くために先に採番する
+  -- ルート。id は route_key から実テーブルへ引くために先に採番する
   CREATE TEMP TABLE _route (
     route_key text PRIMARY KEY,
     id uuid NOT NULL DEFAULT uuid_generate_v7(),
@@ -78,7 +52,7 @@ BEGIN
     ('awajicho_shinochanomizu_base', NULL, false, false, false, false, NULL),
     ('awajicho_shinochanomizu_wc', NULL, false, false, true, false, '移動距離は400m以上あります。');
 
-  -- 設備（18行）。種類の集合であり、順序も回数も持たない。行が無いルートは「設備未入力」
+  -- 設備の種類の集合
   CREATE TEMP TABLE _route_facility (
     route_key text NOT NULL,
     type_code text NOT NULL
@@ -104,7 +78,7 @@ BEGIN
     ('awajicho_shinochanomizu_wc', 'ramp'),
     ('awajicho_shinochanomizu_wc', 'stairLift');
 
-  -- 駅対（15組）。slug_m は丸ノ内線側の駅、slug_o は相手側の駅。
+  -- 駅対。slug_m は丸ノ内線側（outbound = 池袋方面、inbound = 荻窪方面）、slug_o は相手側の駅。
   -- 各駅対は方面2×2の4接続を持つ。source は旧行を踏襲する
   CREATE TEMP TABLE _pair (
     pair_key text PRIMARY KEY,
@@ -132,9 +106,7 @@ BEGIN
     ('awajicho_ogawamachi', 'tokyometro-marunouchi-awajicho', 'toei-shinjuku-ogawamachi', 'ekidata_group', NULL),
     ('awajicho_shinochanomizu', 'tokyometro-marunouchi-awajicho', 'tokyometro-chiyoda-shinochanomizu', 'ekidata_group', NULL);
 
-  -- 接続とルートの紐付け（84行に展開される）。
-  -- m_dir が NULL の行は、その駅対の4接続すべてに紐付く（全方面共通）。
-  -- 全方面共通は NULL で表さず、4接続が同一ルートを参照することで表す（docs/domain/station-master-model.md「4層構造」）。
+  -- 接続とルートの紐付け。m_dir が NULL の行は、その駅対の4接続すべてに展開する。
   -- 淡路町↔小川町だけ、丸ノ内線側の方面ごとに異なるルートを参照する
   CREATE TEMP TABLE _link (
     pair_key text NOT NULL,
@@ -161,7 +133,7 @@ BEGIN
     ('korakuen_oedo', NULL, 'korakuen_oedo_bf', '改札外経由', false),
     ('hongo_oedo', NULL, 'hongo_base', '地上経由', true),
     ('hongo_oedo', NULL, 'hongo_bf', '5番出口エレベーター経由', false),
-    -- 御茶ノ水は快速・中央総武の2駅対（8接続）が同一の1本を共有する（Q6・Q7）
+    -- 御茶ノ水は快速・中央総武の2駅対（8接続）が同一の1本を共有する
     ('ochanomizu_chuorapid', NULL, 'ochanomizu', '地上経由', true),
     ('ochanomizu_chuosobu', NULL, 'ochanomizu', '地上経由', true),
     -- 丸ノ内線 outbound（池袋方面）側は車いす対応エスカレーター経由、inbound（荻窪方面）側はエレベーターのみ。
@@ -171,9 +143,7 @@ BEGIN
     ('awajicho_shinochanomizu', NULL, 'awajicho_shinochanomizu_base', '一般経路', true),
     ('awajicho_shinochanomizu', NULL, 'awajicho_shinochanomizu_wc', '階段昇降機経由', false);
 
-  -- ------------------------------------------------------------------
   -- 2. ガード（実テーブルにはまだ触れていない）
-  -- ------------------------------------------------------------------
 
   -- 対象20駅の slug が揃っているか
   SELECT string_agg(x.slug, ', ') INTO v_missing
@@ -207,20 +177,16 @@ BEGIN
     RETURN;
   END IF;
 
-  -- ------------------------------------------------------------------
   -- 3. 投入
-  -- ------------------------------------------------------------------
 
-  -- 接続: 駅対 × 方面（丸ノ内線側 2 × 相手側 2）= 60行。id は紐付けから引くために先に採番する
+  -- 接続: 駅対 × 方面（丸ノ内線側 2 × 相手側 2）。id は紐付けから引くために先に採番する
   CREATE TEMP TABLE _conn ON COMMIT DROP AS
   SELECT p.pair_key, dm.d AS m_dir, dn.d AS o_dir, uuid_generate_v7() AS id
   FROM _pair p
   CROSS JOIN (VALUES ('inbound'), ('outbound')) dm(d)
   CROSS JOIN (VALUES ('inbound'), ('outbound')) dn(d);
 
-  -- 端点は (stationId, direction_type) の昇順に並べて格納する。
-  -- transfer_connection_endpoints_ordered の CHECK と同じ行値比較で、
-  -- apps/admin の normalizeTransferEndpoints() と同じ順序になる
+  -- 端点は昇順に正規化する（transfer_connection_endpoints_ordered の CHECK と同じ行値比較）
   INSERT INTO transfer_connections (id, station_a_id, direction_a, station_b_id, direction_b, notes, source)
   SELECT
     c.id,
@@ -250,9 +216,7 @@ BEGIN
   JOIN _conn c ON c.pair_key = l.pair_key AND (l.m_dir IS NULL OR l.m_dir = c.m_dir)
   JOIN _route r ON r.route_key = l.route_key;
 
-  -- ------------------------------------------------------------------
-  -- 4. 自己検証（外れたら例外でロールバックする）
-  -- ------------------------------------------------------------------
+  -- 4. 自己検証（外れたら例外でロールバックし、ビルドを止める）
 
   SELECT count(*) INTO v_count FROM _conn c
   JOIN transfer_connections tc ON tc.id = c.id;
@@ -278,7 +242,7 @@ BEGIN
     RAISE EXCEPTION '0012: 設備が18行ではありません: %', v_count;
   END IF;
 
-  -- 基準ルートは接続あたり高々1本（部分ユニークが守る）。0本の接続は許容されるが、この移行では作らない
+  -- 基準ルート0本の接続は許容されるが、この移行では作らない
   SELECT count(*) INTO v_count FROM _conn c
   WHERE NOT EXISTS (
     SELECT 1 FROM connection_routes cr WHERE cr.connection_id = c.id AND cr.is_baseline
