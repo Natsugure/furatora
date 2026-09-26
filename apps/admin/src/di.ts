@@ -17,6 +17,8 @@ import { dbStationAdjacencyPageQuery } from '@/external/query/stationAdjacencyPa
 import { dbStationListPageQuery } from '@/external/query/stationListPageQuery';
 import { dbLineListPageQuery } from '@/external/query/lineListPageQuery';
 import { dbStationLayoutPageQuery } from '@/external/query/stationLayoutPageQuery';
+import { dbTransferConnectionRepository } from '@/external/repository/transferConnectionRepository';
+import { dbTransferPairEditPageQuery } from '@/external/query/transferPairEditPageQuery';
 
 export const platformRepository = dbPlatformRepository;
 export const platformLocationRepository = dbPlatformLocationRepository;
@@ -45,3 +47,7 @@ export const lineListPageQuery = dbLineListPageQuery;
 
 // 駅レイアウト統合ページ
 export const stationLayoutPageQuery = dbStationLayoutPageQuery;
+
+// 乗換難易度の駅対編集（#124）
+export const transferConnectionRepository = dbTransferConnectionRepository;
+export const transferPairEditPageQuery = dbTransferPairEditPageQuery;

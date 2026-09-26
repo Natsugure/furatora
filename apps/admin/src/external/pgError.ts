@@ -25,3 +25,16 @@ export function isPgErrorCode(err: unknown, code: string): boolean {
     : undefined;
   return errorCode(cause) === code;
 }
+
+// 違反した制約名（一意制約違反 23505 などで pg エラーが持つ `constraint`）。
+// errorCode と同じ理由で err.cause も見る。同じ 23505 でも制約ごとに意味が違う場合
+// （例: unique_connection_route_label だけを 409 にしたい）に使う
+export function pgConstraintName(err: unknown): string | undefined {
+  const read = (e: unknown): unknown =>
+    typeof e === 'object' && e !== null && 'constraint' in e ? (e as { constraint: unknown }).constraint : undefined;
+  const direct = read(err);
+  if (typeof direct === 'string') return direct;
+  const cause = typeof err === 'object' && err !== null && 'cause' in err ? (err as { cause: unknown }).cause : undefined;
+  const fromCause = read(cause);
+  return typeof fromCause === 'string' ? fromCause : undefined;
+}
