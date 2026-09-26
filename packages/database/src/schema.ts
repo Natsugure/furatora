@@ -197,8 +197,10 @@ export const connectionRoutes = pgTable('connection_routes', {
 // 別のルート行にする】集合は「すべて通る」を意味するため、代替手段を同居させると
 // 「階段昇降機のルートはベビーカーが通れない」等の判定が壊れる。
 // 【unique (routeId, typeCode)】同じ種類は1行。同種の設備が何か所あっても1行になる
-// （回数が必要になったら count 列を足す。追加なので非破壊）。順序を持たない理由は
-// docs/spec の決定（Issue #123）と docs/domain/station-master-model.md を参照
+// （回数が必要になったら count 列を足す。追加なので非破壊）。順序を持たない理由と却下案は
+// docs/adr/0011-transfer-route-facilities-as-set.md を参照。
+// 【行が0件のルートは「設備未入力」】「設備が無い」ではない。段差の無いルートは sameFloor を明示する。
+// 0件から必要な行為を導出してはならない（docs/adr/0012-zero-facility-route-as-not-entered.md）
 export const transferRouteFacilities = pgTable('transfer_route_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   routeId: uuid('route_id').references(() => transferRoutes.id, { onDelete: 'cascade' }).notNull(),
