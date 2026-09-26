@@ -3,8 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
-import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
-import { strollerDifficultyOptions, wheelchairDifficultyOptions } from '@/constants/difficulty';
 import type { ConnectionRow, OperatorOption } from '@/features/station/ports';
 import { DeleteButton } from '@/components/DeleteButton';
 import { LinkAnchor } from '@/components/LinkElements';
@@ -14,18 +12,6 @@ import {
 } from '@mantine/core';
 
 export type { ConnectionRow } from '@/features/station/ports';
-
-type ConnectionState = {
-  strollerDifficulty: StrollerDifficulty | '';
-  wheelchairDifficulty: WheelchairDifficulty | '';
-  notesAboutStroller: string;
-  notesAboutWheelchair: string;
-};
-
-// 接続 ID を持つ行の配列で保持する。Record にすると noUncheckedIndexedAccess 下で
-// キーアクセスが T | undefined になるが、行は connections から1対1で導出されるため
-// 配列 + find の方が「必ず存在する」ことを表現しやすい（Issue #50）。
-type ConnectionStateRow = ConnectionState & { id: string };
 
 type Props = {
   stationId: string;
@@ -68,25 +54,13 @@ export function StationEditForm({ stationId, initialData, connections, operators
   const [lon, setLon] = useState(initialData.lon ?? '');
   const [operatorId, setOperatorId] = useState(initialData.operatorId);
   const [notes, setNotes] = useState(initialData.notes ?? '');
-  const [connectionStates, setConnectionStates] = useState<ConnectionStateRow[]>(() =>
-    connections.map((c) => ({
-      id: c.id,
-      strollerDifficulty: c.strollerDifficulty ?? '',
-      wheelchairDifficulty: c.wheelchairDifficulty ?? '',
-      notesAboutStroller: c.notesAboutStroller ?? '',
-      notesAboutWheelchair: c.notesAboutWheelchair ?? '',
-    }))
-  );
   const [submitting, setSubmitting] = useState(false);
-
-  function updateConnection(id: string, patch: Partial<ConnectionState>) {
-    setConnectionStates((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-  }
 
   async function handleSave() {
     setSubmitting(true);
 
-    const stationReq = fetch(`/api/stations/${stationId}`, {
+    // 乗換難易度はこの画面では保存しない（駅対の編集画面で入力する）
+    const res = await fetch(`/api/stations/${stationId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -103,27 +77,11 @@ export function StationEditForm({ stationId, initialData, connections, operators
       }),
     });
 
-    const connectionReqs = connectionStates.map((s) =>
-      fetch(`/api/station-connections/${s.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strollerDifficulty: s.strollerDifficulty || null,
-          wheelchairDifficulty: s.wheelchairDifficulty || null,
-          notesAboutStroller: s.notesAboutStroller || null,
-          notesAboutWheelchair: s.notesAboutWheelchair || null,
-        }),
-      })
-    );
-
-    const results = await Promise.all([stationReq, ...connectionReqs]);
-    const failed = results.find((r) => !r.ok);
-
-    if (!failed) {
+    if (res.ok) {
       notifications.show({ title: '保存しました', message: '駅情報を更新しました', color: 'green' });
       router.refresh();
     } else {
-      const body: unknown = await failed.json().catch(() => null);
+      const body: unknown = await res.json().catch(() => null);
       notifications.show({ title: '保存に失敗しました', message: describeError(body), color: 'red' });
     }
     setSubmitting(false);
@@ -221,65 +179,28 @@ export function StationEditForm({ stationId, initialData, connections, operators
           <Text size="sm" c="dimmed" fs="italic">乗り換え接続情報がありません</Text>
         ) : (
           <Stack gap="lg">
-            {connections.map((conn) => {
-              const s = connectionStates.find((cs) => cs.id === conn.id);
-              if (!s) return null;
-              return (
-                <Card key={conn.id} withBorder padding="md">
-                  <Group justify="space-between" mb="md">
-                    <Text fw={500} size="sm">{displayName(conn)}</Text>
+            {connections.map((conn) => (
+              <Card key={conn.id} withBorder padding="md">
+                <Group justify="space-between">
+                  <Text fw={500} size="sm">{displayName(conn)}</Text>
+                  <Group gap="md">
+                    {/* 乗換難易度は、駅対の編集画面（方面の組み合わせ4通りとルート）で入力する（#124）。
+                        この画面の保存ボタンとは別に保存される */}
+                    <LinkAnchor
+                      href={`/stations/${stationId}/connections/${conn.connectedStationId}/transfer`}
+                      size="sm"
+                    >
+                      乗換難易度を編集
+                    </LinkAnchor>
                     <DeleteButton
                       endpoint={`/api/stations/${stationId}/connections/${conn.connectedStationId}`}
                       label="接続を削除"
+                      description="この接続と、この駅対の乗換難易度（ルート・設備を含む評価データ）を削除します。元に戻せません。"
                     />
                   </Group>
-
-                  <SimpleGrid cols={2} mb="md">
-                    <NativeSelect
-                      label="ベビーカー難易度"
-                      data={strollerDifficultyOptions}
-                      value={s.strollerDifficulty}
-                      onChange={(e) =>
-                        updateConnection(conn.id, {
-                          strollerDifficulty: e.target.value as StrollerDifficulty | '',
-                        })
-                      }
-                    />
-                    <NativeSelect
-                      label="車いす難易度"
-                      data={wheelchairDifficultyOptions}
-                      value={s.wheelchairDifficulty}
-                      onChange={(e) =>
-                        updateConnection(conn.id, {
-                          wheelchairDifficulty: e.target.value as WheelchairDifficulty | '',
-                        })
-                      }
-                    />
-                  </SimpleGrid>
-
-                  <SimpleGrid cols={2}>
-                    <Textarea
-                      label="ベビーカー備考"
-                      placeholder="例: A2出口エレベーターを利用"
-                      rows={2}
-                      value={s.notesAboutStroller}
-                      onChange={(e) =>
-                        updateConnection(conn.id, { notesAboutStroller: e.target.value })
-                      }
-                    />
-                    <Textarea
-                      label="車いす備考"
-                      placeholder="例: 駅員への申告が必要"
-                      rows={2}
-                      value={s.notesAboutWheelchair}
-                      onChange={(e) =>
-                        updateConnection(conn.id, { notesAboutWheelchair: e.target.value })
-                      }
-                    />
-                  </SimpleGrid>
-                </Card>
-              );
-            })}
+                </Group>
+              </Card>
+            ))}
           </Stack>
         )}
       </section>

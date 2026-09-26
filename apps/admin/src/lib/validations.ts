@@ -39,16 +39,3 @@ export const directionSchema = z.object({
   terminalStationIds: z.array(z.string().uuid()).nullable().optional(),
   notes: z.string().nullable().optional(),
 });
-
-export const stationConnectionUpdateSchema = z.object({
-  strollerDifficulty: z
-    .enum(['optimal', 'elevator_detour', 'stairs_partial', 'exit_required', 'inaccessible'])
-    .nullable()
-    .optional(),
-  wheelchairDifficulty: z
-    .enum(['optimal', 'detour', 'assistance_required', 'discouraged', 'inaccessible'])
-    .nullable()
-    .optional(),
-  notesAboutStroller: z.string().nullable().optional(),
-  notesAboutWheelchair: z.string().nullable().optional(),
-});

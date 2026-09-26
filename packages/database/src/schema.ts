@@ -148,9 +148,8 @@ export const transferConnections = pgTable('transfer_connections', {
 // 1本の物理経路。接続に従属しない。
 // 【connectionId を持たせないこと】方面差の無い駅は最大4行の接続を持ち、それらが同じ物理経路を
 // 使う。ルート行を複製せず1本を共有するため、接続との関係は connection_routes が担う。
-// 設備の種類の集合と4フラグが既存ルートと完全に一致するルートを作らないこと（接続をまたいで検出し、
-// 一致すれば新規作成せず紐付けを提案する）。集合の一意性は DB 制約で書けないため、
-// 検出はアプリ層（Issue #124 の Repository）の責務
+// 設備の種類の集合と4フラグが一致するルートも DB は拒否しない（集合の一意性は制約で書けず、中身が一致しても
+// 別の物理経路でありうる）。二重登録は Admin が保存時に提示する（apps/admin の domain/duplicates.ts）
 export const transferRoutes = pgTable('transfer_routes', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   // 所要時分が不明なルートを許容する（迂回度は minutes が揃うときだけ導出する）
@@ -170,7 +169,7 @@ export const transferRoutes = pgTable('transfer_routes', {
 // 【label と isBaseline は transfer_routes ではなくこの表に持つこと】ルートが複数の接続から
 // 共有されるため、「その接続でこのルートがどう機能するか」は組に属する事実である。
 // 接続を消すと紐付けは cascade で消えるが、ルート行は他の接続から共有されうるので消えない。
-// 孤立したルートの掃除は Issue #124 の Repository の責務
+// 孤立したルートの掃除はアプリ層の責務（apps/admin の external/transferPairSql.ts の deleteOrphanRoutes。docs/domain「不変条件」）
 export const connectionRoutes = pgTable('connection_routes', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   connectionId: uuid('connection_id').references(() => transferConnections.id, { onDelete: 'cascade' }).notNull(),
@@ -186,7 +185,8 @@ export const connectionRoutes = pgTable('connection_routes', {
   unique('unique_connection_route').on(t.connectionId, t.routeId),
   // 【外さないこと】基準ルートは接続あたり高々1本。無いと迂回度（基準ルートとの所要時分の差）の
   // 分母が一意に定まらない。基準ルートの付け替え（既存の降格＋新規の昇格）は2文になるので、
-  // Repository + withTransaction で行う（ADR-0005）。行数の上限はこの制約では表現しない
+  // Repository + withTransaction で行う（ADR-0005）。Admin の savePair は駅対の紐付けを全部消してから
+  // 入れ直すため、順序の問題は起きない。行数の上限はこの制約では表現しない
   uniqueIndex('unique_connection_baseline').on(t.connectionId).where(sql`${t.isBaseline}`),
 ]);
 

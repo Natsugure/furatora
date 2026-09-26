@@ -1,271 +1,337 @@
-# 設計: 乗換難易度 既存行のデータ移行 (Issue #123)
+# 設計: 乗換難易度 Admin 入力フォームの対応 (Issue #124)
 
 ## 参照
 
 [requirements.md](./requirements.md) / [tasks.md](./tasks.md) /
 [docs/domain/station-master-model.md](../domain/station-master-model.md)「乗換難易度」節（4層構造・不変条件）/
-[ADR-0005](../adr/0005-write-atomicity-driver.md) / [ADR-0008](../adr/0008-environment-database-branch-mapping.md) /
-[ADR-0011](../adr/0011-transfer-route-facilities-as-set.md) / [ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)
+[ADR-0001](../adr/0001-layer-structure.md)（層と依存）/ [ADR-0002](../adr/0002-dependency-inversion-ports.md)（ports）/
+[ADR-0003](../adr/0003-read-write-separation.md)（Query と Repository）/
+[ADR-0005](../adr/0005-write-atomicity-driver.md)（`withTransaction`）/
+[ADR-0011](../adr/0011-transfer-route-facilities-as-set.md)（設備は集合）/
+[ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)（設備0件は未入力）
 
-本Issueは**データの投入**と、その前提となる**設備の集合化（`seq` の削除）**を行う。
-スキーマは #122 で入っているが、設備を直列の並びで持つ点だけを本Issueで変える（決定4）。
-ドメイン定義（4層構造・不変条件・決定記録）は #30 で確定済みで、恒久知識として
-`docs/domain/` にある。本書には**この作業限りの判断**と**移行データ表**だけを置く。
+本Issueは Admin の**入力**を新モデルに切り替える。スキーマとデータは #122・#123 で入っていて変更しない。
+ドメイン定義（4層構造・不変条件）は恒久知識として `docs/domain/` にある。本書には
+**この作業限りの判断**と、画面・API・Repository の設計だけを置く。
 
 ## アーキテクチャ
 
 ```
-旧 station_connections（変更しない。#125 まで現行の読み手がいる）
-  17行 ─(値を埋め込んだ SQL で書き直す)─┐
-                                         ▼
-0011_transfer_route_facilities_as_set.sql（seq を落とし unique (route_id, type_code) を足す）
-0012_migrate_transfer_difficulty.sql（DO ブロック1つ）
-  ├─ ガード: 対象20駅の slug が揃っているか / 設備の種類が facility_types にあるか / 対象の接続が既にあるか
-  ├─ transfer_routes ─ transfer_route_facilities   … ルート N 本と設備
-  └─ transfer_connections（60行）─ connection_routes（接続×ルート）
+app/stations/[stationId]/connections/[connectedStationId]/transfer/page.tsx   (Server Component)
+   └─ transferPairEditPageQuery.getContext(stationId, connectedStationId)      … 読み取り（ADR-0003）
+        └─ TransferPairEditor (Client)  … 下書き（draft）を useState で持つ
+             ├─ RouteCard × N          … 設備チェック・フラグ・方面2×2・プレビュー
+             ├─ DuplicateRouteModal    … 保存時の重複候補（提示のみ）
+             └─ 保存 → PUT /api/stations/[stationId]/connections/[connectedStationId]/transfer
+                        └─ validate（クライアントと共通の純粋関数）→ transferConnectionRepository.savePair()
+                             └─ withTransaction（ADR-0005）
+
+features/transfer-connection/        ports.ts / schema.ts / domain/{draft,validate,duplicates}.ts / components/
+external/query/transferPairEditPageQuery.ts
+external/repository/transferConnectionRepository.ts
+packages/transfer-difficulty/        requirementFor・isBarrierFree（純粋関数。Admin のプレビューと #125 の Web が使う）
 ```
 
-旧行の値を SQL が**読んで**変換するのではなく、確定済みの値を SQL に**埋め込む**。
-旧行には設備の種類・所要時分が無く、旧行から機械的に導出できないため。
-このため、SQL の正しさは「移行データ表」の確定と、手順5の検証クエリで担保する。
+- `features/transfer-connection/domain/` は Next・DB に依存しない純粋関数（ADR-0001）。`app/` にはロジックを書かない。
+- Query と Repository の実装は `external/` に置き、`di.ts` で配線する（ADR-0002）。usecases 層は作らない
+  （前例の station-publishing と同じく、ルートが Repository を直接呼ぶ）。
+- `packages/transfer-difficulty` は `packages/platform-diagram` と同じく、DB・Next 非依存（ESLint で禁止）。
+  ADR-0010 の前例に従うだけで、新しい決定ではない。
 
-## 移行の方式
+## 編集モデル
 
-| 項目 | 決定 |
+### 方面の組み合わせ（ComboKey）
+
+駅対は S・T の各端点が `inbound` / `outbound` の2値を取るので、組み合わせは4通り。
+`ComboKey = 'inbound:inbound' | 'inbound:outbound' | 'outbound:inbound' | 'outbound:outbound'`
+（`${S の方面}:${T の方面}`）。DB の `transfer_connections` は端点を昇順に正規化して持つため、
+**読み込みと保存のときに S/T の向きと A/B の向きを変換する**（変換は `domain/draft.ts` に閉じ、テストする）。
+
+### 下書き（クライアント状態）
+
+```ts
+type RouteDraft = {
+  key: string;                    // カードの安定キー（crypto.randomUUID）
+  routeId: string | null;         // null = 新規ルート
+  label: string;
+  isBaseline: boolean;
+  minutes: number | null;
+  isOutdoor: boolean; requiresExitGate: boolean; requiresStaff: boolean; isOfficiallyGuided: boolean;
+  notes: string;
+  facilities: FacilityTypeCode[]; // 集合。重複なし
+  combos: ComboKey[];             // 適用先
+};
+type PairDraft = {
+  routes: RouteDraft[];
+  connectionNotes: Record<ComboKey, string>;  // ルートが適用されている組み合わせだけ保存する
+};
+```
+
+- `label` と `isBaseline` は本来 `connection_routes`（接続×ルート）の属性だが、**1つの駅対の中では、同じルートの
+  すべての紐付けに同じ値を書く**（決定4）。1枚のカードが持つ値は1つで足りる。
+- 読み込み時、既存データで同じルートの `label` / `isBaseline` が組み合わせごとに違う場合は、最初の組み合わせの値を
+  採り、カードに「紐付けごとに値が異なっていた。保存すると揃う」と警告する（#123 の移行データでは発生しない）。
+
+### 画面の要素
+
+| 要素 | 内容 |
 |---|---|
-| 手段 | 手書きのカスタムマイグレーション（`drizzle-kit generate --custom`）。前例は 0005・0007・0010 |
-| 駅の引き方 | `slug`（環境ごとに `id` が違いうる。0007 の前例） |
-| 原子性 | `DO $$ … $$` の1文（REQ-16） |
-| ガード | 対象20駅の slug が揃わない、または使う4種の設備が `facility_types` に無ければ `RAISE NOTICE` して終了。対象の接続が既にあれば同様（REQ-14・15） |
-| 自己検証 | 投入後に件数（接続60・ルート21・紐付け84・設備18）と、基準ルートを持たない接続・孤立ルートが0であることを検査し、外れれば `RAISE EXCEPTION` でロールバックする（REQ-16）。移行データ表の転記ミスをビルドで止める |
-| データの宣言 | 自然キー（`route_key`）の `VALUES` で書く。ルート・設備・駅対・紐付けの4群 |
-| id の採番 | `uuid_generate_v7()`。`route_key` → id は `CREATE TEMP TABLE … ON COMMIT DROP` |
-| 端点の正規化 | `(id, direction_type)` の行値比較で A < B に並べ替える（CHECK と同じ順序） |
-| 旧表 | 変更しない（REQ-17） |
+| ルートカード | label / 基準ルートのスイッチ / 所要時分 / 4フラグ / 設備の7種チェック / 備考 / 適用先 2×2 / 複製・削除 / プレビュー |
+| 適用先 2×2 | 行を S の方面、列を T の方面とし、`line_directions.displayName` を補助表示する（同義行は「／」で連結。#130 まで解決規則は無い） |
+| 共有バッジ | 「共有中: ○○」＋「この駅対だけ切り離す」（REQ-18・19） |
+| 接続の備考 | 既定は全方面で1欄。組み合わせごとに値が異なるときは組み合わせごとの欄（REQ-10） |
+| 入力ガイド | 代替手段は別ルート／段差無しは `sameFloor`／備考に「〇〇のほうが便利」を書かない（REQ-7・27） |
+| 警告 | 代替手段の同居・基準ルート無し・紐付けごとに値が異なっていた（保存は止めない） |
+| プレビュー | ベビーカー・車いすの必要な行為と、バリアフリールートか。設備0件は「設備が未入力」 |
+
+### 操作（`domain/draft.ts` の純粋関数）
+
+`addRoute` / `duplicateRoute`（`routeId = null`・`combos = []`）/ `removeRoute` / `updateRoute` /
+`toggleCombo` / `toggleFacility` / `detachFromSharedRoute`（`routeId = null` にする）/
+`mergeIntoCandidate`（`routeId` を一致先に付け替える）/ `mergeCards`（2枚を統合。combos は和集合）。
+いずれもイミュータブルで、`editDraft.ts`（station-layout）と同じ形にする。
+
+## データフロー
+
+### 読み込み（`transferPairEditPageQuery.getContext`）
+
+`station_connections` に S→T が無ければ `null`（404）。あれば次を返す。
+
+```ts
+type TransferPairEditContext = {
+  stationId: string; connectedStationId: string;
+  stationName: string; connectedStationName: string;
+  lineName: string | null; connectedLineName: string | null;
+  directionHints: { station: Record<DirectionType, string[]>; connected: Record<DirectionType, string[]> };
+  facilityTypes: { code: FacilityTypeCode; name: string }[];   // facility_types（7行）
+  connections: { combo: ComboKey; connectionId: string; notes: string | null; source: StationConnectionSource | null }[];
+  routes: PairRouteRecord[];        // この駅対の接続に結ばれたルート
+  candidates: CandidateRoute[];     // S か T を端点に持つ接続のルートで、この駅対に結ばれていないもの
+};
+type PairRouteRecord = {
+  routeId: string; minutes: number | null; isOutdoor: boolean; requiresExitGate: boolean;
+  requiresStaff: boolean; isOfficiallyGuided: boolean; notes: string | null; facilities: FacilityTypeCode[];
+  links: { combo: ComboKey; label: string; isBaseline: boolean }[];
+  sharedWith: { stationName: string; connectedStationName: string }[];   // 駅対の外の接続からの参照
+};
+type CandidateRoute = {
+  routeId: string; label: string; minutes: number | null; flags…; facilities: FacilityTypeCode[];
+  usedBy: string;    // 「池袋（丸ノ内線）↔ 池袋（副都心線）」のような表示用の文字列
+};
+```
+
+- 端点が `{S, T}` のどちらか一方でも一致する接続を、端点の両順序（A,B）と（B,A）で引く（domain の読み取り規約）。
+- DTO は JSON で運べる素のデータにする（ADR-0003）。導出結果（必要な行為）は含めず、画面が `packages/transfer-difficulty` で導出する。
+- `directionHints` は `stationLines` → `lines` → `line_directions`（`lineId`, `directionType`）の `displayName` 一覧。
+  路線を持たない駅は空配列。
+
+### 保存
+
+```mermaid
+sequenceDiagram
+  participant UI as TransferPairEditor
+  participant API as PUT …/transfer
+  participant Repo as transferConnectionRepository
+  UI->>UI: validate(draft) と findDuplicates(draft)
+  alt 重複候補あり
+    UI->>UI: モーダルで「共有する」「別ルート」を選ばせる（REQ-15・16）
+  end
+  UI->>API: PairDraft を PairSaveInput に変換して送る
+  API->>API: zod → validate（クライアントと共通）
+  API->>Repo: savePair(stationId, connectedStationId, input)
+  Repo->>Repo: withTransaction: ルート upsert → 接続 upsert → 紐付け入れ直し → 空の接続・孤立ルート削除
+  Repo-->>API: 成功 / null（駅対なし）/ ドメインエラー
+  API-->>UI: 200 / 404 / 409 / 422
+  UI->>UI: 成功で notifications.show と router.refresh
+```
+
+#### `savePair` の手順（1トランザクション）
+
+1. `station_connections` に S→T があるか確認する。無ければ `null` を返す（404）。
+2. この駅対の既存の接続（端点の両順序）と、その `connection_routes`、参照しているルート ID を読む。
+3. 入力の `routeId`（非 null）が「この駅対に結ばれている」または「候補の範囲（S か T を端点に持つ接続のルート）」に
+   あることを確認する。外れていれば `RouteOutOfScopeError`（422）。
+4. ルートを書く。新規は INSERT、既存は UPDATE（`minutes`・4フラグ・`notes`）し、設備は delete → insert で入れ替える。
+5. ルートが1本以上ある組み合わせの接続を upsert する（`unique_transfer_connection` を衝突対象に。端点は
+   `normalizeTransferEndpoints()` で正規化）。新規は `source = 'manual'`、既存の `source` は保つ。`notes` は更新する。
+6. この駅対の接続の `connection_routes` を**全部削除してから入れ直す**（label・isBaseline は入力どおり）。
+   先に全部消すので、基準ルートの付け替えで `unique_connection_baseline` に違反しない。
+7. 紐付けが0件になった接続を削除する（ルートが0本になった組み合わせ）。
+8. この保存で紐付けから外れたルートのうち、どの接続からも参照されなくなったものを削除する。設備は cascade で消える。
+
+- 端点の変換: S の方面と T の方面から `TransferEndpoint` を2つ作り、`normalizeTransferEndpoints()` に通して A/B に割り当てる。
+- `unique_connection_route_label` の違反（23505）は `RouteLabelTakenError`（409）に変換する。`isPgErrorCode`（`external/pgError.ts`）を使う
+  （`withTransaction` の中では `err.cause.code` にも入る）。他の制約違反は想定外として 500。
+- ポート型（`ports.ts`）: `TransferConnectionRepository { savePair(...): Promise<{ ok: true } | null> }` と
+  ドメインエラー `RouteOutOfScopeError` / `RouteLabelTakenError` / `TransferInputInvalidError`。
+
+#### 駅対の削除（`stationConnectionRepository.deletePair` の拡張）
+
+`withTransaction` にして、次を1トランザクションで行う（REQ-25）。
+`station_connections` の2行を削除 → その駅対の `transfer_connections` を削除（`connection_routes` は cascade）→
+孤立ルートを削除。孤立ルートの削除は `savePair` と同じ内部関数を共有する。
+
+## インターフェース
+
+### API
+
+| メソッド | パス | 本文 | 応答 |
+|---|---|---|---|
+| PUT | `/api/stations/[stationId]/connections/[connectedStationId]/transfer` | `PairSaveInput` | 200 `{ success: true }`（既存の API と同じ形）/ 400（JSON 不正・zod）/ 404（駅対なし・id が UUID でない）/ 409（label 重複）/ 422（検証違反の配列 `{ error: ValidationIssue[] }`・範囲外の `routeId`）/ 500 |
+
+```ts
+type PairSaveInput = {
+  routes: {
+    routeId: string | null; label: string; isBaseline: boolean; minutes: number | null;
+    isOutdoor: boolean; requiresExitGate: boolean; requiresStaff: boolean; isOfficiallyGuided: boolean;
+    notes: string | null; facilities: FacilityTypeCode[]; combos: ComboKey[];
+  }[];
+  connectionNotes: Partial<Record<ComboKey, string | null>>;
+};
+```
+
+### `packages/transfer-difficulty`
+
+```ts
+export const FACILITY_TYPE_CODES = ['sameFloor','elevator','ramp','wheelchairEscalator','escalator','stairLift','stairs'] as const;
+export type FacilityTypeCode = typeof FACILITY_TYPE_CODES[number];
+export type Persona = 'stroller' | 'wheelchair';
+export type Requirement = 'as_is' | 'call_staff' | 'fold_and_carry' | 'lift' | 'assisted_by_staff' | 'impossible';
+
+// 設備の集合から、そのペルソナにとって最も重い行為を返す。空集合は null（設備未入力。ADR-0012）
+export function requirementFor(persona: Persona, facilities: readonly FacilityTypeCode[]): Requirement | null;
+export function isBarrierFree(requirement: Requirement | null): boolean;   // as_is または call_staff。null は false
+export const REQUIREMENT_LABEL: Record<Requirement, string>;
+export const PERSONA_LABEL: Record<Persona, string>;
+```
+
+導出表（#30 REQ-13。旧版の `docs/spec` は git 履歴にある）:
+
+| 設備 | ベビーカー | 車いす |
+|---|---|---|
+| `sameFloor` / `elevator` / `ramp` | `as_is` | `as_is` |
+| `wheelchairEscalator` | `fold_and_carry` | `call_staff` |
+| `escalator` | `fold_and_carry` | `impossible` |
+| `stairLift` | `impossible` | `call_staff` |
+| `stairs` | `lift` | `assisted_by_staff` |
+
+重さの順序 — ベビーカー: `as_is` ＜ `fold_and_carry` ＜ `lift` ＜ `impossible` /
+車いす: `as_is` ＜ `call_staff` ＜ `assisted_by_staff` ＜ `impossible`。
+
+- `FACILITY_TYPE_CODES` は DB の `facility_types` の7行と一致すること。DB とパッケージの一致は自動テストでは守れない
+  （CI に DB が無い）ため、手動検証で Neon の `facility_types` と突き合わせる。
 
 ## エラーマトリックス
 
 | 状況 | 結果 | 備考 |
 |---|---|---|
-| 対象20駅のいずれかの `slug` が無い | 何もせず終了（`NOTICE`） | ビルドは失敗しない |
-| 対象の接続が既にある | 何もせず終了（`NOTICE`） | 二重投入の防止 |
-| 制約違反（重複端点・2本目の基準ルート・同一 label 等） | マイグレーション全体が失敗しロールバック | 移行データ表の誤り。事前検証（手順5）で検出する |
-| `type_code` が `facility_types` に無い | FK 違反で失敗 | `wheelchairEscalator` は 0010 で追加済み |
-| 旧17行が Admin で編集された | SQL は検知しない | マージ直前に再確認する（tasks.md TASK-14） |
+| 駅対（`station_connections` の S→T）が無い | ページは `notFound()`、保存は 404 | REQ-2 |
+| JSON が不正 / zod に合わない | 400（`{ error: issues }`） | 設備コードが7種以外もここ |
+| ルートに組み合わせが無い・label 重複・基準ルート2本・`label` が空 | 422 | `validate` がクライアントと共通 |
+| `routeId` が範囲外 | 422 `RouteOutOfScopeError` | 無関係な接続のルートの書き換えを防ぐ |
+| `unique_connection_route_label` 違反（競合で発生） | 409「同じ名前のルートがあります」 | REQ-28 |
+| 想定外の DB エラー | 500（トランザクションは全体がロールバック） | |
+| 2人が同時に同じ駅対を保存した | **後勝ち**（検出しない） | 管理者は開発者1名の前提。競合検出は対象外 |
+| 保存済みの共有ルートを編集した | 共有先にも反映（バッジで明示） | REQ-18 |
+| 重複候補があるが「別ルート」を選んだ | そのまま保存する | 決定2 |
 
 ## ユニットテスト戦略
 
-- DB マイグレーションを自動テストで検証する DB が CI に無い（#122 と同じ）。
-  `BEGIN; <DO ブロック>; <検証 SELECT>; ROLLBACK;` を development で実行して検証する。
-- 検証は `NOTICE` ではなく **`SELECT` で結果を返す**（#122 の反省。NOTICE はトーストで出て取りこぼす）。
-- 検証クエリ（期待値つき）:
+CI に DB が無いため（#122・#123 と同じ）、DB を使う部分は手動検証で担保する。次を自動テストにする。
 
-| 検証 | 期待値 |
+| 対象 | 内容 |
 |---|---|
-| 接続の行数（移行対象の駅に限る） | 60 |
-| 駅対ごとの接続の行数 | すべて 4 |
-| 基準ルートを持たない接続の数 | 0 |
-| 基準ルートを2本以上持つ接続の数 | 0（部分ユニークで保証されるが再確認） |
-| どの接続からも参照されないルートの数 | 0 |
-| 淡路町↔小川町のルート数・設備行の重複 | ルートは2本。丸ノ内 outbound 側2接続が1本、inbound 側2接続が1本を共有 |
-| 同一ルートに同じ `type_code` の行 | 0件（`unique_transfer_route_facility_type` で保証されるが再確認） |
-| 「大手町」を含む備考の数 | 0 |
-| 移行データ表との一致 | ルートごとの（label・フラグ・設備の種類の集合）が表と1対1 |
+| `packages/transfer-difficulty` | 7設備×2ペルソナの導出表、「最も重い行為」（混在）、空集合が `null`、`isBarrierFree` |
+| `domain/draft.ts` | コンテキスト→下書き（淡路町型: 組み合わせが2つのカードに分かれる／御茶ノ水型: 共有の `sharedWith`）、下書き→入力、S/T ⇔ A/B の変換、複製・切り離し・統合 |
+| `domain/validate.ts` | REQ-11 の各違反、組み合わせ単位の判定、警告（基準ルート無し・代替手段の同居） |
+| `domain/duplicates.ts` | 設備0件は対象外、自分自身は除外、変更が無い既存ルートは検出しない、候補外は出ない、同じ画面のカードとの一致 |
+| `schema.ts`（zod） | 必須・上限・設備コードの列挙 |
+| `route.test.ts` | 200・400・404・409・422（`@/di` をモックし、ハンドラを直接呼ぶ。前例: publication の route.test.ts） |
+| コンポーネント | `RouteCard`（設備の切替・プレビュー表示・0件は「未入力」）、`DuplicateRouteModal` |
 
-## 決定記録
+DB 検証は手動: development で保存し、Neon MCP（read-only）の SELECT で不変条件を確かめる（tasks.md TASK-13）。
 
-決定1〜3は既存ADRに反せず、この作業限りの判断のため ADR にしない。
-決定4・5は、覆すときに明示的な意思決定を要するモデルの決定であり、次のIssue以降も有効なため
-ADR に昇格した（決定4 → [ADR-0011](../adr/0011-transfer-route-facilities-as-set.md)、
-決定5 → [ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)）。本書には結論だけを置く。
+## 決定記録（この作業限りの判断）
 
-### 決定1 — 移行はマイグレーションで行い、値を埋め込む
+いずれも既存 ADR に反せず、覆すときに明示的な意思決定を要するアーキテクチャ決定ではないため、ADR にしない
+（ただし決定2はフェーズ5で ADR の要否を再確認する）。
 
-**決定**: 手書きのカスタムマイグレーション1本で投入する。旧行を読んで変換する形にはしない。
+### 決定1 — 編集の単位は「駅対」。1画面で方面の4通りをまとめて編集する
+
+**決定**: 接続（駅×方面の端点対）ごとの画面ではなく、駅対（S・T）ごとの1画面で、4通りの組み合わせの接続を編集する。
+ルートカードに「適用先の方面 2×2」を持たせ、全方面共通は「4つすべてにチェック」、方面差は「カードを分けてチェックを割り振る」で表す。
 
 **オプション**:
-- (a) マイグレーション（採用）— Vercel のビルドが development / preview / production に同じ手順で
-  適用する。CLAUDE.md の「手で本番に流さない」に合う。
-- (b) `apps/scripts` の手動スクリプト — 却下。本番へ手で流すことになり、環境ごとに適用漏れが起きうる。
-- (c) 旧行を読んで変換する SQL — 却下。旧行に設備・時分が無く、機械的に導出できない。
+- (a) 駅対単位＋適用先の 2×2（採用）— ルートの共有・統合・分岐が、同じ画面のカード操作で完結する。
+  「全方面共通で始めて、あとから方面ごとに分ける」（Issue 本文）も、複製とチェックの付け替えで表せ、専用の操作が要らない。
+- (b) 接続（組み合わせ）ごとの画面 — 却下。全方面共通の駅を入力するのに4回の入力と共有の指定が要る。共有を後から付け替える導線も別に要る。
+- (c) 「全方面共通」モードと「方面ごと」モードを切り替える — 却下。モードの切替が2つの状態モデルを生み、
+  途中の状態（一部だけ分けた）を表せない。2×2 のチェックなら中間状態が自然に表せる。
 
-**影響**: 値は SQL に埋め込まれるため、移行後の訂正は #124 の Admin で行う。マイグレーションは
-一度適用されたら二度と流れない（drizzle の履歴）。
+**影響**: 保存は「駅対の最終状態」を1回で送る（決定5）。ルート ID の付け替えや共有の解消は下書きの操作として閉じる。
 
-### 決定2 — 本郷三丁目の備考は、開発者判断で接続の `notes` に残す
+### 決定2 — 重複検出は「提示」に弱め、範囲は同じ駅に限る（#30 REQ-23 の改訂）
 
-**決定**: 「隣の後楽園・春日駅の乗り換えであれば屋内で完結しますが、移動距離が長くなるため一長一短です」を、
-削除せず接続の `notes` に残す（開発者確認済み・2026-09-25）。
+**決定**: 設備の集合と4フラグが一致するルートを、S か T を端点に持つ接続の範囲で候補として提示し、モーダルで
+「既存ルートを共有する」か「別ルートとして作る」かを選ばせる。保存は止めない。設備0件は対象外（ADR-0012）。
 
-**コンテキスト**: `docs/domain/station-master-model.md`「備考の役割」は、出発地・目的地に依存する
-経路上の選好（「〇〇駅のほうが便利」）を書かないと定める。この文は他駅との比較であり、
-淡路町の「大手町のほうが便利」と同種である。一方で「一長一短」と中立に書かれ、優劣を断定していない。
-開発者は情報を失いたくないとして残すことを選んだ（#30 決定9の趣旨「情報を失いたくない」に沿う）。
+**コンテキスト**: #30 REQ-23 は「接続をまたいで検出し、保存を中断」と定めたが、#123 Q2 で確定した
+池袋の6駅対は、中身が完全に一致する（すべて `{elevator}`・フラグ全部 ✕）のに、別の物理経路として別ルートで持つ。
+中断すると、この6本は新規に作れない（label を変えても不可）。
 
-**影響**: 現行のドメイン記述と例外が生じる。次のいずれかを #124 着手時に決める:
-この備考を消す／ドメイン記述に「中立な比較は許容する」と足す。**本Issueでは `docs/domain/` の
-「備考の役割」のルールを変えず**（恒久ルールの変更は本Issueの判断ではないため）、現状のデータにある
-**既知の例外として1段落を添えた**（ドメインの記述と実データの乖離を残さないため）。
+**オプション**:
+- (a) 同じ駅の範囲で提示（採用）— 池袋の6本のような別経路を作れる。共有が自然な御茶ノ水型（駅対をまたいで共有）は、
+  同じ駅を端点に持つので候補に出る。
+- (b) 範囲を DB 全体にして提示 — 却下。中身が同じルートは全国にいくらでもあり、無関係な候補で埋まる。
+- (c) 範囲を同じ駅対だけにする — 却下。御茶ノ水型（快速と各停は駅対が違うが1本を共有）の共有を促せない。
+- (d) REQ-23 どおりハードブロック — 却下。上の池袋が作れない。事実を曲げて制約を通す圧力になる（#30 決定11が退けた形）。
 
-**レビュー**: #124 着手時。
+**影響**: `docs/domain/` の不変条件表の該当行（範囲と、提示であること）と `schema.ts` の `transferRoutes` のコメントを、
+フェーズ5で上書きする。集合の一意性を DB が守らない点は変わらない。**レビュー**: 誤った二重登録が実際に問題になったとき。
 
-### 決定3 — 逆向きの旧行は、値のある方を採る
+### 決定3 — 導出関数は新パッケージ `packages/transfer-difficulty` に置く
 
-**決定**: 後楽園↔春日（三田線）は、`後楽園→春日` に備考があり `春日→後楽園` は備考が NULL。
-無向1行への集約では、備考のある方を採る。難易度は両方向で一致している。
+**決定**: `requirementFor` と関連の定数を、DB・React 非依存のパッケージにする。
+**オプション**: (a) 新パッケージ（採用）— #125 が import するだけで済み、Admin と Web の解釈のずれが構造的に起きない /
+(b) Admin の feature に置く — 却下。#125 で Web に複製するか、そのとき切り出す二度手間が発生する。
+**影響**: `apps/admin` の依存に追加（`workspace:*`）。`packages/platform-diagram` と同じ構成（ADR-0010 の前例に従うだけ）。
 
-### 決定4 — ルートの設備は「直列の並び」ではなく「種類の集合」で持つ
+### 決定4 — `label` と `isBaseline` は、駅対の中では同じルートの全紐付けで同じ値を書く
 
-**決定**: `transfer_route_facilities` から `seq` と `unique (routeId, seq)` を落とし、
-`unique (routeId, typeCode)` を足す（開発者提案・確認済み・2026-09-25）。#30・#122 の「直列の並び」を覆す。
-新しいマイグレーション 0011 で行い、適用済みの 0009 は書き換えない。
-コンテキスト・却下案・影響は [ADR-0011](../adr/0011-transfer-route-facilities-as-set.md)。
+**決定**: モデル上は紐付けごとに違ってよいが、Admin は1枚のカードにつき1つの値を、そのルートの全紐付けに書く。
+DB では縛らない。**理由**: 方面ごとに呼び名や基準かどうかが変わる要望が無く、カードに持たせる値が倍増する。
+必要になれば、下書きを紐付けごとの値に広げられる（読み込みは既に警告付きで許容している）。
+**影響**: 書き込み規約として `docs/domain/` に書く（フェーズ5）。
 
-### 決定5 — 設備0件のルートは「設備未入力」であり、必要な行為を導出しない
+### 決定5 — 保存は「駅対の最終状態」を1回で送り、紐付けを入れ直す
 
-**決定**: `transfer_route_facilities` に行が無いルートは「設備が無い」ではなく**「設備未入力」**を表す。
-段差の無いルートは `sameFloor` を明示する。表示層（#125）は設備0件のルートについて必要な行為を導出せず、
-バリアフリールートにも数えない。#124 の重複検出も設備0件のルートを対象外にする。
-コンテキスト・却下案・影響は [ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)。
+**決定**: 差分ではなく最終状態を PUT する。Repository は紐付けを全部消してから入れ直す。
+**オプション**: (a) 最終状態＋入れ直し（採用）— 基準ルートの降格と昇格の順序問題（部分ユニーク）が消える。API が1本 /
+(b) 操作単位の API（ルート追加・基準変更・共有…）— 却下。操作ごとに不変条件の検証が要り、
+画面の状態とサーバーの状態がずれる余地が増える。
+**影響**: `connection_routes.id` は保存のたびに変わる。この ID を参照する表は無い（#122）ので問題ない。
+`createdAt` は入れ直しで新しくなる（紐付けの作成日時に意味は無い）。
 
-## 移行データ表（確定・2026-09-26）
+### 決定6 — 本郷三丁目の備考は例外のまま残す（#123 決定2 の先送りの解決）
 
-**開発者が確定した内容である**（Q0〜Q11 をすべて決着。既定案を含め「提案どおり」で承認）。
-`0012_migrate_transfer_difficulty.sql` は、この表を1対1で SQL にしたものになる。
-
-### 確定した規則
-
-- **設備は種類の集合**（順序なし。DB のコードはキャメルケース）。
-  旧評価が導出結果で再現されるよう、旧難易度が「バリアフリールートあり」を意味する接続の BF ルートには
-  `elevator` を入れる。旧評価から設備が言えない基準ルートは**設備0件**（＝設備未入力。決定5）。
-  設備が不完全な集合になりうるが、導出結果は最も重い設備で決まるため旧評価とは矛盾しない。
-- **所要時分**は確認できたものだけ入れる（後楽園↔春日の基準ルート 3 分）。他は `NULL`（Q1）。
-- **フラグ**（屋外 / 改札外 / 係員 / 公式）は、旧備考・旧難易度・#30 決定7の実例表で言えるものだけ ◯、
-  言えないものは ✕。
-- **共有**: 1つの駅対の4接続（方面2×2）は同じルートを参照する。駅対をまたぐ共有は
-  **御茶ノ水の快速・中央総武（1本を8接続で共有。Q6・Q7）だけ**で、池袋の6駅対（Q2）と
-  春日の三田線・大江戸線（Q5）は共有しない。
-- **方面**: 丸ノ内線は `outbound`＝池袋方面、`inbound`＝荻窪方面。淡路町↔小川町だけ、丸ノ内線側の方面で
-  参照するルートが変わる。それ以外は全方面（4接続すべて）が同じルートを参照する。
-- **備考**: 淡路町↔新御茶ノ水の「大手町のほうが便利」は移さない（REQ-11）。
-  「必ず屋根のない地上の公道」「改札係員に申し出る」のうち、フラグで表せるものは備考に残さない（REQ-12）。
-  ただし Q3 により、後楽園↔南北の BF ルートは案内の文言として残す。
-
-### ルート（21本）
-
-`基準` は、そのルートを参照する接続での `isBaseline`。
-
-| # | `route_key` | label | 基準 | 設備 | 屋外 / 改札外 / 係員 / 公式 | 時分 | notes |
-|---|---|---|---|---|---|---|---|
-| 1 | `ikebukuro_fukutoshin` | エレベーター経由 | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 2 | `ikebukuro_yurakucho` | エレベーター経由 | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 3 | `ikebukuro_yamanote` | エレベーター経由 | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 4 | `ikebukuro_saikyo` | エレベーター経由 | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 5 | `ikebukuro_shonan` | エレベーター経由 | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 6 | `ikebukuro_tojo` | エレベーター経由 | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 7 | `ikebukuro_seibu_base` | 一般経路 | ◯ | なし（未入力） | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 8 | `ikebukuro_seibu_bf` | エレベーター経由（1番線経由） | ✕ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | 西武線のB1F改札とホーム間は1番線以外エレベーターで繋がっていません。他のホームに向かう場合も、一度1番線を経由して向かう必要があります。 |
-| 9 | `korakuen_namboku_base` | 改札内乗換通路経由 | ◯ | なし（未入力） | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 10 | `korakuen_namboku_bf` | 改札外エレベーター経由 | ✕ | `elevator` | ✕ / ◯ / ◯ / ✕ | NULL | 改札係員に申し出て改札外にあるエレベーターを使用する必要があります。 |
-| 11 | `korakuen_mita_base` | 改札内乗換通路経由 | ◯ | なし（未入力） | ✕ / ✕ / ✕ / ✕ | 3 | — |
-| 12 | `korakuen_mita_bf` | 改札外経由 | ✕ | `elevator` | ✕ / ◯ / ✕ / ✕ | NULL | 東京メトロと都営地下鉄間の乗り換えの場合は、自動改札機を通っても60分以内に都営の改札に入場すれば乗継割引が適用されます。 |
-| 13 | `korakuen_oedo_base` | 改札内乗換通路経由 | ◯ | なし（未入力） | ✕ / ✕ / ✕ / ✕ | 3 | — |
-| 14 | `korakuen_oedo_bf` | 改札外経由 | ✕ | `elevator` | ✕ / ◯ / ✕ / ✕ | NULL | （#12 と同文） |
-| 15 | `hongo_base` | 地上経由 | ◯ | なし（未入力） | ◯ / ◯ / ✕ / ✕ | NULL | — |
-| 16 | `hongo_bf` | 5番出口エレベーター経由 | ✕ | `elevator` | ◯ / ◯ / ✕ / ✕ | NULL | 都営側のエレベーターは5番出口にあり、片側3車線の国道を渡る必要があります。 |
-| 17 | `ochanomizu` | 地上経由 | ◯ | `elevator` | ◯ / ◯ / ✕ / ◯ | NULL | — |
-| 18 | `awajicho_ogawamachi_a` | 車いす対応エスカレーター経由 | ◯ | `elevator`, `wheelchairEscalator` | ✕ / ✕ / ◯ / ✕ | NULL | — |
-| 19 | `awajicho_ogawamachi_b` | エレベーターのみ | ◯ | `elevator` | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 20 | `awajicho_shinochanomizu_base` | 一般経路 | ◯ | なし（未入力） | ✕ / ✕ / ✕ / ✕ | NULL | — |
-| 21 | `awajicho_shinochanomizu_wc` | 階段昇降機経由 | ✕ | `elevator`, `ramp`, `stairLift` | ✕ / ✕ / ◯ / ✕ | NULL | 移動距離は400m以上あります。 |
-
-設備の行は計18行（1〜6・8・10・12・14・16・17・19 が各1、18 が2、21 が3）。
-
-**判断の根拠**
-- #18 の係員 ◯: 旧車いす難易度 `assistance_required`（途中に駅員による介助が必要）と、
-  `wheelchairEscalator` が係員操作であることによる。
-- #12・#14 の係員 ✕: 旧車いす難易度は `assistance_required` だが、#30 決定7の実例表（開発者確認済み）が
-  後楽園↔春日を係員 ✕ としているため表に従う。旧評価との差は導出結果（`elevator` のみ＝そのまま通れる）に現れる。
-- #17: 旧難易度 `optimal` の接続（快速）と未評価の接続（各停）が同一ルートを共有する（Q7）。
-  各停の接続も、共有ルートの中身によりバリアフリールートありと導出される。
-- #21: `stairLift` を含むためベビーカーは通れず（旧 `inaccessible` と整合）、車いすは「係員を呼ぶ」でバリアフリー
-  ルートになる。距離が長いことは所要時分が入ったときに迂回度として導出する。それまでは notes に事実として書く
-  （他駅との比較ではないため決定1・#30 決定9に反しない）。
-
-### 駅対（15組）と接続（60行）
-
-各駅対は方面2×2の4接続を持つ。接続の `source` は旧行を踏襲する。
-
-| `pair_key` | 丸ノ内線側の駅 `slug` | 相手側の駅 `slug` | `source` | 接続の notes | 参照するルート（label で結ぶ） |
-|---|---|---|---|---|---|
-| `ikebukuro_fukutoshin` | `tokyometro-marunouchi-ikebukuro` | `tokyometro-fukutoshin-ikebukuro` | ekidata_group | — | #1 |
-| `ikebukuro_yurakucho` | 同上 | `tokyometro-yurakucho-ikebukuro` | ekidata_group | — | #2 |
-| `ikebukuro_yamanote` | 同上 | `jr-east-yamanote-ikebukuro` | ekidata_group | — | #3 |
-| `ikebukuro_saikyo` | 同上 | `jr-east-saikyokawagoe-ikebukuro` | ekidata_group | — | #4 |
-| `ikebukuro_shonan` | 同上 | `jr-east-shonanshinjuku-ikebukuro` | ekidata_group | — | #5 |
-| `ikebukuro_tojo` | 同上 | `tobu-tojo-ikebukuro` | ekidata_group | — | #6 |
-| `ikebukuro_seibu` | 同上 | `seibu-ikebukuro-ikebukuro` | ekidata_group | — | #7・#8 |
-| `korakuen_namboku` | `tokyometro-marunouchi-korakuen` | `tokyometro-namboku-korakuen` | ekidata_group | — | #9・#10 |
-| `korakuen_mita` | 同上 | `toei-mita-kasuga` | manual | — | #11・#12 |
-| `korakuen_oedo` | 同上 | `toei-oedo-kasuga` | manual | — | #13・#14 |
-| `hongo_oedo` | `tokyometro-marunouchi-hongosanchome` | `toei-oedo-hongosanchome` | ekidata_group | 隣の後楽園・春日駅の乗り換えであれば屋内で完結しますが、移動距離が長くなるため一長一短です。 | #15・#16 |
-| `ochanomizu_chuorapid` | `tokyometro-marunouchi-ochanomizu` | `jr-east-chuorapid-ochanomizu` | ekidata_group | — | #17 |
-| `ochanomizu_chuosobu` | 同上 | `jr-east-chuosobulocal-ochanomizu` | ekidata_group | — | #17（共有） |
-| `awajicho_ogawamachi` | `tokyometro-marunouchi-awajicho` | `toei-shinjuku-ogawamachi` | ekidata_group | — | 丸ノ内 `outbound` 側の2接続 → #18／`inbound` 側の2接続 → #19 |
-| `awajicho_shinochanomizu` | 同上 | `tokyometro-chiyoda-shinochanomizu` | ekidata_group | — | #20・#21 |
-
-本郷三丁目の接続の notes は、4接続すべてに同じ文を入れる（旧のベビーカー側・車いす側の「歩行距離」「移動距離」は
-「移動距離」に統一。決定2）。
-
-**件数**: 接続 60 / ルート 21 / 接続とルートの紐付け 84 / 設備 18。
-紐付けの内訳: 池袋6駅対 24 + 池袋↔西武 8 + 後楽園↔南北 8 + 後楽園↔春日 16 + 本郷三丁目 8 +
-御茶ノ水 8 + 淡路町↔小川町 4 + 淡路町↔新御茶ノ水 8 = 84。
-
-### 確定した質問の一覧
-
-| Q | 確定内容 |
-|---|---|
-| Q0 | 設備が確認できないルートは設備0件で移す（＝設備未入力。決定5） |
-| Q1 | 所要時分が不明なルートは `NULL` |
-| Q2 | 池袋の6駅対は共有しない |
-| Q3 | 後楽園↔南北の BF ルートの notes に「改札係員に申し出て…」を残す |
-| Q4 | 乗継割引の文は春日の BF ルート（三田線・大江戸線）の notes |
-| Q5 | 春日の三田線・大江戸線は共有しない |
-| Q6・Q7 | 御茶ノ水は JR 側の方面によらず、快速・各停で同一ルートを共有（8接続で1本） |
-| Q8 | Q7 により解消（各停の別ルートは作らない） |
-| Q9 | 淡路町↔小川町 A は `elevator` + `wheelchairEscalator`。階段の代替は記録しない |
-| Q10 | A・B とも各接続で唯一のルートなので基準 |
-| Q11・Q11b | 車いす向けは `elevator`・`ramp`・`stairLift`、係員 ◯、notes に「移動距離は400m以上あります。」 |
+**決定**: 「隣の後楽園・春日駅の乗り換えであれば屋内で完結しますが…一長一短です」を残す。恒久ルール（備考の役割）は変えない。
+**影響**: `docs/domain/` の「既知の例外」の「#124 の着手時に決める」を、「例外として維持する。消すかどうかは
+Admin から編集できる」に更新する。入力欄の説明（REQ-27）で、新しい備考に書かないよう示す。
 
 ## フェーズ5で `docs/domain/` へ移す内容
 
-`docs/spec/` は次のIssueで全面書き換えされる。本Issueで確定する恒久知識を列挙する。
-
-- **`station-master-model.md`「乗換難易度」節の適用状況の注記を上書きする**:
-  「スキーマ＋評価済み15駅対・60接続を移行済み。読み書きするコードはまだ無い。旧4列は #125 まで現行の読み手」。
-  #124・#125 が完了したら注記を外す旨は残す。
-- **設備の集合化（決定4）を反映する**。対象は `station-master-model.md`「乗換難易度」節の次の3か所:
-  4層構造の図（「直列に通る順。seq」→ 種類の集合）、不変条件の表
-  （「設備の並びが壊れない `unique (routeId, seq)`」→ 「同じルートに同じ種類は1行 `unique (routeId, typeCode)`」。
-  「設備の並びと4フラグが既存ルートと…」の行も「種類の集合」に）、「ルートと設備」の
-  「`seq` は直列の並びだけを表す」の項（「集合は『すべて通る』を意味するため、代替手段は別ルート」に）。
-  回数・順序を持たない理由と、必要になったら `count` 列を足すことも書く。
-- **設備0件のルートは「設備未入力」**（決定5）。「ルートと設備」の項に、段差の無いルートは `sameFloor` を
-  明示すること、0件のルートは必要な行為を導出せずバリアフリールートにも数えないことを書く。
-  「同じ段差の代替手段は別ルート」の項には、一方が両ペルソナで他方以下の重さなら重い方の記録は省略できること
-  （階段と車いす対応エスカレーター。決定・Q9）と、軽い方が食い違う場合（階段と階段昇降機）は別ルートで
-  記録する必要があることを添える。
-- 上記以外のドメインルール（4層構造・接続の不変条件）に**変更なし**。移行は既存のルールに従うだけで、新しい不変条件は生まれない。
-- 決定2（本郷三丁目の備考）は「備考の役割」と例外関係になるが、恒久ルールの変更ではない。
-  #124 着手時の判断として下記「先送りした将来作業」に置く。
-- ADR: 決定4を [ADR-0011](../adr/0011-transfer-route-facilities-as-set.md)（Accepted）、決定5を
-  [ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)（Proposed。#125 で表示層の実装を確認して Accepted）として新規作成。
-  決定1〜3はこの作業限りの判断。
+- **適用状況の注記**: Admin の入力は新モデルに切り替え済み。旧4列は Admin から書かれない（凍結）。Web は #125 まで旧4列を読む。
+- **不変条件表**: 「設備の種類の集合と4フラグが一致するルートを作らない」の行を、範囲（S か T を端点に持つ接続）と
+  「提示であり中断ではない」に上書きする（決定2）。「接続を消したあとに孤立ルートが残らない」の行に、実装場所
+  （`transferConnectionRepository` と `deletePair`。保存・削除の1トランザクション）を書く。
+- **Admin の書き込み規約**: 駅対の中で `label` と `isBaseline` は同じルートの全紐付けにそろえる（決定4）。
+- **備考の役割**の既知の例外を更新（決定6）。
+- `docs/adr/`: 新規なし。ADR-0012 は `Proposed` のまま（#125 で `Accepted`。#124 では「Admin の重複検出が設備0件を対象外にした」ことを実装として確認する）。
+- `docs/domain/` の他のファイル: 変更なし（フェーズ5で確認結果を残す）。
 
 ## 先送りした将来作業
 
-- [#124](https://github.com/Natsugure/furatora/issues/124) Admin 入力（旧行に無い13駅対の入力を含む。
-  本郷三丁目の備考の扱い（決定2）を再検討する）
-- [#125](https://github.com/Natsugure/furatora/issues/125) Web 表示（旧4列と型の削除は完了後の別デプロイ）
-- [#82](https://github.com/Natsugure/furatora/issues/82) 物理駅粒度への統合
-- [#128](https://github.com/Natsugure/furatora/issues/128) 中野坂上型
+- [#125](https://github.com/Natsugure/furatora/issues/125) Web 表示。旧4列と旧型の削除は完了後の別デプロイ
+- [#130](https://github.com/Natsugure/furatora/issues/130) 方面ラベルの解決（`isDefault`）。本Issueの補助表示は暫定
+- [#128](https://github.com/Natsugure/furatora/issues/128) 中野坂上型 / [#82](https://github.com/Natsugure/furatora/issues/82) 物理駅粒度への統合
+- 複数管理者の同時編集の競合検出、ルートの一括インポート（必要になれば Issue を起票する）

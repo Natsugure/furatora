@@ -129,7 +129,9 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
 Web の駅詳細・Admin の駅編集・設備編集・レイアウト画面が読んでいる。
 乗換難易度の新モデル（次節）が入っても、この表は接続一覧として残る。
 乗換難易度を持つ `strollerDifficulty` / `wheelchairDifficulty` / `notesAbout*` の4列は、
-新モデルへの移行（#123〜#125）が済んだ**あとの別デプロイ**で落とす。
+**Admin からはもう書かれない**（[#124](https://github.com/Natsugure/furatora/issues/124)。値は #123 の
+移行時点のまま凍結）。Web が読み終える [#125](https://github.com/Natsugure/furatora/issues/125) が済んだ
+**あとの別デプロイ**で落とす。
 
 | `source` | 意味 |
 |---|---|
@@ -147,21 +149,24 @@ Admin の駅編集画面の「接続を追加」から
 作成・削除はいずれも `(A→B)` と `(B→A)` を対で扱う。作成は
 `unique_station_connection`（`stationId, connectedStationId`）を衝突対象にした
 `onConflictDoNothing` で冪等（`external/repository/stationConnectionRepository.ts`）。
+**削除は、接続一覧の2行に加えて、その駅対の乗換難易度（`transfer_connections` 以下）と孤立したルートも
+同じトランザクションで消す。** `transfer_connections` は `stationConnections` への FK を持たない
+（旧表は方面を持たない有向2行のため）ので、接続一覧だけを消すと評価データが残る。
+作成した接続は乗換難易度が未評価のまま作られ、続けて駅対の編集画面（下記「乗換難易度」）で入力する。
 再取込の機構は無いため、この3区分は現在は**由来の記録**として働く。
-現行の難易度4列は有向2行の両方に同じ値が入り、向きで異なる場合は既存の
-`PUT /api/station-connections/[connectionId]` で個別に直す。この運用は4列とともに廃止される。
 
 ## 乗換難易度（`transferConnections` ほか4表）
 
-> **適用状況**: 2026-09-26 現在、**スキーマと、評価済み15駅対（接続60行・ルート21本）のデータ移行まで
-> 実装済み**（[#122](https://github.com/Natsugure/furatora/issues/122)・
-> [#123](https://github.com/Natsugure/furatora/issues/123)。development に適用済み。
-> 本番（`main`）へは未適用で、`main` へのリリース時に Vercel のビルドが流す）。
-> **読み書きするコードはまだ無い**。現行の Admin・Web は前節の `stationConnections` の難易度4列を
-> 読み書きしている。Admin 入力は [#124](https://github.com/Natsugure/furatora/issues/124)、
-> Web 表示は [#125](https://github.com/Natsugure/furatora/issues/125)。2件が完了したら、この注記を外す。
+> **適用状況**: 2026-09-26 現在、**スキーマ・評価済み15駅対（接続60行・ルート21本）のデータ移行・
+> Admin の入力まで実装済み**（[#122](https://github.com/Natsugure/furatora/issues/122)・
+> [#123](https://github.com/Natsugure/furatora/issues/123)・
+> [#124](https://github.com/Natsugure/furatora/issues/124)）。移行は development に適用済みで、
+> 本番（`main`）へは未適用（`main` へのリリース時に Vercel のビルドが流す）。
+> **Web はまだ新モデルを読まない**。[#125](https://github.com/Natsugure/furatora/issues/125) が完了するまで、
+> Web は前節の `stationConnections` の難易度4列を読む。4列は Admin から書かれないため、値は #123 の移行時点の
+> まま凍結されている（新モデルで入力した内容は Web に出ない）。#125 が完了したら、この注記を外す。
 > 移行したルートの多くは**設備が未入力**（下記「ルートと設備」）で、所要時分もほとんど `NULL`。
-> 旧行に設備の種類・所要時分が無かったため、確認できた範囲だけを入れている。
+> 旧行に設備の種類・所要時分が無かったため、確認できた範囲だけを入れている。Admin から補完できる。
 
 ### 4層構造
 
@@ -173,7 +178,8 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 ```
 
 - **ペルソナ（ベビーカー・車いす）は層ではない。** ペルソナ別の可否・必要な行為・所要時分は
-  保存せず、設備から表示層で導出する。「通れる」と「バリアフリーで通れる」は別の述語である
+  保存せず、設備から表示層で導出する（導出は `packages/transfer-difficulty` の `requirementFor`。
+  DB・React 非依存の純粋関数で、Admin のプレビューと Web（#125）が同じ規則を使う）。「通れる」と「バリアフリーで通れる」は別の述語である
   （階段を持ち上げれば通れるが、バリアフリールートは無い、という状態がありうる）。
 - **ルートは接続に従属しない。** 方面によって条件が変わらない駅は、方面の組み合わせ分
   （最大4行）の接続を持つ。それらが同じ物理経路を使うときは、ルート行を複製せず
@@ -215,9 +221,9 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 | 同一接続内でルート名が重複しない | `unique_connection_route_label (connectionId, label)` | 属性（フラグ等）を一意キーに含めない。事実の訂正が制約に阻まれる |
 | 同じルートを同じ接続に2回結ばない | `unique_connection_route (connectionId, routeId)` | — |
 | 同じルートに同じ種類の設備を2行入れない | `unique_transfer_route_facility_type (routeId, typeCode)` | 外すと同種の設備が重複し、集合の一致判定（重複ルートの検出）が崩れる |
-| 設備の種類の集合と4フラグが既存ルートと完全に一致するルートを作らない | **アプリ層**（#124）。**接続をまたいで**検出し、一致すれば新規作成せず紐付けを提案する。**設備0件（未入力）のルートは対象外**（未入力どうしは中身が分からず、「一致」とは言えない） | 集合の一意性は DB 制約で書けない |
-| 基準ルートの付け替えが中途半端に終わらない | Repository + `withTransaction`（[ADR-0005](../adr/0005-write-atomicity-driver.md)） | 降格と昇格の2文になる |
-| 接続を消したあとに孤立ルートが残らない | **アプリ層**（#124）。`connection_routes` は接続の削除で cascade するが、ルートは共有されうるため DB では消さない | — |
+| 設備の種類の集合と4フラグが一致するルートの二重登録に気づける | **アプリ層**（Admin。`features/transfer-connection/domain/duplicates.ts`）。保存時に、S か T を端点に持つ接続のルート（候補）と同じ画面のカードとの一致を検出し、「共有する」か「別ルートとして作る」かを選ばせる。**提示であり、保存は止めない**（中身が一致しても別の物理経路でありうる。例: 池袋の各線のエレベーター経由）。**設備0件（未入力）のルートは対象外**（未入力どうしは中身が分からず、「一致」とは言えない） | 集合の一意性は DB 制約で書けない。中断（ハードブロック）にすると、別経路のルートを作れなくなる |
+| 基準ルートの付け替えが中途半端に終わらない | Repository + `withTransaction`（[ADR-0005](../adr/0005-write-atomicity-driver.md)）。Admin の保存は駅対の最終状態を1回で送り、`savePair` が紐付けを**全部消してから入れ直す**ので、降格と昇格の順序は問題にならない | 降格と昇格の2文になる |
+| 接続を消したあとに孤立ルートが残らない | **アプリ層**。`connection_routes` は接続の削除で cascade するが、ルートは共有されうるため DB では消さない。接続や紐付けを消す書き込み（`transferConnectionRepository.savePair` と `stationConnectionRepository.deletePair`）は、同じトランザクションで `external/transferPairSql.ts` の `deleteOrphanRoutes` を呼ぶ | 呼び忘れると、どの接続からも参照されないルートが残る。他の接続がまだ参照しているルートは消さない |
 
 **行数の上限は制約で表現しない**（PostgreSQL の制約は行数を数えられない）。
 
@@ -246,6 +252,25 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
   設備が未入力であることを示すこと。「接続が無い＝未評価」と同型の、行が無いことによる表現である
   （[ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)）。
 
+### Admin の書き込み規約
+
+- **編集の単位は駅対**（自駅 S・相手駅 T。`stationConnections` の1ペア）。方面の組み合わせ4通りの接続と
+  そのルートを1画面で編集し、駅対の**最終状態**を1回で送る
+  （`PUT /api/stations/[stationId]/connections/[connectedStationId]/transfer`）。
+  接続は `stationConnections` の駅対が存在するときだけ編集できる。
+- **ルートが1本もない方面の組み合わせは、接続行を持たない**（未評価）。ルートが1本以上ある組み合わせだけ接続行を作り、
+  新規は `source = 'manual'`、既存は `source` を保つ。端点は `normalizeTransferEndpoints()` で正規化する。
+- **全方面共通は、1本のルートを4つの組み合わせに結んで表す。** 方面によって条件が変わる駅は、ルートを分けて、
+  組み合わせを割り振る（例: 淡路町↔小川町）。値を複製して4本作らない。
+- **`label` と `isBaseline` は、1つの駅対の中では、同じルートの全紐付けに同じ値を書く。** モデル上は紐付けごとに
+  違ってよいが、Admin はカード1枚に1つの値しか持たない。DB では縛らない。既存データで違っていた場合は、
+  最初の組み合わせの値を採り、保存で全組み合わせにそろう。
+- **共有中のルート（他の駅対の接続からも参照されているもの）を編集すると、共有先にも反映される。** ルート本体
+  （所要時分・フラグ・設備・備考）が共有されるため。画面は「共有中」と共有先を示し、「この駅対だけ切り離す」で
+  新しいルートに分けられる。`label` と `isBaseline` は紐付けの属性なので、共有先には影響しない。
+- 保存できるルートの `routeId` は、その駅対に結ばれているか、候補の範囲（S か T を端点に持つ接続のルート）にあるものだけ。
+  無関係な接続のルートは書き換えられない。
+
 ### 備考の役割
 
 `transferConnections.notes` / `transferRoutes.notes` は、モデルが構造的に表現しない次元
@@ -256,7 +281,9 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 **既知の例外**: 本郷三丁目（丸ノ内線↔都営大江戸線）の接続の `notes` には、他駅との比較
 （「隣の後楽園・春日駅の乗り換えであれば屋内で完結しますが…一長一短です」）が、開発者判断で
 残っている（[#123](https://github.com/Natsugure/furatora/issues/123)。優劣を断定しない中立な書き方のため）。
-この扱い（消すか、中立な比較を許容するルールにするか）は #124 の着手時に決める。
+[#124](https://github.com/Natsugure/furatora/issues/124) で、この例外は**維持する**と決めた
+（上のルールは変えない）。消すかどうかは、Admin の駅対の編集画面から編集できる。
+Admin の入力欄には、出発地・目的地に依存する比較を書かないよう説明を出している。
 
 ### `source`
 

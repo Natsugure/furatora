@@ -50,6 +50,22 @@ describe('DeleteButton', () => {
     expect(await screen.findByText('本当に削除しますか？')).toBeInTheDocument();
   });
 
+  it('description を渡すと、確認モーダルの本文がその文言になる', async () => {
+    const user = userEvent.setup();
+    renderWithMantine(
+      <DeleteButton
+        endpoint="/api/stations/1/connections/2"
+        label="接続を削除"
+        description="この接続の乗換難易度の評価データも一緒に削除されます。"
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '接続を削除' }));
+
+    expect(await screen.findByText('この接続の乗換難易度の評価データも一緒に削除されます。')).toBeInTheDocument();
+    expect(screen.queryByText('本当に削除しますか？')).not.toBeInTheDocument();
+  });
+
   it('キャンセルボタンでモーダルが閉じる', async () => {
     const user = userEvent.setup();
     renderWithMantine(
