@@ -9,7 +9,12 @@ describe('stationConnectionCreateSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('難易度・備考を含めてもパースされる', () => {
+  it('connectedStationId が UUID でない場合は失敗する', () => {
+    const result = stationConnectionCreateSchema.safeParse({ connectedStationId: 'x' });
+    expect(result.success).toBe(false);
+  });
+
+  it('旧4列（難易度・備考）が送られても受け取らない（乗換難易度は駅対の編集画面で入力する。#124）', () => {
     const result = stationConnectionCreateSchema.safeParse({
       connectedStationId: UUID,
       strollerDifficulty: 'elevator_detour',
@@ -18,18 +23,6 @@ describe('stationConnectionCreateSchema', () => {
       notesAboutWheelchair: null,
     });
     expect(result.success).toBe(true);
-  });
-
-  it('connectedStationId が UUID でない場合は失敗する', () => {
-    const result = stationConnectionCreateSchema.safeParse({ connectedStationId: 'x' });
-    expect(result.success).toBe(false);
-  });
-
-  it('未知の難易度値は失敗する', () => {
-    const result = stationConnectionCreateSchema.safeParse({
-      connectedStationId: UUID,
-      strollerDifficulty: 'unknown',
-    });
-    expect(result.success).toBe(false);
+    expect(result.data).toEqual({ connectedStationId: UUID });
   });
 });

@@ -1,4 +1,3 @@
-import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import type { ListParams, ListResult } from '@/shared/list/params';
 import type { OperatorCard } from '@/shared/list/operatorCard';
 import type { StationCreateInput } from './schema';
@@ -35,18 +34,15 @@ export interface StationRepository {
 
 // --- 読み取り ---
 
-// 乗り換え接続の1行。難易度・備考は編集対象。駅名/路線名は表示用に解決済み。
-// connectedStationId は接続の削除（#88）で使う。有向2行の削除は
-// (stationId, connectedStationId) を渡す DELETE エンドポイントが担う。
+// 乗り換え接続の1行（接続一覧）。駅名/路線名は表示用に解決済み。
+// connectedStationId は接続の削除（#88）と、乗換難易度の編集画面（#124）への遷移で使う。
+// 有向2行の削除は (stationId, connectedStationId) を渡す DELETE エンドポイントが担う。
+// 乗換難易度は新モデル（transfer_connections 以下）にあり、この行には持たない。
 export type ConnectionRow = {
   id: string;
   connectedStationId: string;
   connectedStationName: string | null;
   connectedLineName: string | null;
-  strollerDifficulty: StrollerDifficulty | null;
-  wheelchairDifficulty: WheelchairDifficulty | null;
-  notesAboutStroller: string | null;
-  notesAboutWheelchair: string | null;
 };
 
 export type StationEditContext = {
