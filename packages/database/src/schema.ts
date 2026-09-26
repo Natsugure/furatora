@@ -148,7 +148,7 @@ export const transferConnections = pgTable('transfer_connections', {
 // 1本の物理経路。接続に従属しない。
 // 【connectionId を持たせないこと】方面差の無い駅は最大4行の接続を持ち、それらが同じ物理経路を
 // 使う。ルート行を複製せず1本を共有するため、接続との関係は connection_routes が担う。
-// 設備の並びと4フラグが既存ルートと完全に一致するルートを作らないこと（接続をまたいで検出し、
+// 設備の種類の集合と4フラグが既存ルートと完全に一致するルートを作らないこと（接続をまたいで検出し、
 // 一致すれば新規作成せず紐付けを提案する）。集合の一意性は DB 制約で書けないため、
 // 検出はアプリ層（Issue #124 の Repository）の責務
 export const transferRoutes = pgTable('transfer_routes', {
@@ -190,17 +190,17 @@ export const connectionRoutes = pgTable('connection_routes', {
   uniqueIndex('unique_connection_baseline').on(t.connectionId).where(sql`${t.isBaseline}`),
 ]);
 
-// ルートが直列に通る設備。
-// 【seq は直列の並びだけを表す】同じ段差に対する代替手段（階段と階段昇降機が並んでいる箇所）は
-// 同一ルートに2つ並べず、別のルート行にする。この帰属規則が、ペルソナごとの
-// 「必要な行為」の判定（階段昇降機のルートはベビーカーが通れない等）を正しく機能させる
+// ルートが通る設備の種類の集合（順序・回数は持たない。ADR-0011）。1行 = 「この種類をすべて通る」。
+// 【代替手段（階段と階段昇降機など）は同一ルートに入れず別ルートにすること】同居させると
+// 「階段昇降機のルートはベビーカーが通れない」等の判定が壊れる。
+// 【行が0件のルートは「設備未入力」】段差無しは sameFloor を明示する。0件から必要な行為を
+// 導出しないこと（ADR-0012。#124・#125 の制約）
 export const transferRouteFacilities = pgTable('transfer_route_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   routeId: uuid('route_id').references(() => transferRoutes.id, { onDelete: 'cascade' }).notNull(),
-  seq: smallint('seq').notNull(),
   typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
 }, (t) => [
-  unique('unique_transfer_route_facility_seq').on(t.routeId, t.seq),
+  unique('unique_transfer_route_facility_type').on(t.routeId, t.typeCode),
 ]);
 
 export const trains = pgTable('trains', {
