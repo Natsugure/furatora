@@ -202,6 +202,26 @@ describe('applyDuplicateChoices', () => {
     expect(next.routes[0]).toMatchObject({ key: 'old', routeId: 'r1', combos: ['inbound:inbound', 'outbound:outbound'] });
   });
 
+  it('2枚が同じ候補を「共有する」と、カードどうしの選択に関わらず1枚に統合する（同じルートを2枚が持たない）', () => {
+    const draft = draftOf(
+      card({ key: 'a', isBaseline: true, combos: ['inbound:inbound'] }),
+      card({ key: 'b', label: 'B', combos: ['outbound:outbound'] }),
+    );
+    const matches = findDuplicates(draft, [], [candidate()]);
+    const choices = Object.fromEntries(matches.map((m) => [
+      matchKey(m),
+      m.kind === 'candidate' ? 'share' as const : 'separate' as const,
+    ]));
+    const next = applyDuplicateChoices(draft, matches, choices);
+    expect(next.routes).toHaveLength(1);
+    expect(next.routes[0]).toMatchObject({
+      key: 'a',
+      routeId: 'rc',
+      isBaseline: true,
+      combos: ['inbound:inbound', 'outbound:outbound'],
+    });
+  });
+
   it('すでに統合で消えたカードを含む検出は、無視して壊さない', () => {
     // a・b・c が同一内容: 検出は (b→a) と (c→a)。両方を「共有する」にしても、3枚が1枚になるだけ
     const draft = draftOf(card({ key: 'a' }), card({ key: 'b', label: 'B' }), card({ key: 'c', label: 'C' }));

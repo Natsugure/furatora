@@ -83,7 +83,8 @@ export function findDuplicates(
 }
 
 // 入力者の選択を下書きに反映する。選択が無い・「別ルートとして作る」の検出は変えない。
-// 統合で先に消えたカードを含む検出は無視する（同一内容が3枚以上あるとき）
+// 統合で先に消えたカードを含む検出は無視する（同一内容が3枚以上あるとき）。
+// 同じ候補を2枚目が「共有する」ときは、1枚目のカードへ統合する（同じ routeId のカードは保存できない）
 export function applyDuplicateChoices(
   draft: PairDraft,
   matches: readonly DuplicateMatch[],
@@ -95,7 +96,10 @@ export function applyDuplicateChoices(
     const exists = (key: string) => next.routes.some((r) => r.key === key);
     if (!exists(match.key)) continue;
     if (match.kind === 'candidate') {
-      next = mergeIntoCandidate(next, match.key, match.candidate);
+      const sharing = next.routes.find((r) => r.key !== match.key && r.routeId === match.candidate.routeId);
+      next = sharing
+        ? mergeCards(next, sharing.key, match.key)
+        : mergeIntoCandidate(next, match.key, match.candidate);
     } else if (exists(match.otherKey)) {
       next = mergeCards(next, match.otherKey, match.key);
     }

@@ -83,7 +83,6 @@ export function TransferPairEditor({ context }: Props) {
         { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(targetInput) },
       );
     } catch {
-      // 通信の失敗（オフライン等）。下書きは残っているので、そのまま保存し直せる
       notifications.show({
         title: '保存に失敗しました',
         message: '通信できませんでした。接続を確認して、もう一度保存してください',
@@ -272,9 +271,8 @@ export function TransferPairEditor({ context }: Props) {
   );
 }
 
-// 【全方面共通の欄で表示するときは、未適用の組み合わせにも同じ備考を持たせる】
-// draftFromContext は接続行の無い組み合わせを '' にするため、そのままだと、あとから適用した組み合わせだけ
-// 画面に見えている備考と違う値（null）で保存される。共通の欄は setAllNotes と同じく「4つとも同じ値」を保つ
+// 全方面共通の欄で表示するときは、未適用の組み合わせにも同じ備考を持たせる
+// （あとから適用した組み合わせが、表示中の備考ではなく null で保存されないように）
 function loadDraft(context: TransferPairEditContext): PairDraft {
   const draft = draftFromContext(context);
   if (hasDifferentNotes(draft)) return draft;

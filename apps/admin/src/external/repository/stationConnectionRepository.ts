@@ -4,6 +4,7 @@ import { inArray, or } from 'drizzle-orm';
 import type { StationConnectionRepository } from '@/features/station-connection/ports';
 import {
   deleteOrphanRoutes,
+  lockStationPair,
   pairConnectionCondition,
   routeIdsOfConnections,
   stationPairCondition,
@@ -38,6 +39,7 @@ export const dbStationConnectionRepository: StationConnectionRepository = {
   // （docs/domain/station-master-model.md「乗換接続」「不変条件」）。1トランザクションで行う（ADR-0005）。
   async deletePair(stationId, connectedStationId) {
     return withTransaction(async (tx) => {
+      await lockStationPair(tx, stationId, connectedStationId);
       const evaluated = await tx
         .select({ id: transferConnections.id })
         .from(transferConnections)

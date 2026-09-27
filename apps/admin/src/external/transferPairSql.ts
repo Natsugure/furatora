@@ -14,6 +14,20 @@ export function stationPairCondition(stationId: string, connectedStationId: stri
   );
 }
 
+// 【駅対の乗換難易度を書く・消すトランザクションは、最初にこれを呼ぶこと】（ADR-0013）
+// 返り値はロックした接続一覧の行（駅対が無ければ空）
+export async function lockStationPair(tx: Tx, stationId: string, connectedStationId: string) {
+  return tx
+    .select({ stationId: stationConnections.stationId, connectedStationId: stationConnections.connectedStationId })
+    .from(stationConnections)
+    .where(or(
+      stationPairCondition(stationId, connectedStationId),
+      stationPairCondition(connectedStationId, stationId),
+    ))
+    .orderBy(stationConnections.id)
+    .for('update');
+}
+
 // 駅対 {S, T} の接続。transfer_connections は端点を正規化順（A < B）で持つので、
 // 読み取り側は両順序（A=S,B=T と A=T,B=S）を見る（docs/domain/station-master-model.md）
 export function pairConnectionCondition(stationId: string, connectedStationId: string) {

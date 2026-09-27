@@ -1,6 +1,5 @@
 import {
   connectionRoutes,
-  stationConnections,
   transferConnections,
   transferRouteFacilities,
   transferRoutes,
@@ -18,9 +17,9 @@ import { isPgErrorCode, pgConstraintName, PG_UNIQUE_VIOLATION } from '@/external
 import { requireInserted } from '@/external/requireInserted';
 import {
   deleteOrphanRoutes,
+  lockStationPair,
   pairConnectionCondition,
   routeIdsOfConnections,
-  stationPairCondition,
   touchesStationsCondition,
 } from '@/external/transferPairSql';
 
@@ -33,11 +32,9 @@ export const dbTransferConnectionRepository: TransferConnectionRepository = {
   async savePair(stationId, connectedStationId, input) {
     try {
       return await withTransaction(async (tx) => {
-        // 1. 駅対が存在すること（station_connections は接続一覧）
-        const [pair] = await tx
-          .select({ id: stationConnections.id })
-          .from(stationConnections)
-          .where(stationPairCondition(stationId, connectedStationId));
+        // 1. 駅対をロックし、S→T 行が存在することを確かめる
+        const locked = await lockStationPair(tx, stationId, connectedStationId);
+        const pair = locked.find((row) => row.stationId === stationId && row.connectedStationId === connectedStationId);
         if (!pair) return false;
 
         // 2. 既存の接続と、それに結ばれているルート
