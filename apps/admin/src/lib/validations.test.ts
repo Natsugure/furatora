@@ -4,7 +4,6 @@ import {
   stationUpdateSchema,
   lineUpdateSchema,
   directionSchema,
-  stationConnectionUpdateSchema,
 } from './validations';
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -122,34 +121,6 @@ describe('directionSchema', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
       representativeStationId: VALID_UUID,
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('stationConnectionUpdateSchema', () => {
-  it('全フィールド省略で正常にパースされる', () => {
-    const result = stationConnectionUpdateSchema.safeParse({});
-    expect(result.success).toBe(true);
-  });
-
-  it('有効なstrollerDifficultyで正常にパースされる', () => {
-    const result = stationConnectionUpdateSchema.safeParse({
-      strollerDifficulty: 'optimal',
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('strollerDifficultyに不正な値の場合は失敗する', () => {
-    const result = stationConnectionUpdateSchema.safeParse({
-      strollerDifficulty: 'easy',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('wheelchairDifficultyに不正な値の場合は失敗する', () => {
-    const result = stationConnectionUpdateSchema.safeParse({
-      wheelchairDifficulty: 'easy',
     });
     expect(result.success).toBe(false);
   });

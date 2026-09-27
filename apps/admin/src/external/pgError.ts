@@ -12,16 +12,22 @@
 export const PG_UNIQUE_VIOLATION = '23505';
 export const PG_FOREIGN_KEY_VIOLATION = '23503';
 
-function errorCode(err: unknown): unknown {
-  return typeof err === 'object' && err !== null && 'code' in err
-    ? (err as { code: unknown }).code
-    : undefined;
-}
-
-export function isPgErrorCode(err: unknown, code: string): boolean {
-  if (errorCode(err) === code) return true;
+// pg エラーのフィールドを、err 自身と err.cause（DrizzleQueryError のラップ）の両方から読む
+function pgFieldCandidates(err: unknown, key: 'code' | 'constraint'): unknown[] {
+  const read = (e: unknown): unknown =>
+    typeof e === 'object' && e !== null && key in e ? (e as Record<string, unknown>)[key] : undefined;
   const cause = typeof err === 'object' && err !== null && 'cause' in err
     ? (err as { cause: unknown }).cause
     : undefined;
-  return errorCode(cause) === code;
+  return [read(err), read(cause)];
+}
+
+export function isPgErrorCode(err: unknown, code: string): boolean {
+  return pgFieldCandidates(err, 'code').includes(code);
+}
+
+// 違反した制約名。同じ 23505 でも制約ごとに意味が違う場合
+// （例: unique_connection_route_label だけを 409 にしたい）に使う
+export function pgConstraintName(err: unknown): string | undefined {
+  return pgFieldCandidates(err, 'constraint').find((v): v is string => typeof v === 'string');
 }

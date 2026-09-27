@@ -1,4 +1,5 @@
 import type { DirectionType } from '@furatora/database/enums';
+import type { ComboKey } from './types';
 
 export type TransferEndpoint = {
   stationId: string;
@@ -33,4 +34,33 @@ function compareEndpoints(x: TransferEndpoint, y: TransferEndpoint): number {
   if (xId !== yId) return xId < yId ? -1 : 1;
   if (x.directionType !== y.directionType) return x.directionType < y.directionType ? -1 : 1;
   return 0;
+}
+
+export function comboKeyOf(stationDirection: DirectionType, connectedDirection: DirectionType): ComboKey {
+  return `${stationDirection}:${connectedDirection}`;
+}
+
+// 方面の組み合わせ（S 基準）を、DB の正規化順（A < B）の端点対に変換する。
+// 書き込み側が INSERT 前に必ず通すこと（check transfer_connection_endpoints_ordered が逆順を拒否する）
+export function endpointsOfCombo(
+  stationId: string,
+  connectedStationId: string,
+  combo: ComboKey,
+): { a: TransferEndpoint; b: TransferEndpoint } {
+  const [stationDirection, connectedDirection] = combo.split(':') as [DirectionType, DirectionType];
+  return normalizeTransferEndpoints(
+    { stationId, directionType: stationDirection },
+    { stationId: connectedStationId, directionType: connectedDirection },
+  );
+}
+
+// DB の接続行（端点は正規化順）を、S 基準の組み合わせに戻す。
+// 【同一駅どうしの接続（#82 で正当になりうる）は扱わない】stationId の一致だけで A/B を判定する
+export function comboOfConnection(
+  row: { stationAId: string; directionA: DirectionType; stationBId: string; directionB: DirectionType },
+  stationId: string,
+): ComboKey {
+  return row.stationAId.toLowerCase() === stationId.toLowerCase()
+    ? comboKeyOf(row.directionA, row.directionB)
+    : comboKeyOf(row.directionB, row.directionA);
 }
