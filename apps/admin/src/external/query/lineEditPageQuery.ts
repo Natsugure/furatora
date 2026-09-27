@@ -44,6 +44,10 @@ export const dbLineEditPageQuery: LineEditPageQuery = {
   },
 };
 
+async function getLineName(lineId: string) {
+  return db.select({ name: lines.name }).from(lines).where(eq(lines.id, lineId)).limit(1);
+}
+
 async function getLineStations(lineId: string): Promise<DirectionStationOption[]> {
   return db
     .select({
@@ -73,24 +77,28 @@ async function getCurrentDefaults(lineId: string): Promise<LineDirectionEditCont
 
 export const dbLineDirectionEditPageQuery: LineDirectionEditPageQuery = {
   async getCreateContext(lineId) {
-    const [line] = await db.select({ name: lines.name }).from(lines).where(eq(lines.id, lineId)).limit(1);
+    // neon-http は await ごとに HTTP 往復になるため、依存の無いものは Promise.all でまとめる
+    const [[line], lineStations, currentDefaults] = await Promise.all([
+      getLineName(lineId),
+      getLineStations(lineId),
+      getCurrentDefaults(lineId),
+    ]);
     if (!line) return null;
 
-    const [lineStations, currentDefaults] = await Promise.all([getLineStations(lineId), getCurrentDefaults(lineId)]);
     return { lineName: line.name, stations: lineStations, currentDefaults };
   },
 
   async getEditContext(lineId, directionId) {
-    const [line] = await db.select({ name: lines.name }).from(lines).where(eq(lines.id, lineId)).limit(1);
-    if (!line) return null;
-
-    const [direction] = await db
-      .select()
-      .from(lineDirections)
-      .where(and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId)));
-    if (!direction) return null;
-
-    const [lineStations, currentDefaults] = await Promise.all([getLineStations(lineId), getCurrentDefaults(lineId)]);
+    const [[line], [direction], lineStations, currentDefaults] = await Promise.all([
+      getLineName(lineId),
+      db
+        .select()
+        .from(lineDirections)
+        .where(and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId))),
+      getLineStations(lineId),
+      getCurrentDefaults(lineId),
+    ]);
+    if (!line || !direction) return null;
 
     const context: LineDirectionEditContext = {
       lineName: line.name,

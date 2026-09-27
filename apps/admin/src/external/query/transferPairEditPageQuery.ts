@@ -63,14 +63,14 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
         .select({
           stationId: platforms.stationId,
           lineId: platforms.lineId,
+          platformNumber: platforms.platformNumber,
           inboundName: inboundDirections.displayName,
           outboundName: outboundDirections.displayName,
         })
         .from(platforms)
         .leftJoin(inboundDirections, eq(inboundDirections.id, platforms.inboundDirectionId))
         .leftJoin(outboundDirections, eq(outboundDirections.id, platforms.outboundDirectionId))
-        .where(inArray(platforms.stationId, [stationId, connectedStationId]))
-        .orderBy(asc(platforms.platformNumber)),
+        .where(inArray(platforms.stationId, [stationId, connectedStationId])),
       // 方面の文言の ②: 路線の既定行
       db
         .select({
@@ -139,7 +139,9 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
         .select({ stationId: stationLines.stationId, lineId: stationLines.lineId, lineName: lines.name })
         .from(stationLines)
         .innerJoin(lines, eq(lines.id, stationLines.lineId))
-        .where(inArray(stationLines.stationId, [...stationIds])),
+        .where(inArray(stationLines.stationId, [...stationIds]))
+        // 「駅の最初の路線」を決める。1駅が複数路線を持っても、読み込みのたびに変わらないようにする
+        .orderBy(asc(lines.displayOrder), asc(lines.id)),
     ]);
     const stationName = new Map(stationRows.map((s) => [s.id, s.name]));
     const firstLineOf = new Map<string, { lineId: string; lineName: string }>();
@@ -155,7 +157,10 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
     // 路線で絞るのは、1駅が複数路線を持つようになったとき（#82）に別路線の文言が混ざらないようにするため
     const hints = (id: string): Record<DirectionType, string> => {
       const lineId = firstLineOf.get(id)?.lineId;
-      const platformsOfLine = platformRows.filter((p) => p.stationId === id && p.lineId === lineId);
+      // ホーム番号は varchar なので、SQL の並びでは '10' が '2' より前になる。数値として並べる
+      const platformsOfLine = platformRows
+        .filter((p) => p.stationId === id && p.lineId === lineId)
+        .sort((a, b) => a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true }));
       const resolve = (directionType: DirectionType, platformNames: (string | null)[]) =>
         resolveDirectionLabel({
           directionType,
