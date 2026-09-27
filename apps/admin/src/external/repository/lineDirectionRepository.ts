@@ -1,12 +1,12 @@
 import { db } from '@furatora/database/client';
 import { lineDirections } from '@furatora/database/schema';
+import type { DirectionType } from '@furatora/database/enums';
 import { withTransaction, type Tx } from '@furatora/database/tx';
 import { and, eq, ne } from 'drizzle-orm';
 import {
   DirectionDefaultConflictError,
   type LineDirectionRecord,
   type LineDirectionRepository,
-  type LineDirectionWriteInput,
 } from '@/features/line/ports';
 import { isPgErrorCode, pgConstraintName, PG_UNIQUE_VIOLATION } from '@/external/pgError';
 import { requireInserted } from '@/external/requireInserted';
@@ -33,29 +33,17 @@ const columns = {
   isDefault: lineDirections.isDefault,
 };
 
-function values(input: LineDirectionWriteInput) {
-  return {
-    directionType: input.directionType,
-    representativeStationId: input.representativeStationId,
-    displayName: input.displayName,
-    displayNameEn: input.displayNameEn,
-    terminalStationIds: input.terminalStationIds,
-    notes: input.notes,
-    isDefault: input.isDefault,
-  };
-}
-
 const byIdOnLine = (lineId: string, directionId: string) =>
   and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId));
 
 // 組の旧既定を外す。更新では自分自身を除く（directionType を変える更新では、移動先の組が対象になる）
-async function clearDefault(tx: Tx, lineId: string, input: LineDirectionWriteInput, exceptId?: string) {
+async function clearDefault(tx: Tx, lineId: string, directionType: DirectionType, exceptId?: string) {
   await tx
     .update(lineDirections)
     .set({ isDefault: false })
     .where(and(
       eq(lineDirections.lineId, lineId),
-      eq(lineDirections.directionType, input.directionType),
+      eq(lineDirections.directionType, directionType),
       eq(lineDirections.isDefault, true),
       exceptId === undefined ? undefined : ne(lineDirections.id, exceptId),
     ));
@@ -77,13 +65,13 @@ export const dbLineDirectionRepository: LineDirectionRepository = {
     return mapConflict(async (): Promise<LineDirectionRecord> => {
       if (!input.isDefault) {
         return requireInserted(
-          await db.insert(lineDirections).values({ lineId, ...values(input) }).returning(columns),
+          await db.insert(lineDirections).values({ lineId, ...input }).returning(columns),
         );
       }
       return withTransaction(async (tx) => {
-        await clearDefault(tx, lineId, input);
+        await clearDefault(tx, lineId, input.directionType);
         return requireInserted(
-          await tx.insert(lineDirections).values({ lineId, ...values(input) }).returning(columns),
+          await tx.insert(lineDirections).values({ lineId, ...input }).returning(columns),
         );
       });
     });
@@ -94,7 +82,7 @@ export const dbLineDirectionRepository: LineDirectionRepository = {
       if (!input.isDefault) {
         const [row] = await db
           .update(lineDirections)
-          .set(values(input))
+          .set(input)
           .where(byIdOnLine(lineId, directionId))
           .returning(columns);
         return row ?? null;
@@ -107,10 +95,10 @@ export const dbLineDirectionRepository: LineDirectionRepository = {
           .where(byIdOnLine(lineId, directionId))
           .for('update');
         if (!target) return null;
-        await clearDefault(tx, lineId, input, directionId);
+        await clearDefault(tx, lineId, input.directionType, directionId);
         const [row] = await tx
           .update(lineDirections)
-          .set(values(input))
+          .set(input)
           .where(byIdOnLine(lineId, directionId))
           .returning(columns);
         return row ?? null;

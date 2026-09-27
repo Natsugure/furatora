@@ -42,14 +42,8 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { displayNameEn, terminalStationIds, notes, ...rest } = parsed.data;
 
-    const updated = await lineDirectionRepository.update(lineId, directionId, {
-      ...rest,
-      displayNameEn: displayNameEn ?? null,
-      terminalStationIds: terminalStationIds ?? null,
-      notes: notes ?? null,
-    });
+    const updated = await lineDirectionRepository.update(lineId, directionId, parsed.data);
 
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });

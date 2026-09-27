@@ -6,11 +6,14 @@ import {
   Alert, Button, Checkbox, Group, NativeSelect, ScrollArea,
   Stack, Text, TextInput, Textarea,
 } from '@mantine/core';
+import type { DirectionType } from '@furatora/database/enums';
+import { FALLBACK_DIRECTION_LABELS } from '@furatora/transfer-difficulty/domain';
 import type { DirectionStationOption, LineDirectionEditContext } from '@/features/line/ports';
+import { describeError } from '@/features/station-publishing/describeError';
 
 type LineDirectionData = {
   id?: string;
-  directionType: string;
+  directionType: DirectionType;
   representativeStationId: string;
   displayName: string;
   displayNameEn: string;
@@ -18,8 +21,6 @@ type LineDirectionData = {
   notes: string;
   isDefault: boolean;
 };
-
-type DirectionTypeValue = keyof LineDirectionEditContext['currentDefaults'];
 
 type Props = {
   lineId: string;
@@ -29,7 +30,7 @@ type Props = {
   currentDefaults: LineDirectionEditContext['currentDefaults'];
 };
 
-const isDirectionType = (value: string): value is DirectionTypeValue =>
+const isDirectionType = (value: string): value is DirectionType =>
   value === 'inbound' || value === 'outbound';
 
 function stationLabel(s: DirectionStationOption) {
@@ -38,9 +39,9 @@ function stationLabel(s: DirectionStationOption) {
 
 export function LineDirectionForm({ lineId, initialData, isEdit = false, stations, currentDefaults }: Props) {
   const router = useRouter();
-  const [directionType, setDirectionType] = useState(initialData?.directionType ?? 'inbound');
+  const [directionType, setDirectionType] = useState<DirectionType>(initialData?.directionType ?? 'inbound');
   // 新規作成で、その組に既定行がまだ無ければ既定にしておく（ADR-0014。無いと「上り」「下り」で表示される）
-  const hasNoDefault = (type: string) => isDirectionType(type) && currentDefaults[type] === null;
+  const hasNoDefault = (type: DirectionType) => currentDefaults[type] === null;
   const [isDefault, setIsDefault] = useState(initialData?.isDefault ?? hasNoDefault(directionType));
   // 利用者がチェックを触ったあとは、方面タイプを切り替えても初期値を上書きしない
   const [isDefaultTouched, setIsDefaultTouched] = useState(isEdit);
@@ -63,12 +64,13 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
   }
 
   function changeDirectionType(value: string) {
+    if (!isDirectionType(value)) return;
     setDirectionType(value);
     if (!isDefaultTouched) setIsDefault(hasNoDefault(value));
   }
 
   // 選んだ組に自分以外の既定行があるなら、保存でそれが置き換わることを示す
-  const otherDefault = isDirectionType(directionType) ? currentDefaults[directionType] : null;
+  const otherDefault = currentDefaults[directionType];
   const replacedDefault = otherDefault && otherDefault.id !== initialData?.id ? otherDefault : null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -102,12 +104,9 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
       router.refresh();
     } else {
       setSubmitting(false);
-      // 409 は同じ組の既定の同時変更（API がメッセージを返す）
-      const body: unknown = res.status === 409 ? await res.json().catch(() => null) : null;
-      const message = typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string'
-        ? body.error
-        : '保存に失敗しました';
-      setError(message);
+      // 409（同じ組の既定の同時変更）を含め、API のメッセージを表示する
+      const body: unknown = await res.json().catch(() => null);
+      setError(describeError(body));
     }
   }
 
@@ -122,8 +121,8 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
         <NativeSelect
           label="方面タイプ"
           data={[
-            { value: 'inbound', label: '上り' },
-            { value: 'outbound', label: '下り' },
+            { value: 'inbound', label: FALLBACK_DIRECTION_LABELS.inbound },
+            { value: 'outbound', label: FALLBACK_DIRECTION_LABELS.outbound },
           ]}
           value={directionType}
           onChange={(e) => changeDirectionType(e.target.value)}

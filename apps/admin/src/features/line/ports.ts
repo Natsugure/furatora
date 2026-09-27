@@ -102,7 +102,7 @@ export type LineDirectionEditContext = {
   stations: DirectionStationOption[];
   direction?: {
     id: string;
-    directionType: string;
+    directionType: DirectionType;
     representativeStationId: string;
     displayName: string;
     displayNameEn: string;

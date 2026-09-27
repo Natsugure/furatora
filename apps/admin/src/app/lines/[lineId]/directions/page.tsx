@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { lines, lineDirections, stations } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
+import { FALLBACK_DIRECTION_LABELS } from '@furatora/transfer-difficulty/domain';
 import { Badge, Card, Group, Stack, Text, Title } from '@mantine/core';
 import { DeleteButton } from '@/components/DeleteButton';
 import { LinkAnchor, LinkButton } from '@/components/LinkElements';
@@ -69,7 +70,7 @@ export default async function LineDirectionsPage({
                     )}
                   </Group>
                   <Text size="sm" c="dimmed">
-                    タイプ: {direction.directionType === 'inbound' ? '上り' : '下り'}
+                    タイプ: {FALLBACK_DIRECTION_LABELS[direction.directionType]}
                   </Text>
                   <Text size="sm" c="dimmed">
                     代表駅: {stationMap[direction.representativeStationId] ?? '-'}

@@ -4,7 +4,7 @@ export type DirectionType = 'inbound' | 'outbound';
 
 export type DirectionLabelSource = 'platform' | 'default' | 'fallback';
 
-/** Admin の方面一覧・フォームの「方面タイプ」の表記と同じ対応 */
+/** Admin の方面一覧・フォームの「方面タイプ」の表記にも使う */
 export const FALLBACK_DIRECTION_LABELS: Record<DirectionType, string> = {
   inbound: '上り',
   outbound: '下り',

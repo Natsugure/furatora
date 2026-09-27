@@ -218,7 +218,7 @@ export function RouteCard({
   );
 }
 
-// 方面の補助表示。同一 (路線, 方面) に同義行があるため一覧で出す（解決規則は #130）
+// 方面の補助表示（①ホーム → ②既定行 → ③上り/下り で解決済みの文言。ADR-0014）
 function HintText({ hint }: { hint: string }) {
   return <Text size="xs" c="dimmed" fw={400}>{hint}</Text>;
 }

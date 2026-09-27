@@ -21,14 +21,8 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { displayNameEn, terminalStationIds, notes, ...rest } = parsed.data;
 
-    const direction = await lineDirectionRepository.create(lineId, {
-      ...rest,
-      displayNameEn: displayNameEn ?? null,
-      terminalStationIds: terminalStationIds ?? null,
-      notes: notes ?? null,
-    });
+    const direction = await lineDirectionRepository.create(lineId, parsed.data);
 
     return NextResponse.json(direction, { status: 201 });
   } catch (err) {
