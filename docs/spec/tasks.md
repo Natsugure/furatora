@@ -92,3 +92,20 @@
       決定2（候補1行の組）・決定3（8組の選定）は `0014` の SQL と `line-directions.md`「既定行」に残る。
       将来作業は既存の Issue（#125 Web 表示・#128 中野坂上・#82 物理駅粒度）で追える。新しく起票する Issue は無い。
       PR: [#134](https://github.com/Natsugure/furatora/pull/134)（develop 宛て）
+
+## PR #134 のレビュー対応
+
+- [x] **TASK-13** `/code-review high` の指摘8件を修正する（2026-09-27）
+      1. フォーム: 既定行のチェックを外す・方面タイプを変えると、元の組の既定が無くなることを示す（+テスト3件）
+      2. 移行 0014 の手順4: 同名の行があっても組ごとに1行だけ既定にする（`DISTINCT ON`）。
+         Neon MCP（read-only）で main に対象の SELECT を流し、一致26行・選択26行・重複0組で結果が変わらないことを確認
+         （大江戸線の2行は手順1で追加されるため main にはまだ無い）
+      3. `directionSchema.isDefault` を必須にした（PUT で省略すると既定が黙って外れたため）。省略は 400（+テスト）
+      4. 駅対画面の ① のホームを、ホーム番号の数値順に並べる（varchar の辞書順では '10' < '2'）
+      5. 駅対画面の「駅の最初の路線」を路線の `displayOrder`・id 順で決める（並び順の指定が無く非決定的だった）
+      6. 方面の新規・編集画面の読み取りを1回の `Promise.all` にまとめた
+      7. 走行方向の型: `transfer-difficulty` は ESLint で DB 非依存が強制されているため、`@furatora/database/enums` を
+         import する案はやめ、admin の `transfer-connection/domain/types.ts` で両者の一致を型検査するようにした。
+         フォームの `isDirectionType`・選択肢と `validations` の enum は `DIRECTIONS` から作る
+      8. `lineDirectionRepository.test.ts` を追加（7件）。旧既定を外す条件から自分の除外を消すと失敗することを確認した
+      結果: 全体の test（admin 626・platform-diagram 203・transfer-difficulty 36・frontend 13）・typecheck（6）・lint（4）が通った

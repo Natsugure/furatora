@@ -54,13 +54,13 @@ line_directions
 3. **③ フォールバック**: D が inbound なら「上り」、outbound なら「下り」
 
 - ① で文言が複数あるとき（1つの走行方向に複数のホームが対応する駅。中野坂上 inbound の「方南町方面」「荻窪・方南町方面」）は、
-  **どれか1つに決めず**、重複を除いてホーム番号順に「／」で連結する。解消は [#128](https://github.com/Natsugure/furatora/issues/128)。
+  **どれか1つに決めず**、重複を除いてホーム番号の数値順（'2' → '10'）に「／」で連結する。解消は [#128](https://github.com/Natsugure/furatora/issues/128)。
 - 空文字の文言は、無いものとして次の段へ進む。
 - 実装は `packages/transfer-difficulty/src/domain/directionLabel.ts` の `resolveDirectionLabel`
   （DB・React に依存しない純粋関数）。呼び出し側がホームと既定行を読んで渡す。
   Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）が使っており、
   Web（#125）も同じ関数を使うこと。規則を各アプリで書き直さない。
-- 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面は駅の最初の路線（`stationLines`）について解決し、
+- 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面は駅の最初の路線（`stationLines` を路線の `displayOrder`、同順なら id で並べた先頭）について解決し、
   ホームと既定行をその路線で絞る。1駅が複数路線を持つようになったら（[#82](https://github.com/Natsugure/furatora/issues/82)）、
   解決の入力に路線を明示する必要がある。
 
@@ -68,6 +68,7 @@ line_directions
 
 - 方面の作成・更新（`POST /api/lines/[lineId]/directions`・`PUT …/[directionId]`）は
   `apps/admin/src/external/repository/lineDirectionRepository.ts` を通す。
+- API の `isDefault` は必須（省略は 400）。PUT は全項目の置き換えなので、省略を false と読むと既定行が黙って既定から外れるため。
 - **既定にする書き込みは、同じ組の旧既定を外してから書く。** 2文になるので `withTransaction` で1つにする
   （[ADR-0005](../adr/0005-write-atomicity-driver.md)）。方面タイプを変える更新では、移動先の組の既定を外す（移動元の組は既定が0行になる）。
   更新は、対象の行が路線に属することを先に確かめてから旧既定を外す（別路線の id での更新で、旧既定だけが外れないようにするため）。
@@ -75,7 +76,8 @@ line_directions
   （二重の既定は制約が拒否し、トランザクションごと戻るので不整合は残らない）。
 - **既定行を削除しても、別の行を自動で既定にしない。** どれを昇格させるかを機械的に決められないため。その組は ③ になる。
 - フォームは、新規作成で組に既定行がまだ無ければ「既定にする」を選んだ状態で開き、別の既定行があれば
-  「保存すると置き換わる」ことを示す。方面の一覧は既定行に「既定」と表示する。
+  「保存すると置き換わる」ことを示す。既定行のチェックを外すか方面タイプを変えると、元の組の既定が無くなることを示す
+  （保存は止めない）。方面の一覧は既定行に「既定」と表示する。
 
 ## 関連
 

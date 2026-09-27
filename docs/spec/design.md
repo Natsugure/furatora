@@ -67,6 +67,8 @@ export const lineDirections = pgTable('line_directions', {
    `lines.slug` と結合して対象行を特定し、`is_default = true` にする。
    - 対象の行が無い組は飛ばす（0005 の方針）。
    - **その組に既定行が既にあれば触らない**（`NOT EXISTS`）。Admin で先に設定された値を上書きしないため、また2回目の適用で何も変えないため。
+   - **組ごとに1行へ絞る**（`DISTINCT ON (line_id, direction_type)`、同名なら id の小さい行）。`(line_id, direction_type, display_name)` は
+     一意制約が無く Admin から同名の行を作れるため、絞らないと同名の2行が両方 true になり、部分ユニーク違反で移行（= Vercel のビルド）が落ちる。
 3. 行の特定に id を使わないのは、環境ごとに id が違いうるため（0007・0012 の前例）。
    `(line_id, direction_type, display_name)` が52行とも一意であることは main で確認済み（2026-09-27）。
 
@@ -195,6 +197,8 @@ currentDefaults: Record<DirectionType, { id: string; displayName: string } | nul
 - Checkbox「この路線・方面の既定の表示名にする」。説明:「ホームが登録されていない駅で、乗換案内の方面名として使われます。
   途中の駅名を含まない、終点方向の文言を選んでください」。
 - `currentDefaults[directionType]` があり、それが自分でなければ「現在の既定: ○○（保存すると置き換わります）」を出す（方面タイプの切り替えにも追従）。
+- 既定行を編集していて、チェックを外すか方面タイプを変えたら「保存すると、○○の既定の表示名が無くなります」を出す
+  （元の組が既定行を失い ③ になるため。保存は止めない）。
 - 初期値: 編集なら `initialData.isDefault`。新規なら、選択中の方面タイプに既定行が無ければ true。新規で方面タイプを切り替えたときも
   同じ規則で初期値を変える（利用者がチェックを触ったあとは変えない）。
 - 409 のとき「同じ路線・方面の既定が同時に変更されました。再読み込みしてください」を表示する。それ以外の失敗は現行どおり。
@@ -214,11 +218,13 @@ currentDefaults: Record<DirectionType, { id: string; displayName: string } | nul
 
 - `packages/transfer-difficulty/src/domain/directionLabel.test.ts`: ①1件 / ①複数（連結・重複除去・順序保持）/ ①が空で②あり /
   ③ inbound・outbound / ①が空文字だけのときに②へ進む / ②が空文字のときに③へ進む
-- `apps/admin/src/lib/validations.test.ts`: `isDefault` の省略・true・型違い
+- `apps/admin/src/lib/validations.test.ts`: `isDefault` の省略（400。PUT で送り忘れたクライアントが既定を黙って外さないよう必須）・true・型違い
+- `apps/admin/src/external/repository/lineDirectionRepository.test.ts`: クエリビルダを記録する偽物で、旧既定を外す条件
+  （移動先の方面タイプ・自分自身の除外）と文の順序、対象が無いときに外さないこと、部分ユニーク違反の 409 化を確かめる
 - `apps/admin/src/app/api/lines/[lineId]/directions/route.test.ts`・`[directionId]/route.test.ts`（新規。`api/lines/route.test.ts` の形）:
   201 / 400（JSON・検証）/ 409（`DirectionDefaultConflictError`）/ PUT の 404
 - 既存テストのフィクスチャ（`TransferPairEditor.test.tsx`・`draft.test.ts`）を `directionHints` の新しい型に合わせる
-- Repository・Query・移行 SQL は DB が要るので、development で手動検証する（tasks.md TASK-10）
+- Query・移行 SQL は DB が要るので、development で手動検証する（tasks.md TASK-10）
 
 ## 決定記録（この作業限り）
 
