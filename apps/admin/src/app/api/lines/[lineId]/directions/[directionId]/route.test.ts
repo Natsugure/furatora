@@ -58,6 +58,13 @@ describe('PUT /api/lines/[lineId]/directions/[directionId]', () => {
     expect(response.status).toBe(404);
   });
 
+  it('isDefault を省略した場合は400を返し、既定を外さない', async () => {
+    const response = await PUT(request(JSON.stringify({ ...validBody, isDefault: undefined })), params);
+
+    expect(response.status).toBe(400);
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('不正な JSON は400を返す', async () => {
     const response = await PUT(request('not json'), params);
 

@@ -27,6 +27,7 @@ const validBody = {
   directionType: 'outbound',
   representativeStationId: STATION_ID,
   displayName: '池袋方面',
+  isDefault: false,
 };
 
 describe('POST /api/lines/[lineId]/directions', () => {
@@ -34,8 +35,8 @@ describe('POST /api/lines/[lineId]/directions', () => {
     vi.clearAllMocks();
   });
 
-  it('正常なリクエストで201と作成行を返す。isDefault を省略すると false で作る', async () => {
-    const created = { id: 'direction-1', lineId: LINE_ID, ...validBody, isDefault: false };
+  it('正常なリクエストで201と作成行を返す。省略した任意項目は null で作る', async () => {
+    const created = { id: 'direction-1', lineId: LINE_ID, ...validBody };
     create.mockResolvedValue(created);
 
     const response = await POST(request(JSON.stringify(validBody)), params);
