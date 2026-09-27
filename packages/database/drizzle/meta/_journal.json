@@ -92,6 +92,20 @@
       "when": 1790383260416,
       "tag": "0012_migrate_transfer_difficulty",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790472466804,
+      "tag": "0013_add_line_direction_default",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790472470664,
+      "tag": "0014_set_line_direction_defaults",
+      "breakpoints": true
     }
   ]
 }
