@@ -160,6 +160,47 @@ describe('findDuplicates: 同じ画面のカードどうし', () => {
   it('内容が違えば検出しない', () => {
     expect(findDuplicates(draftOf(card({ key: 'a' }), card({ key: 'b', facilities: ['ramp'] })), [], [])).toEqual([]);
   });
+
+  describe('方面を分けたカード（適用先が重ならない2枚）', () => {
+    const inbound = ['inbound:inbound', 'inbound:outbound'] as const;
+    const outbound = ['outbound:inbound', 'outbound:outbound'] as const;
+
+    it('所要時分が違えば、設備とフラグが同じでも検出しない（「複製して方面を分ける」の結果）', () => {
+      const drafts = draftOf(
+        card({ key: 'a', combos: [...inbound] }),
+        card({ key: 'b', label: 'B', minutes: 5, combos: [...outbound] }),
+      );
+      expect(findDuplicates(drafts, [], [])).toEqual([]);
+    });
+
+    it('備考が違えば、設備とフラグが同じでも検出しない', () => {
+      const drafts = draftOf(
+        card({ key: 'a', combos: [...inbound] }),
+        card({ key: 'b', label: 'B', notes: '下り側は北改札寄り', combos: [...outbound] }),
+      );
+      expect(findDuplicates(drafts, [], [])).toEqual([]);
+    });
+
+    it('所要時分・備考まで同じなら、分ける理由が無いので統合を提示する', () => {
+      const drafts = draftOf(
+        card({ key: 'a', minutes: 3, notes: 'x', combos: [...inbound] }),
+        card({ key: 'b', label: 'B', minutes: 3, notes: ' x ', combos: [...outbound] }),
+      );
+      expect(findDuplicates(drafts, [], [])).toEqual([
+        expect.objectContaining({ kind: 'card', key: 'b', otherKey: 'a' }),
+      ]);
+    });
+
+    it('適用先が1つでも重なれば、所要時分が違っても検出する（同じ方面に同じ経路の二重登録）', () => {
+      const drafts = draftOf(
+        card({ key: 'a', combos: [...inbound] }),
+        card({ key: 'b', label: 'B', minutes: 5, combos: ['inbound:outbound', 'outbound:inbound'] }),
+      );
+      expect(findDuplicates(drafts, [], [])).toEqual([
+        expect.objectContaining({ kind: 'card', key: 'b', otherKey: 'a' }),
+      ]);
+    });
+  });
 });
 
 describe('matchKey', () => {

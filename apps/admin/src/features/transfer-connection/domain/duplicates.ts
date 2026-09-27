@@ -28,6 +28,14 @@ function signature(shape: Shape): string {
   ]);
 }
 
+// 方面を分けた2枚か。適用先が重ならず、所要時分か備考が違う（「複製して方面を分ける」で作り、値を変えた結果）。
+// 統合すると残す側の値で上書きされ、分けた差が消えるため、カードどうしの一致に数えない。
+// 所要時分・備考まで同じなら分ける理由が無いので数える（全方面共通は1本のルートで表す。docs/domain「Admin の書き込み規約」）
+function isDirectionSplit(a: RouteDraft, b: RouteDraft): boolean {
+  if (a.combos.some((c) => b.combos.includes(c))) return false;
+  return a.minutes !== b.minutes || a.notes.trim() !== b.notes.trim();
+}
+
 export function matchKey(match: DuplicateMatch): string {
   return match.kind === 'candidate'
     ? `${match.key}|candidate:${match.candidate.routeId}`
@@ -66,6 +74,7 @@ export function findDuplicates(
       const earlier = draft.routes[i]!;
       if (!checkable(earlier) || !checkable(later)) continue;
       if (signature(earlier) !== signature(later)) continue;
+      if (isDirectionSplit(earlier, later)) continue;
       if (!isSubject(earlier) && !isSubject(later)) continue;
       if (earlier.routeId !== null && earlier.routeId === later.routeId) continue;
       // routeId を持つ側（既存ルート）を残す。両方持つ／持たないときは前のカードを残す
