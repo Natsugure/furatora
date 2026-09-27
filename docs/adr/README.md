@@ -63,7 +63,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0011](./0011-transfer-route-facilities-as-set.md) | 乗換ルートの設備を「直列の並び」ではなく「種類の集合」で持つ | Accepted   | 2026-09-25 |
 | [0012](./0012-zero-facility-route-as-not-entered.md) | 設備0件のルートを「設備未入力」とし、必要な行為を導出しない | Proposed   | 2026-09-26 |
 | [0013](./0013-serialize-transfer-pair-writes.md) | 駅対の乗換難易度の書き込みを、接続一覧の行ロックで1本ずつにする | Accepted   | 2026-09-27 |
-| [0014](./0014-direction-label-by-default-row.md) | 方面の表示文言を、(路線, 走行方向) ごとの既定行で解決する | Proposed   | 2026-09-27 |
+| [0014](./0014-direction-label-by-default-row.md) | 方面の表示文言を、(路線, 走行方向) ごとの既定行で解決する | Accepted   | 2026-09-27 |
 
 ## 関連ドキュメント
 

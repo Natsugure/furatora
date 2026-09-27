@@ -1,6 +1,6 @@
 # ADR-0014: 方面の表示文言を、(路線, 走行方向) ごとの既定行で解決する
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-09-27
 - **決定者**: @Natsugure
 - **関連**: [`docs/domain/station-master-model.md`](../domain/station-master-model.md)「接続の端点」,

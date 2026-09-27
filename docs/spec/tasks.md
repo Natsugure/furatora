@@ -74,8 +74,14 @@
 
 ## フェーズ5: 振り返り
 
-- [ ] **TASK-11** `docs/domain/line-directions.md` を新規作成し、`README.md` の一覧と `station-master-model.md`「接続の端点」から参照する。
-      ADR-0014 を Accepted にし、`docs/adr/README.md` の一覧を更新する（design.md「フェーズ5で恒久化する内容」）
+- [x] **TASK-11** `docs/domain/line-directions.md` を新規作成し、`README.md` の一覧と `station-master-model.md`「接続の端点」から参照する。
+      ADR-0014 を Accepted にし、`docs/adr/README.md` の一覧を更新する（design.md「フェーズ5で恒久化する内容」）。
+      結果（2026-09-27）: `line-directions.md` を新規作成（モデル・既定行の不変条件と選び方・解決規則・Admin の書き込み規約）。
+      design.md の決定1（選び方の基準）・決定4〜5（大江戸線）・決定6（① の複数件）・決定7（ロックしない）は、ここと ADR-0014 に移した。
+      `README.md` の一覧と `station-master-model.md`「接続の端点」「関連」から参照した。
+      ほかの domain 文書（`platform-coordinate-system.md`・`station-visibility.md`・`train-stop-patterns.md`）は、
+      方面を扱わないため変更なし（確認済み）。
+      ADR-0014 は開発者の承認を得て Accepted にした（2026-09-27。`.claude/rules/adr.md`。実装・検証は TASK-9・TASK-10 で通過）
 
 ## フェーズ6: 引き渡し
 
