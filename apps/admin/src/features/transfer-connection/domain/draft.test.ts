@@ -44,8 +44,8 @@ function context(over: Partial<TransferPairEditContext> = {}): TransferPairEditC
     lineName: '丸ノ内線',
     connectedLineName: '新宿線',
     directionHints: {
-      station: { inbound: [], outbound: [] },
-      connected: { inbound: [], outbound: [] },
+      station: { inbound: '上り', outbound: '下り' },
+      connected: { inbound: '上り', outbound: '下り' },
     },
     facilityTypes: [],
     connections: [],

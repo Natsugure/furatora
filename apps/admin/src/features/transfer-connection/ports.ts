@@ -39,10 +39,10 @@ export type TransferPairEditContext = {
   connectedStationName: string;
   lineName: string | null;
   connectedLineName: string | null;
-  /** 入力の補助表示。同一 (路線, 方面) に同義行があるため一覧で持つ（解決規則は #130） */
+  /** 入力の補助表示の方面の文言。①ホーム → ②既定行 → ③上り/下り で解決済み（ADR-0014 / docs/domain/line-directions.md） */
   directionHints: {
-    station: Record<DirectionType, string[]>;
-    connected: Record<DirectionType, string[]>;
+    station: Record<DirectionType, string>;
+    connected: Record<DirectionType, string>;
   };
   facilityTypes: { code: FacilityTypeCode; name: string }[];
   connections: TransferPairConnection[];

@@ -4,6 +4,7 @@ import {
   facilityTypes,
   lineDirections,
   lines,
+  platforms,
   stationConnections,
   stationLines,
   stations,
@@ -12,8 +13,13 @@ import {
   transferRoutes,
 } from '@furatora/database/schema';
 import type { DirectionType } from '@furatora/database/enums';
-import { FACILITY_TYPE_CODES, type FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
+import {
+  FACILITY_TYPE_CODES,
+  resolveDirectionLabel,
+  type FacilityTypeCode,
+} from '@furatora/transfer-difficulty/domain';
 import { and, asc, eq, inArray, not } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type {
   CandidateRoute,
   PairRouteRecord,
@@ -35,11 +41,14 @@ import {
 const isFacilityCode = (code: string): code is FacilityTypeCode =>
   (FACILITY_TYPE_CODES as readonly string[]).includes(code);
 
+const inboundDirections = alias(lineDirections, 'inbound_directions');
+const outboundDirections = alias(lineDirections, 'outbound_directions');
+
 export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
   async getContext(stationId, connectedStationId) {
     const pairCondition = pairConnectionCondition(stationId, connectedStationId);
     // neon-http は await ごとに HTTP 往復になるため、依存の無いものは Promise.all でまとめる
-    const [[pair], pairConnections, nearbyConnections, facilityTypeRows, directionRows] = await Promise.all([
+    const [[pair], pairConnections, nearbyConnections, facilityTypeRows, platformRows, defaultDirectionRows] = await Promise.all([
       db.select({ id: stationConnections.id }).from(stationConnections)
         .where(stationPairCondition(stationId, connectedStationId)),
       db.select().from(transferConnections).where(pairCondition),
@@ -49,16 +58,32 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
         pairCondition && not(pairCondition),
       )),
       db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes),
+      // 方面の文言の ①: ホームの枠ごとの方面（ADR-0014）
       db
         .select({
-          stationId: stationLines.stationId,
+          stationId: platforms.stationId,
+          lineId: platforms.lineId,
+          inboundName: inboundDirections.displayName,
+          outboundName: outboundDirections.displayName,
+        })
+        .from(platforms)
+        .leftJoin(inboundDirections, eq(inboundDirections.id, platforms.inboundDirectionId))
+        .leftJoin(outboundDirections, eq(outboundDirections.id, platforms.outboundDirectionId))
+        .where(inArray(platforms.stationId, [stationId, connectedStationId]))
+        .orderBy(asc(platforms.platformNumber)),
+      // 方面の文言の ②: 路線の既定行
+      db
+        .select({
+          lineId: lineDirections.lineId,
           directionType: lineDirections.directionType,
           displayName: lineDirections.displayName,
         })
         .from(lineDirections)
         .innerJoin(stationLines, eq(stationLines.lineId, lineDirections.lineId))
-        .where(inArray(stationLines.stationId, [stationId, connectedStationId]))
-        .orderBy(asc(lineDirections.displayName)),
+        .where(and(
+          inArray(stationLines.stationId, [stationId, connectedStationId]),
+          eq(lineDirections.isDefault, true),
+        )),
     ]);
     if (!pair) return null;
 
@@ -111,29 +136,38 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
     const [stationRows, stationLineRows] = await Promise.all([
       db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, [...stationIds])),
       db
-        .select({ stationId: stationLines.stationId, lineName: lines.name })
+        .select({ stationId: stationLines.stationId, lineId: stationLines.lineId, lineName: lines.name })
         .from(stationLines)
         .innerJoin(lines, eq(lines.id, stationLines.lineId))
         .where(inArray(stationLines.stationId, [...stationIds])),
     ]);
     const stationName = new Map(stationRows.map((s) => [s.id, s.name]));
-    const firstLineNameOf = new Map<string, string>();
+    const firstLineOf = new Map<string, { lineId: string; lineName: string }>();
     for (const row of stationLineRows) {
-      if (!firstLineNameOf.has(row.stationId)) firstLineNameOf.set(row.stationId, row.lineName);
+      if (!firstLineOf.has(row.stationId)) firstLineOf.set(row.stationId, { lineId: row.lineId, lineName: row.lineName });
     }
-    const firstLineName = (id: string) => firstLineNameOf.get(id) ?? null;
+    const firstLineName = (id: string) => firstLineOf.get(id)?.lineName ?? null;
     const label = (id: string) => withLine(stationName.get(id) ?? '（不明な駅）', firstLineName(id));
     const connectionLabel = (c: { stationAId: string; stationBId: string }) =>
       `${label(c.stationAId)} ↔ ${label(c.stationBId)}`;
 
-    // 入力の補助表示の方面文言
-    const hints = (id: string): Record<DirectionType, string[]> => {
-      const result: Record<DirectionType, string[]> = { inbound: [], outbound: [] };
-      for (const row of directionRows) {
-        if (row.stationId !== id) continue;
-        if (!result[row.directionType].includes(row.displayName)) result[row.directionType].push(row.displayName);
-      }
-      return result;
+    // 入力の補助表示の方面文言。駅名・路線名の表示と同じく、駅の最初の路線について解決する。
+    // 路線で絞るのは、1駅が複数路線を持つようになったとき（#82）に別路線の文言が混ざらないようにするため
+    const hints = (id: string): Record<DirectionType, string> => {
+      const lineId = firstLineOf.get(id)?.lineId;
+      const platformsOfLine = platformRows.filter((p) => p.stationId === id && p.lineId === lineId);
+      const resolve = (directionType: DirectionType, platformNames: (string | null)[]) =>
+        resolveDirectionLabel({
+          directionType,
+          platformNames: platformNames.filter((name): name is string => name !== null),
+          defaultName: defaultDirectionRows.find(
+            (d) => d.lineId === lineId && d.directionType === directionType,
+          )?.displayName ?? null,
+        }).label;
+      return {
+        inbound: resolve('inbound', platformsOfLine.map((p) => p.inboundName)),
+        outbound: resolve('outbound', platformsOfLine.map((p) => p.outboundName)),
+      };
     };
 
     const facilitiesOf = new Map<string, FacilityTypeCode[]>();
