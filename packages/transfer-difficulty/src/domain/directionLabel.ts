@@ -1,5 +1,7 @@
 // 方面ラベル（「池袋方面」など）の解決規則（ADR-0014 / docs/domain/line-directions.md）。
 
+// DB 非依存のパッケージなので @furatora/database/enums の DirectionType を import せず自前で持つ。
+// 両者の一致は apps/admin の features/transfer-connection/domain/types.ts で型検査している
 export type DirectionType = 'inbound' | 'outbound';
 
 export type DirectionLabelSource = 'platform' | 'default' | 'fallback';

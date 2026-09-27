@@ -9,6 +9,7 @@ import {
 import type { DirectionType } from '@furatora/database/enums';
 import { FALLBACK_DIRECTION_LABELS } from '@furatora/transfer-difficulty/domain';
 import type { DirectionStationOption, LineDirectionEditContext } from '@/features/line/ports';
+import { DIRECTIONS } from '@/features/transfer-connection/domain/types';
 import { describeError } from '@/features/station-publishing/describeError';
 
 type LineDirectionData = {
@@ -31,7 +32,7 @@ type Props = {
 };
 
 const isDirectionType = (value: string): value is DirectionType =>
-  value === 'inbound' || value === 'outbound';
+  (DIRECTIONS as readonly string[]).includes(value);
 
 function stationLabel(s: DirectionStationOption) {
   return `${s.name}${s.nameEn ? ` (${s.nameEn})` : ''}${s.code ? ` [${s.code}]` : ''}`;
@@ -72,6 +73,10 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
   // 選んだ組に自分以外の既定行があるなら、保存でそれが置き換わることを示す
   const otherDefault = currentDefaults[directionType];
   const replacedDefault = otherDefault && otherDefault.id !== initialData?.id ? otherDefault : null;
+  // 既定行のチェックを外すか方面タイプを変えると、元の組は既定行を失い「上り」「下り」で表示される
+  const lostDefaultType = initialData?.isDefault && (!isDefault || directionType !== initialData.directionType)
+    ? initialData.directionType
+    : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,10 +125,7 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
       <Stack gap="lg" maw="42rem">
         <NativeSelect
           label="方面タイプ"
-          data={[
-            { value: 'inbound', label: FALLBACK_DIRECTION_LABELS.inbound },
-            { value: 'outbound', label: FALLBACK_DIRECTION_LABELS.outbound },
-          ]}
+          data={DIRECTIONS.map((type) => ({ value: type, label: FALLBACK_DIRECTION_LABELS[type] }))}
           value={directionType}
           onChange={(e) => changeDirectionType(e.target.value)}
           required
@@ -157,6 +159,12 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
           {isDefault && replacedDefault && (
             <Text size="xs" c="orange" mt={4} ml={32}>
               現在の既定: {replacedDefault.displayName}（保存すると置き換わります）
+            </Text>
+          )}
+          {lostDefaultType && (
+            <Text size="xs" c="orange" mt={4} ml={32}>
+              保存すると、{FALLBACK_DIRECTION_LABELS[lostDefaultType]}の既定の表示名が無くなります
+              （ホームが未登録の駅では「{FALLBACK_DIRECTION_LABELS[lostDefaultType]}」と表示されます）
             </Text>
           )}
         </div>

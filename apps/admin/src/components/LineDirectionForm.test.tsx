@@ -38,6 +38,20 @@ function setup(props: Partial<Props> = {}) {
 }
 
 const defaultCheckbox = () => screen.getByRole('checkbox', { name: 'この路線・方面の既定の表示名にする' });
+const editingIkebukuro = (isDefault: boolean): Partial<Props> => ({
+  isEdit: true,
+  initialData: {
+    id: isDefault ? ikebukuroDefault.id : 'direction-other',
+    directionType: 'outbound',
+    representativeStationId: 'station-1',
+    displayName: '池袋方面',
+    displayNameEn: '',
+    terminalStationIds: null,
+    notes: '',
+    isDefault,
+  },
+});
+const lostDefaultWarning = () => screen.queryByText(/下りの既定の表示名が無くなります/);
 
 describe('LineDirectionForm: 既定の表示名', () => {
   beforeEach(() => {
@@ -73,21 +87,28 @@ describe('LineDirectionForm: 既定の表示名', () => {
   });
 
   it('既定行そのものを編集するときは、置き換えを示さない', () => {
-    setup({
-      isEdit: true,
-      initialData: {
-        id: ikebukuroDefault.id,
-        directionType: 'outbound',
-        representativeStationId: 'station-1',
-        displayName: '池袋方面',
-        displayNameEn: '',
-        terminalStationIds: null,
-        notes: '',
-        isDefault: true,
-      },
-    });
+    setup(editingIkebukuro(true));
     expect(defaultCheckbox()).toBeChecked();
     expect(screen.queryByText(/現在の既定/)).not.toBeInTheDocument();
+    expect(lostDefaultWarning()).not.toBeInTheDocument();
+  });
+
+  it('既定行のチェックを外すと、元の組が既定を失うことを示す', async () => {
+    setup(editingIkebukuro(true));
+    await userEvent.click(defaultCheckbox());
+    expect(lostDefaultWarning()).toBeInTheDocument();
+  });
+
+  it('既定行の方面タイプを変えると、元の組が既定を失うことを示す', async () => {
+    setup(editingIkebukuro(true));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: '方面タイプ' }), 'inbound');
+    expect(lostDefaultWarning()).toBeInTheDocument();
+  });
+
+  it('既定でない行の編集では、既定を失う警告を出さない', async () => {
+    setup(editingIkebukuro(false));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: '方面タイプ' }), 'inbound');
+    expect(lostDefaultWarning()).not.toBeInTheDocument();
   });
 
   it('保存で isDefault を送り、409 なら API のメッセージを表示する', async () => {
