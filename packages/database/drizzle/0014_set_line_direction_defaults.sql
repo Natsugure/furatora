@@ -73,18 +73,23 @@ BEGIN
     RAISE NOTICE '0014: 対象の方面が存在しないため、次の既定の設定をスキップします: %', v_skipped;
   END IF;
 
-  -- 4. 既定を立てる。既定行が既にある組には触らない
-  UPDATE line_directions d
+  -- 4. 既定を立てる。既定行が既にある組には触らない。
+  --    (路線, 方面タイプ, 表示名) は一意ではない（Admin から同名の行を作れる）ため、組ごとに1行へ絞る。
+  --    絞らないと同名の2行が両方 true になり unique_line_direction_default 違反で移行（= Vercel のビルド）が落ちる
+  UPDATE line_directions
   SET is_default = true
-  FROM _default x, lines l
-  WHERE l.id = d.line_id
-    AND l.slug = x.line_slug
-    AND d.direction_type = x.direction_type
-    AND d.display_name = x.display_name
-    AND NOT EXISTS (
+  WHERE id IN (
+    SELECT DISTINCT ON (d.line_id, d.direction_type) d.id
+    FROM line_directions d
+    JOIN lines l ON l.id = d.line_id
+    JOIN _default x
+      ON x.line_slug = l.slug AND x.direction_type = d.direction_type AND x.display_name = d.display_name
+    WHERE NOT EXISTS (
       SELECT 1 FROM line_directions e
       WHERE e.line_id = d.line_id AND e.direction_type = d.direction_type AND e.is_default
-    );
+    )
+    ORDER BY d.line_id, d.direction_type, d.id
+  );
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE '0014: 既定行を % 行設定しました', v_count;
 END
