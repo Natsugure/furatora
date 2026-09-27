@@ -85,9 +85,10 @@
 
 ## フェーズ6: 引き渡し
 
-- [ ] **TASK-12** `develop` 宛ての PR の本文を用意する（エグゼクティブサマリー・変更履歴・`docs/domain`・`docs/adr` の変更点）。
+- [x] **TASK-12** `develop` 宛ての PR の本文を用意する（エグゼクティブサマリー・変更履歴・`docs/domain`・`docs/adr` の変更点）。
       `docs/spec/` に次の Issue でも必要な内容が残っていないことを確認する。
       結果（2026-09-27）: 全体の typecheck（6）・lint（4）・test（admin 615・platform-diagram 203・transfer-difficulty 36・frontend 13）が通った。
       恒久知識の取り残しを確認した: design.md の決定1・4〜7 と解決規則・書き込み規約は `line-directions.md` と ADR-0014 に移してある。
       決定2（候補1行の組）・決定3（8組の選定）は `0014` の SQL と `line-directions.md`「既定行」に残る。
-      将来作業は既存の Issue（#125 Web 表示・#128 中野坂上・#82 物理駅粒度）で追える。新しく起票する Issue は無い
+      将来作業は既存の Issue（#125 Web 表示・#128 中野坂上・#82 物理駅粒度）で追える。新しく起票する Issue は無い。
+      PR: [#134](https://github.com/Natsugure/furatora/pull/134)（develop 宛て）
