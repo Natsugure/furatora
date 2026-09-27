@@ -261,10 +261,14 @@ export const lineDirections = pgTable('line_directions', {
   displayName: varchar('display_name', { length: 100 }).notNull(), // "渋谷方面"
   displayNameEn: varchar('display_name_en', { length: 100 }), // "For Shibuya"
   terminalStationIds: uuid('terminal_station_ids').array(), // 終着駅候補（複数対応）
+  // (路線, 走行方向) の既定の文言。ホームが登録されていない駅の方面ラベルに使う（ADR-0014）。
+  isDefault: boolean('is_default').notNull().default(false),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  uniqueIndex('unique_line_direction_default').on(t.lineId, t.directionType).where(sql`${t.isDefault}`),
+]);
 
 export const platforms = pgTable('platforms', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),

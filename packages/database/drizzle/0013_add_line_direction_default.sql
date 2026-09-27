@@ -1,0 +1,2 @@
+ALTER TABLE "line_directions" ADD COLUMN "is_default" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_line_direction_default" ON "line_directions" USING btree ("line_id","direction_type") WHERE "line_directions"."is_default";

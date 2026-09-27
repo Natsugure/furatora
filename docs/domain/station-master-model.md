@@ -193,6 +193,8 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 
 - 端点は `(stationId, direction_type)`。`direction_type` は `'inbound' | 'outbound'` の2値で、
   両端点とも必須。`line_directions.id` は参照しない。
+  表示する方面の文言（「池袋方面」など）は、ホーム → `(路線, direction_type)` の既定行 → 「上り」「下り」の順で解決する
+  （[line-directions.md](./line-directions.md)）。
 - **解決は完全一致の1行を引くだけ。** 優先順位規則もタイブレークも無い。
   `NULLS NOT DISTINCT` も要らない（方面が `NOT NULL` のため）。
 - **無向1行で持ち、端点を `(stationId, direction_type)` の昇順に正規化して格納する。**
@@ -355,3 +357,4 @@ Admin の入力欄には、出発地・目的地に依存する比較を書か�
 - [ADR-0001](../adr/0001-layer-structure.md) — feature 間の一方向依存
 - [ADR-0011](../adr/0011-transfer-route-facilities-as-set.md) — 乗換ルートの設備を種類の集合で持つ理由と却下案
 - [ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md) — 設備0件のルートを「設備未入力」とする理由と却下案
+- [line-directions.md](./line-directions.md) — 乗換接続の方面の文言の解決規則（[ADR-0014](../adr/0014-direction-label-by-default-row.md)）

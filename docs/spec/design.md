@@ -1,337 +1,277 @@
-# 設計: 乗換難易度 Admin 入力フォームの対応 (Issue #124)
+# 設計: line_directions に isDefault を追加する（方面ラベルの解決）(Issue #130)
 
 ## 参照
 
 [requirements.md](./requirements.md) / [tasks.md](./tasks.md) /
-[docs/domain/station-master-model.md](../domain/station-master-model.md)「乗換難易度」節（4層構造・不変条件）/
+[docs/domain/station-master-model.md](../domain/station-master-model.md)「乗換難易度」節（接続の端点）/
 [ADR-0001](../adr/0001-layer-structure.md)（層と依存）/ [ADR-0002](../adr/0002-dependency-inversion-ports.md)（ports）/
 [ADR-0003](../adr/0003-read-write-separation.md)（Query と Repository）/
 [ADR-0005](../adr/0005-write-atomicity-driver.md)（`withTransaction`）/
-[ADR-0011](../adr/0011-transfer-route-facilities-as-set.md)（設備は集合）/
-[ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)（設備0件は未入力）
+[ADR-0014](../adr/0014-direction-label-by-default-row.md)（既定行で方面の文言を解決する。本Issueで作成）
 
-本Issueは Admin の**入力**を新モデルに切り替える。スキーマとデータは #122・#123 で入っていて変更しない。
-ドメイン定義（4層構造・不変条件）は恒久知識として `docs/domain/` にある。本書には
-**この作業限りの判断**と、画面・API・Repository の設計だけを置く。
+既定行という仕組みを選んだ理由と、既定を選ぶ基準の根拠は ADR-0014 に書く。本書には、この作業限りの判断と、
+スキーマ・移行・関数・画面の設計だけを置く。
 
 ## アーキテクチャ
 
 ```
-app/stations/[stationId]/connections/[connectedStationId]/transfer/page.tsx   (Server Component)
-   └─ transferPairEditPageQuery.getContext(stationId, connectedStationId)      … 読み取り（ADR-0003）
-        └─ TransferPairEditor (Client)  … 下書き（draft）を useState で持つ
-             ├─ RouteCard × N          … 設備チェック・フラグ・方面2×2・プレビュー
-             ├─ DuplicateRouteModal    … 保存時の重複候補（提示のみ）
-             └─ 保存 → PUT /api/stations/[stationId]/connections/[connectedStationId]/transfer
-                        └─ validate（クライアントと共通の純粋関数）→ transferConnectionRepository.savePair()
-                             └─ withTransaction（ADR-0005）
+packages/database/src/schema.ts            lineDirections.isDefault + unique_line_direction_default（部分ユニーク）
+packages/database/drizzle/0013_*.sql       ADD COLUMN / CREATE UNIQUE INDEX（drizzle-kit generate）
+packages/database/drizzle/0014_*.sql       既定の設定と大江戸線の2行の追加（手書きのデータ移行）
 
-features/transfer-connection/        ports.ts / schema.ts / domain/{draft,validate,duplicates}.ts / components/
-external/query/transferPairEditPageQuery.ts
-external/repository/transferConnectionRepository.ts
-packages/transfer-difficulty/        requirementFor・isBarrierFree（純粋関数。Admin のプレビューと #125 の Web が使う）
+packages/transfer-difficulty/src/domain/directionLabel.ts
+   resolveDirectionLabel()   … ①ホーム → ②既定行 → ③上り/下り（純粋関数。Admin と #125 の Web が使う）
+
+apps/admin
+ ├─ external/query/transferPairEditPageQuery.ts   ホームと既定行を読み、resolveDirectionLabel で見出しの文言を決める
+ ├─ features/transfer-connection/components/RouteCard.tsx   HintText は1件の文字列を表示する
+ ├─ features/line/ports.ts                         LineDirectionRepository / DirectionDefaultConflictError / currentDefaults
+ ├─ external/repository/lineDirectionRepository.ts  create / update（既定の付け替えは withTransaction）
+ ├─ external/query/lineEditPageQuery.ts            currentDefaults を埋める
+ ├─ app/api/lines/[lineId]/directions/route.ts      POST → Repository
+ ├─ app/api/lines/[lineId]/directions/[directionId]/route.ts   PUT → Repository（GET・DELETE は変えない）
+ ├─ components/LineDirectionForm.tsx               「既定にする」チェックと現在の既定の表示
+ └─ app/lines/[lineId]/directions/page.tsx          既定行に Badge
 ```
 
-- `features/transfer-connection/domain/` は Next・DB に依存しない純粋関数（ADR-0001）。`app/` にはロジックを書かない。
-- Query と Repository の実装は `external/` に置き、`di.ts` で配線する（ADR-0002）。usecases 層は作らない
-  （前例の station-publishing と同じく、ルートが Repository を直接呼ぶ）。
-- `packages/transfer-difficulty` は `packages/platform-diagram` と同じく、DB・Next 非依存（ESLint で禁止）。
-  ADR-0010 の前例に従うだけで、新しい決定ではない。
+`resolveDirectionLabel` を `packages/transfer-difficulty` に置くのは、`requirementFor` と同じく、#125 で Web が同じ規則を使うため。
+パッケージは DB に依存しないので、`DirectionType` はパッケージ内で `'inbound' | 'outbound'` として定義する
+（`@furatora/database/enums` の型と構造的に互換）。
 
-## 編集モデル
-
-### 方面の組み合わせ（ComboKey）
-
-駅対は S・T の各端点が `inbound` / `outbound` の2値を取るので、組み合わせは4通り。
-`ComboKey = 'inbound:inbound' | 'inbound:outbound' | 'outbound:inbound' | 'outbound:outbound'`
-（`${S の方面}:${T の方面}`）。DB の `transfer_connections` は端点を昇順に正規化して持つため、
-**読み込みと保存のときに S/T の向きと A/B の向きを変換する**（変換は `domain/draft.ts` に閉じ、テストする）。
-
-### 下書き（クライアント状態）
+## データモデル
 
 ```ts
-type RouteDraft = {
-  key: string;                    // カードの安定キー（crypto.randomUUID）
-  routeId: string | null;         // null = 新規ルート
-  label: string;
-  isBaseline: boolean;
-  minutes: number | null;
-  isOutdoor: boolean; requiresExitGate: boolean; requiresStaff: boolean; isOfficiallyGuided: boolean;
-  notes: string;
-  facilities: FacilityTypeCode[]; // 集合。重複なし
-  combos: ComboKey[];             // 適用先
-};
-type PairDraft = {
-  routes: RouteDraft[];
-  connectionNotes: Record<ComboKey, string>;  // ルートが適用されている組み合わせだけ保存する
-};
+export const lineDirections = pgTable('line_directions', {
+  // …既存列…
+  // (路線, 走行方向) ごとの既定の文言。ホームが登録されていない駅で方面ラベルに使う。
+  // 組ごとに高々1行（下の部分ユニーク）。0行も許容し、その場合は「上り」「下り」にフォールバックする。
+  // 解決規則と選び方の基準は docs/domain/line-directions.md
+  isDefault: boolean('is_default').notNull().default(false),
+  // …
+}, (t) => [
+  uniqueIndex('unique_line_direction_default').on(t.lineId, t.directionType).where(sql`${t.isDefault}`),
+]);
 ```
 
-- `label` と `isBaseline` は本来 `connection_routes`（接続×ルート）の属性だが、**1つの駅対の中では、同じルートの
-  すべての紐付けに同じ値を書く**（決定4）。1枚のカードが持つ値は1つで足りる。
-- 読み込み時、既存データで同じルートの `label` / `isBaseline` が組み合わせごとに違う場合は、最初の組み合わせの値を
-  採り、カードに「紐付けごとに値が異なっていた。保存すると揃う」と警告する（#123 の移行データでは発生しない）。
+- 列の追加だけなので非破壊。1回のデプロイで入れてよい（CLAUDE.md の二段階ルールの対象外）。
+- 移行 SQL（0013）は `pnpm run db:generate` で生成する。
 
-### 画面の要素
+## データ移行（0014）
 
-| 要素 | 内容 |
-|---|---|
-| ルートカード | label / 基準ルートのスイッチ / 所要時分 / 4フラグ / 設備の7種チェック / 備考 / 適用先 2×2 / 複製・削除 / プレビュー |
-| 適用先 2×2 | 行を S の方面、列を T の方面とし、`line_directions.displayName` を補助表示する（同義行は「／」で連結。#130 まで解決規則は無い） |
-| 共有バッジ | 「共有中: ○○」＋「この駅対だけ切り離す」（REQ-18・19） |
-| 接続の備考 | 既定は全方面で1欄。組み合わせごとに値が異なるときは組み合わせごとの欄（REQ-10） |
-| 入力ガイド | 代替手段は別ルート／段差無しは `sameFloor`／備考に「〇〇のほうが便利」を書かない（REQ-7・27） |
-| 警告 | 代替手段の同居・基準ルート無し・紐付けごとに値が異なっていた（保存は止めない） |
-| プレビュー | ベビーカー・車いすの必要な行為と、バリアフリールートか。設備0件は「設備が未入力」 |
+`drizzle-kit generate --custom --name=set_line_direction_defaults` で空ファイルを作り、手で書く。形は 0012 にそろえる
+（`DO $$ … $$`、一時テーブル、ガードを通ってから実テーブルへ書く）。
 
-### 操作（`domain/draft.ts` の純粋関数）
+1. **大江戸線の2行を追加する**。`lines.slug = 'toei-oedo'`、代表駅は `stations.slug = 'toei-oedo-tochomae'`（決定5）。
+   同じ `(line_id, direction_type, display_name)` の行が既にあれば追加しない。路線か駅が無い環境では何もしない。
+2. **既定を立てる**。一時テーブル `_default (line_slug, direction_type, display_name)` に28組を入れ、
+   `lines.slug` と結合して対象行を特定し、`is_default = true` にする。
+   - 対象の行が無い組は飛ばす（0005 の方針）。
+   - **その組に既定行が既にあれば触らない**（`NOT EXISTS`）。Admin で先に設定された値を上書きしないため、また2回目の適用で何も変えないため。
+   - **組ごとに1行へ絞る**（`DISTINCT ON (line_id, direction_type)`、同名なら id の小さい行）。`(line_id, direction_type, display_name)` は
+     一意制約が無く Admin から同名の行を作れるため、絞らないと同名の2行が両方 true になり、部分ユニーク違反で移行（= Vercel のビルド）が落ちる。
+3. 行の特定に id を使わないのは、環境ごとに id が違いうるため（0007・0012 の前例）。
+   `(line_id, direction_type, display_name)` が52行とも一意であることは main で確認済み（2026-09-27）。
 
-`addRoute` / `duplicateRoute`（`routeId = null`・`combos = []`）/ `removeRoute` / `updateRoute` /
-`toggleCombo` / `toggleFacility` / `detachFromSharedRoute`（`routeId = null` にする）/
-`mergeIntoCandidate`（`routeId` を一致先に付け替える）/ `mergeCards`（2枚を統合。combos は和集合）。
-いずれもイミュータブルで、`editDraft.ts`（station-layout）と同じ形にする。
+### 既定にする行（決定1〜4）
 
-## データフロー
+| 路線（slug） | inbound | outbound |
+|---|---|---|
+| toei-nipporitoneri | 日暮里方面 | 見沼代親水公園方面 |
+| tokyometro-marunouchi | 荻窪・方南町方面 | 池袋方面 |
+| tokyometro-fukutoshin | 渋谷・東急線・みなとみらい線・相鉄線方面 | 和光市・東武線・西武線方面 |
+| tokyometro-chiyoda | 代々木上原・小田急線方面 | 北綾瀬・JR常磐線方面 |
+| tokyometro-hanzomon | 押上・東武線方面 | 渋谷・東急線方面 |
+| tokyometro-namboku | 赤羽岩淵・埼玉高速線方面 | 目黒・東急線・相鉄線方面 |
+| tokyometro-hibiya | 中目黒方面 | 北千住・東武線方面 |
+| tokyometro-yurakucho | 新木場方面 | 和光市・東武線・西武線方面 |
+| tokyometro-tozai | 西船橋・東葉勝田台・津田沼方面 | 中野・三鷹方面 |
+| tokyometro-ginza | 渋谷方面 | 浅草方面 |
+| toei-mita | 目黒・東急線・相鉄線方面 | 西高島平方面 |
+| toei-oedo | **内回り**（新規） | **外回り**（新規） |
+| toei-shinjuku | 新宿・橋本・高尾山口方面 | 本八幡方面 |
+| toei-asakusa | 西馬込・羽田空港・三崎口方面 | 押上・印旛日本医大・成田空港方面 |
 
-### 読み込み（`transferPairEditPageQuery.getContext`）
-
-`station_connections` に S→T が無ければ `null`（404）。あれば次を返す。
+## 解決規則（`resolveDirectionLabel`）
 
 ```ts
-type TransferPairEditContext = {
-  stationId: string; connectedStationId: string;
-  stationName: string; connectedStationName: string;
-  lineName: string | null; connectedLineName: string | null;
-  directionHints: { station: Record<DirectionType, string[]>; connected: Record<DirectionType, string[]> };
-  facilityTypes: { code: FacilityTypeCode; name: string }[];   // facility_types（7行）
-  connections: { combo: ComboKey; connectionId: string; notes: string | null; source: StationConnectionSource | null }[];
-  routes: PairRouteRecord[];        // この駅対の接続に結ばれたルート
-  candidates: CandidateRoute[];     // S か T を端点に持つ接続のルートで、この駅対に結ばれていないもの
-};
-type PairRouteRecord = {
-  routeId: string; minutes: number | null; isOutdoor: boolean; requiresExitGate: boolean;
-  requiresStaff: boolean; isOfficiallyGuided: boolean; notes: string | null; facilities: FacilityTypeCode[];
-  links: { combo: ComboKey; label: string; isBaseline: boolean }[];
-  sharedWith: { stationName: string; connectedStationName: string }[];   // 駅対の外の接続からの参照
-};
-type CandidateRoute = {
-  routeId: string; label: string; minutes: number | null; flags…; facilities: FacilityTypeCode[];
-  usedBy: string;    // 「池袋（丸ノ内線）↔ 池袋（副都心線）」のような表示用の文字列
-};
+export type DirectionType = 'inbound' | 'outbound';
+export type DirectionLabelSource = 'platform' | 'default' | 'fallback';
+
+export const FALLBACK_DIRECTION_LABELS: Record<DirectionType, string> = { inbound: '上り', outbound: '下り' };
+
+export function resolveDirectionLabel(input: {
+  directionType: DirectionType;
+  /** ①: その駅のその路線のホームが、その走行方向の枠に持つ方面の文言（呼び出し側がホーム番号順に並べる） */
+  platformNames: readonly string[];
+  /** ②: (路線, 走行方向) の既定行の文言。無ければ null */
+  defaultName: string | null;
+}): { label: string; source: DirectionLabelSource };
 ```
 
-- 端点が `{S, T}` のどちらか一方でも一致する接続を、端点の両順序（A,B）と（B,A）で引く（domain の読み取り規約）。
-- DTO は JSON で運べる素のデータにする（ADR-0003）。導出結果（必要な行為）は含めず、画面が `packages/transfer-difficulty` で導出する。
-- `directionHints` は `stationLines` → `lines` → `line_directions`（`lineId`, `directionType`）の `displayName` 一覧。
-  路線を持たない駅は空配列。
+- ① 重複を除いて1件以上あれば、「／」で連結して返す（REQ-10）。
+- ② `defaultName` が null でなければ返す。
+- ③ `FALLBACK_DIRECTION_LABELS[directionType]`。Admin の方面一覧・フォームの「上り」「下り」と同じ対応。
+- `source` は、#125 で ③ のときに表示を変える（「方面未設定」と注記するなど）場合に使えるよう返す。Admin では使わない。
+- 空文字の文言は、①・② ともに無いものとして扱う（`displayName` は `min(1)` の検証があるが、関数は入力を信用しない）。
 
-### 保存
+## Admin: 駅対の編集画面（REQ-12）
 
-```mermaid
-sequenceDiagram
-  participant UI as TransferPairEditor
-  participant API as PUT …/transfer
-  participant Repo as transferConnectionRepository
-  UI->>UI: validate(draft) と findDuplicates(draft)
-  alt 重複候補あり
-    UI->>UI: モーダルで「共有する」「別ルート」を選ばせる（REQ-15・16）
-  end
-  UI->>API: PairDraft を PairSaveInput に変換して送る
-  API->>API: zod → validate（クライアントと共通）
-  API->>Repo: savePair(stationId, connectedStationId, input)
-  Repo->>Repo: withTransaction: ルート upsert → 接続 upsert → 紐付け入れ直し → 空の接続・孤立ルート削除
-  Repo-->>API: 成功 / null（駅対なし）/ ドメインエラー
-  API-->>UI: 200 / 404 / 409 / 422
-  UI->>UI: 成功で notifications.show と router.refresh
+`transferPairEditPageQuery.getContext` の `directionRows`（路線の方面をすべて取っていたクエリ）を、次の2本に置き換える。
+
+```ts
+// ①: 2駅のホームと、各枠の方面の文言
+db.select({ stationId, lineId, platformNumber, inboundName: inboundDir.displayName, outboundName: outboundDir.displayName })
+  .from(platforms)
+  .leftJoin(inboundDir, eq(platforms.inboundDirectionId, inboundDir.id))    // alias(lineDirections, 'inbound_dir')
+  .leftJoin(outboundDir, eq(platforms.outboundDirectionId, outboundDir.id))
+  .where(inArray(platforms.stationId, [stationId, connectedStationId]))
+  .orderBy(asc(platforms.platformNumber))
+
+// ②: 2駅の路線の既定行
+db.select({ stationId: stationLines.stationId, lineId, directionType, displayName })
+  .from(lineDirections).innerJoin(stationLines, eq(stationLines.lineId, lineDirections.lineId))
+  .where(and(inArray(stationLines.stationId, [...]), eq(lineDirections.isDefault, true)))
 ```
 
-#### `savePair` の手順（1トランザクション）
+- 見出しの文言は、その駅の**最初の路線**（`firstLineName` と同じ行）について解決する。ホームと既定行はその路線でフィルタする。
+  1駅が複数路線を持つ状態（#82 のあと）でも、別路線の文言が混ざらないようにするため。
+  `firstLineNameOf` の Map を `{ lineId, lineName }` を持つ形に広げる。
+- `ports.ts` の `directionHints` の型を `Record<DirectionType, string>` にする。
+- `RouteCard.tsx` の `HintText` は `hint: string` を受け取って表示する（連結はしない）。③ でも「上り」「下り」を表示する
+  （見出しの `inbound` / `outbound` の読み方を補うため）。
 
-1. `station_connections` に S→T があるか確認する。無ければ `null` を返す（404）。
-2. この駅対の既存の接続（端点の両順序）と、その `connection_routes`、参照しているルート ID を読む。
-3. 入力の `routeId`（非 null）が「この駅対に結ばれている」または「候補の範囲（S か T を端点に持つ接続のルート）」に
-   あることを確認する。外れていれば `RouteOutOfScopeError`（422）。
-4. ルートを書く。新規は INSERT、既存は UPDATE（`minutes`・4フラグ・`notes`）し、設備は delete → insert で入れ替える。
-5. ルートが1本以上ある組み合わせの接続を upsert する（`unique_transfer_connection` を衝突対象に。端点は
-   `normalizeTransferEndpoints()` で正規化）。新規は `source = 'manual'`、既存の `source` は保つ。`notes` は更新する。
-6. この駅対の接続の `connection_routes` を**全部削除してから入れ直す**（label・isBaseline は入力どおり）。
-   先に全部消すので、基準ルートの付け替えで `unique_connection_baseline` に違反しない。
-7. 紐付けが0件になった接続を削除する（ルートが0本になった組み合わせ）。
-8. この保存で紐付けから外れたルートのうち、どの接続からも参照されなくなったものを削除する。設備は cascade で消える。
+## Admin: 既定行の保守（REQ-13〜19）
 
-- 端点の変換: S の方面と T の方面から `TransferEndpoint` を2つ作り、`normalizeTransferEndpoints()` に通して A/B に割り当てる。
-- `unique_connection_route_label` の違反（23505）は `RouteLabelTakenError`（409）に変換する。`isPgErrorCode`（`external/pgError.ts`）を使う
-  （`withTransaction` の中では `err.cause.code` にも入る）。他の制約違反は想定外として 500。
-- ポート型（`ports.ts`）: `TransferConnectionRepository { savePair(...): Promise<{ ok: true } | null> }` と
-  ドメインエラー `RouteOutOfScopeError` / `RouteLabelTakenError` / `TransferInputInvalidError`。
+### ports（`features/line/ports.ts`）
 
-#### 駅対の削除（`stationConnectionRepository.deletePair` の拡張）
+```ts
+export type LineDirectionWriteInput = {
+  directionType: DirectionType;
+  representativeStationId: string;
+  displayName: string;
+  displayNameEn: string | null;
+  terminalStationIds: string[] | null;
+  notes: string | null;
+  isDefault: boolean;
+};
 
-`withTransaction` にして、次を1トランザクションで行う（REQ-25）。
-`station_connections` の2行を削除 → その駅対の `transfer_connections` を削除（`connection_routes` は cascade）→
-孤立ルートを削除。孤立ルートの削除は `savePair` と同じ内部関数を共有する。
+export interface LineDirectionRepository {
+  create(lineId: string, input: LineDirectionWriteInput): Promise<LineDirectionRow>;
+  /** 方面が無い、または別路線のものなら null */
+  update(lineId: string, directionId: string, input: LineDirectionWriteInput): Promise<LineDirectionRow | null>;
+}
 
-## インターフェース
+/** 同じ組の既定が同時に変更された（部分ユニーク違反） */
+export class DirectionDefaultConflictError extends Error { … }
+
+// LineDirectionEditContext に追加
+currentDefaults: Record<DirectionType, { id: string; displayName: string } | null>;
+```
+
+`LineDirectionRow` は API が返している行の形（`typeof lineDirections.$inferSelect` 相当）を ports 側に型として書く
+（features は DB の型を import しない。ADR-0001）。
+
+### Repository（`external/repository/lineDirectionRepository.ts`）
+
+- `isDefault = false`: 単一表への1文なので `db` のまま書く（`lineRepository` と同じ判断。ADR-0005「単一テーブルの単純な書き込み」）。
+- `isDefault = true`: `withTransaction` の中で、
+  1. `UPDATE line_directions SET is_default = false WHERE line_id = $1 AND direction_type = $2 AND is_default AND id <> $self`
+     （作成時は `id <> $self` を付けない）
+  2. INSERT / UPDATE（`is_default = true`）
+- `directionType` を変える更新も同じ手順で、**移動先の組**の既定を外す。移動元の組は既定が0行になる（REQ-3）。
+- 部分ユニーク違反（`pgConstraintName(err) === 'unique_line_direction_default'`）は `DirectionDefaultConflictError` に変える。
+  READ COMMITTED では、同じ組を同時に既定にする2本の書き込みの一方が違反しうる（両方が「外す」対象を読み終えてから書くため）。
+  頻度は低く、ADR-0013 のようなロックは入れない（Admin は開発者1人が使う前提。0件の組は行ロックの対象も無い）。
 
 ### API
 
-| メソッド | パス | 本文 | 応答 |
-|---|---|---|---|
-| PUT | `/api/stations/[stationId]/connections/[connectedStationId]/transfer` | `PairSaveInput` | 200 `{ success: true }`（既存の API と同じ形）/ 400（JSON 不正・zod）/ 404（駅対なし・id が UUID でない）/ 409（label 重複）/ 422（検証違反の配列 `{ error: ValidationIssue[] }`・範囲外の `routeId`）/ 500 |
+- `POST /api/lines/[lineId]/directions` と `PUT …/[directionId]` を Repository 経由にする。
+  `DirectionDefaultConflictError` → 409、`update` が null → 404。
+- 不正な JSON は 400（`api/lines/route.ts` と同じガード）。
+- POST のファイルは `@furatora/database` を import しなくなるので、`apps/admin/eslint.config.mjs` の `legacyExclusions` から外す。
+  `[directionId]/route.ts` は GET・DELETE が `db` を使うので残す。
+- DELETE は変えない。既定行を消すと、その組は ③ になる（REQ-19）。どの行を昇格させるかを機械的に決められないため、自動では昇格させない。
 
-```ts
-type PairSaveInput = {
-  routes: {
-    routeId: string | null; label: string; isBaseline: boolean; minutes: number | null;
-    isOutdoor: boolean; requiresExitGate: boolean; requiresStaff: boolean; isOfficiallyGuided: boolean;
-    notes: string | null; facilities: FacilityTypeCode[]; combos: ComboKey[];
-  }[];
-  connectionNotes: Partial<Record<ComboKey, string | null>>;
-};
-```
+### フォーム（`LineDirectionForm.tsx`）
 
-### `packages/transfer-difficulty`
-
-```ts
-export const FACILITY_TYPE_CODES = ['sameFloor','elevator','ramp','wheelchairEscalator','escalator','stairLift','stairs'] as const;
-export type FacilityTypeCode = typeof FACILITY_TYPE_CODES[number];
-export type Persona = 'stroller' | 'wheelchair';
-export type Requirement = 'as_is' | 'call_staff' | 'fold_and_carry' | 'lift' | 'assisted_by_staff' | 'impossible';
-
-// 設備の集合から、そのペルソナにとって最も重い行為を返す。空集合は null（設備未入力。ADR-0012）
-export function requirementFor(persona: Persona, facilities: readonly FacilityTypeCode[]): Requirement | null;
-export function isBarrierFree(requirement: Requirement | null): boolean;   // as_is または call_staff。null は false
-export const REQUIREMENT_LABEL: Record<Requirement, string>;
-export const PERSONA_LABEL: Record<Persona, string>;
-```
-
-導出表（#30 REQ-13。旧版の `docs/spec` は git 履歴にある）:
-
-| 設備 | ベビーカー | 車いす |
-|---|---|---|
-| `sameFloor` / `elevator` / `ramp` | `as_is` | `as_is` |
-| `wheelchairEscalator` | `fold_and_carry` | `call_staff` |
-| `escalator` | `fold_and_carry` | `impossible` |
-| `stairLift` | `impossible` | `call_staff` |
-| `stairs` | `lift` | `assisted_by_staff` |
-
-重さの順序 — ベビーカー: `as_is` ＜ `fold_and_carry` ＜ `lift` ＜ `impossible` /
-車いす: `as_is` ＜ `call_staff` ＜ `assisted_by_staff` ＜ `impossible`。
-
-- `FACILITY_TYPE_CODES` は DB の `facility_types` の7行と一致すること。DB とパッケージの一致は自動テストでは守れない
-  （CI に DB が無い）ため、手動検証で Neon の `facility_types` と突き合わせる。
+- Checkbox「この路線・方面の既定の表示名にする」。説明:「ホームが登録されていない駅で、乗換案内の方面名として使われます。
+  途中の駅名を含まない、終点方向の文言を選んでください」。
+- `currentDefaults[directionType]` があり、それが自分でなければ「現在の既定: ○○（保存すると置き換わります）」を出す（方面タイプの切り替えにも追従）。
+- 既定行を編集していて、チェックを外すか方面タイプを変えたら「保存すると、○○の既定の表示名が無くなります」を出す
+  （元の組が既定行を失い ③ になるため。保存は止めない）。
+- 初期値: 編集なら `initialData.isDefault`。新規なら、選択中の方面タイプに既定行が無ければ true。新規で方面タイプを切り替えたときも
+  同じ規則で初期値を変える（利用者がチェックを触ったあとは変えない）。
+- 409 のとき「同じ路線・方面の既定が同時に変更されました。再読み込みしてください」を表示する。それ以外の失敗は現行どおり。
 
 ## エラーマトリックス
 
-| 状況 | 結果 | 備考 |
-|---|---|---|
-| 駅対（`station_connections` の S→T）が無い | ページは `notFound()`、保存は 404 | REQ-2 |
-| JSON が不正 / zod に合わない | 400（`{ error: issues }`） | 設備コードが7種以外もここ |
-| ルートに組み合わせが無い・label 重複・基準ルート2本・`label` が空 | 422 | `validate` がクライアントと共通 |
-| `routeId` が範囲外 | 422 `RouteOutOfScopeError` | 無関係な接続のルートの書き換えを防ぐ |
-| `unique_connection_route_label` 違反（競合で発生） | 409「同じ名前のルートがあります」 | REQ-28 |
-| 想定外の DB エラー | 500（トランザクションは全体がロールバック） | |
-| 2人が同時に同じ駅対を保存した | **後勝ち**（検出しない） | 管理者は開発者1名の前提。競合検出は対象外 |
-| 保存済みの共有ルートを編集した | 共有先にも反映（バッジで明示） | REQ-18 |
-| 重複候補があるが「別ルート」を選んだ | そのまま保存する | 決定2 |
-
-## ユニットテスト戦略
-
-CI に DB が無いため（#122・#123 と同じ）、DB を使う部分は手動検証で担保する。次を自動テストにする。
-
-| 対象 | 内容 |
+| 状況 | 応答 |
 |---|---|
-| `packages/transfer-difficulty` | 7設備×2ペルソナの導出表、「最も重い行為」（混在）、空集合が `null`、`isBarrierFree` |
-| `domain/draft.ts` | コンテキスト→下書き（淡路町型: 組み合わせが2つのカードに分かれる／御茶ノ水型: 共有の `sharedWith`）、下書き→入力、S/T ⇔ A/B の変換、複製・切り離し・統合 |
-| `domain/validate.ts` | REQ-11 の各違反、組み合わせ単位の判定、警告（基準ルート無し・代替手段の同居） |
-| `domain/duplicates.ts` | 設備0件は対象外、自分自身は除外、変更が無い既存ルートは検出しない、候補外は出ない、同じ画面のカードとの一致 |
-| `schema.ts`（zod） | 必須・上限・設備コードの列挙 |
-| `route.test.ts` | 200・400・404・409・422（`@/di` をモックし、ハンドラを直接呼ぶ。前例: publication の route.test.ts） |
-| コンポーネント | `RouteCard`（設備の切替・プレビュー表示・0件は「未入力」）、`DuplicateRouteModal` |
+| 同じ組を同時に既定にした（部分ユニーク違反） | 409 と再読み込みを促すメッセージ |
+| PUT の方面が無い・別路線 | 404 |
+| 本文が不正な JSON・検証失敗 | 400 |
+| 移行の対象の路線・行・駅が無い環境 | その組を飛ばす |
+| 移行時点で既定行がある組 | 触らない |
+| ホームも既定行も無い | 「上り」「下り」 |
 
-DB 検証は手動: development で保存し、Neon MCP（read-only）の SELECT で不変条件を確かめる（tasks.md TASK-13）。
+## テスト
 
-## 決定記録（この作業限りの判断）
+- `packages/transfer-difficulty/src/domain/directionLabel.test.ts`: ①1件 / ①複数（連結・重複除去・順序保持）/ ①が空で②あり /
+  ③ inbound・outbound / ①が空文字だけのときに②へ進む / ②が空文字のときに③へ進む
+- `apps/admin/src/lib/validations.test.ts`: `isDefault` の省略（400。PUT で送り忘れたクライアントが既定を黙って外さないよう必須）・true・型違い
+- `apps/admin/src/external/repository/lineDirectionRepository.test.ts`: クエリビルダを記録する偽物で、旧既定を外す条件
+  （移動先の方面タイプ・自分自身の除外）と文の順序、対象が無いときに外さないこと、部分ユニーク違反の 409 化を確かめる
+- `apps/admin/src/app/api/lines/[lineId]/directions/route.test.ts`・`[directionId]/route.test.ts`（新規。`api/lines/route.test.ts` の形）:
+  201 / 400（JSON・検証）/ 409（`DirectionDefaultConflictError`）/ PUT の 404
+- 既存テストのフィクスチャ（`TransferPairEditor.test.tsx`・`draft.test.ts`）を `directionHints` の新しい型に合わせる
+- Query・移行 SQL は DB が要るので、development で手動検証する（tasks.md TASK-10）
 
-いずれも既存 ADR に反せず、覆すときに明示的な意思決定を要するアーキテクチャ決定ではないため、ADR にしない
-（ただし決定2はフェーズ5で ADR の要否を再確認する）。
+## 決定記録（この作業限り）
 
-### 決定1 — 編集の単位は「駅対」。1画面で方面の4通りをまとめて編集する
+### 決定1 — 既定を選ぶ基準は「途中の駅名を含まない、終点方向の文言」
 
-**決定**: 接続（駅×方面の端点対）ごとの画面ではなく、駅対（S・T）ごとの1画面で、4通りの組み合わせの接続を編集する。
-ルートカードに「適用先の方面 2×2」を持たせ、全方面共通は「4つすべてにチェック」、方面差は「カードを分けてチェックを割り振る」で表す。
+Issue 本文の「最も一般的なもの」は採らない。根拠は ADR-0014 に書く（恒久的な基準のため）。
 
-**オプション**:
-- (a) 駅対単位＋適用先の 2×2（採用）— ルートの共有・統合・分岐が、同じ画面のカード操作で完結する。
-  「全方面共通で始めて、あとから方面ごとに分ける」（Issue 本文）も、複製とチェックの付け替えで表せ、専用の操作が要らない。
-- (b) 接続（組み合わせ）ごとの画面 — 却下。全方面共通の駅を入力するのに4回の入力と共有の指定が要る。共有を後から付け替える導線も別に要る。
-- (c) 「全方面共通」モードと「方面ごと」モードを切り替える — 却下。モードの切替が2つの状態モデルを生み、
-  途中の状態（一部だけ分けた）を表せない。2×2 のチェックなら中間状態が自然に表せる。
+### 決定2 — 候補1行の組はその行を既定にする
 
-**影響**: 保存は「駅対の最終状態」を1回で送る（決定5）。ルート ID の付け替えや共有の解消は下書きの操作として閉じる。
+選択の余地が無いため。
 
-### 決定2 — 重複検出は「提示」に弱め、範囲は同じ駅に限る（#30 REQ-23 の改訂）
+### 決定3 — 候補が複数ある8組の選定（2026-09-27 開発者と合意）
 
-**決定**: 設備の集合と4フラグが一致するルートを、S か T を端点に持つ接続の範囲で候補として提示し、モーダルで
-「既存ルートを共有する」か「別ルートとして作る」かを選ばせる。保存は止めない。設備0件は対象外（ADR-0012）。
+上の表のとおり。副都心線・有楽町線の outbound は「和光市・東武線・西武線方面」（小竹向原より南の駅は西武線直通がある。
+小竹向原より北の駅では西武線が余計だが誤りではない）。浅草線 inbound は「西馬込・羽田空港・三崎口方面」
+（泉岳寺より南の駅では羽田空港・三崎口が当てはまらないが、路線の大半の駅で通用する）。
 
-**コンテキスト**: #30 REQ-23 は「接続をまたいで検出し、保存を中断」と定めたが、#123 Q2 で確定した
-池袋の6駅対は、中身が完全に一致する（すべて `{elevator}`・フラグ全部 ✕）のに、別の物理経路として別ルートで持つ。
-中断すると、この6本は新規に作れない（label を変えても不可）。
+### 決定4 — 大江戸線は「内回り」「外回り」の2行を新しく作る
 
-**オプション**:
-- (a) 同じ駅の範囲で提示（採用）— 池袋の6本のような別経路を作れる。共有が自然な御茶ノ水型（駅対をまたいで共有）は、
-  同じ駅を端点に持つので候補に出る。
-- (b) 範囲を DB 全体にして提示 — 却下。中身が同じルートは全国にいくらでもあり、無関係な候補で埋まる。
-- (c) 範囲を同じ駅対だけにする — 却下。御茶ノ水型（快速と各停は駅対が違うが1本を共有）の共有を促せない。
-- (d) REQ-23 どおりハードブロック — 却下。上の池袋が作れない。事実を曲げて制約を通す圧力になる（#30 決定11が退けた形）。
+既存13行は環状部の区間ごとの掲示で、どれも全駅には通用しない。開発者の指定で、inbound を内回り、outbound を外回りとする。
+既存13行は消さない（ホームを登録するときに ① の文言として使う）。
 
-**影響**: `docs/domain/` の不変条件表の該当行（範囲と、提示であること）と `schema.ts` の `transferRoutes` のコメントを、
-フェーズ5で上書きする。集合の一意性を DB が守らない点は変わらない。**レビュー**: 誤った二重登録が実際に問題になったとき。
+### 決定5 — 大江戸線の新しい2行の代表駅は都庁前（仮置き）
 
-### 決定3 — 導出関数は新パッケージ `packages/transfer-difficulty` に置く
+`representative_station_id` が NOT NULL のため何かを入れる必要がある。環状部の起点・終点である都庁前にする。
+代表駅は Admin の一覧に出るだけで、解決規則には使わない。変えるときは Admin から編集できる。
 
-**決定**: `requirementFor` と関連の定数を、DB・React 非依存のパッケージにする。
-**オプション**: (a) 新パッケージ（採用）— #125 が import するだけで済み、Admin と Web の解釈のずれが構造的に起きない /
-(b) Admin の feature に置く — 却下。#125 で Web に複製するか、そのとき切り出す二度手間が発生する。
-**影響**: `apps/admin` の依存に追加（`workspace:*`）。`packages/platform-diagram` と同じ構成（ADR-0010 の前例に従うだけ）。
+### 決定6 — ① の複数件は連結し、どちらかに決めない
 
-### 決定4 — `label` と `isBaseline` は、駅対の中では同じルートの全紐付けで同じ値を書く
+中野坂上 inbound（方南町方面／荻窪・方南町方面）は #128 の既知の制約。どちらかを選ぶ規則を作ると、#128 の解決まで
+誤った方面を1つだけ出すことになる。
 
-**決定**: モデル上は紐付けごとに違ってよいが、Admin は1枚のカードにつき1つの値を、そのルートの全紐付けに書く。
-DB では縛らない。**理由**: 方面ごとに呼び名や基準かどうかが変わる要望が無く、カードに持たせる値が倍増する。
-必要になれば、下書きを紐付けごとの値に広げられる（読み込みは既に警告付きで許容している）。
-**影響**: 書き込み規約として `docs/domain/` に書く（フェーズ5）。
+### 決定7 — 既定行の付け替えはロックを取らず、違反を 409 にする
 
-### 決定5 — 保存は「駅対の最終状態」を1回で送り、紐付けを入れ直す
+ADR-0013 と違い、競合時に不整合は残らない（部分ユニークが二重の既定を拒否し、トランザクションごと戻る）。
+利用者は再読み込みすればよいので、ロックの仕組みを足すほどの価値は無い。
 
-**決定**: 差分ではなく最終状態を PUT する。Repository は紐付けを全部消してから入れ直す。
-**オプション**: (a) 最終状態＋入れ直し（採用）— 基準ルートの降格と昇格の順序問題（部分ユニーク）が消える。API が1本 /
-(b) 操作単位の API（ルート追加・基準変更・共有…）— 却下。操作ごとに不変条件の検証が要り、
-画面の状態とサーバーの状態がずれる余地が増える。
-**影響**: `connection_routes.id` は保存のたびに変わる。この ID を参照する表は無い（#122）ので問題ない。
-`createdAt` は入れ直しで新しくなる（紐付けの作成日時に意味は無い）。
+## フェーズ5で恒久化する内容
 
-### 決定6 — 本郷三丁目の備考は例外のまま残す（#123 決定2 の先送りの解決）
+- **`docs/domain/line-directions.md`（新規）**: 同義行があること、枠と `direction_type` の関係、`is_default` の不変条件（組ごとに高々1行・0行を許容）、
+  解決規則 ①→②→③ と ① の複数件の扱い、既定を選ぶ基準、大江戸線の内回り・外回り、実装の場所。
+- `docs/domain/README.md`: 一覧に追加する。
+- `docs/domain/station-master-model.md`「接続の端点」: 方面の文言の解決は line-directions.md を参照、と書く。
+- **ADR-0014** を Accepted にし、`docs/adr/README.md` の一覧を更新する。
 
-**決定**: 「隣の後楽園・春日駅の乗り換えであれば屋内で完結しますが…一長一短です」を残す。恒久ルール（備考の役割）は変えない。
-**影響**: `docs/domain/` の「既知の例外」の「#124 の着手時に決める」を、「例外として維持する。消すかどうかは
-Admin から編集できる」に更新する。入力欄の説明（REQ-27）で、新しい備考に書かないよう示す。
+## 先送りする将来作業
 
-## フェーズ5で `docs/domain/` へ移す内容
-
-- **適用状況の注記**: Admin の入力は新モデルに切り替え済み。旧4列は Admin から書かれない（凍結）。Web は #125 まで旧4列を読む。
-- **不変条件表**: 「設備の種類の集合と4フラグが一致するルートを作らない」の行を、範囲（S か T を端点に持つ接続）と
-  「提示であり中断ではない」に上書きする（決定2）。「接続を消したあとに孤立ルートが残らない」の行に、実装場所
-  （`transferConnectionRepository` と `deletePair`。保存・削除の1トランザクション）を書く。
-- **Admin の書き込み規約**: 駅対の中で `label` と `isBaseline` は同じルートの全紐付けにそろえる（決定4）。
-- **備考の役割**の既知の例外を更新（決定6）。
-- `docs/adr/`: 新規なし。ADR-0012 は `Proposed` のまま（#125 で `Accepted`。#124 では「Admin の重複検出が設備0件を対象外にした」ことを実装として確認する）。
-- `docs/domain/` の他のファイル: 変更なし（フェーズ5で確認結果を残す）。
-
-## 先送りした将来作業
-
-- [#125](https://github.com/Natsugure/furatora/issues/125) Web 表示。旧4列と旧型の削除は完了後の別デプロイ
-- [#130](https://github.com/Natsugure/furatora/issues/130) 方面ラベルの解決（`isDefault`）。本Issueの補助表示は暫定
-- [#128](https://github.com/Natsugure/furatora/issues/128) 中野坂上型 / [#82](https://github.com/Natsugure/furatora/issues/82) 物理駅粒度への統合
-- 複数管理者の同時編集の競合検出、ルートの一括インポート（必要になれば Issue を起票する）
+- [#125](https://github.com/Natsugure/furatora/issues/125) Web で乗換接続の方面ラベルを表示する（`resolveDirectionLabel` を使う）
+- [#128](https://github.com/Natsugure/furatora/issues/128) 中野坂上型（① が複数件になる駅）
+- 大江戸線の代表駅の見直し（必要なら Admin で直す。Issue にはしない）

@@ -44,8 +44,8 @@ function setup(route: RouteDraft, extra: Partial<Parameters<typeof RouteCard>[0]
         route={route}
         index={0}
         facilityTypes={facilityTypes}
-        stationAxis={{ stationName: '淡路町（丸ノ内線）', hints: { inbound: [], outbound: [] } }}
-        connectedAxis={{ stationName: '小川町（新宿線）', hints: { inbound: [], outbound: [] } }}
+        stationAxis={{ stationName: '淡路町（丸ノ内線）', hints: { inbound: '東京・新宿・荻窪・方南町方面', outbound: '池袋方面' } }}
+        connectedAxis={{ stationName: '小川町（新宿線）', hints: { inbound: '新宿・橋本・高尾山口方面', outbound: '本八幡方面' } }}
         sharedWith={[]}
         divergentLinks={false}
         errors={[]}
@@ -59,6 +59,13 @@ function setup(route: RouteDraft, extra: Partial<Parameters<typeof RouteCard>[0]
 }
 
 describe('RouteCard', () => {
+  it('適用先の見出しに、解決済みの方面の文言を1件ずつ出す', () => {
+    setup(draft());
+    for (const hint of ['東京・新宿・荻窪・方南町方面', '池袋方面', '新宿・橋本・高尾山口方面', '本八幡方面']) {
+      expect(screen.getByText(hint)).toBeInTheDocument();
+    }
+  });
+
   it('設備の種類は7種のチェックボックスで、押すとその種類の切替が呼ばれる', async () => {
     const handlers = setup(draft());
     for (const type of facilityTypes) {

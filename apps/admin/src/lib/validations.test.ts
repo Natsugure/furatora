@@ -95,6 +95,7 @@ describe('directionSchema', () => {
       directionType: 'inbound',
       representativeStationId: VALID_UUID,
       displayName: '内回り',
+      isDefault: false,
     });
     expect(result.success).toBe(true);
   });
@@ -121,6 +122,35 @@ describe('directionSchema', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
       representativeStationId: VALID_UUID,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('isDefaultを省略した場合は失敗する（PUT で既定行が黙って既定から外れないように）', () => {
+    const result = directionSchema.safeParse({
+      directionType: 'inbound',
+      representativeStationId: VALID_UUID,
+      displayName: '内回り',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('isDefaultに true を渡せる', () => {
+    const result = directionSchema.safeParse({
+      directionType: 'inbound',
+      representativeStationId: VALID_UUID,
+      displayName: '内回り',
+      isDefault: true,
+    });
+    expect(result.success && result.data.isDefault).toBe(true);
+  });
+
+  it('isDefaultが真偽値でない場合は失敗する', () => {
+    const result = directionSchema.safeParse({
+      directionType: 'inbound',
+      representativeStationId: VALID_UUID,
+      displayName: '内回り',
+      isDefault: 'true',
     });
     expect(result.success).toBe(false);
   });

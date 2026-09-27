@@ -7,6 +7,7 @@ import { dbStationPublishingPageQuery } from '@/external/query/stationPublishing
 import { dbTrainEditPageQuery } from '@/external/query/trainEditPageQuery';
 import { dbLineEditPageQuery, dbLineDirectionEditPageQuery } from '@/external/query/lineEditPageQuery';
 import { dbLineRepository } from '@/external/repository/lineRepository';
+import { dbLineDirectionRepository } from '@/external/repository/lineDirectionRepository';
 import { dbStationEditPageQuery } from '@/external/query/stationEditPageQuery';
 import { dbStationCreatePageQuery } from '@/external/query/stationCreatePageQuery';
 import { dbStationRepository } from '@/external/repository/stationRepository';
@@ -51,3 +52,6 @@ export const stationLayoutPageQuery = dbStationLayoutPageQuery;
 // 乗換難易度の駅対編集（#124）
 export const transferConnectionRepository = dbTransferConnectionRepository;
 export const transferPairEditPageQuery = dbTransferPairEditPageQuery;
+
+// 方面の既定行の保守（#130）
+export const lineDirectionRepository = dbLineDirectionRepository;

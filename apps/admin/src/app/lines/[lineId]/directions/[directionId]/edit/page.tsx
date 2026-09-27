@@ -21,6 +21,7 @@ export default async function EditDirectionPage({
         isEdit
         initialData={context.direction}
         stations={context.stations}
+        currentDefaults={context.currentDefaults}
       />
     </div>
   );

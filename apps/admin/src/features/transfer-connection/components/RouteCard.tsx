@@ -13,7 +13,8 @@ import { RoutePreview } from './RoutePreview';
 
 export type DirectionAxis = {
   stationName: string;
-  hints: Record<Direction, string[]>;
+  /** 方面の文言（解決済みで常に1件。ADR-0014） */
+  hints: Record<Direction, string>;
 };
 
 type Props = {
@@ -168,7 +169,7 @@ export function RouteCard({
                 {DIRECTIONS.map((t) => (
                   <Table.Th key={t}>
                     {connectedAxis.stationName} {t}
-                    <HintText hints={connectedAxis.hints[t]} />
+                    <HintText hint={connectedAxis.hints[t]} />
                   </Table.Th>
                 ))}
               </Table.Tr>
@@ -178,7 +179,7 @@ export function RouteCard({
                 <Table.Tr key={s}>
                   <Table.Th>
                     {stationAxis.stationName} {s}
-                    <HintText hints={stationAxis.hints[s]} />
+                    <HintText hint={stationAxis.hints[s]} />
                   </Table.Th>
                   {DIRECTIONS.map((t) => {
                     const combo = comboKeyOf(s, t);
@@ -217,8 +218,7 @@ export function RouteCard({
   );
 }
 
-// 方面の補助表示。同一 (路線, 方面) に同義行があるため一覧で出す（解決規則は #130）
-function HintText({ hints }: { hints: string[] }) {
-  if (hints.length === 0) return null;
-  return <Text size="xs" c="dimmed" fw={400}>{hints.join('／')}</Text>;
+// 方面の補助表示（①ホーム → ②既定行 → ③上り/下り で解決済みの文言。ADR-0014）
+function HintText({ hint }: { hint: string }) {
+  return <Text size="xs" c="dimmed" fw={400}>{hint}</Text>;
 }
