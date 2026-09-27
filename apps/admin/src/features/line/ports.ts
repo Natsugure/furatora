@@ -5,6 +5,7 @@
 // 書き込み: Repository（ADR-0003）。路線の新規作成（#88）で追加。
 // この feature は schema.ts を持つ（`lineCreateSchema`）。domain/ は持たない。
 
+import type { DirectionType } from '@furatora/database/enums';
 import type { ListParams, ListResult } from '@/shared/list/params';
 import type { OperatorCard } from '@/shared/list/operatorCard';
 import type { LineCreateInput } from './schema';
@@ -23,6 +24,38 @@ export interface LineRepository {
   // lines へ1行 INSERT する。単一テーブル単一行のため withTransaction は使わない
   // （ADR-0005「単一テーブルの単純な書き込み」）。slug / ekidataLineCd は設定しない。
   create(input: LineCreateInput): Promise<LineRecord>;
+}
+
+// --- 方面の書き込み（#130）---
+
+export type LineDirectionWriteInput = {
+  directionType: DirectionType;
+  representativeStationId: string;
+  displayName: string;
+  displayNameEn: string | null;
+  terminalStationIds: string[] | null;
+  notes: string | null;
+  isDefault: boolean;
+};
+
+export type LineDirectionRecord = LineDirectionWriteInput & {
+  id: string;
+  lineId: string;
+};
+
+export interface LineDirectionRepository {
+  // isDefault が true なら、同じ (路線, 走行方向) の旧既定を外してから書く（1トランザクション。ADR-0005・ADR-0014）
+  create(lineId: string, input: LineDirectionWriteInput): Promise<LineDirectionRecord>;
+  // 方面が無い、または別路線のものなら null
+  update(lineId: string, directionId: string, input: LineDirectionWriteInput): Promise<LineDirectionRecord | null>;
+}
+
+// 同じ (路線, 走行方向) の既定が同時に変更された（unique_line_direction_default 違反）
+export class DirectionDefaultConflictError extends Error {
+  constructor() {
+    super('同じ路線・方面の既定が同時に変更されました。画面を読み込み直してください');
+    this.name = 'DirectionDefaultConflictError';
+  }
 }
 
 // --- 読み取り ---
@@ -75,7 +108,10 @@ export type LineDirectionEditContext = {
     displayNameEn: string;
     terminalStationIds: string[] | null;
     notes: string;
+    isDefault: boolean;
   };
+  // (路線, 走行方向) ごとの現在の既定行。フォームで「保存すると置き換わる」を示すために使う
+  currentDefaults: Record<DirectionType, { id: string; displayName: string } | null>;
 };
 
 export interface LineDirectionEditPageQuery {

@@ -1,36 +1,40 @@
 import { NextResponse } from 'next/server';
-import { db } from '@furatora/database/client';
-import { lineDirections } from '@furatora/database/schema';
 import { directionSchema } from '@/lib/validations';
+import { lineDirectionRepository } from '@/di';
+import { DirectionDefaultConflictError } from '@/features/line/ports';
 
+// 方面の新規作成
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ lineId: string }> }
 ) {
   try {
     const { lineId } = await params;
-    const body = await request.json();
+    // 空ボディ・不正 JSON は 400
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'リクエストボディが不正な JSON です' }, { status: 400 });
+    }
     const parsed = directionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { directionType, representativeStationId, displayName, displayNameEn, terminalStationIds, notes } = parsed.data;
+    const { displayNameEn, terminalStationIds, notes, ...rest } = parsed.data;
 
-    const [direction] = await db
-      .insert(lineDirections)
-      .values({
-        lineId,
-        directionType,
-        representativeStationId,
-        displayName,
-        displayNameEn: displayNameEn ?? null,
-        terminalStationIds: terminalStationIds ?? null,
-        notes: notes ?? null,
-      })
-      .returning();
+    const direction = await lineDirectionRepository.create(lineId, {
+      ...rest,
+      displayNameEn: displayNameEn ?? null,
+      terminalStationIds: terminalStationIds ?? null,
+      notes: notes ?? null,
+    });
 
     return NextResponse.json(direction, { status: 201 });
-  } catch {
+  } catch (err) {
+    if (err instanceof DirectionDefaultConflictError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

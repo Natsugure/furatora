@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
 import { lines, lineDirections, stations } from '@furatora/database/schema';
 import { eq, asc, inArray } from 'drizzle-orm';
-import { Card, Group, Stack, Text, Title } from '@mantine/core';
+import { Badge, Card, Group, Stack, Text, Title } from '@mantine/core';
 import { DeleteButton } from '@/components/DeleteButton';
 import { LinkAnchor, LinkButton } from '@/components/LinkElements';
 
@@ -47,7 +47,7 @@ export default async function LineDirectionsPage({
       </Group>
 
       <Text size="sm" c="dimmed" mb="md">
-        この路線の方面情報を設定します。ホームを登録する際に使用されます。
+        この路線の方面情報を設定します。ホームを登録する際に使用されます。「既定」の方面は、ホームが登録されていない駅で、乗換案内の方面名として使われます（上り・下りごとに1つ）。
       </Text>
 
       {directions.length === 0 ? (
@@ -62,6 +62,8 @@ export default async function LineDirectionsPage({
                 <div>
                   <Group gap="xs" mb={4}>
                     <Text fw={500} size="lg">{direction.displayName}</Text>
+                    {/* (路線, 走行方向) の既定行。ホームが無い駅の方面ラベルに使う（ADR-0014） */}
+                    {direction.isDefault && <Badge variant="light">既定</Badge>}
                     {direction.displayNameEn && (
                       <Text size="sm" c="dimmed">({direction.displayNameEn})</Text>
                     )}

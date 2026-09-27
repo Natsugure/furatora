@@ -124,4 +124,33 @@ describe('directionSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('isDefaultを省略した場合は false になる（既定行にしない）', () => {
+    const result = directionSchema.safeParse({
+      directionType: 'inbound',
+      representativeStationId: VALID_UUID,
+      displayName: '内回り',
+    });
+    expect(result.success && result.data.isDefault).toBe(false);
+  });
+
+  it('isDefaultに true を渡せる', () => {
+    const result = directionSchema.safeParse({
+      directionType: 'inbound',
+      representativeStationId: VALID_UUID,
+      displayName: '内回り',
+      isDefault: true,
+    });
+    expect(result.success && result.data.isDefault).toBe(true);
+  });
+
+  it('isDefaultが真偽値でない場合は失敗する', () => {
+    const result = directionSchema.safeParse({
+      directionType: 'inbound',
+      representativeStationId: VALID_UUID,
+      displayName: '内回り',
+      isDefault: 'true',
+    });
+    expect(result.success).toBe(false);
+  });
 });

@@ -3,6 +3,8 @@ import { db } from '@furatora/database/client';
 import { lineDirections } from '@furatora/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { directionSchema } from '@/lib/validations';
+import { lineDirectionRepository } from '@/di';
+import { DirectionDefaultConflictError } from '@/features/line/ports';
 
 export async function GET(
   _request: Request,
@@ -30,31 +32,33 @@ export async function PUT(
 ) {
   try {
     const { lineId, directionId } = await params;
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'リクエストボディが不正な JSON です' }, { status: 400 });
+    }
     const parsed = directionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { directionType, representativeStationId, displayName, displayNameEn, terminalStationIds, notes } = parsed.data;
+    const { displayNameEn, terminalStationIds, notes, ...rest } = parsed.data;
 
-    const [updated] = await db
-      .update(lineDirections)
-      .set({
-        directionType,
-        representativeStationId,
-        displayName,
-        displayNameEn: displayNameEn ?? null,
-        terminalStationIds: terminalStationIds ?? null,
-        notes: notes ?? null,
-      })
-      .where(and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId)))
-      .returning();
+    const updated = await lineDirectionRepository.update(lineId, directionId, {
+      ...rest,
+      displayNameEn: displayNameEn ?? null,
+      terminalStationIds: terminalStationIds ?? null,
+      notes: notes ?? null,
+    });
 
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     return NextResponse.json(updated);
-  } catch {
+  } catch (err) {
+    if (err instanceof DirectionDefaultConflictError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

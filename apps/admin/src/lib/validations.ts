@@ -38,4 +38,6 @@ export const directionSchema = z.object({
   displayNameEn: z.string().nullable().optional(),
   terminalStationIds: z.array(z.string().uuid()).nullable().optional(),
   notes: z.string().nullable().optional(),
+  // (路線, 走行方向) の既定行にするか（ADR-0014）。true なら、同じ組の旧既定は Repository が外す
+  isDefault: z.boolean().default(false),
 });
