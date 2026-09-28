@@ -11,17 +11,21 @@
 
 ## フェーズ3: 実装
 
-- [ ] **TASK-3** `schema.ts` から4列と enum 型の import を、`enums.ts` から2型を削除する（依存: なし）
-- [ ] **TASK-4** `pnpm run db:generate` でマイグレーションを生成し、DROP COLUMN ×4 だけであることを確認する（依存: TASK-3）
-- [ ] **TASK-5** Admin のテスト・コメント、`packages/database/CLAUDE.md` を更新する（依存: TASK-3）
+- [x] **TASK-3** `schema.ts` から4列と enum 型の import を、`enums.ts` から2型を削除する（依存: なし）
+- [x] **TASK-4** `pnpm run db:generate` でマイグレーションを生成し、DROP COLUMN ×4 だけであることを確認する（依存: TASK-3）。
+      結果: `0015_drop_legacy_transfer_difficulty.sql`。0011 に倣い、削除が安全な理由を冒頭のコメントに書いた
+- [x] **TASK-5** Admin のテスト・コメント、`packages/database/CLAUDE.md` を更新する（依存: TASK-3）
 
 ## フェーズ4: 検証
 
-- [ ] **TASK-6** `pnpm run typecheck` / `lint` / `test` / `build` が通ること。旧4列・enum 型の参照が残っていないこと
+- [x] **TASK-6** `pnpm run typecheck` / `lint` / `test` / `build` が通ること。旧4列・enum 型の参照が残っていないこと。
+      結果（2026-09-29）: typecheck 6・lint 4・build 2 タスク成功、test は admin 625・platform-diagram 203・
+      transfer-difficulty 55・frontend 42 が成功。参照は `schema.ts` の削除済みの注記のみ
 - [ ] **TASK-7** 開発者が development に `db:migrate` を適用する。Neon MCP で列が消え行数が変わらないことを確認し、
       Admin の接続の追加・削除と Web の駅詳細を確認する
 
 ## フェーズ5〜6: 振り返り・引き渡し
 
-- [ ] **TASK-8** `docs/domain/station-master-model.md` の凍結の記述を削除する。ADR の変更が無いことを確認する
+- [x] **TASK-8** `docs/domain/station-master-model.md` の凍結の記述を削除する。ADR の変更が無いことを確認する。
+      あわせて「乗換難易度」の適用状況を本番反映済みに上書きした（Neon MCP で main に 0000〜0014 の15件・接続60・ルート21 を確認）
 - [ ] **TASK-9** PR（base: `develop`）を作成する。デプロイ中は Admin で接続を追加しない旨を書く

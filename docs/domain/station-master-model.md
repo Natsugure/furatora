@@ -127,11 +127,7 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
 
 `stationConnections` は「どの駅からどの駅へ乗り換えられるか」を持つ**接続一覧**であり、
 Web の駅詳細・Admin の駅編集・設備編集・レイアウト画面が読んでいる。
-乗換難易度の新モデル（次節）が入っても、この表は接続一覧として残る。
-乗換難易度を持つ `strollerDifficulty` / `wheelchairDifficulty` / `notesAbout*` の4列は、
-**Admin からも Web からも読み書きされない**（Admin は [#124](https://github.com/Natsugure/furatora/issues/124)、
-Web は [#125](https://github.com/Natsugure/furatora/issues/125)。値は #123 の移行時点のまま凍結）。
-#125 が本番にデプロイされたあとの**別デプロイ**で落とす（[#136](https://github.com/Natsugure/furatora/issues/136)）。
+この表は乗換難易度を持たない。難易度は次節の新モデルが持つ。
 
 | `source` | 意味 |
 |---|---|
@@ -157,12 +153,11 @@ Admin の駅編集画面の「接続を追加」から
 
 ## 乗換難易度（`transferConnections` ほか4表）
 
-> **適用状況**: 2026-09-28 現在、**スキーマ・評価済み15駅対（接続60行・ルート21本）のデータ移行・
-> Admin の入力・Web の表示まで実装済み**（[#122](https://github.com/Natsugure/furatora/issues/122)・
+> **適用状況**: 2026-09-29 現在、**スキーマ・評価済み15駅対（接続60行・ルート21本）のデータ移行・
+> Admin の入力・Web の表示まで実装済み・本番反映済み**（[#122](https://github.com/Natsugure/furatora/issues/122)・
 > [#123](https://github.com/Natsugure/furatora/issues/123)・
 > [#124](https://github.com/Natsugure/furatora/issues/124)・
-> [#125](https://github.com/Natsugure/furatora/issues/125)）。移行は development に適用済みで、
-> 本番（`main`）へは未適用（`main` へのリリース時に Vercel のビルドが流す）。
+> [#125](https://github.com/Natsugure/furatora/issues/125)）。
 > 移行したルートの多くは**設備が未入力**（下記「ルートと設備」）で、所要時分もほとんど `NULL`。
 > 旧行に設備の種類・所要時分が無かったため、確認できた範囲だけを入れている。Admin から補完できる。
 
