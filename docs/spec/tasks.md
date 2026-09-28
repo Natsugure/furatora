@@ -32,4 +32,4 @@
 
 - [x] **TASK-8** `docs/domain/station-master-model.md` の凍結の記述を削除する。ADR の変更が無いことを確認する。
       あわせて「乗換難易度」の適用状況を本番反映済みに上書きした（Neon MCP で main に 0000〜0014 の15件・接続60・ルート21 を確認）
-- [ ] **TASK-9** PR（base: `develop`）を作成する。デプロイ中は Admin で接続を追加しない旨を書く
+- [x] **TASK-9** PR（base: `develop`）を作成する。デプロイ中は Admin で接続を追加しない旨を書く 結果: #142
