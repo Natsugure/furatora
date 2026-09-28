@@ -49,7 +49,7 @@ describe('assessRoutes: 状態の分類', () => {
     ]);
     expect(result.kind).toBe('barrierFree');
     if (result.kind !== 'barrierFree') return;
-    expect(result.routes.map((r) => r.id)).toEqual(['ev']);
+    expect(result.routes.map((r) => r.route.id)).toEqual(['ev']);
   });
 
   it('係員を呼ぶ ルートは車いすのバリアフリールートに数える', () => {
@@ -89,7 +89,19 @@ describe('assessRoutes: 状態の分類', () => {
       route('fastStaff', ['stairLift'], { minutes: 4 }),
     ]);
     if (result.kind !== 'barrierFree') throw new Error(result.kind);
-    expect(result.routes.map((r) => r.id)).toEqual(['fastStaff', 'slowAsIs', 'unknown']);
+    expect(result.routes.map((r) => r.route.id)).toEqual(['fastStaff', 'slowAsIs', 'unknown']);
+  });
+
+  it('BF ルートごとに、そのペルソナの必要な行為を添える', () => {
+    const result = assessRoutes('wheelchair', [
+      route('ev', ['elevator'], { minutes: 3 }),
+      route('lift', ['stairLift'], { minutes: 5 }),
+    ]);
+    if (result.kind !== 'barrierFree') throw new Error(result.kind);
+    expect(result.routes.map((r) => [r.route.id, r.requirement])).toEqual([
+      ['ev', 'as_is'],
+      ['lift', 'call_staff'],
+    ]);
   });
 
   it('所要時分が同じなら元の順序を保つ', () => {
@@ -98,7 +110,7 @@ describe('assessRoutes: 状態の分類', () => {
       route('a', ['sameFloor'], { minutes: 3 }),
     ]);
     if (result.kind !== 'barrierFree') throw new Error(result.kind);
-    expect(result.routes.map((r) => r.id)).toEqual(['b', 'a']);
+    expect(result.routes.map((r) => r.route.id)).toEqual(['b', 'a']);
   });
 });
 

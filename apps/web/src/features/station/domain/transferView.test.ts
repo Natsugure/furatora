@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DirectionType } from '@furatora/transfer-difficulty/domain';
+import { assessRoutes, type DirectionType, type Persona } from '@furatora/transfer-difficulty/domain';
 import { differingFields, groupCombos } from './transferView';
 import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from './types';
 
@@ -139,19 +139,28 @@ describe('groupCombos', () => {
 });
 
 describe('differingFields', () => {
+  // 表示と同じく、assessRoutes が導出したバリアフリールート（必要な行為つき）を渡す
+  const barrierFreeRoutes = (persona: Persona, routes: TransferRouteDTO[]) => {
+    const result = assessRoutes(persona, routes);
+    if (result.kind !== 'barrierFree') throw new Error(result.kind);
+    return result.routes;
+  };
+
   it('ルートが1本なら何も異ならない', () => {
-    expect(differingFields('stroller', [ev])).toEqual(new Set());
+    expect(differingFields(barrierFreeRoutes('stroller', [ev]))).toEqual(new Set());
   });
 
   it('所要時分・必要な行為・フラグのうち、値が違うものだけを返す', () => {
     const a = route({ routeId: 'a', minutes: 3, facilities: ['elevator'] });
     const b = route({ routeId: 'b', minutes: 5, facilities: ['stairLift'], requiresStaff: true });
-    expect(differingFields('wheelchair', [a, b])).toEqual(new Set(['minutes', 'requirement', 'requiresStaff']));
+    expect(differingFields(barrierFreeRoutes('wheelchair', [a, b]))).toEqual(
+      new Set(['minutes', 'requirement', 'requiresStaff']),
+    );
   });
 
-  it('必要な行為はペルソナごとに比べる', () => {
+  it('必要な行為が同じなら、設備の種類が違っても異なるとしない', () => {
     const a = route({ routeId: 'a', facilities: ['elevator'] });
     const b = route({ routeId: 'b', facilities: ['sameFloor'] });
-    expect(differingFields('wheelchair', [a, b])).toEqual(new Set());
+    expect(differingFields(barrierFreeRoutes('wheelchair', [a, b]))).toEqual(new Set());
   });
 });

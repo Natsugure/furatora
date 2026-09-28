@@ -5,7 +5,7 @@ import {
   PERSONA_LABEL,
   REQUIREMENT_LABEL,
   assessRoutes,
-  requirementFor,
+  type AssessedRoute,
   type Assessment,
   type Persona,
 } from '@furatora/transfer-difficulty/domain';
@@ -60,16 +60,14 @@ function Chip({ children, highlighted }: { children: React.ReactNode; highlighte
   );
 }
 
+// バリアフリールートの1本。設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）
 function RouteItem({
-  persona,
-  route,
+  assessed: { route, requirement },
   highlights,
 }: {
-  persona: Persona;
-  route: TransferRouteDTO;
+  assessed: AssessedRoute<TransferRouteDTO>;
   highlights: Set<RouteField>;
 }) {
-  const requirement = requirementFor(persona, route.facilities);
   const flags: [RouteField, boolean, string][] = [
     ['isOutdoor', route.isOutdoor, ROUTE_FLAG_LABEL.isOutdoor],
     ['requiresExitGate', route.requiresExitGate, ROUTE_FLAG_LABEL.requiresExitGate],
@@ -87,10 +85,7 @@ function RouteItem({
         )}
       </p>
       <div className="mt-1 flex flex-wrap gap-1">
-        {/* 設備0件（未入力）から必要な行為を導出しない（ADR-0012）。未入力である旨も利用者には出さない（#135） */}
-        {requirement !== null && (
-          <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
-        )}
+        <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
         {flags.map(
           ([field, shown, label]) =>
             shown && (
@@ -114,20 +109,20 @@ type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barr
 
 function BarrierFreeDetail({ persona, assessment }: { persona: Persona; assessment: BarrierFreeAssessment }) {
   const { routes, detour } = assessment;
-  const highlights = routes.length > 1 ? differingFields(persona, routes) : new Set<RouteField>();
+  const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
   // routes は1本以上あり、先頭が最短
-  const shortestRequirement = requirementFor(persona, routes[0]!.facilities);
+  const shortest = routes[0]!;
   return (
     <>
       <ul className={`mt-2 divide-y ${PERSONA_STYLE[persona].divideClass}`}>
-        {routes.map((route) => (
-          <RouteItem key={route.routeId} persona={persona} route={route} highlights={highlights} />
+        {routes.map((assessed) => (
+          <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} />
         ))}
       </ul>
       {/* 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある） */}
-      {detour !== null && shortestRequirement !== null && (
+      {detour !== null && (
         <p className="mt-2 text-xs text-gray-700">
-          最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortestRequirement]}）
+          最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortest.requirement]}）
         </p>
       )}
     </>

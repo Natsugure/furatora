@@ -1,4 +1,4 @@
-import { requirementFor, type DirectionType, type Persona } from '@furatora/transfer-difficulty/domain';
+import type { AssessedRoute, DirectionType } from '@furatora/transfer-difficulty/domain';
 import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from './types';
 
 // 乗換セクションの表示の組み立て（純関数・DB非依存）。
@@ -80,15 +80,18 @@ export type RouteField =
   | 'requiresStaff'
   | 'isOfficiallyGuided';
 
-/** バリアフリールートを並記するとき、ルートの間で値が異なる項目（強調表示の対象） */
-export function differingFields(persona: Persona, routes: readonly TransferRouteDTO[]): Set<RouteField> {
-  const valueOf: Record<RouteField, (r: TransferRouteDTO) => unknown> = {
-    minutes: (r) => r.minutes,
-    requirement: (r) => requirementFor(persona, r.facilities),
-    isOutdoor: (r) => r.isOutdoor,
-    requiresExitGate: (r) => r.requiresExitGate,
-    requiresStaff: (r) => r.requiresStaff,
-    isOfficiallyGuided: (r) => r.isOfficiallyGuided,
+/**
+ * バリアフリールートを並記するとき、ルートの間で値が異なる項目（強調表示の対象）。
+ * 必要な行為は assessRoutes がペルソナごとに導出済みのものを比べる
+ */
+export function differingFields(routes: readonly AssessedRoute<TransferRouteDTO>[]): Set<RouteField> {
+  const valueOf: Record<RouteField, (r: AssessedRoute<TransferRouteDTO>) => unknown> = {
+    minutes: (r) => r.route.minutes,
+    requirement: (r) => r.requirement,
+    isOutdoor: (r) => r.route.isOutdoor,
+    requiresExitGate: (r) => r.route.requiresExitGate,
+    requiresStaff: (r) => r.route.requiresStaff,
+    isOfficiallyGuided: (r) => r.route.isOfficiallyGuided,
   };
   const fields = Object.keys(valueOf) as RouteField[];
   return new Set(fields.filter((field) => new Set(routes.map(valueOf[field])).size > 1));

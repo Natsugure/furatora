@@ -78,19 +78,15 @@ function buildPartnerLines(rows: Awaited<ReturnType<typeof getStationConnectionR
   return result;
 }
 
-// connectedStationId ごとの乗換路線名・色（facilityConnections のラベル付けに使う）
-function buildLinesByStation(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
+// connectedStationId ごとの乗換路線名・色（facilityConnections のラベル付けに使う）。
+// 重複除去は buildPartnerLines の1か所に置く（乗換セクションと図の乗換プレートで路線一覧を食い違わせない）
+function buildLinesByStation(partnerLines: PartnerLine[]) {
   const map = new Map<string, { names: string[]; colors: (string | null)[] }>();
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (!row.connectedStationId) continue;
-    const key = `${row.connectedStationId}:${row.lineName}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (!map.has(row.connectedStationId)) map.set(row.connectedStationId, { names: [], colors: [] });
-    const entry = map.get(row.connectedStationId)!;
-    entry.names.push(row.lineName);
-    entry.colors.push(row.lineColor);
+  for (const p of partnerLines) {
+    const entry = map.get(p.connectedStationId) ?? { names: [], colors: [] };
+    entry.names.push(p.lineName);
+    entry.colors.push(p.lineColor);
+    map.set(p.connectedStationId, entry);
   }
   return map;
 }
@@ -141,12 +137,9 @@ export const dbStationDetailQuery: StationDetailQuery = {
       },
       headerLineColor: headerLineRows[0]?.color ?? null,
     };
+    const partnerLines = buildPartnerLines(stationConnectionRows);
     // 乗換の読み取りはホーム側のクエリに依存しないので、次の Promise.all に載せて往復を増やさない
-    const transferPartnersPromise = buildTransferPartners(
-      stationRow.id,
-      buildPartnerLines(stationConnectionRows),
-      transferConnectionRows,
-    );
+    const transferPartnersPromise = buildTransferPartners(stationRow.id, partnerLines, transferConnectionRows);
 
     if (platformList.length === 0) {
       return { ...baseDTO, transferPartners: await transferPartnersPromise, platforms: [] };
@@ -306,7 +299,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
       ? await db.select().from(stationFacilities).where(inArray(stationFacilities.platformLocationCellId, cellIds))
       : [];
 
-    const linesByStation = buildLinesByStation(stationConnectionRows);
+    const linesByStation = buildLinesByStation(partnerLines);
 
     const facilitiesByCell = new Map(cellIds.map((id) => [id, facilityList.filter((f) => f.platformLocationCellId === id)]));
     const cellsByLocation = new Map(locationIds.map((id) => [id, cellList.filter((c) => c.platformLocationId === id)]));
