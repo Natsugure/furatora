@@ -1,10 +1,8 @@
 # 方面（`line_directions`）と方面ラベルの解決
 
-> **適用状況**: 2026-09-27 現在、**スキーマ・既定行のデータ・解決関数・Admin の入力と表示まで実装済み**
-> （[#130](https://github.com/Natsugure/furatora/issues/130)）。移行（`0013`・`0014`）は development に適用済みで、
-> 本番（`main`）へは未適用（`main` へのリリース時に Vercel のビルドが流す）。
-> **Web はまだ乗換接続の方面ラベルを表示しない**。表示は [#125](https://github.com/Natsugure/furatora/issues/125) で、
-> そこで下記の `resolveDirectionLabel` を使う。#125 が完了したら、この注記の最後の2文を外す。
+> **適用状況**: 2026-09-28 現在、**スキーマ・既定行のデータ・解決関数・Admin の入力と表示・Web の乗換セクションの方面の見出しまで実装済み**
+> （[#130](https://github.com/Natsugure/furatora/issues/130)・[#125](https://github.com/Natsugure/furatora/issues/125)）。
+> 移行（`0013`・`0014`）は development に適用済みで、本番（`main`）へは未適用（`main` へのリリース時に Vercel のビルドが流す）。
 
 「路線のある走行方向を、利用者にどう呼ぶか（池袋方面・内回り など）」を持つ。
 判断の根拠と却下案は [ADR-0014](../adr/0014-direction-label-by-default-row.md)。
@@ -58,8 +56,8 @@ line_directions
 - 空文字の文言は、無いものとして次の段へ進む。
 - 実装は `packages/transfer-difficulty/src/domain/directionLabel.ts` の `resolveDirectionLabel`
   （DB・React に依存しない純粋関数）。呼び出し側がホームと既定行を読んで渡す。
-  Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）が使っており、
-  Web（#125）も同じ関数を使うこと。規則を各アプリで書き直さない。
+  Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）と
+  Web の駅詳細（`apps/web/src/external/query/transferPartnerRows.ts`）が使う。規則を各アプリで書き直さない。
 - 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面は駅の最初の路線（`stationLines` を路線の `displayOrder`、同順なら id で並べた先頭）について解決し、
   ホームと既定行をその路線で絞る。1駅が複数路線を持つようになったら（[#82](https://github.com/Natsugure/furatora/issues/82)）、
   解決の入力に路線を明示する必要がある。
