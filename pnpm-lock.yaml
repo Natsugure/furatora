@@ -178,6 +178,9 @@ importers:
       '@furatora/platform-diagram':
         specifier: workspace:*
         version: link:../../packages/platform-diagram
+      '@furatora/transfer-difficulty':
+        specifier: workspace:*
+        version: link:../../packages/transfer-difficulty
       '@mantine/core':
         specifier: ^8.3.14
         version: 8.3.14(@mantine/hooks@8.3.14(react@19.2.3))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)

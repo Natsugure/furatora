@@ -14,8 +14,8 @@
 旧パターンはもう存在しない。再導入しないこと。**
 
 路線名の解決は `connectedStationId → stationLines → lines` の join で行う
-（ekidata は路線ごとに駅を割るため、駅が決まればほぼ1路線に定まる。実測で
-複数路線を持つ駅はごく少数。その場合は `(connectedStationId, lineName)` で
+（ekidata は路線ごとに駅を割るため、駅が決まれば1路線に定まる。複数路線を持つ駅は
+実測0件だが不変条件ではない（#82）ので、`(connectedStationId, lineName)` で
 重複除去する）。参考実装: `apps/web/src/external/query/stationDetailQuery.ts`
 の `getStationConnectionRows`。
 

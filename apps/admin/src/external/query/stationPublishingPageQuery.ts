@@ -31,7 +31,7 @@ export const dbStationPublishingPageQuery: StationPublishingPageQuery = {
     const [stationRow] = await db.select().from(stations).where(eq(stations.id, stationId)).limit(1);
     if (!stationRow) return null;
 
-    // 駅が複数路線を持つ場合（実測5駅）は「slug を持つ路線」を優先して1件表示する。
+    // 駅が複数路線を持つ場合（実測0駅。#82 で生じうる）は「slug を持つ路線」を優先して1件表示する。
     // stationPublishingRepository.findLineSlug と同じ ORDER BY を使うこと（LINE_SLUG_ORDER_BY）。
     // ここでの表示と publish API の検証が別々の路線を見ると公開ゲートが食い違う。
     const [lineRow] = await db

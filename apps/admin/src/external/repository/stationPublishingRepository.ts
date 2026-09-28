@@ -15,7 +15,7 @@ import { isPgErrorCode, PG_UNIQUE_VIOLATION } from '@/external/pgError';
 // 【注意】stopPatternRepository.ts の isUniqueViolation は err.code しか見ておらず、
 // withTransaction 経由でラップされたケースを取りこぼす。統一は別 Issue。
 
-// 駅が属する路線の slug を読む。stationLines が複数路線を持つ場合（実測5駅）は
+// 駅が属する路線の slug を読む。stationLines が複数路線を持つ場合（実測0駅。#82 で生じうる）は
 // 「slug を持つ路線」を優先して1件返す（slug NULLS LAST、同順位は lines.id で確定）。
 // これは「所属路線のいずれかが slug を持てば公開できる」という公開ゲートの
 // 意図に合わせたもの。可視性（visibleLine）は apps/web 側で路線ごとに個別判定される。

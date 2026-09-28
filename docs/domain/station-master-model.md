@@ -129,9 +129,9 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
 Web の駅詳細・Admin の駅編集・設備編集・レイアウト画面が読んでいる。
 乗換難易度の新モデル（次節）が入っても、この表は接続一覧として残る。
 乗換難易度を持つ `strollerDifficulty` / `wheelchairDifficulty` / `notesAbout*` の4列は、
-**Admin からはもう書かれない**（[#124](https://github.com/Natsugure/furatora/issues/124)。値は #123 の
-移行時点のまま凍結）。Web が読み終える [#125](https://github.com/Natsugure/furatora/issues/125) が済んだ
-**あとの別デプロイ**で落とす。
+**Admin からも Web からも読み書きされない**（Admin は [#124](https://github.com/Natsugure/furatora/issues/124)、
+Web は [#125](https://github.com/Natsugure/furatora/issues/125)。値は #123 の移行時点のまま凍結）。
+#125 が本番にデプロイされたあとの**別デプロイ**で落とす（[#136](https://github.com/Natsugure/furatora/issues/136)）。
 
 | `source` | 意味 |
 |---|---|
@@ -157,14 +157,12 @@ Admin の駅編集画面の「接続を追加」から
 
 ## 乗換難易度（`transferConnections` ほか4表）
 
-> **適用状況**: 2026-09-26 現在、**スキーマ・評価済み15駅対（接続60行・ルート21本）のデータ移行・
-> Admin の入力まで実装済み**（[#122](https://github.com/Natsugure/furatora/issues/122)・
+> **適用状況**: 2026-09-28 現在、**スキーマ・評価済み15駅対（接続60行・ルート21本）のデータ移行・
+> Admin の入力・Web の表示まで実装済み**（[#122](https://github.com/Natsugure/furatora/issues/122)・
 > [#123](https://github.com/Natsugure/furatora/issues/123)・
-> [#124](https://github.com/Natsugure/furatora/issues/124)）。移行は development に適用済みで、
+> [#124](https://github.com/Natsugure/furatora/issues/124)・
+> [#125](https://github.com/Natsugure/furatora/issues/125)）。移行は development に適用済みで、
 > 本番（`main`）へは未適用（`main` へのリリース時に Vercel のビルドが流す）。
-> **Web はまだ新モデルを読まない**。[#125](https://github.com/Natsugure/furatora/issues/125) が完了するまで、
-> Web は前節の `stationConnections` の難易度4列を読む。4列は Admin から書かれないため、値は #123 の移行時点の
-> まま凍結されている（新モデルで入力した内容は Web に出ない）。#125 が完了したら、この注記を外す。
 > 移行したルートの多くは**設備が未入力**（下記「ルートと設備」）で、所要時分もほとんど `NULL`。
 > 旧行に設備の種類・所要時分が無かったため、確認できた範囲だけを入れている。Admin から補完できる。
 
@@ -179,7 +177,7 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 
 - **ペルソナ（ベビーカー・車いす）は層ではない。** ペルソナ別の可否・必要な行為・所要時分は
   保存せず、設備から表示層で導出する（導出は `packages/transfer-difficulty` の `requirementFor`。
-  DB・React 非依存の純粋関数で、Admin のプレビューと Web（#125）が同じ規則を使う）。「通れる」と「バリアフリーで通れる」は別の述語である
+  DB・React 非依存の純粋関数で、Admin のプレビューと Web が同じ規則を使う）。「通れる」と「バリアフリーで通れる」は別の述語である
   （階段を持ち上げれば通れるが、バリアフリールートは無い、という状態がありうる）。
 - **ルートは接続に従属しない。** 方面によって条件が変わらない駅は、方面の組み合わせ分
   （最大4行）の接続を持つ。それらが同じ物理経路を使うときは、ルート行を複製せず
@@ -225,6 +223,7 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 | 同じルートに同じ種類の設備を2行入れない | `unique_transfer_route_facility_type (routeId, typeCode)` | 外すと同種の設備が重複し、集合の一致判定（重複ルートの検出）が崩れる |
 | 設備の種類の集合と4フラグが一致するルートの二重登録に気づける | **アプリ層**（Admin。`features/transfer-connection/domain/duplicates.ts`）。保存時に、S か T を端点に持つ接続のルート（候補）と同じ画面のカードとの一致を検出し（**適用先が重ならないカードどうしは、所要時分か備考が違えば一致に数えない**。方面を分けた結果であり、統合すると分けた差が消える）、「共有する」か「別ルートとして作る」かを選ばせる。**提示であり、保存は止めない**（中身が一致しても別の物理経路でありうる。例: 池袋の各線のエレベーター経由）。**設備0件（未入力）のルートは対象外**（未入力どうしは中身が分からず、「一致」とは言えない） | 集合の一意性は DB 制約で書けない。中断（ハードブロック）にすると、別経路のルートを作れなくなる |
 | 基準ルートの付け替えが中途半端に終わらない | Repository + `withTransaction`（[ADR-0005](../adr/0005-write-atomicity-driver.md)）。Admin の保存は駅対の最終状態を1回で送り、`savePair` が紐付けを**全部消してから入れ直す**ので、降格と昇格の順序は問題にならない | 降格と昇格の2文になる |
+| 接続は1本以上のルートを持つ（ルートが0本の組み合わせは接続行を持たない＝未評価） | **アプリ層**。`transferConnectionRepository.savePair` が、ルートが0本になった組み合わせの接続を同じトランザクションで消す。ルートの削除は `deleteOrphanRoutes`（どの接続からも参照されないルートのみ）に限られるので、紐付けの cascade で接続がルートを失うことも無い。Web は念のため、接続行の有無ではなくルートの有無で未評価を判定する（`TransferDifficultySection` の `isEvaluated`） | 外すと、接続行はあるのにルートが無い「評価済みに見える未評価」ができる |
 | 接続を消したあとに孤立ルートが残らない | **アプリ層**。`connection_routes` は接続の削除で cascade するが、ルートは共有されうるため DB では消さない。接続や紐付けを消す書き込み（`transferConnectionRepository.savePair` と `stationConnectionRepository.deletePair`）は、同じトランザクションで `external/transferPairSql.ts` の `deleteOrphanRoutes` を呼ぶ | 呼び忘れると、どの接続からも参照されないルートが残る。他の接続がまだ参照しているルートは消さない |
 
 **行数の上限は制約で表現しない**（PostgreSQL の制約は行数を数えられない）。
@@ -250,9 +249,46 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
   別ルートで記録する必要がある。
 - **設備0件のルートは「設備未入力」を表す。** 「設備が無い」ではない。段差の無いルートは
   `sameFloor` を明示する。空集合に必要な行為の導出を素直に適用すると「そのまま通れる」と読めるため、
-  表示層は設備0件のルートについて必要な行為を導出せず、バリアフリールートにも数えず、
-  設備が未入力であることを示すこと。「接続が無い＝未評価」と同型の、行が無いことによる表現である
+  表示層は設備0件のルートについて必要な行為を導出せず、バリアフリールートにも数えないこと
+  （Web での見せ方は下記「Web の表示の規則」）。「接続が無い＝未評価」と同型の、行が無いことによる表現である
   （[ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)）。
+- **Web は、定数 `FACILITY_TYPE_CODES` に無い設備コードを含むルートを「設備未入力」として扱う**
+  （`apps/web/src/external/query/transferPartnerRows.ts` の `facilitiesByRoute`）。そのコードだけを捨てると、
+  残りの設備で判定されて実際より軽い行為に丸められるため。定数と `facility_types` の一致は現在、人が確かめており、
+  仕組みで守るのは [#139](https://github.com/Natsugure/furatora/issues/139)。Admin の駅対編集画面は未知のコードを捨てたままである（#139 で解消する）。
+
+### Web の表示の規則
+
+Web の駅詳細（`apps/web/src/components/TransferDifficultySection.tsx`）は、次の規則で表示する。
+解釈（必要な行為・状態の分類・並べ替え・迂回度）は `packages/transfer-difficulty` の純粋関数に置き、
+アプリ側で書き直さない（重さの順序はパッケージの `requirement.ts` の外に出さない）。
+DTO はルートと設備をそのまま運び、ペルソナで絞らない。
+
+- **状態の分類**（`assessRoutes`。方面の組み合わせ×ペルソナごと）:
+
+  | 状態 | 条件 | 表示 |
+  |---|---|---|
+  | 未評価 | ルートが0本（接続行が無い） | 「情報なし」 |
+  | バリアフリールートあり | バリアフリールートが1本以上 | そのルートをすべて並べる。2本以上なら、値が異なる項目（所要時分・必要な行為・4フラグ）を強調する |
+  | 確認できていない | バリアフリールートが0本で、設備0件のルートがある | 「バリアフリールートを確認できていません」。設備が入力済みのルートに通れるものがあれば「確認できているルートでは、最も軽い方法: …」 |
+  | バリアフリールートなし | バリアフリールートが0本で、全ルートの設備が入力済み | 「バリアフリールートなし」＋最も軽い行為（`lightestRequirement`）。通れるルートが無ければその旨 |
+
+- **設備未入力のルートの有無・件数・名前は、利用者に出さない。** 補完は管理者の作業で、Admin で一覧する
+  （[#135](https://github.com/Natsugure/furatora/issues/135)）。「なし」と断定しないことだけを表示で守る（ADR-0012）。
+- **並べ替えは所要時分の昇順だけ**。未入力は末尾。必要な行為では並べない（「畳んで抱える」と「係員を呼ぶ」の
+  どちらが軽いかは利用者によって逆転する）。「おすすめ」に相当する印を付けない。
+- **迂回度** = バリアフリールートの最短の所要時分 − 基準ルートの所要時分（`assessRoutes` の barrierFree の `detour`）。両方が揃うときだけ出し、
+  最短ルートの必要な行為と並べる（差には距離の差と移動速度の差が混ざる）。保存しない。
+- **方面**: 方面の組み合わせを、ルートの組（routeId・label・isBaseline）と接続の備考が一致するものどうしでまとめる
+  （`apps/web/src/features/station/domain/transferView.ts` の `groupCombos`）。全組み合わせが1つにまとまれば見出しを出さない。
+  分かれる場合は、片側の方面だけで決まるなら「{路線} {方面}」、そうでなければ組み合わせごとに「{自駅側} → {相手駅側}」を
+  見出しにする。一部の組み合わせだけが未評価なら、残りを1つの「情報なし」のまとまりにする。方面の文言は
+  `resolveDirectionLabel`（[line-directions.md](./line-directions.md)）。
+- **乗換先の一覧**は接続一覧（`stationConnections`）の相手駅×路線で、未評価の相手駅も含める。評価済みを先に並べる。
+  評価済みの相手駅が1つも無い駅では、セクションを出さない。ekidata のグループには別駅が入ることがある
+  （例: 淡路町 → 御茶ノ水）ため、相手駅の駅名が自駅と違えば選択肢に駅名を添える。
+- 「公式案内なし」（`isOfficiallyGuided = false`）は、駅の構内図・公式案内に載っていないルートである旨を出す。
+  移行データの false は確認済みの値である。
 
 ### Admin の書き込み規約
 

@@ -20,7 +20,7 @@ export default async function StationDetailPage({ params }: Props) {
     notFound();
   }
 
-  const { station, headerLineColor, platforms: platformList, transferConnections, tabs } = data;
+  const { station, headerLineColor, platforms: platformList, transferPartners, tabs } = data;
 
   return (
     <Container className="py-6">
@@ -50,7 +50,7 @@ export default async function StationDetailPage({ params }: Props) {
       )}
 
       {/* Transfer difficulty */}
-      <TransferDifficultySection connections={transferConnections} />
+      <TransferDifficultySection stationName={station.name} partners={transferPartners} />
 
       {/* Platform list */}
       {platformList.length > 0 ? (
