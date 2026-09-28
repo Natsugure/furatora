@@ -251,6 +251,10 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
   表示層は設備0件のルートについて必要な行為を導出せず、バリアフリールートにも数えないこと
   （Web での見せ方は下記「Web の表示の規則」）。「接続が無い＝未評価」と同型の、行が無いことによる表現である
   （[ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)）。
+- **Web は、定数 `FACILITY_TYPE_CODES` に無い設備コードを含むルートを「設備未入力」として扱う**
+  （`apps/web/src/external/query/transferPartnerRows.ts` の `facilitiesByRoute`）。そのコードだけを捨てると、
+  残りの設備で判定されて実際より軽い行為に丸められるため。定数と `facility_types` の一致は現在、人が確かめており、
+  仕組みで守るのは [#139](https://github.com/Natsugure/furatora/issues/139)。Admin の駅対編集画面は未知のコードを捨てたままである（#139 で解消する）。
 
 ### Web の表示の規則
 

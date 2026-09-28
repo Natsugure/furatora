@@ -31,6 +31,25 @@ const outboundDirections = alias(lineDirections, 'outbound_directions');
 const isFacilityCode = (code: string): code is FacilityTypeCode =>
   (FACILITY_TYPE_CODES as readonly string[]).includes(code);
 
+// ルートごとの設備。定数に無い設備コードを含むルートは、設備を空（未入力）として扱う。
+// そのコードだけ捨てると残りの設備で判定され、段差のあるルートを「バリアフリールートあり」と出しうる。
+// 未入力なら必要な行為を導出しない（ADR-0012）。定数と facility_types の一致を仕組みで守るのは #139
+export function facilitiesByRoute(
+  rows: readonly { routeId: string; typeCode: string }[],
+): Map<string, FacilityTypeCode[]> {
+  const facilitiesOf = new Map<string, FacilityTypeCode[]>();
+  const unknownRouteIds = new Set<string>();
+  for (const row of rows) {
+    if (!isFacilityCode(row.typeCode)) {
+      unknownRouteIds.add(row.routeId);
+      continue;
+    }
+    facilitiesOf.set(row.routeId, [...(facilitiesOf.get(row.routeId) ?? []), row.typeCode]);
+  }
+  for (const routeId of unknownRouteIds) facilitiesOf.set(routeId, []);
+  return facilitiesOf;
+}
+
 // transfer_connections は端点を正規化順（A < B）で持つので、S が A 側・B 側の両方を見る
 export async function getTransferConnectionRows(stationId: string) {
   return db
@@ -152,11 +171,7 @@ export async function buildTransferPartners(
     };
   };
 
-  const facilitiesOf = new Map<string, FacilityTypeCode[]>();
-  for (const row of facilityRows) {
-    if (!isFacilityCode(row.typeCode)) continue;
-    facilitiesOf.set(row.routeId, [...(facilitiesOf.get(row.routeId) ?? []), row.typeCode]);
-  }
+  const facilitiesOf = facilitiesByRoute(facilityRows);
   const routesOf = new Map<string, TransferRouteDTO[]>();
   for (const { connectionId, ...route } of linkRows) {
     const dto: TransferRouteDTO = { ...route, facilities: facilitiesOf.get(route.routeId) ?? [] };
