@@ -21,8 +21,12 @@
 - [x] **TASK-6** `pnpm run typecheck` / `lint` / `test` / `build` が通ること。旧4列・enum 型の参照が残っていないこと。
       結果（2026-09-29）: typecheck 6・lint 4・build 2 タスク成功、test は admin 625・platform-diagram 203・
       transfer-difficulty 55・frontend 42 が成功。参照は `schema.ts` の削除済みの注記のみ
-- [ ] **TASK-7** 開発者が development に `db:migrate` を適用する。Neon MCP で列が消え行数が変わらないことを確認し、
-      Admin の接続の追加・削除と Web の駅詳細を確認する
+- [x] **TASK-7** 開発者が development に `db:migrate` を適用する。Neon MCP で列が消え行数が変わらないことを確認し、
+      Admin の接続の追加・削除と Web の駅詳細を確認する。
+      結果（2026-09-29）: 適用済みマイグレーション 15→16、`station_connections` は 10列→6列・6,950行のまま。main は15件・10列のまま。
+      Admin の API で淡路町↔神田（銀座線）の接続を作成（201・有向2行・`manual`）→ 削除（200）し、6,950行・接続60・ルート21 に戻った。
+      Admin の駅編集・レイアウト・駅対の編集画面が 200 で表示され、Web の淡路町は乗換先5件と評価を表示した。
+      Web のホーム図でハイドレーションの不一致（`FreeSpaceBadges` の `<title>`）がコンソールに出たが、本変更の対象外
 
 ## フェーズ5〜6: 振り返り・引き渡し
 
