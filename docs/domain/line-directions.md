@@ -58,9 +58,12 @@ line_directions
   （DB・React に依存しない純粋関数）。呼び出し側がホームと既定行を読んで渡す。
   Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）と
   Web の駅詳細（`apps/web/src/external/query/transferPartnerRows.ts`）が使う。規則を各アプリで書き直さない。
-- 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面は駅の最初の路線（`stationLines` を路線の `displayOrder`、同順なら id で並べた先頭）について解決し、
+- 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面と Web の駅詳細の乗換セクションは、駅の最初の路線（`stationLines` を路線の `displayOrder`、同順なら id で並べた先頭）について解決し、
   ホームと既定行をその路線で絞る。1駅が複数路線を持つようになったら（[#82](https://github.com/Natsugure/furatora/issues/82)）、
   解決の入力に路線を明示する必要がある。
+  - `transfer_connections` の端点は「駅＋方面」で路線を持たないため、複数路線を持つ相手駅では、接続がどの路線への乗換かを区別できない。
+    Web の乗換セクションは相手駅の路線ごとに選択肢を出すが、どの路線を選んでも同じ接続（同じルート）と最初の路線の方面名が出る。
+    表示だけで解決せず、#82 で端点に路線を持たせる必要がある。
 
 ## Admin の書き込み規約
 

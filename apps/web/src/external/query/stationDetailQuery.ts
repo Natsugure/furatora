@@ -35,7 +35,7 @@ import type {
 // connectedRailwayId 列は廃止済み（ODPT 同期専用の列であり、以後 ODPT 同期は行わない。
 // ADR-0007 決定3 / Issue #56）。路線名は connectedStationId → stationLines → lines の
 // join で解決する。駅マスタは路線ごとに駅を割るモデルのため、接続先の駅が決まれば
-// 路線がほぼ一意に定まる（複数路線を持つ駅はごく少数。lineName で重複除去して吸収する）。
+// 路線が一意に定まる（複数路線を持つ駅は実測0件。ただし不変条件ではないので lineName で重複除去して吸収する）。
 // 詳細: docs/domain/station-master-model.md「乗換接続（stationConnections）」。
 //
 // 接続先の駅には publishedStation() を通さない（stations は駅名のためだけに join する）。
@@ -58,7 +58,8 @@ async function getStationConnectionRows(stationId: string) {
     .where(eq(stationConnections.stationId, stationId));
 }
 
-// 乗換先の相手駅と路線。2路線を持つ駅（実測5件）は connectedStationId ごとに複数行になるため、
+// 乗換先の相手駅と路線。2路線を持つ駅（実測0件。#82 で物理駅粒度に統合されると生じうる）は
+// connectedStationId ごとに複数行になるため、
 // 同一路線の重複を除く。乗換難易度が未評価の相手駅も含める（未評価は表示層が「情報なし」と示す）
 function buildPartnerLines(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
   const seen = new Set<string>();
