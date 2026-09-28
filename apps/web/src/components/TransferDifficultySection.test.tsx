@@ -225,6 +225,31 @@ describe('TransferDifficultySection', () => {
     expect(within(card('ベビーカー')).getByText('バリアフリールートあり')).toBeInTheDocument();
   });
 
+  // 未評価は「ルートが0本」（docs/domain/station-master-model.md）。接続行があってもルートが無ければ未評価に数える
+  it('接続行はあるがルートが0本の相手駅は、評価済みの相手駅より後に並べる', () => {
+    render(
+      <TransferDifficultySection
+        stationName="小川町"
+        partners={[
+          partner({ connectedStationId: 't2', connectedStationName: '新御茶ノ水', lineName: '東京メトロ千代田線', combos: allCombos([]) }),
+          partner({ connectedStationName: '淡路町', lineName: '東京メトロ丸ノ内線', combos: allCombos([route({ routeId: 'ev' })]) }),
+        ]}
+      />,
+    );
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      '東京メトロ丸ノ内線（淡路町）',
+      '東京メトロ千代田線（新御茶ノ水）',
+    ]);
+    expect(within(card('ベビーカー')).getByText('バリアフリールートあり')).toBeInTheDocument();
+  });
+
+  it('接続行はあるがルートが0本の相手駅しか無ければ何も表示しない', () => {
+    const { container } = render(
+      <TransferDifficultySection stationName="淡路町" partners={[partner({ combos: allCombos([]) })]} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('未評価の相手駅を選ぶと「情報なし」を示す', async () => {
     render(
       <TransferDifficultySection

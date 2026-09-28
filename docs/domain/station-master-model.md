@@ -223,6 +223,7 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 | 同じルートに同じ種類の設備を2行入れない | `unique_transfer_route_facility_type (routeId, typeCode)` | 外すと同種の設備が重複し、集合の一致判定（重複ルートの検出）が崩れる |
 | 設備の種類の集合と4フラグが一致するルートの二重登録に気づける | **アプリ層**（Admin。`features/transfer-connection/domain/duplicates.ts`）。保存時に、S か T を端点に持つ接続のルート（候補）と同じ画面のカードとの一致を検出し（**適用先が重ならないカードどうしは、所要時分か備考が違えば一致に数えない**。方面を分けた結果であり、統合すると分けた差が消える）、「共有する」か「別ルートとして作る」かを選ばせる。**提示であり、保存は止めない**（中身が一致しても別の物理経路でありうる。例: 池袋の各線のエレベーター経由）。**設備0件（未入力）のルートは対象外**（未入力どうしは中身が分からず、「一致」とは言えない） | 集合の一意性は DB 制約で書けない。中断（ハードブロック）にすると、別経路のルートを作れなくなる |
 | 基準ルートの付け替えが中途半端に終わらない | Repository + `withTransaction`（[ADR-0005](../adr/0005-write-atomicity-driver.md)）。Admin の保存は駅対の最終状態を1回で送り、`savePair` が紐付けを**全部消してから入れ直す**ので、降格と昇格の順序は問題にならない | 降格と昇格の2文になる |
+| 接続は1本以上のルートを持つ（ルートが0本の組み合わせは接続行を持たない＝未評価） | **アプリ層**。`transferConnectionRepository.savePair` が、ルートが0本になった組み合わせの接続を同じトランザクションで消す。ルートの削除は `deleteOrphanRoutes`（どの接続からも参照されないルートのみ）に限られるので、紐付けの cascade で接続がルートを失うことも無い。Web は念のため、接続行の有無ではなくルートの有無で未評価を判定する（`TransferDifficultySection` の `isEvaluated`） | 外すと、接続行はあるのにルートが無い「評価済みに見える未評価」ができる |
 | 接続を消したあとに孤立ルートが残らない | **アプリ層**。`connection_routes` は接続の削除で cascade するが、ルートは共有されうるため DB では消さない。接続や紐付けを消す書き込み（`transferConnectionRepository.savePair` と `stationConnectionRepository.deletePair`）は、同じトランザクションで `external/transferPairSql.ts` の `deleteOrphanRoutes` を呼ぶ | 呼び忘れると、どの接続からも参照されないルートが残る。他の接続がまだ参照しているルートは消さない |
 
 **行数の上限は制約で表現しない**（PostgreSQL の制約は行数を数えられない）。

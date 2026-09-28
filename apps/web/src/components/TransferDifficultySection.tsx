@@ -186,11 +186,13 @@ function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRo
 export function TransferDifficultySection({ stationName, partners: allPartners }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const evaluated = allPartners.filter((p) => p.combos.length > 0);
+  // 未評価は「ルートが0本」（docs/domain/station-master-model.md）。接続行の有無ではなくルートの有無で判定する
+  const isEvaluated = (p: TransferPartnerDTO) => p.combos.some((c) => c.routes.length > 0);
+  const evaluated = allPartners.filter(isEvaluated);
   // 評価済みの相手駅が1つも無い駅では出さない（未評価の相手駅は選べば「情報なし」と出る）
   if (evaluated.length === 0) return null;
   // 開いた直後に「情報なし」が出ないよう、評価済みの相手駅を先に並べる（それぞれの中では元の順序を保つ）
-  const partners = [...evaluated, ...allPartners.filter((p) => p.combos.length === 0)];
+  const partners = [...evaluated, ...allPartners.filter((p) => !isEvaluated(p))];
 
   // partners が縮んで selectedIndex が範囲外になっても先頭にフォールバックする（evaluated が空でないので必ずある）
   const selected = partners[selectedIndex] ?? partners[0]!;
