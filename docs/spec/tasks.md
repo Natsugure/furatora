@@ -1,111 +1,55 @@
-# 実装タスク: line_directions に isDefault を追加する（方面ラベルの解決）(Issue #130)
+# 実装タスク: 乗換難易度 Web 表示の対応 (Issue #125)
 
 - **参照**: [requirements.md](./requirements.md) / [design.md](./design.md)
-- **ブランチ**: `feat/issue130-line-direction-default`（`develop` から作成）
-- **前提**: #124（PR #133）が `develop` にマージ済み。駅対の編集画面の方面の補助表示は、同じ意味の行を「／」で連結する暫定実装
-- **進め方**: 信頼度88%（高）のため PoC は置かず、依存の順に実装する。移行の適用（TASK-5）は開発者が行う
+- **ブランチ**: `feat/issue125-transfer-difficulty-web`（`develop` から作成）
+- **前提**: #122・#123・#124・#130 が `develop` にマージ済み
+- **進め方**: 信頼度80%（中）のため、MVP（TASK-4〜7）を作り、**開発者が development で見た目を確認してから**（TASK-8）仕上げる
 
 ## フェーズ1〜2: 分析・設計
 
-- [x] **TASK-1** 現行コードと実データの調査（`line_directions` 52行・28組、ホームの枠と `direction_type` の一致、
-      `(line, direction_type, display_name)` の一意性を main で確認）。`docs/domain/`・ADR の確認。
-      #124 の「フェーズ5で docs/domain/ へ移す内容」が `station-master-model.md` に反映済みであることを確認した
-- [x] **TASK-2** 開発者確認（2026-09-27）: 既定を選ぶ基準は「終点方向の文言」/ 大江戸線は内回り・外回り /
-      Admin での保守も本 Issue に含める
-- [x] **TASK-3** `docs/spec/` 3点セットを本Issue用に全面書き換え（REQ-1〜19）。ADR-0014 を Proposed で作る
+- [x] **TASK-1** 現行コード（`TransferDifficultySection`・`stationDetailQuery`）・パッケージ・domain・ADR-0011〜0014 の確認と、
+      development の実データの確認（評価済み7駅対・ルート21本・設備0件6本・方面差は淡路町↔小川町だけ）
+- [x] **TASK-2** 開発者確認（2026-09-27〜28）: ペルソナ2列を維持 / 未評価の相手駅も一覧に出す /
+      「確認できていない」状態を足す / `isOfficiallyGuided = false` は確認済みの値なので表示する
+- [x] **TASK-3** `docs/spec/` の3点セットを本 Issue 用に全面的に書き換える
 
-## フェーズ3: 実装 — スキーマと移行
+## フェーズ3: 実装 — MVP
 
-- [x] **TASK-4** `schema.ts` に `isDefault` と `unique_line_direction_default` を追加し、`pnpm run db:generate` で 0013 を作る。
-      `drizzle-kit generate --custom` で 0014 を作り、design.md「データ移行」の SQL を書く
-      （依存: TASK-3。期待: 0013 が ADD COLUMN と CREATE UNIQUE INDEX だけを含む。0014 が冪等）。
-      結果: 0013 は2文だけ（2026-09-27）。0014 の既存行26組の文言が main の行と完全一致することを
-      Neon MCP（read-only）で照合した（26/26。残る2組は大江戸線の新規行）
-- [x] **TASK-5** **【開発者】** development に 0013・0014 を適用する（`pnpm run db:migrate`。向き先が development であることを確認のうえ）。
-      Claude は Neon MCP（read-only）で結果を確認する: 既定行28件、組ごとに1件以下、行数54、main には列が無い
-      （依存: TASK-4）。
-      結果（2026-09-27。開発者が `pnpm run db:migrate` を実行）: development で行数54・既定行28・28組すべてに既定が1行、
-      2行以上の組は0。大江戸線の内回り・外回り（代表駅 都庁前）が既定。28組の文言は design.md の表と一致。
-      `unique_line_direction_default` が作られている。main には `is_default` 列が無い（未適用）
+- [x] **TASK-4** `packages/transfer-difficulty/src/domain/assessment.ts` をテスト先行で実装する（依存: なし。
+      期待: `pnpm --filter @furatora/transfer-difficulty test` が通る）。
+      結果: テスト先行（18件の失敗を確認）→ 実装。`lightestRequirement` は重さの順序を外に出さないため `requirement.ts` に置いた。
+      54テスト・typecheck・lint が通った（2026-09-28）
+- [x] **TASK-5** Web の DTO と `transferView.ts`（`groupCombos`・`differingFields`）をテスト先行で実装する。
+      `apps/web/package.json` に依存を足す（依存: TASK-4）。結果: 12テストが通った
+- [x] **TASK-6** `transferPartnerRows.ts` と `stationDetailQuery.ts` の変更。旧4列の読み取りを外す（依存: TASK-5）。
+      確認中に追加: 相手駅の駅名を DTO に足した（ekidata のグループに別駅が入る。例: 淡路町 → 御茶ノ水の丸ノ内線・JR）
+- [x] **TASK-7** `TransferDifficultySection.tsx` の書き換えとコンポーネントテスト。`constants/transferDifficulty.ts` を足し、
+      `constants/difficulty.ts` を削除する（依存: TASK-5・6）。確認中に追加: 評価済みの相手駅を先に並べる／
+      相手駅の駅名が自駅と違えば選択肢に「（駅名）」を添える。Web は 36 テスト・typecheck・lint が通った。
+      淡路町・小川町・春日・池袋を Chrome DevTools で表示できることを確認した
+- [x] **TASK-8** 開発者が development で確認する（淡路町・小川町・池袋・後楽園・淡路町↔新御茶ノ水）。
+      指摘（2026-09-28）: 設備未入力のルートの有無・件数・名前を Web に出さない。Admin で一覧する Issue を起票（#135）
 
-## フェーズ3: 実装 — 解決規則
+## フェーズ3: 実装 — 仕上げ
 
-- [x] **TASK-6** `packages/transfer-difficulty/src/domain/directionLabel.ts` と `directionLabel.test.ts`（テストを先に書く）。
-      `index.ts` から export する（依存: TASK-3。期待: `pnpm --filter @furatora/transfer-difficulty test` が通る）。
-      結果: テスト先行（9件が実装なしで失敗）→ 実装。パッケージ全体で36テスト・typecheck・lint が通った
-
-## フェーズ3: 実装 — Admin
-
-- [x] **TASK-7** 駅対の編集画面: `transferPairEditPageQuery.ts` のホーム・既定行の読み取りと `resolveDirectionLabel`、
-      `ports.ts` の `directionHints` の型、`RouteCard.tsx` の `HintText`、テストのフィクスチャ
-      （依存: TASK-5・TASK-6。期待: admin のテスト・typecheck が通る）。
-      結果: `RouteCard.test.tsx` に「見出しに解決済みの文言を1件ずつ出す」を追加。DB を読む部分は TASK-10 で確認する
-- [x] **TASK-8** 既定行の保守: `validations.ts`（+テスト）、`features/line/ports.ts`、`lineDirectionRepository.ts`、`di.ts`、
-      POST・PUT の API（+ `route.test.ts`）、`lineEditPageQuery.ts` の `currentDefaults`、`LineDirectionForm.tsx`、
-      新規・編集ページ、一覧の Badge、`eslint.config.mjs` の `legacyExclusions`
-      （依存: TASK-5。期待: admin のテスト・typecheck・lint が通る）。
-      結果: 設計からの変更が2点。(1) 更新で既定にするとき、対象の行を先に `FOR UPDATE` で確かめる
-      （別路線の id で PUT されると、404 なのに旧既定だけ外れてコミットされるため）。
-      (2) フォームのテスト（`LineDirectionForm.test.tsx`・6件）を追加し、失敗時の `alert()` をフォーム内の表示に変えた
-      （409 のメッセージを出すため）。POST の route は `legacyExclusions` から外した
+- [x] **TASK-9** TASK-8 の指摘を反映する。「未入力のルートが N 本あります」の注記と「確認できていません」の補足（ルート名）を削除し、
+      最も軽い行為の前置きを「確認できているルートでは、」にした。パッケージの `notEnteredCount` / `notEntered` を削除。
+      値が異なる項目の強調・迂回度は実データに該当が無いため、自動テストで確認した
 
 ## フェーズ4: 検証
 
-- [x] **TASK-9** `pnpm --filter @furatora/transfer-difficulty test`、`pnpm --filter admin test`、`pnpm run build`。
-      結果（2026-09-27）: transfer-difficulty 36テスト、admin 47ファイル・615テスト、admin の typecheck・lint、
-      `pnpm run build`（web・admin）がすべて通った
-- [x] **TASK-10** development で手動検証（開発者が `pnpm dev` を起動し、ブラウザで確認）
-      - 淡路町↔小川町: 丸ノ内線側の見出しが ① のホームの文言（「東京・新宿・荻窪・方南町方面」「池袋方面」）
-      - ホームが無い駅を含む駅対: ② の既定行の文言
-      - 方面フォームで別の行を既定にすると元の既定が外れ、一覧の Badge が移る
-      - 既定行を消すと、その組の見出しが「上り」「下り」になる（確認後、既定を戻す）
-
-      結果（2026-09-27。Chrome DevTools MCP で操作。向き先は development）:
-      - 淡路町↔小川町の見出しは、淡路町が ①「東京・新宿・荻窪・方南町方面」「池袋方面」、小川町（ホームなし）が
-        ②「新宿・橋本・高尾山口方面」「本八幡方面」。開発者のスクリーンショットでも確認
-      - 丸ノ内線 outbound で「東京・池袋方面」を既定にすると、フォームに「現在の既定: 池袋方面（保存すると置き換わります）」が出て、
-        保存後は一覧の「既定」が「東京・池袋方面」に移り「池袋方面」から外れた。「池袋方面」を既定に戻した（逆向きの表示も確認）
-      - 新宿線「本八幡方面」の既定を外すと、駅対画面の小川町 outbound が「下り」になった。既定に戻した
-        （行の削除は元の id に戻せないため、既定のチェックを外す操作で ③ を確かめた）
-      - 検証後の development: 行数54・既定行28・全28組が既定1件。変更したのは触った3行の `updated_at` だけ
-      - 途中、駅対画面が読み込み中のまま返らない事象があった。Query を単体で実行すると0.5秒で正しい結果を返し、
-        実データでの `TransferPairEditor` の描画（jsdom）も81ms で終わったため実装側ではないと判断した。
-        開発サーバーを再起動したら解消した（起動中にスキーマ・共有パッケージの export を変え、移行を流したため古い状態が残ったと推定）
+- [x] **TASK-10** `test` / `typecheck` / `lint`（パッケージと web）と `pnpm run build`。結果: パッケージ 54・web 37・admin 626 テスト、
+      typecheck・lint、build（web・admin）がすべて通った
+- [x] **TASK-11** Chrome DevTools で手動確認する（requirements の REQ-11〜17）。淡路町・小川町・春日・池袋で確認。
+      駅詳細のコンソールにハイドレーションエラーがあるが、ホーム図（`FreeSpaceBadges` の `<title>`）で発生しており本 Issue の変更外
 
 ## フェーズ5: 振り返り
 
-- [x] **TASK-11** `docs/domain/line-directions.md` を新規作成し、`README.md` の一覧と `station-master-model.md`「接続の端点」から参照する。
-      ADR-0014 を Accepted にし、`docs/adr/README.md` の一覧を更新する（design.md「フェーズ5で恒久化する内容」）。
-      結果（2026-09-27）: `line-directions.md` を新規作成（モデル・既定行の不変条件と選び方・解決規則・Admin の書き込み規約）。
-      design.md の決定1（選び方の基準）・決定4〜5（大江戸線）・決定6（① の複数件）・決定7（ロックしない）は、ここと ADR-0014 に移した。
-      `README.md` の一覧と `station-master-model.md`「接続の端点」「関連」から参照した。
-      ほかの domain 文書（`platform-coordinate-system.md`・`station-visibility.md`・`train-stop-patterns.md`）は、
-      方面を扱わないため変更なし（確認済み）。
-      ADR-0014 は開発者の承認を得て Accepted にした（2026-09-27。`.claude/rules/adr.md`。実装・検証は TASK-9・TASK-10 で通過）
+- [x] **TASK-12** `docs/domain/station-master-model.md`「乗換難易度」の適用状況の注記を外し、表示の規則を書く
+- [x] **TASK-13** `docs/domain/line-directions.md` の適用状況の最後の2文を外す
+- [x] **TASK-14** ADR-0012 を `Accepted` にする（決定の表示の記述を、未入力を利用者に出さない形に直してから）
 
 ## フェーズ6: 引き渡し
 
-- [x] **TASK-12** `develop` 宛ての PR の本文を用意する（エグゼクティブサマリー・変更履歴・`docs/domain`・`docs/adr` の変更点）。
-      `docs/spec/` に次の Issue でも必要な内容が残っていないことを確認する。
-      結果（2026-09-27）: 全体の typecheck（6）・lint（4）・test（admin 615・platform-diagram 203・transfer-difficulty 36・frontend 13）が通った。
-      恒久知識の取り残しを確認した: design.md の決定1・4〜7 と解決規則・書き込み規約は `line-directions.md` と ADR-0014 に移してある。
-      決定2（候補1行の組）・決定3（8組の選定）は `0014` の SQL と `line-directions.md`「既定行」に残る。
-      将来作業は既存の Issue（#125 Web 表示・#128 中野坂上・#82 物理駅粒度）で追える。新しく起票する Issue は無い。
-      PR: [#134](https://github.com/Natsugure/furatora/pull/134)（develop 宛て）
-
-## PR #134 のレビュー対応
-
-- [x] **TASK-13** `/code-review high` の指摘8件を修正する（2026-09-27）
-      1. フォーム: 既定行のチェックを外す・方面タイプを変えると、元の組の既定が無くなることを示す（+テスト3件）
-      2. 移行 0014 の手順4: 同名の行があっても組ごとに1行だけ既定にする（`DISTINCT ON`）。
-         Neon MCP（read-only）で main に対象の SELECT を流し、一致26行・選択26行・重複0組で結果が変わらないことを確認
-         （大江戸線の2行は手順1で追加されるため main にはまだ無い）
-      3. `directionSchema.isDefault` を必須にした（PUT で省略すると既定が黙って外れたため）。省略は 400（+テスト）
-      4. 駅対画面の ① のホームを、ホーム番号の数値順に並べる（varchar の辞書順では '10' < '2'）
-      5. 駅対画面の「駅の最初の路線」を路線の `displayOrder`・id 順で決める（並び順の指定が無く非決定的だった）
-      6. 方面の新規・編集画面の読み取りを1回の `Promise.all` にまとめた
-      7. 走行方向の型: `transfer-difficulty` は ESLint で DB 非依存が強制されているため、`@furatora/database/enums` を
-         import する案はやめ、admin の `transfer-connection/domain/types.ts` で両者の一致を型検査するようにした。
-         フォームの `isDirectionType`・選択肢と `validations` の enum は `DIRECTIONS` から作る
-      8. `lineDirectionRepository.test.ts` を追加（7件）。旧既定を外す条件から自分の除外を消すと失敗することを確認した
-      結果: 全体の test（admin 626・platform-diagram 203・transfer-difficulty 36・frontend 13）・typecheck（6）・lint（4）が通った
+- [x] **TASK-15** 旧4列・enum の削除 Issue を起票する（#136）
+- [ ] **TASK-16** PR を作る（#124 と同じリリースで出すことを明記する）
