@@ -1,40 +1,197 @@
 'use client';
 
 import { useState } from 'react';
-import type { StrollerDifficulty, WheelchairDifficulty } from '@furatora/database/enums';
 import {
-  STROLLER_DIFFICULTY_META,
-  WHEELCHAIR_DIFFICULTY_META,
-} from '@/constants/difficulty';
-
-export type TransferConnection = {
-  lineName: string;
-  lineColor: string | null;
-  strollerDifficulty: StrollerDifficulty | null;
-  wheelchairDifficulty: WheelchairDifficulty | null;
-  notesAboutStroller: string | null;
-  notesAboutWheelchair: string | null;
-};
+  PERSONA_LABEL,
+  REQUIREMENT_LABEL,
+  assessRoutes,
+  type AssessedRoute,
+  type Assessment,
+  type Persona,
+} from '@furatora/transfer-difficulty/domain';
+import type { TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
+import { differingFields, groupCombos, type RouteField } from '@/features/station/domain/transferView';
+import { ROUTE_FLAG_LABEL, TRANSFER_STATUS_META } from '@/constants/transferDifficulty';
 
 type Props = {
-  connections: TransferConnection[];
+  /** 自駅の駅名。相手駅の駅名が違うときだけ、選択肢に駅名を添える */
+  stationName: string;
+  partners: TransferPartnerDTO[];
 };
 
-export function TransferDifficultySection({ connections }: Props) {
+// Tailwind はクラス名を静的に拾うので、クラス名は組み立てずに文字列リテラルで持つ
+const PERSONA_STYLE: Record<Persona, { backgroundColor: string; divideClass: string }> = {
+  stroller: { backgroundColor: '#FCE4EC', divideClass: 'divide-pink-200' },
+  wheelchair: { backgroundColor: '#E3F2FD', divideClass: 'divide-blue-200' },
+};
+
+const HIGHLIGHT = 'bg-yellow-100 font-semibold';
+
+function StatusIcon({ iconPath, iconColorHex }: { iconPath: string; iconColorHex: string }) {
+  return (
+    <span
+      aria-hidden
+      className="flex-shrink-0 mt-0.5"
+      style={{
+        display: 'inline-block',
+        width: 20,
+        height: 20,
+        backgroundColor: iconColorHex,
+        WebkitMaskImage: `url(${iconPath})`,
+        WebkitMaskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat',
+        maskImage: `url(${iconPath})`,
+        maskSize: 'contain',
+        maskRepeat: 'no-repeat',
+      }}
+    />
+  );
+}
+
+function Chip({ children, highlighted }: { children: React.ReactNode; highlighted: boolean }) {
+  return (
+    <span
+      className={`inline-block rounded px-1.5 py-0.5 text-[11px] leading-tight border border-gray-200 ${
+        highlighted ? HIGHLIGHT : 'bg-white/70 text-gray-700'
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+// バリアフリールートの1本。設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）
+function RouteItem({
+  assessed: { route, requirement },
+  highlights,
+}: {
+  assessed: AssessedRoute<TransferRouteDTO>;
+  highlights: Set<RouteField>;
+}) {
+  const flags: [RouteField, boolean, string][] = [
+    ['isOutdoor', route.isOutdoor, ROUTE_FLAG_LABEL.isOutdoor],
+    ['requiresExitGate', route.requiresExitGate, ROUTE_FLAG_LABEL.requiresExitGate],
+    ['requiresStaff', route.requiresStaff, ROUTE_FLAG_LABEL.requiresStaff],
+    ['isOfficiallyGuided', !route.isOfficiallyGuided, ROUTE_FLAG_LABEL.notOfficiallyGuided],
+  ];
+  return (
+    <li className="py-2 first:pt-0 last:pb-0">
+      <p className="text-xs text-gray-800 font-medium">
+        {route.label}
+        {route.minutes !== null && (
+          <span className={`ml-1.5 font-normal ${highlights.has('minutes') ? HIGHLIGHT : 'text-gray-600'}`}>
+            {route.minutes}分
+          </span>
+        )}
+      </p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
+        {flags.map(
+          ([field, shown, label]) =>
+            shown && (
+              <Chip key={field} highlighted={highlights.has(field)}>
+                {label}
+              </Chip>
+            ),
+        )}
+      </div>
+      {route.notes && <p className="mt-1 text-xs text-gray-600 whitespace-pre-wrap">{route.notes}</p>}
+    </li>
+  );
+}
+
+function detourText(minutes: number): string {
+  if (minutes === 0) return '一般的なルートと同じ所要時間';
+  return minutes > 0 ? `一般的なルートより ${minutes}分長い` : `一般的なルートより ${-minutes}分短い`;
+}
+
+type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barrierFree' }>;
+
+function BarrierFreeDetail({ persona, assessment }: { persona: Persona; assessment: BarrierFreeAssessment }) {
+  const { routes, detour } = assessment;
+  const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
+  // routes は1本以上あり、先頭が最短
+  const shortest = routes[0]!;
+  return (
+    <>
+      <ul className={`mt-2 divide-y ${PERSONA_STYLE[persona].divideClass}`}>
+        {routes.map((assessed) => (
+          <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} />
+        ))}
+      </ul>
+      {/* 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある） */}
+      {detour !== null && (
+        <p className="mt-2 text-xs text-gray-700">
+          最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortest.requirement]}）
+        </p>
+      )}
+    </>
+  );
+}
+
+// 設備未入力のルートの存在・名前は利用者に出さない（補完は管理者の作業。#135）。
+// undetermined の最も軽い行為は、未入力のルートの方が軽い可能性があるので「確認できているルートでは」と限定する
+function lightestText(assessment: Extract<Assessment<TransferRouteDTO>, { kind: 'undetermined' | 'none' }>) {
+  const { kind, lightest } = assessment;
+  if (lightest !== null) {
+    return `${kind === 'undetermined' ? '確認できているルートでは、' : ''}最も軽い方法: ${REQUIREMENT_LABEL[lightest]}`;
+  }
+  return kind === 'none' ? '通行可能なルートがありません' : null;
+}
+
+function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
+  const assessment = assessRoutes(persona, routes);
+  if (assessment.kind === 'unevaluated') {
+    return <p className="text-xs text-gray-500 italic">情報なし</p>;
+  }
+
+  const meta = TRANSFER_STATUS_META[assessment.kind];
+  const text = assessment.kind === 'barrierFree' ? null : lightestText(assessment);
+  return (
+    <>
+      <div className="flex items-start gap-2">
+        <StatusIcon iconPath={meta.iconPath} iconColorHex={meta.iconColorHex} />
+        <p className="text-xs text-gray-700 leading-snug">
+          {meta.label}
+          {assessment.kind === 'barrierFree' && assessment.routes.length > 1 && `（${assessment.routes.length}本）`}
+        </p>
+      </div>
+      {assessment.kind === 'barrierFree' ? (
+        <BarrierFreeDetail persona={persona} assessment={assessment} />
+      ) : (
+        text && <p className="mt-1 text-xs text-gray-700">{text}</p>
+      )}
+    </>
+  );
+}
+
+function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
+  return (
+    <section
+      aria-label={PERSONA_LABEL[persona]}
+      className="rounded-lg border border-gray-100 p-3"
+      style={{ backgroundColor: PERSONA_STYLE[persona].backgroundColor }}
+    >
+      <p className="text-xs font-semibold text-gray-600 mb-2">{PERSONA_LABEL[persona]}</p>
+      <PersonaBody persona={persona} routes={routes} />
+    </section>
+  );
+}
+
+export function TransferDifficultySection({ stationName, partners: allPartners }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  if (connections.length === 0) return null;
+  // 未評価は「ルートが0本」（docs/domain/station-master-model.md）。接続行の有無ではなくルートの有無で判定する
+  const isEvaluated = (p: TransferPartnerDTO) => p.combos.some((c) => c.routes.length > 0);
+  const evaluated = allPartners.filter(isEvaluated);
+  // 評価済みの相手駅が1つも無い駅では出さない（未評価の相手駅は選べば「情報なし」と出る）
+  if (evaluated.length === 0) return null;
+  // 開いた直後に「情報なし」が出ないよう、評価済みの相手駅を先に並べる（それぞれの中では元の順序を保つ）
+  const partners = [...evaluated, ...allPartners.filter((p) => !isEvaluated(p))];
 
-  // connections が縮んで selectedIndex が範囲外になっても先頭にフォールバックする
-  const selected = connections[selectedIndex] ?? connections[0];
-  if (!selected) return null;
-
-  const strollerMeta = selected.strollerDifficulty
-    ? STROLLER_DIFFICULTY_META[selected.strollerDifficulty]
-    : null;
-  const wheelchairMeta = selected.wheelchairDifficulty
-    ? WHEELCHAIR_DIFFICULTY_META[selected.wheelchairDifficulty]
-    : null;
+  // partners が縮んで selectedIndex が範囲外になっても先頭にフォールバックする（evaluated が空でないので必ずある）
+  const selected = partners[selectedIndex] ?? partners[0]!;
+  const groups = groupCombos(selected);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
@@ -43,17 +200,20 @@ export function TransferDifficultySection({ connections }: Props) {
       </h2>
 
       {/* 路線ドロップダウン */}
-      {connections.length > 1 ? (
+      {partners.length > 1 ? (
         <div className="mb-4">
-          <label className="block text-xs text-gray-500 mb-1">乗換先路線</label>
+          <label htmlFor="transfer-partner" className="block text-xs text-gray-500 mb-1">乗換先路線</label>
           <select
+            id="transfer-partner"
             value={selectedIndex}
             onChange={(e) => setSelectedIndex(Number(e.target.value))}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
           >
-            {connections.map((conn, i) => (
-              <option key={i} value={i}>
-                {conn.lineName}
+            {partners.map((partner, i) => (
+              <option key={`${partner.connectedStationId}:${partner.lineName}`} value={i}>
+                {partner.connectedStationName === stationName
+                  ? partner.lineName
+                  : `${partner.lineName}（${partner.connectedStationName}）`}
               </option>
             ))}
           </select>
@@ -70,71 +230,19 @@ export function TransferDifficultySection({ connections }: Props) {
         </div>
       )}
 
-      {/* 難易度表示 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* ベビーカー */}
-        <div className="rounded-lg border border-gray-100 p-3" style={{ backgroundColor: '#FCE4EC' }}>
-          <p className="text-xs font-semibold text-gray-600 mb-2">ベビーカー</p>
-          {strollerMeta ? (
-            <div className="flex items-start gap-2">
-              <span
-                className="flex-shrink-0 mt-0.5"
-                style={{
-                  display: 'inline-block',
-                  width: 20,
-                  height: 20,
-                  backgroundColor: strollerMeta.iconColorHex,
-                  WebkitMaskImage: `url(${strollerMeta.iconPath})`,
-                  WebkitMaskSize: 'contain',
-                  WebkitMaskRepeat: 'no-repeat',
-                  maskImage: `url(${strollerMeta.iconPath})`,
-                  maskSize: 'contain',
-                  maskRepeat: 'no-repeat',
-                }}
-              />
-              <p className="text-xs text-gray-700 leading-snug">{strollerMeta.label}</p>
+      <div className="space-y-4">
+        {groups.map((group, i) => (
+          <div key={group.heading ?? i}>
+            {group.heading && <h3 className="text-xs font-semibold text-gray-700 mb-2">{group.heading}</h3>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <PersonaCard persona="stroller" routes={group.routes} />
+              <PersonaCard persona="wheelchair" routes={group.routes} />
             </div>
-          ) : (
-            <p className="text-xs text-gray-500 italic">情報なし</p>
-          )}
-          {selected.notesAboutStroller && (
-            <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-pink-200 whitespace-pre-wrap">
-              {selected.notesAboutStroller}
-            </p>
-          )}
-        </div>
-
-        {/* 車いす */}
-        <div className="rounded-lg border border-gray-100 p-3" style={{ backgroundColor: '#E3F2FD' }}>
-          <p className="text-xs font-semibold text-gray-600 mb-2">車いす</p>
-          {wheelchairMeta ? (
-            <div className="flex items-start gap-2">
-              <span
-                className="flex-shrink-0 mt-0.5"
-                style={{
-                  display: 'inline-block',
-                  width: 20,
-                  height: 20,
-                  backgroundColor: wheelchairMeta.iconColorHex,
-                  WebkitMaskImage: `url(${wheelchairMeta.iconPath})`,
-                  WebkitMaskSize: 'contain',
-                  WebkitMaskRepeat: 'no-repeat',
-                  maskImage: `url(${wheelchairMeta.iconPath})`,
-                  maskSize: 'contain',
-                  maskRepeat: 'no-repeat',
-                }}
-              />
-              <p className="text-xs text-gray-700 leading-snug">{wheelchairMeta.label}</p>
-            </div>
-          ) : (
-            <p className="text-xs text-gray-500 italic">情報なし</p>
-          )}
-          {selected.notesAboutWheelchair && (
-            <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-blue-200 whitespace-pre-wrap">
-              {selected.notesAboutWheelchair}
-            </p>
-          )}
-        </div>
+            {group.notes && (
+              <p className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{group.notes}</p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

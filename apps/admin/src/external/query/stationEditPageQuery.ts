@@ -20,10 +20,6 @@ export const dbStationEditPageQuery: StationEditPageQuery = {
         .select({
           id: stationConnections.id,
           connectedStationId: stationConnections.connectedStationId,
-          strollerDifficulty: stationConnections.strollerDifficulty,
-          wheelchairDifficulty: stationConnections.wheelchairDifficulty,
-          notesAboutStroller: stationConnections.notesAboutStroller,
-          notesAboutWheelchair: stationConnections.notesAboutWheelchair,
         })
         .from(stationConnections)
         .where(eq(stationConnections.stationId, stationId)),
@@ -60,10 +56,6 @@ export const dbStationEditPageQuery: StationEditPageQuery = {
       connectedStationId: c.connectedStationId,
       connectedStationName: c.connectedStationId ? (stationNameMap.get(c.connectedStationId) ?? null) : null,
       connectedLineName: c.connectedStationId ? (lineNameByStationId.get(c.connectedStationId) ?? null) : null,
-      strollerDifficulty: c.strollerDifficulty,
-      wheelchairDifficulty: c.wheelchairDifficulty,
-      notesAboutStroller: c.notesAboutStroller,
-      notesAboutWheelchair: c.notesAboutWheelchair,
     }));
 
     const context: StationEditContext = {

@@ -1,79 +1,154 @@
-# 設計: ホーム図の設備アイコン欠けとガイド線の重なり
+# 設計: 乗換難易度 Web 表示の対応 (Issue #125)
 
-要件は [requirements.md](./requirements.md)。座標系の恒久的な規則は
-[platform-coordinate-system.md](../domain/platform-coordinate-system.md) に反映済み。
+- **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
-## 変更① 設備アイコンの張り出しを描画範囲に含める
-
-`domain/geometry.ts` に `FACILITY_ICON_SIZE`(6m) / `FACILITY_ICON_PITCH`(7m) /
-`facilityIconHalfExtent(count)` を置き、`computeBounds()` と `DiagramSvg` が共用する。
-
-| 設備件数 | 片側の張り出し |
-|---|---|
-| 0 | 0 |
-| 1 | 3.0m |
-| 2 | 6.5m |
-| 3 | 10.0m |
-
-`computeBounds()` のシグネチャは不変（`cells[].facilities` は既存の引数型に含まれる）。
-
-## 変更② 引き出し線の迂回
-
-### データフロー
+## アーキテクチャ
 
 ```
-layoutConcoursePlates()
-  └ assignLanes()            段の割り当て（既存）
-  └ routePlates()            px→割合に直して routeLeaders() を呼ぶ
-      └ routeLeaders()       lane ごとに直進 / 左右へ迂回 / 背面 を決める（純関数）
-ConcoursePlateRow
-  └ 縦線レイヤ(z0) / プレート(z1) / 余白帯の横線レイヤ(z2) を lane ごとの grid に重ねる
+packages/transfer-difficulty/src/domain/
+  requirement.ts     requirementFor / isBarrierFree（#124。変更なし）
+  directionLabel.ts  resolveDirectionLabel（#130。変更なし）
+  assessment.ts      【新規】lightestRequirement / assessRoutes（重さの順序を使うのでここに置く）
+
+apps/web/src/
+  external/query/stationDetailQuery.ts   旧4列の読み取りを外し、transferPartners を組む
+  external/query/transferPartnerRows.ts  【新規】新モデルの読み取り（2段の Promise.all）と DTO の組み立て
+  features/station/domain/types.ts       TransferPartnerDTO ほか（TransferConnectionDTO を置き換え）
+  features/station/domain/transferView.ts【新規】方面のグループ化・値が異なる項目の検出（純粋関数）
+  components/TransferDifficultySection.tsx  書き換え（ペルソナ2列を維持）
+  constants/transferDifficulty.ts        【新規】状態のアイコン・色、フラグの文言
+  constants/difficulty.ts                【削除】読む箇所が無くなる
 ```
 
-### インターフェース
+## データフロー
+
+```mermaid
+sequenceDiagram
+  participant Page as stations/[slug]/page.tsx
+  participant Q as stationDetailQuery
+  participant DB
+  Page->>Q: getBySlug(slug)
+  Q->>DB: 1段目 stationConnections×lines / transfer_connections（S を端点に持つ）/ ほか既存
+  Q->>DB: 2段目 connection_routes⋈transfer_routes / 設備 / ホームの方面 / 既定行 / 路線
+  Q-->>Page: StationDetailDTO { transferPartners }
+  Page->>Section: partners
+  Section->>transferView: groupCombos(partner)
+  Section->>assessment: assessRoutes(persona, routes)
+```
+
+## インターフェース
+
+### パッケージ（`assessment.ts`）
 
 ```ts
-type LeaderSegment = { enterFraction: number; exitFraction: number; passesBehindPlate: boolean };
-type LeaderRoute = { segments: LeaderSegment[]; arrivalFraction: number };
-routeLeaders(plates: RoutablePlate[], clearanceFraction: number): LeaderRoute[]
+export type RouteFacts = { minutes: number | null; isBaseline: boolean; facilities: readonly FacilityTypeCode[] };
+
+export function lightestRequirement(persona: Persona, requirements: readonly (Requirement | null)[]): Requirement | null;
+
+export type Assessment<R extends RouteFacts> =
+  | { kind: 'unevaluated' }
+  | { kind: 'barrierFree'; routes: R[]; detour: number | null }   // detour = routes[0] − 基準ルート（迂回度）
+  | { kind: 'undetermined'; lightest: Requirement | null }
+  | { kind: 'none'; lightest: Requirement | null };
+
+export function assessRoutes<R extends RouteFacts>(persona: Persona, routes: readonly R[]): Assessment<R>;
 ```
 
-`ConcoursePlateGroup.route` に載せる。`segments.length === lane`。
-`arrivalFraction` は自レーン上端への到達位置で、自レーンの余白帯で `anchorX` へ戻す。
-見積り幅（`startPx`/`endPx`）自体は公開面に出さない。
+### DTO（`features/station/domain/types.ts`）
 
-### 迂回アルゴリズム
+```ts
+export type TransferRouteDTO = {
+  routeId: string; label: string; isBaseline: boolean; minutes: number | null;
+  isOutdoor: boolean; requiresExitGate: boolean; requiresStaff: boolean; isOfficiallyGuided: boolean;
+  notes: string | null; facilities: FacilityTypeCode[];
+};
+export type TransferComboDTO = {
+  stationDirection: DirectionType; connectedDirection: DirectionType;
+  notes: string | null; routes: TransferRouteDTO[];
+};
+export type TransferPartnerDTO = {
+  connectedStationId: string; lineName: string; lineColor: string | null;
+  stationLineName: string;
+  directionLabels: { station: Record<DirectionType, string>; connected: Record<DirectionType, string> };
+  combos: TransferComboDTO[];   // 接続行がある組み合わせだけ。空 = 未評価
+};
+```
 
-各レーンで、現在のxが箱から `clearance`（= `PLATE_GAP_PX / 2`）以上離れていれば直進。
-ぶつかる場合は塞がり区間を左右へ乗り越えた候補を求め、範囲内かつ空きの側のうち
-移動量が小さい方を採る。どちらも不可なら動かさず `passesBehindPlate`。
+### 表示の組み立て（`transferView.ts`）
 
-### 決定記録
+```ts
+export type ComboGroup = {
+  heading: string | null;          // すべての組み合わせが同じなら null
+  routes: TransferRouteDTO[];      // 空 = 未評価のグループ
+  notes: string | null;
+};
+export function groupCombos(partner: TransferPartnerDTO): ComboGroup[];
+export type RouteField = 'minutes' | 'requirement' | 'isOutdoor' | 'requiresExitGate' | 'requiresStaff' | 'isOfficiallyGuided';
+export function differingFields(persona: Persona, routes: readonly TransferRouteDTO[]): Set<RouteField>;
+```
 
-**決定**: 迂回させる（背面に隠す・薄くする案は不採用）| **理由**: 線が隠れないため
-「どの設備がどの出口か」を図だけで追跡できる（開発者選択）| **トレードオフ**: 経路が
-幅の見積りに依存するため、外れた場合に備えて `z-index` の保険を二重に持つ |
-**影響**: `concourseLayout.ts` と `ConcoursePlateRow.tsx` に手が入る |
-**レビュー**: 実データで迂回線どうしの交差が問題になった場合。
+## 決定
 
-ADR 化はしない（覆すのに明示的な意思決定を要さない表示上の判断のため）。
+### 決定1: 重さの順序を使う関数はパッケージに置く
+`requirement.ts` の WEIGHT は「この関数の中だけに存在する」規約。最も軽い行為（REQ-7）は順序が要るため、Web に書かず
+パッケージに足す。状態の分類・迂回度も解釈規則なので同じ場所に置く（Admin のプレビューが将来使える）。
 
-### エラーハンドリング
+### 決定2: 「確認できていない」状態を足す
+ADR-0012 は、設備0件のルートを導出にもバリアフリールートの数にも入れないと決めている。
+その結果、バリアフリールートが0本でも、未入力のルートがバリアフリーである可能性は残る。この状態を「なし」と
+断定すると事実と違うことがあるため、別の状態にする（開発者判断 2026-09-27）。恒久ルールとして domain に書く。ADR は作らない
+（ADR-0012 の帰結であり、独立した設計判断ではないため）。
+
+### 決定3: 方面のグループ化は「ルートの組＋接続の備考」の一致で行う
+組み合わせごとに routeId・label・isBaseline の組と接続の備考が一致するものを1グループにまとめる。
+見出しは次のように決める。
+- グループが S 側の方面1つだけで決まる場合（T の両方面を含む）→「{S の路線} {S の方面}」
+- T 側の方面1つだけで決まる場合 →「{T の路線} {T の方面}」
+- それ以外 → 組み合わせごとに「{S の方面} → {T の方面}」を「、」で連結する
+
+評価済みの組み合わせが4通りそろわない場合、残りの組み合わせは「未評価」のグループにする。
+全組み合わせが1グループなら見出しは null になる（現行と同じ1枚の見た目）。
+
+### 決定4: 方面ラベルは駅の最初の路線で解決する
+`docs/domain/line-directions.md` のとおり、駅は1駅1路線である。Admin の駅対編集画面と同じく、`stationLines` を路線の
+`displayOrder`、同順なら id で並べた先頭の路線で、ホームと既定行を絞る。ホームは番号の数値順に渡す。
+
+### 決定5: `PlatformTabs` とは統合しない
+ホームのタブは `line_directions.id` 単位で、乗換接続は `(駅, direction_type)` 単位。キーが違ううえに、ホームが
+登録されている駅は20駅だけである。乗換セクションの中で方面の見出しを出す。
+
+### 決定6: `constants/difficulty.ts` はこのデプロイで消す
+Web で読む箇所が無くなり、DB にも触れないため。旧4列と enum の削除は、列を読むコードが本番から消えたあとの次のデプロイで行う
+（CLAUDE.md の二段階ルール）。
+
+### 決定7: 「公式案内なし」を表示する
+移行データの `isOfficiallyGuided = false` は確認済みの値（開発者確認 2026-09-28）。false のルートに
+「駅の構内図・公式案内に載っていないルート」と表示する。
+
+## エラーハンドリング
 
 | 状況 | 応答 |
 |---|---|
-| `canvasWidthPx <= 0` | 迂回せず全レーン直進の経路を返す |
-| 両側とも迂回不能 | 位置を動かさず `passesBehindPlate: true`。`z-index` でプレートが前面 |
-| 見積り幅が実幅より小さい | 線がプレート縁に接近しうるが、`z-index` によりプレートの文字は覆われない |
-
-### 恒久知識の振り分け
-
-- `docs/domain/platform-coordinate-system.md` へ反映済み（描画範囲のアイコン張り出し、
-  引き出し線の迂回と `z-index` 規則）
-- ADR は新設しない
+| 設備コードが `FACILITY_TYPE_CODES` に無い | その行を捨てる（Admin の `isFacilityCode` と同じ） |
+| 紐付けの先のルートが見つからない | その紐付けを捨てる |
+| 相手駅の路線が引けない | 既存どおり、inner join で相手駅ごと出ない |
+| 方面の文言が無い | `resolveDirectionLabel` の ③（上り/下り） |
+| DB エラー | 既存どおり、ページの error boundary に任せる |
 
 ## テスト戦略
 
-`geometry.test.ts`（張り出し）・`leaderRoute.test.ts`（経路）・
-`concourseLayout.test.ts`（`route` の整合）。描画（CSS の重なり）は node 環境では
-検証できないため目視確認とする。
+- パッケージ（vitest）: `lightestRequirement` はペルソナごとの順序・impossible と null の除外、`assessRoutes` は4状態＋未入力の混在、
+  並べ替え（null を末尾に）、`detour` は値が欠けたとき・基準ルートがバリアフリーのとき
+- Web domain（vitest）: `groupCombos`（全共通・淡路町↔小川町型・未評価の混在・単一の組み合わせ）、`differingFields`
+- コンポーネント（testing-library）: 設備0件のルートが「そのまま通れる」と出ないこと、各状態の文言、方面の見出し
+- クエリ: CI に DB が無いため、development での手動確認で押さえる
+
+## 恒久知識の振り分け（フェーズ5で反映）
+
+| 内容 | 置き場 |
+|---|---|
+| 表示の状態の分類（「確認できていない」を含む）・並べ替え・迂回度の定義 | `docs/domain/station-master-model.md`「乗換難易度」 |
+| 方面のグループ化の規則 | 同上 |
+| Web が方面ラベルを表示する（適用状況の注記を外す） | `docs/domain/line-directions.md` |
+| ADR-0012 の Accepted 化 | `docs/adr/0012-*.md` |
+| 旧4列の削除 | GitHub Issue（予定された作業） |

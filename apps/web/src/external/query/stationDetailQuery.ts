@@ -20,7 +20,8 @@ import {
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { publishedStation } from './visibility';
 import type { StationDetailQuery } from '@/features/station/ports';
-import type { StationDetailDTO, TransferConnectionDTO } from '@/features/station/domain/types';
+import type { StationDetailDTO } from '@/features/station/domain/types';
+import { buildTransferPartners, getTransferConnectionRows, type PartnerLine } from './transferPartnerRows';
 import type {
   ConcourseDTO,
   PlatformDTO,
@@ -34,11 +35,11 @@ import type {
 // connectedRailwayId 列は廃止済み（ODPT 同期専用の列であり、以後 ODPT 同期は行わない。
 // ADR-0007 決定3 / Issue #56）。路線名は connectedStationId → stationLines → lines の
 // join で解決する。駅マスタは路線ごとに駅を割るモデルのため、接続先の駅が決まれば
-// 路線がほぼ一意に定まる（複数路線を持つ駅はごく少数。lineName で重複除去して吸収する）。
+// 路線が一意に定まる（複数路線を持つ駅は実測0件。ただし不変条件ではないので lineName で重複除去して吸収する）。
 // 詳細: docs/domain/station-master-model.md「乗換接続（stationConnections）」。
 //
-// 接続先の駅には publishedStation() を通さない。ここが供給するのは「乗換先の路線名」と
-// 「バリアフリー難易度」だけで、接続先の駅ページへのリンクは一切生成しない。
+// 接続先の駅には publishedStation() を通さない（stations は駅名のためだけに join する）。
+// ここが供給するのは「乗換先の路線名・駅名」と「乗換難易度の相手駅」だけで、接続先の駅ページへのリンクは一切生成しない。
 // 未公開駅を除外すると路線名が丸ごと引けなくなり、図の乗換プレートが空になる
 // （docs/domain/station-visibility.md「乗換接続からの到達」/ Issue #77 REQ-7.4b）。
 // リンクを伴う参照を後から足す場合は、そのとき publishedStation() を通すこと。
@@ -46,56 +47,46 @@ async function getStationConnectionRows(stationId: string) {
   return db
     .select({
       connectedStationId: stationConnections.connectedStationId,
+      connectedStationName: stations.name,
       lineName: lines.name,
       lineColor: lines.color,
-      strollerDifficulty: stationConnections.strollerDifficulty,
-      wheelchairDifficulty: stationConnections.wheelchairDifficulty,
-      notesAboutStroller: stationConnections.notesAboutStroller,
-      notesAboutWheelchair: stationConnections.notesAboutWheelchair,
     })
     .from(stationConnections)
+    .innerJoin(stations, eq(stations.id, stationConnections.connectedStationId))
     .innerJoin(stationLines, eq(stationLines.stationId, stationConnections.connectedStationId))
     .innerJoin(lines, eq(lines.id, stationLines.lineId))
     .where(eq(stationConnections.stationId, stationId));
 }
 
-function buildTransferConnections(
-  rows: Awaited<ReturnType<typeof getStationConnectionRows>>,
-): TransferConnectionDTO[] {
-  // 2路線を持つ駅（実測5件）は connectedStationId ごとに複数行になるため、
-  // 同一路線の重複を除いてから DTO 化する
+// 乗換先の相手駅と路線。2路線を持つ駅（実測0件。#82 で物理駅粒度に統合されると生じうる）は
+// connectedStationId ごとに複数行になるため、
+// 同一路線の重複を除く。乗換難易度が未評価の相手駅も含める（未評価は表示層が「情報なし」と示す）
+function buildPartnerLines(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
   const seen = new Set<string>();
-  const result: TransferConnectionDTO[] = [];
+  const result: PartnerLine[] = [];
   for (const r of rows) {
-    if (r.strollerDifficulty === null && r.wheelchairDifficulty === null) continue;
     const key = `${r.connectedStationId}:${r.lineName}`;
     if (seen.has(key)) continue;
     seen.add(key);
     result.push({
+      connectedStationId: r.connectedStationId,
+      connectedStationName: r.connectedStationName,
       lineName: r.lineName,
       lineColor: r.lineColor,
-      strollerDifficulty: r.strollerDifficulty,
-      wheelchairDifficulty: r.wheelchairDifficulty,
-      notesAboutStroller: r.notesAboutStroller,
-      notesAboutWheelchair: r.notesAboutWheelchair,
     });
   }
   return result;
 }
 
-// connectedStationId ごとの乗換路線名・色（facilityConnections のラベル付けに使う）
-function buildLinesByStation(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
+// connectedStationId ごとの乗換路線名・色（facilityConnections のラベル付けに使う）。
+// 重複除去は buildPartnerLines の1か所に置く（乗換セクションと図の乗換プレートで路線一覧を食い違わせない）
+function buildLinesByStation(partnerLines: PartnerLine[]) {
   const map = new Map<string, { names: string[]; colors: (string | null)[] }>();
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (!row.connectedStationId) continue;
-    const key = `${row.connectedStationId}:${row.lineName}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (!map.has(row.connectedStationId)) map.set(row.connectedStationId, { names: [], colors: [] });
-    const entry = map.get(row.connectedStationId)!;
-    entry.names.push(row.lineName);
-    entry.colors.push(row.lineColor);
+  for (const p of partnerLines) {
+    const entry = map.get(p.connectedStationId) ?? { names: [], colors: [] };
+    entry.names.push(p.lineName);
+    entry.colors.push(p.lineColor);
+    map.set(p.connectedStationId, entry);
   }
   return map;
 }
@@ -112,7 +103,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
       .limit(1);
     if (!stationRow) return null;
 
-    const [headerLineRows, platformList, stationConnectionRows] = await Promise.all([
+    const [headerLineRows, platformList, stationConnectionRows, transferConnectionRows] = await Promise.all([
       db
         .select({ color: lines.color })
         .from(stationLines)
@@ -133,9 +124,10 @@ export const dbStationDetailQuery: StationDetailQuery = {
         .from(platforms)
         .where(eq(platforms.stationId, stationRow.id)),
       getStationConnectionRows(stationRow.id),
+      getTransferConnectionRows(stationRow.id),
     ]);
 
-    const baseDTO: Omit<StationDetailDTO, 'platforms'> = {
+    const baseDTO: Omit<StationDetailDTO, 'platforms' | 'transferPartners'> = {
       station: {
         id: stationRow.id,
         name: stationRow.name,
@@ -144,11 +136,13 @@ export const dbStationDetailQuery: StationDetailQuery = {
         notes: stationRow.notes,
       },
       headerLineColor: headerLineRows[0]?.color ?? null,
-      transferConnections: buildTransferConnections(stationConnectionRows),
     };
+    const partnerLines = buildPartnerLines(stationConnectionRows);
+    // 乗換の読み取りはホーム側のクエリに依存しないので、次の Promise.all に載せて往復を増やさない
+    const transferPartnersPromise = buildTransferPartners(stationRow.id, partnerLines, transferConnectionRows);
 
     if (platformList.length === 0) {
-      return { ...baseDTO, platforms: [] };
+      return { ...baseDTO, transferPartners: await transferPartnersPromise, platforms: [] };
     }
 
     const platformIds = platformList.map((p) => p.id);
@@ -161,12 +155,13 @@ export const dbStationDetailQuery: StationDetailQuery = {
       ),
     ];
 
-    const [lineList, directionList, facilityTypeList] = await Promise.all([
+    const [lineList, directionList, facilityTypeList, transferPartners] = await Promise.all([
       db.select().from(lines).where(inArray(lines.id, lineIds)),
       directionIds.length > 0
         ? db.select().from(lineDirections).where(inArray(lineDirections.id, directionIds))
         : Promise.resolve([]),
       db.select().from(facilityTypes),
+      transferPartnersPromise,
     ]);
 
     const lineMap = new Map(lineList.map((l) => [l.id, l]));
@@ -304,7 +299,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
       ? await db.select().from(stationFacilities).where(inArray(stationFacilities.platformLocationCellId, cellIds))
       : [];
 
-    const linesByStation = buildLinesByStation(stationConnectionRows);
+    const linesByStation = buildLinesByStation(partnerLines);
 
     const facilitiesByCell = new Map(cellIds.map((id) => [id, facilityList.filter((f) => f.platformLocationCellId === id)]));
     const cellsByLocation = new Map(locationIds.map((id) => [id, cellList.filter((c) => c.platformLocationId === id)]));
@@ -366,6 +361,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
       };
     });
 
-    return { ...baseDTO, platforms: platformDTOs };
+    return { ...baseDTO, transferPartners, platforms: platformDTOs };
   },
 };

@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Group, NativeSelect, Stack, Text, Textarea } from '@mantine/core';
-import { strollerDifficultyOptions, wheelchairDifficultyOptions } from '@/constants/difficulty';
+import { Button, Group, NativeSelect, Stack, Text } from '@mantine/core';
 import type {
   ConnectionCandidateStation, StationConnectionCreateContext,
 } from '@/features/station-connection/ports';
@@ -27,10 +26,6 @@ export function StationConnectionCreateForm({ stationId, operatorId, lineId, con
   const base = `/stations/${stationId}/connections/new`;
 
   const [connectedStationId, setConnectedStationId] = useState('');
-  const [strollerDifficulty, setStrollerDifficulty] = useState('');
-  const [wheelchairDifficulty, setWheelchairDifficulty] = useState('');
-  const [notesAboutStroller, setNotesAboutStroller] = useState('');
-  const [notesAboutWheelchair, setNotesAboutWheelchair] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   function selectOperator(next: string) {
@@ -50,17 +45,13 @@ export function StationConnectionCreateForm({ stationId, operatorId, lineId, con
     const res = await fetch(`/api/stations/${stationId}/connections`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        connectedStationId,
-        strollerDifficulty: strollerDifficulty || null,
-        wheelchairDifficulty: wheelchairDifficulty || null,
-        notesAboutStroller: notesAboutStroller || null,
-        notesAboutWheelchair: notesAboutWheelchair || null,
-      }),
+      body: JSON.stringify({ connectedStationId }),
     });
 
     if (res.ok) {
-      router.push(`/stations/${stationId}/edit`);
+      // 接続を作っただけでは乗換難易度は未評価のまま。そのまま入力できるよう、
+      // 駅対の乗換難易度の編集画面（#124）へ進める
+      router.push(`/stations/${stationId}/connections/${connectedStationId}/transfer`);
       router.refresh();
     } else {
       setSubmitting(false);
@@ -86,7 +77,7 @@ export function StationConnectionCreateForm({ stationId, operatorId, lineId, con
       <Stack gap="lg" maw="42rem">
         <Text size="sm" c="dimmed">
           {context.stationName} からの乗換接続を追加します。対向（相手駅→この駅）も
-          あわせて作成されます。
+          あわせて作成されます。乗換難易度は、作成後に開く編集画面で入力します。
         </Text>
 
         <NativeSelect
@@ -110,33 +101,6 @@ export function StationConnectionCreateForm({ stationId, operatorId, lineId, con
           data={candidateSelect}
           disabled={!lineId}
           description={lineId && context.candidates.length === 0 ? 'この路線に駅がありません' : undefined}
-        />
-
-        <NativeSelect
-          label="ベビーカーの乗換難易度 - 任意"
-          value={strollerDifficulty}
-          onChange={(e) => setStrollerDifficulty(e.target.value)}
-          data={strollerDifficultyOptions}
-        />
-        <Textarea
-          label="ベビーカーの補足 - 任意"
-          autosize
-          minRows={2}
-          value={notesAboutStroller}
-          onChange={(e) => setNotesAboutStroller(e.target.value)}
-        />
-        <NativeSelect
-          label="車いすの乗換難易度 - 任意"
-          value={wheelchairDifficulty}
-          onChange={(e) => setWheelchairDifficulty(e.target.value)}
-          data={wheelchairDifficultyOptions}
-        />
-        <Textarea
-          label="車いすの補足 - 任意"
-          autosize
-          minRows={2}
-          value={notesAboutWheelchair}
-          onChange={(e) => setNotesAboutWheelchair(e.target.value)}
         />
 
         <Group gap="sm">

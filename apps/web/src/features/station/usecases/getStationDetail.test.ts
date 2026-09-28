@@ -28,7 +28,7 @@ function stationDetail(overrides: Partial<StationDetailDTO> = {}): StationDetail
     station: { id: 'st1', name: '渋谷', nameEn: 'Shibuya', code: 'G01', notes: null },
     headerLineColor: '#f39700',
     platforms: [],
-    transferConnections: [],
+    transferPartners: [],
     ...overrides,
   };
 }

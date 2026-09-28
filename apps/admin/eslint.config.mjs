@@ -18,7 +18,6 @@ const legacyExclusions = {
     'src/app/api/stations/\\[stationId\\]/platform-locations/route.ts',
     'src/app/api/stations/\\[stationId\\]/train-stop-patterns/route.ts',
     'src/app/api/lines/\\[lineId\\]/route.ts',
-    'src/app/api/lines/\\[lineId\\]/directions/route.ts',
     'src/app/api/lines/\\[lineId\\]/directions/\\[directionId\\]/route.ts',
     'src/app/api/operators/route.ts',
     'src/app/api/operators/route.test.ts',
