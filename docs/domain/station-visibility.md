@@ -61,6 +61,17 @@ CHECK 制約 `published_requires_slug` は `publishedAt = NULL` により自然�
 可視性は読み取り側の述語が単独で担保するが、書き込み側でも不整合な状態を作らせない。
 `apps/admin` の公開操作（`features/station-publishing/`）は次を守る。
 
+- **所属路線を1つも持たない駅は公開させない**（`stationPublishingRepository` の
+  `findLineSlug` が行を返さなければ `false` → 404）。これにより
+  **「公開駅は必ず1つ以上の路線を持つ」** が不変条件として成り立つ。
+  - 公開後に路線を外す経路は現在存在しない（Admin が `station_lines` に書くのは
+    駅の新規作成時の insert のみ。`station_lines` の外部キーは cascade を持たないため、
+    駅が属する路線も削除できない）。
+  - そのため `apps/web` の読み取り側は、路線の無い公開駅を**防御しない**
+    （`?? ''` / `?? null` で表示が崩れるだけに留め、ページを遮断する条件は足さない。
+    可視性の述語を `visibility.ts` 以外に増やさないため）。
+  - **Admin に駅の路線を付け外しする操作を足すときは、公開駅から最後の路線を
+    外せないようにすること。** この不変条件は書き込み側だけが担保している。
 - **所属路線に `slug` が無ければ駅を公開させない**（`LineSlugMissingError` → 422）。
   `visibleLine()` の `slug IS NOT NULL` 条件と揃え、`slug` の無い路線に公開駅がぶら下がる
   状態を作らない。
