@@ -41,7 +41,7 @@ export const REQUIREMENT_LABEL: Record<Requirement, string> = {
 };
 
 // 「重さ」の順序はペルソナごとに違う（畳んで抱える と 係員を呼ぶ は別軸）。
-// この順序はこの関数の中だけに存在する。表示側で並べ替えに使わないこと
+// この順序はこのファイルの中だけに存在する（requirementFor / lightestRequirement）。export して表示側の並べ替えに使わないこと
 const WEIGHT: Record<Persona, readonly Requirement[]> = {
   stroller: ['as_is', 'fold_and_carry', 'lift', 'impossible'],
   wheelchair: ['as_is', 'call_staff', 'assisted_by_staff', 'impossible'],
@@ -77,4 +77,19 @@ export function requirementFor(
 // null（設備未入力）はバリアフリールートに数えない（ADR-0012）
 export function isBarrierFree(requirement: Requirement | null): boolean {
   return requirement === 'as_is' || requirement === 'call_staff';
+}
+
+// 通行可能な行為（「通れない」と null＝設備未入力を除く）のうち、そのペルソナにとって最も軽いものを返す。無ければ null。
+// バリアフリールートが無いときに「最も軽い方法」として示す（docs/domain「乗換難易度」の表示の規則）
+export function lightestRequirement(
+  persona: Persona,
+  requirements: readonly (Requirement | null)[],
+): Requirement | null {
+  const order = WEIGHT[persona];
+  let lightest: Requirement | null = null;
+  for (const requirement of requirements) {
+    if (requirement === null || requirement === 'impossible') continue;
+    if (lightest === null || order.indexOf(requirement) < order.indexOf(lightest)) lightest = requirement;
+  }
+  return lightest;
 }
