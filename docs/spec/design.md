@@ -8,7 +8,7 @@
 packages/transfer-difficulty/src/domain/
   requirement.ts     requirementFor / isBarrierFree（#124。変更なし）
   directionLabel.ts  resolveDirectionLabel（#130。変更なし）
-  assessment.ts      【新規】lightestRequirement / assessRoutes / detourMinutes（重さの順序を使うのでここに置く）
+  assessment.ts      【新規】lightestRequirement / assessRoutes（重さの順序を使うのでここに置く）
 
 apps/web/src/
   external/query/stationDetailQuery.ts   旧4列の読み取りを外し、transferPartners を組む
@@ -47,12 +47,11 @@ export function lightestRequirement(persona: Persona, requirements: readonly (Re
 
 export type Assessment<R extends RouteFacts> =
   | { kind: 'unevaluated' }
-  | { kind: 'barrierFree'; routes: R[] }
+  | { kind: 'barrierFree'; routes: R[]; detour: number | null }   // detour = routes[0] − 基準ルート（迂回度）
   | { kind: 'undetermined'; lightest: Requirement | null }
   | { kind: 'none'; lightest: Requirement | null };
 
 export function assessRoutes<R extends RouteFacts>(persona: Persona, routes: readonly R[]): Assessment<R>;
-export function detourMinutes(persona: Persona, routes: readonly RouteFacts[]): number | null;
 ```
 
 ### DTO（`features/station/domain/types.ts`）
@@ -80,8 +79,8 @@ export type TransferPartnerDTO = {
 ```ts
 export type ComboGroup = {
   heading: string | null;          // すべての組み合わせが同じなら null
-  combos: TransferComboDTO[];      // 空 = 未評価のグループ
-  routes: TransferRouteDTO[]; notes: string | null;
+  routes: TransferRouteDTO[];      // 空 = 未評価のグループ
+  notes: string | null;
 };
 export function groupCombos(partner: TransferPartnerDTO): ComboGroup[];
 export type RouteField = 'minutes' | 'requirement' | 'isOutdoor' | 'requiresExitGate' | 'requiresStaff' | 'isOfficiallyGuided';
@@ -139,7 +138,7 @@ Web で読む箇所が無くなり、DB にも触れないため。旧4列と en
 ## テスト戦略
 
 - パッケージ（vitest）: `lightestRequirement` はペルソナごとの順序・impossible と null の除外、`assessRoutes` は4状態＋未入力の混在、
-  並べ替え（null を末尾に）、`detourMinutes` は値が欠けたとき・基準ルートがバリアフリーのとき
+  並べ替え（null を末尾に）、`detour` は値が欠けたとき・基準ルートがバリアフリーのとき
 - Web domain（vitest）: `groupCombos`（全共通・淡路町↔小川町型・未評価の混在・単一の組み合わせ）、`differingFields`
 - コンポーネント（testing-library）: 設備0件のルートが「そのまま通れる」と出ないこと、各状態の文言、方面の見出し
 - クエリ: CI に DB が無いため、development での手動確認で押さえる

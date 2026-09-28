@@ -53,7 +53,7 @@ const all = (routes: TransferRouteDTO[], notes: string | null = null) => [
 
 describe('groupCombos', () => {
   it('未評価（接続0行）は見出しなしの空グループ1つ', () => {
-    expect(groupCombos(partner([]))).toEqual([{ heading: null, combos: [], routes: [], notes: null }]);
+    expect(groupCombos(partner([]))).toEqual([{ heading: null, routes: [], notes: null }]);
   });
 
   it('4組み合わせが同じルート・備考なら、見出しなしの1グループ', () => {
@@ -132,8 +132,8 @@ describe('groupCombos', () => {
       combo('inbound', 'outbound', [ev]),
     ]));
     expect(groups).toEqual([
-      { heading: '東京メトロ丸ノ内線 荻窪方面', combos: expect.any(Array), routes: [ev], notes: null },
-      { heading: '東京メトロ丸ノ内線 池袋方面', combos: [], routes: [], notes: null },
+      { heading: '東京メトロ丸ノ内線 荻窪方面', routes: [ev], notes: null },
+      { heading: '東京メトロ丸ノ内線 池袋方面', routes: [], notes: null },
     ]);
   });
 });

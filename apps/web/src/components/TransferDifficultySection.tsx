@@ -5,8 +5,8 @@ import {
   PERSONA_LABEL,
   REQUIREMENT_LABEL,
   assessRoutes,
-  detourMinutes,
   requirementFor,
+  type Assessment,
   type Persona,
 } from '@furatora/transfer-difficulty/domain';
 import type { TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
@@ -70,6 +70,12 @@ function RouteItem({
   highlights: Set<RouteField>;
 }) {
   const requirement = requirementFor(persona, route.facilities);
+  const flags: [RouteField, boolean, string][] = [
+    ['isOutdoor', route.isOutdoor, ROUTE_FLAG_LABEL.isOutdoor],
+    ['requiresExitGate', route.requiresExitGate, ROUTE_FLAG_LABEL.requiresExitGate],
+    ['requiresStaff', route.requiresStaff, ROUTE_FLAG_LABEL.requiresStaff],
+    ['isOfficiallyGuided', !route.isOfficiallyGuided, ROUTE_FLAG_LABEL.notOfficiallyGuided],
+  ];
   return (
     <li className="py-2 first:pt-0 last:pb-0">
       <p className="text-xs text-gray-800 font-medium">
@@ -85,15 +91,13 @@ function RouteItem({
         {requirement !== null && (
           <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
         )}
-        {route.isOutdoor && <Chip highlighted={highlights.has('isOutdoor')}>{ROUTE_FLAG_LABEL.isOutdoor}</Chip>}
-        {route.requiresExitGate && (
-          <Chip highlighted={highlights.has('requiresExitGate')}>{ROUTE_FLAG_LABEL.requiresExitGate}</Chip>
-        )}
-        {route.requiresStaff && (
-          <Chip highlighted={highlights.has('requiresStaff')}>{ROUTE_FLAG_LABEL.requiresStaff}</Chip>
-        )}
-        {!route.isOfficiallyGuided && (
-          <Chip highlighted={highlights.has('isOfficiallyGuided')}>{ROUTE_FLAG_LABEL.notOfficiallyGuided}</Chip>
+        {flags.map(
+          ([field, shown, label]) =>
+            shown && (
+              <Chip key={field} highlighted={highlights.has(field)}>
+                {label}
+              </Chip>
+            ),
         )}
       </div>
       {route.notes && <p className="mt-1 text-xs text-gray-600 whitespace-pre-wrap">{route.notes}</p>}
@@ -106,70 +110,75 @@ function detourText(minutes: number): string {
   return minutes > 0 ? `一般的なルートより ${minutes}分長い` : `一般的なルートより ${-minutes}分短い`;
 }
 
-function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
-  const style = PERSONA_STYLE[persona];
-  const assessment = assessRoutes(persona, routes);
+type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barrierFree' }>;
 
-  let body: React.ReactNode;
+function BarrierFreeDetail({ persona, assessment }: { persona: Persona; assessment: BarrierFreeAssessment }) {
+  const { routes, detour } = assessment;
+  const highlights = routes.length > 1 ? differingFields(persona, routes) : new Set<RouteField>();
+  // routes は1本以上あり、先頭が最短
+  const shortestRequirement = requirementFor(persona, routes[0]!.facilities);
+  return (
+    <>
+      <ul className={`mt-2 divide-y ${PERSONA_STYLE[persona].divideClass}`}>
+        {routes.map((route) => (
+          <RouteItem key={route.routeId} persona={persona} route={route} highlights={highlights} />
+        ))}
+      </ul>
+      {/* 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある） */}
+      {detour !== null && shortestRequirement !== null && (
+        <p className="mt-2 text-xs text-gray-700">
+          最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortestRequirement]}）
+        </p>
+      )}
+    </>
+  );
+}
+
+// 設備未入力のルートの存在・名前は利用者に出さない（補完は管理者の作業。#135）。
+// undetermined の最も軽い行為は、未入力のルートの方が軽い可能性があるので「確認できているルートでは」と限定する
+function lightestText(assessment: Extract<Assessment<TransferRouteDTO>, { kind: 'undetermined' | 'none' }>) {
+  const { kind, lightest } = assessment;
+  if (lightest !== null) {
+    return `${kind === 'undetermined' ? '確認できているルートでは、' : ''}最も軽い方法: ${REQUIREMENT_LABEL[lightest]}`;
+  }
+  return kind === 'none' ? '通行可能なルートがありません' : null;
+}
+
+function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
+  const assessment = assessRoutes(persona, routes);
   if (assessment.kind === 'unevaluated') {
-    body = <p className="text-xs text-gray-500 italic">情報なし</p>;
-  } else {
-    const meta = TRANSFER_STATUS_META[assessment.kind];
-    let detail: React.ReactNode = null;
-    if (assessment.kind === 'barrierFree') {
-      const highlights = assessment.routes.length > 1 ? differingFields(persona, assessment.routes) : new Set<RouteField>();
-      const detour = detourMinutes(persona, routes);
-      const shortest = assessment.routes[0];
-      const shortestRequirement = shortest ? requirementFor(persona, shortest.facilities) : null;
-      detail = (
-        <>
-          <ul className={`mt-2 divide-y ${style.divideClass}`}>
-            {assessment.routes.map((route) => (
-              <RouteItem key={route.routeId} persona={persona} route={route} highlights={highlights} />
-            ))}
-          </ul>
-          {/* 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある） */}
-          {detour !== null && shortestRequirement !== null && (
-            <p className="mt-2 text-xs text-gray-700">
-              最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortestRequirement]}）
-            </p>
-          )}
-        </>
-      );
-    } else {
-      const lightest = assessment.lightest;
-      // 設備未入力のルートの存在・名前は利用者に出さない（補完は管理者の作業。#135）。
-      // undetermined の最も軽い行為は、未入力のルートの方が軽い可能性があるので「確認できているルートでは」と限定する
-      let lightestText: string | null = null;
-      if (lightest !== null) {
-        lightestText = `${assessment.kind === 'undetermined' ? '確認できているルートでは、' : ''}最も軽い方法: ${REQUIREMENT_LABEL[lightest]}`;
-      } else if (assessment.kind === 'none') {
-        lightestText = '通行可能なルートがありません';
-      }
-      detail = lightestText && <p className="mt-1 text-xs text-gray-700">{lightestText}</p>;
-    }
-    body = (
-      <>
-        <div className="flex items-start gap-2">
-          <StatusIcon iconPath={meta.iconPath} iconColorHex={meta.iconColorHex} />
-          <p className="text-xs text-gray-700 leading-snug">
-            {meta.label}
-            {assessment.kind === 'barrierFree' && assessment.routes.length > 1 && `（${assessment.routes.length}本）`}
-          </p>
-        </div>
-        {detail}
-      </>
-    );
+    return <p className="text-xs text-gray-500 italic">情報なし</p>;
   }
 
+  const meta = TRANSFER_STATUS_META[assessment.kind];
+  const text = assessment.kind === 'barrierFree' ? null : lightestText(assessment);
+  return (
+    <>
+      <div className="flex items-start gap-2">
+        <StatusIcon iconPath={meta.iconPath} iconColorHex={meta.iconColorHex} />
+        <p className="text-xs text-gray-700 leading-snug">
+          {meta.label}
+          {assessment.kind === 'barrierFree' && assessment.routes.length > 1 && `（${assessment.routes.length}本）`}
+        </p>
+      </div>
+      {assessment.kind === 'barrierFree' ? (
+        <BarrierFreeDetail persona={persona} assessment={assessment} />
+      ) : (
+        text && <p className="mt-1 text-xs text-gray-700">{text}</p>
+      )}
+    </>
+  );
+}
+
+function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
   return (
     <section
       aria-label={PERSONA_LABEL[persona]}
       className="rounded-lg border border-gray-100 p-3"
-      style={{ backgroundColor: style.backgroundColor }}
+      style={{ backgroundColor: PERSONA_STYLE[persona].backgroundColor }}
     >
       <p className="text-xs font-semibold text-gray-600 mb-2">{PERSONA_LABEL[persona]}</p>
-      {body}
+      <PersonaBody persona={persona} routes={routes} />
     </section>
   );
 }
@@ -177,17 +186,14 @@ function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRo
 export function TransferDifficultySection({ stationName, partners: allPartners }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  const evaluated = allPartners.filter((p) => p.combos.length > 0);
   // 評価済みの相手駅が1つも無い駅では出さない（未評価の相手駅は選べば「情報なし」と出る）
-  if (!allPartners.some((p) => p.combos.length > 0)) return null;
+  if (evaluated.length === 0) return null;
   // 開いた直後に「情報なし」が出ないよう、評価済みの相手駅を先に並べる（それぞれの中では元の順序を保つ）
-  const partners = [
-    ...allPartners.filter((p) => p.combos.length > 0),
-    ...allPartners.filter((p) => p.combos.length === 0),
-  ];
+  const partners = [...evaluated, ...allPartners.filter((p) => p.combos.length === 0)];
 
-  // partners が縮んで selectedIndex が範囲外になっても先頭にフォールバックする
-  const selected = partners[selectedIndex] ?? partners[0];
-  if (!selected) return null;
+  // partners が縮んで selectedIndex が範囲外になっても先頭にフォールバックする（evaluated が空でないので必ずある）
+  const selected = partners[selectedIndex] ?? partners[0]!;
   const groups = groupCombos(selected);
 
   return (

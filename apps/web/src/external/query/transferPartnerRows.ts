@@ -41,6 +41,12 @@ export async function getTransferConnectionRows(stationId: string) {
 
 type ConnectionRow = Awaited<ReturnType<typeof getTransferConnectionRows>>[number];
 
+/** 接続一覧（station_connections）の相手駅と、その路線 */
+export type PartnerLine = Pick<
+  TransferPartnerDTO,
+  'connectedStationId' | 'connectedStationName' | 'lineName' | 'lineColor'
+>;
+
 // 接続行を S から見た向きに直す。uuid の大文字小文字の違いで取り違えないよう小文字で比べる
 // （apps/admin の comboOfConnection と同じ規則）
 function orient(row: ConnectionRow, stationId: string) {
@@ -52,8 +58,8 @@ function orient(row: ConnectionRow, stationId: string) {
 
 export async function buildTransferPartners(
   stationId: string,
-  // 接続一覧（station_connections）の相手駅と、その路線。未評価の相手駅もここから出す
-  partnerLines: { connectedStationId: string; connectedStationName: string; lineName: string; lineColor: string | null }[],
+  // 未評価の相手駅もここから出す
+  partnerLines: PartnerLine[],
   connectionRows: ConnectionRow[],
 ): Promise<TransferPartnerDTO[]> {
   if (partnerLines.length === 0) return [];

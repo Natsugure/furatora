@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessRoutes,
-  detourMinutes,
   lightestRequirement,
   type FacilityTypeCode,
+  type Persona,
   type RouteFacts,
 } from './index';
 
@@ -102,7 +102,12 @@ describe('assessRoutes: 状態の分類', () => {
   });
 });
 
-describe('detourMinutes: BF ルートの最短 − 基準ルート', () => {
+describe('assessRoutes の detour: BF ルートの最短 − 基準ルート', () => {
+  const detourMinutes = (persona: Persona, routes: RouteFacts[]) => {
+    const result = assessRoutes(persona, routes);
+    return result.kind === 'barrierFree' ? result.detour : null;
+  };
+
   it('両方の所要時分があれば差を返す', () => {
     expect(detourMinutes('stroller', [
       route('general', ['stairs'], { minutes: 3, isBaseline: true }),

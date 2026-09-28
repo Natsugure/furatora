@@ -21,7 +21,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { publishedStation } from './visibility';
 import type { StationDetailQuery } from '@/features/station/ports';
 import type { StationDetailDTO } from '@/features/station/domain/types';
-import { buildTransferPartners, getTransferConnectionRows } from './transferPartnerRows';
+import { buildTransferPartners, getTransferConnectionRows, type PartnerLine } from './transferPartnerRows';
 import type {
   ConcourseDTO,
   PlatformDTO,
@@ -62,14 +62,8 @@ async function getStationConnectionRows(stationId: string) {
 // 同一路線の重複を除く。乗換難易度が未評価の相手駅も含める（未評価は表示層が「情報なし」と示す）
 function buildPartnerLines(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
   const seen = new Set<string>();
-  const result: {
-    connectedStationId: string;
-    connectedStationName: string;
-    lineName: string;
-    lineColor: string | null;
-  }[] = [];
+  const result: PartnerLine[] = [];
   for (const r of rows) {
-    if (!r.connectedStationId) continue;
     const key = `${r.connectedStationId}:${r.lineName}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -136,7 +130,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
       getTransferConnectionRows(stationRow.id),
     ]);
 
-    const baseDTO: Omit<StationDetailDTO, 'platforms'> = {
+    const baseDTO: Omit<StationDetailDTO, 'platforms' | 'transferPartners'> = {
       station: {
         id: stationRow.id,
         name: stationRow.name,
@@ -145,15 +139,16 @@ export const dbStationDetailQuery: StationDetailQuery = {
         notes: stationRow.notes,
       },
       headerLineColor: headerLineRows[0]?.color ?? null,
-      transferPartners: await buildTransferPartners(
-        stationRow.id,
-        buildPartnerLines(stationConnectionRows),
-        transferConnectionRows,
-      ),
     };
+    // 乗換の読み取りはホーム側のクエリに依存しないので、次の Promise.all に載せて往復を増やさない
+    const transferPartnersPromise = buildTransferPartners(
+      stationRow.id,
+      buildPartnerLines(stationConnectionRows),
+      transferConnectionRows,
+    );
 
     if (platformList.length === 0) {
-      return { ...baseDTO, platforms: [] };
+      return { ...baseDTO, transferPartners: await transferPartnersPromise, platforms: [] };
     }
 
     const platformIds = platformList.map((p) => p.id);
@@ -166,12 +161,13 @@ export const dbStationDetailQuery: StationDetailQuery = {
       ),
     ];
 
-    const [lineList, directionList, facilityTypeList] = await Promise.all([
+    const [lineList, directionList, facilityTypeList, transferPartners] = await Promise.all([
       db.select().from(lines).where(inArray(lines.id, lineIds)),
       directionIds.length > 0
         ? db.select().from(lineDirections).where(inArray(lineDirections.id, directionIds))
         : Promise.resolve([]),
       db.select().from(facilityTypes),
+      transferPartnersPromise,
     ]);
 
     const lineMap = new Map(lineList.map((l) => [l.id, l]));
@@ -371,6 +367,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
       };
     });
 
-    return { ...baseDTO, platforms: platformDTOs };
+    return { ...baseDTO, transferPartners, platforms: platformDTOs };
   },
 };

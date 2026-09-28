@@ -19,8 +19,10 @@ export type Assessment<R extends RouteFacts> =
   // ルートが0本（接続行が無い）
   | { kind: 'unevaluated' }
   // バリアフリールートが1本以上。所要時分の昇順・未入力は末尾。
-  // 設備未入力のルートがあっても利用者には出さない（補完は管理者の作業。Admin で一覧する: #135）
-  | { kind: 'barrierFree'; routes: R[] }
+  // 設備未入力のルートがあっても利用者には出さない（補完は管理者の作業。Admin で一覧する: #135）。
+  // detour（迂回度）= routes の先頭（最短）の所要時分 − 基準ルートの所要時分。どちらかが無ければ null。
+  // 差には距離の差と移動速度の差が混ざるので、表示では必要な行為と並べること
+  | { kind: 'barrierFree'; routes: R[]; detour: number | null }
   // バリアフリールートは0本だが、設備未入力のルートがあるので「無い」とは言えない。
   // lightest は設備が入力済みのルートだけから選ぶ（未入力のルートの方が軽い可能性がある）
   | { kind: 'undetermined'; lightest: Requirement | null }
@@ -47,20 +49,16 @@ export function assessRoutes<R extends RouteFacts>(persona: Persona, routes: rea
   const barrierFree = entered.filter((route) => isBarrierFree(requirementFor(persona, route.facilities)));
 
   if (barrierFree.length > 0) {
-    return { kind: 'barrierFree', routes: byMinutes(barrierFree) };
+    const sorted = byMinutes(barrierFree);
+    return { kind: 'barrierFree', routes: sorted, detour: detourOf(sorted[0]!, routes) };
   }
   const lightest = lightestRequirement(persona, entered.map((route) => requirementFor(persona, route.facilities)));
   if (hasNotEntered) return { kind: 'undetermined', lightest };
   return { kind: 'none', lightest };
 }
 
-// 迂回度 = バリアフリールートの最短の所要時分 − 基準ルートの所要時分。どちらかが無ければ null。
-// 差には距離の差と移動速度の差が混ざるので、表示では必要な行為と並べること
-export function detourMinutes(persona: Persona, routes: readonly RouteFacts[]): number | null {
+function detourOf(shortest: RouteFacts, routes: readonly RouteFacts[]): number | null {
   const baseline = routes.find((route) => route.isBaseline);
-  if (!baseline || baseline.minutes === null) return null;
-  const assessment = assessRoutes(persona, routes);
-  if (assessment.kind !== 'barrierFree') return null;
-  const shortest = assessment.routes[0]?.minutes;
-  return shortest === null || shortest === undefined ? null : shortest - baseline.minutes;
+  if (!baseline || baseline.minutes === null || shortest.minutes === null) return null;
+  return shortest.minutes - baseline.minutes;
 }

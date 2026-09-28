@@ -9,7 +9,6 @@ export type ComboGroup = {
   /** 全組み合わせが1グループのときは null（方面を出さない） */
   heading: string | null;
   /** 空 = 未評価の組み合わせのまとまり */
-  combos: TransferComboDTO[];
   routes: TransferRouteDTO[];
   notes: string | null;
 };
@@ -38,9 +37,10 @@ function headingOf(partner: TransferPartnerDTO, keys: readonly (readonly [Direct
 }
 
 export function groupCombos(partner: TransferPartnerDTO): ComboGroup[] {
-  if (partner.combos.length === 0) return [{ heading: null, combos: [], routes: [], notes: null }];
+  if (partner.combos.length === 0) return [{ heading: null, routes: [], notes: null }];
 
-  const groups: { keys: (readonly [DirectionType, DirectionType])[]; combos: TransferComboDTO[] }[] = [];
+  // ルートの組と備考は同じシグネチャ内で等しいので、最初の組み合わせのものを持つ
+  const groups: { keys: (readonly [DirectionType, DirectionType])[]; combo: TransferComboDTO }[] = [];
   const bySignature = new Map<string, (typeof groups)[number]>();
   const missing: (readonly [DirectionType, DirectionType])[] = [];
   for (const key of ALL_COMBOS) {
@@ -53,9 +53,8 @@ export function groupCombos(partner: TransferPartnerDTO): ComboGroup[] {
     const group = bySignature.get(signature);
     if (group) {
       group.keys.push(key);
-      group.combos.push(combo);
     } else {
-      const created = { keys: [key], combos: [combo] };
+      const created = { keys: [key], combo };
       groups.push(created);
       bySignature.set(signature, created);
     }
@@ -64,12 +63,11 @@ export function groupCombos(partner: TransferPartnerDTO): ComboGroup[] {
   const showHeading = groups.length > 1 || missing.length > 0;
   const result: ComboGroup[] = groups.map((g) => ({
     heading: showHeading ? headingOf(partner, g.keys) : null,
-    combos: g.combos,
-    routes: g.combos[0]!.routes,
-    notes: g.combos[0]!.notes,
+    routes: g.combo.routes,
+    notes: g.combo.notes,
   }));
   if (missing.length > 0) {
-    result.push({ heading: headingOf(partner, missing), combos: [], routes: [], notes: null });
+    result.push({ heading: headingOf(partner, missing), routes: [], notes: null });
   }
   return result;
 }
