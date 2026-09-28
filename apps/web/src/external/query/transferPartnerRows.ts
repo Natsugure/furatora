@@ -104,7 +104,11 @@ export async function buildTransferPartners(
           })
           .from(connectionRoutes)
           .innerJoin(transferRoutes, eq(transferRoutes.id, connectionRoutes.routeId))
-          .where(inArray(connectionRoutes.connectionId, connectionIds)),
+          .where(inArray(connectionRoutes.connectionId, connectionIds))
+          // assessRoutes は所要時分で安定ソートするので、同じ時分のルートの順序はここで決まる。
+          // 順序が揺れると「最短のバリアフリールート」に添える必要な行為が再読み込みで入れ替わりうる。
+          // label は接続内で一意（unique_connection_route_label）なので、これで順序が確定する
+          .orderBy(asc(connectionRoutes.label)),
     connectionIds.length === 0
       ? []
       : db
