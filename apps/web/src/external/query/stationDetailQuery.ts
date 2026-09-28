@@ -20,7 +20,8 @@ import {
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { publishedStation } from './visibility';
 import type { StationDetailQuery } from '@/features/station/ports';
-import type { StationDetailDTO, TransferConnectionDTO } from '@/features/station/domain/types';
+import type { StationDetailDTO } from '@/features/station/domain/types';
+import { buildTransferPartners, getTransferConnectionRows } from './transferPartnerRows';
 import type {
   ConcourseDTO,
   PlatformDTO,
@@ -37,8 +38,8 @@ import type {
 // 路線がほぼ一意に定まる（複数路線を持つ駅はごく少数。lineName で重複除去して吸収する）。
 // 詳細: docs/domain/station-master-model.md「乗換接続（stationConnections）」。
 //
-// 接続先の駅には publishedStation() を通さない。ここが供給するのは「乗換先の路線名」と
-// 「バリアフリー難易度」だけで、接続先の駅ページへのリンクは一切生成しない。
+// 接続先の駅には publishedStation() を通さない（stations は駅名のためだけに join する）。
+// ここが供給するのは「乗換先の路線名・駅名」と「乗換難易度の相手駅」だけで、接続先の駅ページへのリンクは一切生成しない。
 // 未公開駅を除外すると路線名が丸ごと引けなくなり、図の乗換プレートが空になる
 // （docs/domain/station-visibility.md「乗換接続からの到達」/ Issue #77 REQ-7.4b）。
 // リンクを伴う参照を後から足す場合は、そのとき publishedStation() を通すこと。
@@ -46,38 +47,37 @@ async function getStationConnectionRows(stationId: string) {
   return db
     .select({
       connectedStationId: stationConnections.connectedStationId,
+      connectedStationName: stations.name,
       lineName: lines.name,
       lineColor: lines.color,
-      strollerDifficulty: stationConnections.strollerDifficulty,
-      wheelchairDifficulty: stationConnections.wheelchairDifficulty,
-      notesAboutStroller: stationConnections.notesAboutStroller,
-      notesAboutWheelchair: stationConnections.notesAboutWheelchair,
     })
     .from(stationConnections)
+    .innerJoin(stations, eq(stations.id, stationConnections.connectedStationId))
     .innerJoin(stationLines, eq(stationLines.stationId, stationConnections.connectedStationId))
     .innerJoin(lines, eq(lines.id, stationLines.lineId))
     .where(eq(stationConnections.stationId, stationId));
 }
 
-function buildTransferConnections(
-  rows: Awaited<ReturnType<typeof getStationConnectionRows>>,
-): TransferConnectionDTO[] {
-  // 2路線を持つ駅（実測5件）は connectedStationId ごとに複数行になるため、
-  // 同一路線の重複を除いてから DTO 化する
+// 乗換先の相手駅と路線。2路線を持つ駅（実測5件）は connectedStationId ごとに複数行になるため、
+// 同一路線の重複を除く。乗換難易度が未評価の相手駅も含める（未評価は表示層が「情報なし」と示す）
+function buildPartnerLines(rows: Awaited<ReturnType<typeof getStationConnectionRows>>) {
   const seen = new Set<string>();
-  const result: TransferConnectionDTO[] = [];
+  const result: {
+    connectedStationId: string;
+    connectedStationName: string;
+    lineName: string;
+    lineColor: string | null;
+  }[] = [];
   for (const r of rows) {
-    if (r.strollerDifficulty === null && r.wheelchairDifficulty === null) continue;
+    if (!r.connectedStationId) continue;
     const key = `${r.connectedStationId}:${r.lineName}`;
     if (seen.has(key)) continue;
     seen.add(key);
     result.push({
+      connectedStationId: r.connectedStationId,
+      connectedStationName: r.connectedStationName,
       lineName: r.lineName,
       lineColor: r.lineColor,
-      strollerDifficulty: r.strollerDifficulty,
-      wheelchairDifficulty: r.wheelchairDifficulty,
-      notesAboutStroller: r.notesAboutStroller,
-      notesAboutWheelchair: r.notesAboutWheelchair,
     });
   }
   return result;
@@ -112,7 +112,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
       .limit(1);
     if (!stationRow) return null;
 
-    const [headerLineRows, platformList, stationConnectionRows] = await Promise.all([
+    const [headerLineRows, platformList, stationConnectionRows, transferConnectionRows] = await Promise.all([
       db
         .select({ color: lines.color })
         .from(stationLines)
@@ -133,6 +133,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
         .from(platforms)
         .where(eq(platforms.stationId, stationRow.id)),
       getStationConnectionRows(stationRow.id),
+      getTransferConnectionRows(stationRow.id),
     ]);
 
     const baseDTO: Omit<StationDetailDTO, 'platforms'> = {
@@ -144,7 +145,11 @@ export const dbStationDetailQuery: StationDetailQuery = {
         notes: stationRow.notes,
       },
       headerLineColor: headerLineRows[0]?.color ?? null,
-      transferConnections: buildTransferConnections(stationConnectionRows),
+      transferPartners: await buildTransferPartners(
+        stationRow.id,
+        buildPartnerLines(stationConnectionRows),
+        transferConnectionRows,
+      ),
     };
 
     if (platformList.length === 0) {
