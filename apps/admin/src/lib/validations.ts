@@ -34,11 +34,9 @@ export const lineUpdateSchema = z.object({
 
 export const directionSchema = z.object({
   directionType: z.enum(DIRECTIONS),
-  representativeStationId: z.string().uuid(),
   displayName: z.string().min(1),
   // 省略時は null にして、Repository の書き込み形（LineDirectionWriteInput）をそのまま出す
   displayNameEn: z.string().nullable().default(null),
-  terminalStationIds: z.array(z.string().uuid()).nullable().default(null),
   notes: z.string().nullable().default(null),
   // (路線, 走行方向) の既定行にするか（ADR-0014）。true なら、同じ組の旧既定は Repository が外す。
   // 省略を false と読むと、PUT で送り忘れたクライアントが既定行を黙って既定から外すため、必須にする

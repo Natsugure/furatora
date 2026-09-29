@@ -63,10 +63,8 @@ const LINE_ID = 'line-1';
 const DIRECTION_ID = 'direction-1';
 const input = (overrides: Partial<LineDirectionWriteInput> = {}): LineDirectionWriteInput => ({
   directionType: 'outbound',
-  representativeStationId: 'station-1',
   displayName: '池袋方面',
   displayNameEn: null,
-  terminalStationIds: null,
   notes: null,
   isDefault: true,
   ...overrides,

@@ -8,18 +8,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
-// 終点駅の一覧の ScrollArea（Mantine）が ResizeObserver を使う。jsdom には無いので空の実装を置く
-vi.stubGlobal(
-  'ResizeObserver',
-  class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  },
-);
-
 const LINE_ID = 'line-1';
-const stations = [{ id: 'station-1', name: '池袋', nameEn: null, code: null }];
 const ikebukuroDefault = { id: 'direction-default', displayName: '池袋方面' };
 
 type Props = Parameters<typeof LineDirectionForm>[0];
@@ -29,7 +18,6 @@ function setup(props: Partial<Props> = {}) {
     <MantineProvider>
       <LineDirectionForm
         lineId={LINE_ID}
-        stations={stations}
         currentDefaults={{ inbound: null, outbound: ikebukuroDefault }}
         {...props}
       />
@@ -43,10 +31,8 @@ const editingIkebukuro = (isDefault: boolean): Partial<Props> => ({
   initialData: {
     id: isDefault ? ikebukuroDefault.id : 'direction-other',
     directionType: 'outbound',
-    representativeStationId: 'station-1',
     displayName: '池袋方面',
     displayNameEn: '',
-    terminalStationIds: null,
     notes: '',
     isDefault,
   },
@@ -119,11 +105,25 @@ describe('LineDirectionForm: 既定の表示名', () => {
     );
     setup();
     await userEvent.type(screen.getByRole('textbox', { name: /表示名（日本語）/ }), '内回り');
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: /代表駅/ }), 'station-1');
     await userEvent.click(screen.getByRole('button', { name: '登録' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('同じ路線・方面の既定が同時に変更されました'));
     const [, init] = fetchMock.mock.calls[0] ?? [];
     expect(JSON.parse(String(init?.body))).toMatchObject({ directionType: 'inbound', isDefault: true });
+  });
+
+  it('代表駅・終点駅の入力が無く、送信内容にも含めない（#129）', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 201 }));
+    setup();
+    expect(screen.queryByRole('combobox', { name: /代表駅/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/終点駅/)).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox', { name: /表示名（日本語）/ }), '内回り');
+    await userEvent.click(screen.getByRole('button', { name: '登録' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body).not.toHaveProperty('representativeStationId');
+    expect(body).not.toHaveProperty('terminalStationIds');
   });
 });

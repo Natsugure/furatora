@@ -25,10 +25,8 @@ const columns = {
   id: lineDirections.id,
   lineId: lineDirections.lineId,
   directionType: lineDirections.directionType,
-  representativeStationId: lineDirections.representativeStationId,
   displayName: lineDirections.displayName,
   displayNameEn: lineDirections.displayNameEn,
-  terminalStationIds: lineDirections.terminalStationIds,
   notes: lineDirections.notes,
   isDefault: lineDirections.isDefault,
 };

@@ -20,7 +20,6 @@ export default async function EditDirectionPage({
         lineId={lineId}
         isEdit
         initialData={context.direction}
-        stations={context.stations}
         currentDefaults={context.currentDefaults}
       />
     </div>

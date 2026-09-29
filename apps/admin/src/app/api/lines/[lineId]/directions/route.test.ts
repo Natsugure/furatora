@@ -25,7 +25,6 @@ function request(body: string) {
 
 const validBody = {
   directionType: 'outbound',
-  representativeStationId: STATION_ID,
   displayName: '池袋方面',
   isDefault: false,
 };
@@ -45,13 +44,24 @@ describe('POST /api/lines/[lineId]/directions', () => {
     expect(await response.json()).toEqual(created);
     expect(create).toHaveBeenCalledWith(LINE_ID, {
       directionType: 'outbound',
-      representativeStationId: STATION_ID,
       displayName: '池袋方面',
       displayNameEn: null,
-      terminalStationIds: null,
       notes: null,
       isDefault: false,
     });
+  });
+
+  it('代表駅・終点駅を送られても Repository に渡さない（#129 で廃止した項目。旧クライアントからの送信を受け付ける）', async () => {
+    create.mockResolvedValue({ id: 'direction-1' });
+
+    const response = await POST(
+      request(JSON.stringify({ ...validBody, representativeStationId: STATION_ID, terminalStationIds: [STATION_ID] })),
+      params,
+    );
+
+    expect(response.status).toBe(201);
+    expect(create.mock.calls[0]?.[1]).not.toHaveProperty('representativeStationId');
+    expect(create.mock.calls[0]?.[1]).not.toHaveProperty('terminalStationIds');
   });
 
   it('isDefault: true を Repository に渡す', async () => {
