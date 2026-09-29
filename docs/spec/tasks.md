@@ -23,10 +23,16 @@
 - [x] **TASK-7** `pnpm run typecheck` / `lint` / `test` / `build`。2項目の参照が残っていないこと。`db:generate` を試しに実行すると DROP ×2 だけが出ること（生成物は破棄する）。
       結果（2026-09-30）: typecheck 6・lint 4・build 2 タスク成功、test は admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42 が成功。
       試しの `db:generate` は FK `line_directions_representative_station_id_stations_id_fk` の削除と DROP COLUMN ×2 だけを出した（破棄済み）
-- [ ] **TASK-8** 開発者が development に `db:migrate` を適用する。Neon MCP で `NOT NULL` が外れ、行数・値が変わらないことを確認し、
-      Admin の方面の作成・編集・一覧、Web の駅詳細を確認する
+- [x] **TASK-8** 開発者が development に `db:migrate` を適用する。Neon MCP で `NOT NULL` が外れ、行数・値が変わらないことを確認し、
+      Admin の方面の作成・編集・一覧、Web の駅詳細を確認する。
+      結果（2026-09-30）: 適用済みマイグレーション 16→17、`representative_station_id` の `is_nullable` が NO→YES。
+      54行・代表駅54行・終点駅7行で、`id`・両列の md5 が適用前と一致。main は15件・NOT NULL のまま。
+      Admin（Chrome DevTools MCP）: 丸ノ内線の方面一覧が9件で代表駅の表示なし・既定のバッジあり。編集画面に代表駅・終点駅の入力が無く、無変更の更新が保存され、既存の代表駅の値は残る。
+      代表駅・終点駅を含めた POST が 201 で、作成行の両列は NULL。DELETE 200 のあと md5 が適用前と一致。新規作成画面に代表駅・終点駅が無い。
+      Web の淡路町はホームの方面ボタン2つ・1番線・乗換先を表示した
 
 ## フェーズ5〜6: 振り返り・引き渡し
 
-- [ ] **TASK-9** `docs/domain/line-directions.md` を更新する。ADR の変更が無いことを確認する
+- [x] **TASK-9** `docs/domain/line-directions.md` を更新する。ADR の変更が無いことを確認する。
+      結果: モデル図から2列を外し、適用状況に除去の途中であることを書いた。0013・0014 の本番反映済みも上書きした。ADR は変更なし
 - [ ] **TASK-10** 2段目の Issue を起票し、PR を作成する（base は PR #142 のマージ前は `feat/issue136-drop-legacy-difficulty-columns`）

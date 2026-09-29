@@ -1,8 +1,10 @@
 # 方面（`line_directions`）と方面ラベルの解決
 
-> **適用状況**: 2026-09-28 現在、**スキーマ・既定行のデータ・解決関数・Admin の入力と表示・Web の乗換セクションの方面の見出しまで実装済み**
+> **適用状況**: 2026-09-30 現在、**スキーマ・既定行のデータ・解決関数・Admin の入力と表示・Web の乗換セクションの方面の見出しまで実装済み・本番反映済み**
 > （[#130](https://github.com/Natsugure/furatora/issues/130)・[#125](https://github.com/Natsugure/furatora/issues/125)）。
-> 移行（`0013`・`0014`）は development に適用済みで、本番（`main`）へは未適用（`main` へのリリース時に Vercel のビルドが流す）。
+> 代表駅・終点駅の列（`representative_station_id` / `terminal_station_ids`）は除去の途中である（[#129](https://github.com/Natsugure/furatora/issues/129)）。
+> コードと `schema.ts` からは消えているが、DB には次のデプロイで DROP するまで残る（`representative_station_id` は `NOT NULL` を外し済み）。
+> 値は ODPT 時代の名残で、どこからも読まれない。
 
 「路線のある走行方向を、利用者にどう呼ぶか（池袋方面・内回り など）」を持つ。
 判断の根拠と却下案は [ADR-0014](../adr/0014-direction-label-by-default-row.md)。
@@ -13,8 +15,6 @@
 line_directions
   ├── lineId, directionType ('inbound' | 'outbound')
   ├── displayName / displayNameEn        表示の文言
-  ├── representativeStationId (NOT NULL)  代表駅。一覧の表示用で、解決規則には使わない
-  ├── terminalStationIds                  終点駅の候補
   └── isDefault                           (lineId, directionType) の既定の文言か
         └── unique_line_direction_default: (lineId, directionType) WHERE is_default
 ```
@@ -39,7 +39,7 @@ line_directions
   既定の文言は、ホームが登録されていない**すべての駅**で同じ文言として出るためである。
   例: 丸ノ内線 inbound は「荻窪・方南町方面」（「東京・新宿・荻窪・方南町方面」は新宿駅・東京駅で誤りになる）。
 - 既存の行にどの駅でも通用する文言が無い路線は、既定用の行を新しく作る。
-  **都営大江戸線は inbound =「内回り」・outbound =「外回り」** を既定行にしている（代表駅は都庁前）。
+  **都営大江戸線は inbound =「内回り」・outbound =「外回り」** を既定行にしている。
   区間ごとの掲示の13行は、ホームを登録するときに ① の文言として使うために残してある。
 - 2026-09-27 時点で、全14路線28組に既定行がある（移行 `0014_set_line_direction_defaults.sql`）。
 
