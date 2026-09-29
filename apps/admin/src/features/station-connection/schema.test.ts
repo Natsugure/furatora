@@ -13,16 +13,4 @@ describe('stationConnectionCreateSchema', () => {
     const result = stationConnectionCreateSchema.safeParse({ connectedStationId: 'x' });
     expect(result.success).toBe(false);
   });
-
-  it('旧4列（難易度・備考）が送られても受け取らない（乗換難易度は駅対の編集画面で入力する。#124）', () => {
-    const result = stationConnectionCreateSchema.safeParse({
-      connectedStationId: UUID,
-      strollerDifficulty: 'elevator_detour',
-      wheelchairDifficulty: 'assistance_required',
-      notesAboutStroller: '西口のエレベーターを使う',
-      notesAboutWheelchair: null,
-    });
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual({ connectedStationId: UUID });
-  });
 });

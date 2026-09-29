@@ -13,7 +13,6 @@ import {
 // 乗換接続は有向2行で持つ（docs/domain/station-master-model.md「乗換接続」）。
 // station_connections は接続一覧（乗換できる相手駅）で、乗換難易度は持たない。難易度は
 // transfer_connections 以下の新モデルで、駅対の編集画面から入力する（#124）。
-// 旧4列（strollerDifficulty 等）は #125 のあとの別デプロイで落とすまで残るが、ここからは書かない。
 
 // createPair は両方向を1トランザクションで冪等に挿入する（ADR-0005）。
 export const dbStationConnectionRepository: StationConnectionRepository = {
