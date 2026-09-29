@@ -35,4 +35,4 @@
 
 - [x] **TASK-9** `docs/domain/line-directions.md` を更新する。ADR の変更が無いことを確認する。
       結果: モデル図から2列を外し、適用状況に除去の途中であることを書いた。0013・0014 の本番反映済みも上書きした。ADR は変更なし
-- [ ] **TASK-10** 2段目の Issue を起票し、PR を作成する（base は PR #142 のマージ前は `feat/issue136-drop-legacy-difficulty-columns`）
+- [x] **TASK-10** 2段目の Issue を起票し、PR を作成する（base は PR #142 のマージ前は `feat/issue136-drop-legacy-difficulty-columns`） 結果: 2段目は #144
