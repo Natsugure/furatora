@@ -16,7 +16,6 @@ vi.mock('@furatora/database/client', () => ({ db: {} }));
 
 const LINE_ID = '550e8400-e29b-41d4-a716-446655440000';
 const DIRECTION_ID = '550e8400-e29b-41d4-a716-446655440002';
-const STATION_ID = '550e8400-e29b-41d4-a716-446655440001';
 const params = { params: Promise.resolve({ lineId: LINE_ID, directionId: DIRECTION_ID }) };
 
 function request(body: string) {
@@ -29,7 +28,6 @@ function request(body: string) {
 
 const validBody = {
   directionType: 'inbound',
-  representativeStationId: STATION_ID,
   displayName: '荻窪・方南町方面',
   isDefault: true,
 };

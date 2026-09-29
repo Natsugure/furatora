@@ -93,7 +93,6 @@ describe('directionSchema', () => {
   it('必須フィールドで正常にパースされる', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
-      representativeStationId: VALID_UUID,
       displayName: '内回り',
       isDefault: false,
     });
@@ -103,25 +102,27 @@ describe('directionSchema', () => {
   it('directionTypeが不正な値の場合は失敗する', () => {
     const result = directionSchema.safeParse({
       directionType: 'clockwise',
-      representativeStationId: VALID_UUID,
       displayName: '内回り',
     });
     expect(result.success).toBe(false);
   });
 
-  it('representativeStationIdがUUIDでない場合は失敗する', () => {
+  it('代表駅・終点駅を送っても結果に含めない（#129 で廃止した項目）', () => {
     const result = directionSchema.safeParse({
       directionType: 'outbound',
-      representativeStationId: 'not-uuid',
       displayName: '外回り',
+      isDefault: false,
+      representativeStationId: VALID_UUID,
+      terminalStationIds: [VALID_UUID],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.data).not.toHaveProperty('representativeStationId');
+    expect(result.data).not.toHaveProperty('terminalStationIds');
   });
 
   it('displayNameがない場合は失敗する', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
-      representativeStationId: VALID_UUID,
     });
     expect(result.success).toBe(false);
   });
@@ -129,7 +130,6 @@ describe('directionSchema', () => {
   it('isDefaultを省略した場合は失敗する（PUT で既定行が黙って既定から外れないように）', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
-      representativeStationId: VALID_UUID,
       displayName: '内回り',
     });
     expect(result.success).toBe(false);
@@ -138,7 +138,6 @@ describe('directionSchema', () => {
   it('isDefaultに true を渡せる', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
-      representativeStationId: VALID_UUID,
       displayName: '内回り',
       isDefault: true,
     });
@@ -148,7 +147,6 @@ describe('directionSchema', () => {
   it('isDefaultが真偽値でない場合は失敗する', () => {
     const result = directionSchema.safeParse({
       directionType: 'inbound',
-      representativeStationId: VALID_UUID,
       displayName: '内回り',
       isDefault: 'true',
     });

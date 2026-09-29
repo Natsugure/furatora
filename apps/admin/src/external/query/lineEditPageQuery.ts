@@ -1,10 +1,10 @@
 import { db } from '@furatora/database/client';
-import { operators, lines, lineDirections, stationLines, stations } from '@furatora/database/schema';
+import { operators, lines, lineDirections } from '@furatora/database/schema';
 import type { DirectionType } from '@furatora/database/enums';
 import { and, asc, eq } from 'drizzle-orm';
 import type {
   LineEditPageQuery, LineDirectionEditPageQuery,
-  LineDirectionEditContext, OperatorOption, DirectionStationOption,
+  LineDirectionEditContext, OperatorOption,
 } from '@/features/line/ports';
 
 // admin 全体の Query Service 化は #48。ここは #49 で先行導入したもの。
@@ -48,20 +48,6 @@ async function getLineName(lineId: string) {
   return db.select({ name: lines.name }).from(lines).where(eq(lines.id, lineId)).limit(1);
 }
 
-async function getLineStations(lineId: string): Promise<DirectionStationOption[]> {
-  return db
-    .select({
-      id: stations.id,
-      name: stations.name,
-      nameEn: stations.nameEn,
-      code: stations.code,
-    })
-    .from(stationLines)
-    .innerJoin(stations, eq(stationLines.stationId, stations.id))
-    .where(eq(stationLines.lineId, lineId))
-    .orderBy(asc(stationLines.stationOrder));
-}
-
 // (路線, 走行方向) ごとの現在の既定行（ADR-0014）。組ごとに高々1行（unique_line_direction_default）
 async function getCurrentDefaults(lineId: string): Promise<LineDirectionEditContext['currentDefaults']> {
   const rows = await db
@@ -78,39 +64,34 @@ async function getCurrentDefaults(lineId: string): Promise<LineDirectionEditCont
 export const dbLineDirectionEditPageQuery: LineDirectionEditPageQuery = {
   async getCreateContext(lineId) {
     // neon-http は await ごとに HTTP 往復になるため、依存の無いものは Promise.all でまとめる
-    const [[line], lineStations, currentDefaults] = await Promise.all([
+    const [[line], currentDefaults] = await Promise.all([
       getLineName(lineId),
-      getLineStations(lineId),
       getCurrentDefaults(lineId),
     ]);
     if (!line) return null;
 
-    return { lineName: line.name, stations: lineStations, currentDefaults };
+    return { lineName: line.name, currentDefaults };
   },
 
   async getEditContext(lineId, directionId) {
-    const [[line], [direction], lineStations, currentDefaults] = await Promise.all([
+    const [[line], [direction], currentDefaults] = await Promise.all([
       getLineName(lineId),
       db
         .select()
         .from(lineDirections)
         .where(and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId))),
-      getLineStations(lineId),
       getCurrentDefaults(lineId),
     ]);
     if (!line || !direction) return null;
 
     const context: LineDirectionEditContext = {
       lineName: line.name,
-      stations: lineStations,
       currentDefaults,
       direction: {
         id: direction.id,
         directionType: direction.directionType,
-        representativeStationId: direction.representativeStationId,
         displayName: direction.displayName,
         displayNameEn: direction.displayNameEn ?? '',
-        terminalStationIds: direction.terminalStationIds,
         notes: direction.notes ?? '',
         isDefault: direction.isDefault,
       },
