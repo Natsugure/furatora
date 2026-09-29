@@ -12,13 +12,17 @@
 
 ## フェーズ3: 実装
 
-- [ ] **TASK-4** `schema.ts` から2列を削除し、`drizzle-kit generate --custom` で `0016` を作って `DROP NOT NULL` を書く（依存: なし）
-- [ ] **TASK-5** Admin の zod・ports・Repository・Query・フォーム・一覧・ページから2項目と `stations` を外す。テストを更新する（依存: TASK-4）
-- [ ] **TASK-6** CLAUDE.md の二段階ルールに補足する
+- [x] **TASK-4** `schema.ts` から2列を削除し、`drizzle-kit generate --custom` で `0016` を作って `DROP NOT NULL` を書く（依存: なし）。
+      結果: `0016_line_directions_representative_nullable.sql`。`0016_snapshot.json` は `id`・`prevId` 以外 0015 と同一（両列が残る）
+- [x] **TASK-5** Admin の zod・ports・Repository・Query・フォーム・一覧・ページから2項目と `stations` を外す。テストを更新する（依存: TASK-4）。
+      結果: 方面フォームの `stations` と駅の取得（`getLineStations`）も削除した。REQ-4 のテストを zod・API・フォームに追加
+- [x] **TASK-6** CLAUDE.md の二段階ルールに補足する
 
 ## フェーズ4: 検証
 
-- [ ] **TASK-7** `pnpm run typecheck` / `lint` / `test` / `build`。2項目の参照が残っていないこと。`db:generate` を試しに実行すると DROP ×2 だけが出ること（生成物は破棄する）
+- [x] **TASK-7** `pnpm run typecheck` / `lint` / `test` / `build`。2項目の参照が残っていないこと。`db:generate` を試しに実行すると DROP ×2 だけが出ること（生成物は破棄する）。
+      結果（2026-09-30）: typecheck 6・lint 4・build 2 タスク成功、test は admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42 が成功。
+      試しの `db:generate` は FK `line_directions_representative_station_id_stations_id_fk` の削除と DROP COLUMN ×2 だけを出した（破棄済み）
 - [ ] **TASK-8** 開発者が development に `db:migrate` を適用する。Neon MCP で `NOT NULL` が外れ、行数・値が変わらないことを確認し、
       Admin の方面の作成・編集・一覧、Web の駅詳細を確認する
 
