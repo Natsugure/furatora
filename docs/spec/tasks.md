@@ -1,35 +1,28 @@
-# 実装タスク: station_connections の旧4列と難易度 enum の削除 (Issue #136)
+# 実装タスク: line_directions の代表駅・終点駅の除去 — 1段目 (Issue #129)
 
 - **参照**: [requirements.md](./requirements.md) / [design.md](./design.md)
-- **ブランチ**: `feat/issue136-drop-legacy-difficulty-columns`（`develop` から作成）
-- **前提**: #125 が `main` にリリース済み（2026-09-28 に確認）
+- **ブランチ**: `feat/issue129-line-directions-drop-representative`（`feat/issue136-drop-legacy-difficulty-columns` から作成）
+- **前提**: #136（PR #142）のマイグレーション 0015 の上に積む
 
 ## フェーズ1〜2: 分析・設計
 
-- [x] **TASK-1** 旧4列・enum 型の参照箇所と、`stationConnections` の SELECT / INSERT / DELETE の形を確認する
-- [x] **TASK-2** `docs/spec/` の3点セットを本 Issue 用に全面的に書き換える
+- [x] **TASK-1** 両列の読み書き箇所と、`line_directions` の全列 SELECT（Web `stationDetailQuery`・Admin の一覧・API の GET・`lineEditPageQuery`）を確認する
+- [x] **TASK-2** 開発者確認（2026-09-30）: 1段目で `schema.ts` から消す方式（決定1）。ADR にせず CLAUDE.md に補足する。Issue #129 の本文を修正する
+- [x] **TASK-3** `docs/spec/` の3点セットを本 Issue 用に全面的に書き換える
 
 ## フェーズ3: 実装
 
-- [x] **TASK-3** `schema.ts` から4列と enum 型の import を、`enums.ts` から2型を削除する（依存: なし）
-- [x] **TASK-4** `pnpm run db:generate` でマイグレーションを生成し、DROP COLUMN ×4 だけであることを確認する（依存: TASK-3）。
-      結果: `0015_drop_legacy_transfer_difficulty.sql`。0011 に倣い、削除が安全な理由を冒頭のコメントに書いた
-- [x] **TASK-5** Admin のテスト・コメント、`packages/database/CLAUDE.md` を更新する（依存: TASK-3）
+- [ ] **TASK-4** `schema.ts` から2列を削除し、`drizzle-kit generate --custom` で `0016` を作って `DROP NOT NULL` を書く（依存: なし）
+- [ ] **TASK-5** Admin の zod・ports・Repository・Query・フォーム・一覧・ページから2項目と `stations` を外す。テストを更新する（依存: TASK-4）
+- [ ] **TASK-6** CLAUDE.md の二段階ルールに補足する
 
 ## フェーズ4: 検証
 
-- [x] **TASK-6** `pnpm run typecheck` / `lint` / `test` / `build` が通ること。旧4列・enum 型の参照が残っていないこと。
-      結果（2026-09-29）: typecheck 6・lint 4・build 2 タスク成功、test は admin 625・platform-diagram 203・
-      transfer-difficulty 55・frontend 42 が成功。参照は `schema.ts` の削除済みの注記のみ
-- [x] **TASK-7** 開発者が development に `db:migrate` を適用する。Neon MCP で列が消え行数が変わらないことを確認し、
-      Admin の接続の追加・削除と Web の駅詳細を確認する。
-      結果（2026-09-29）: 適用済みマイグレーション 15→16、`station_connections` は 10列→6列・6,950行のまま。main は15件・10列のまま。
-      Admin の API で淡路町↔神田（銀座線）の接続を作成（201・有向2行・`manual`）→ 削除（200）し、6,950行・接続60・ルート21 に戻った。
-      Admin の駅編集・レイアウト・駅対の編集画面が 200 で表示され、Web の淡路町は乗換先5件と評価を表示した。
-      Web のホーム図でハイドレーションの不一致（`FreeSpaceBadges` の `<title>`）がコンソールに出たが、本変更の対象外
+- [ ] **TASK-7** `pnpm run typecheck` / `lint` / `test` / `build`。2項目の参照が残っていないこと。`db:generate` を試しに実行すると DROP ×2 だけが出ること（生成物は破棄する）
+- [ ] **TASK-8** 開発者が development に `db:migrate` を適用する。Neon MCP で `NOT NULL` が外れ、行数・値が変わらないことを確認し、
+      Admin の方面の作成・編集・一覧、Web の駅詳細を確認する
 
 ## フェーズ5〜6: 振り返り・引き渡し
 
-- [x] **TASK-8** `docs/domain/station-master-model.md` の凍結の記述を削除する。ADR の変更が無いことを確認する。
-      あわせて「乗換難易度」の適用状況を本番反映済みに上書きした（Neon MCP で main に 0000〜0014 の15件・接続60・ルート21 を確認）
-- [x] **TASK-9** PR（base: `develop`）を作成する。デプロイ中は Admin で接続を追加しない旨を書く 結果: #142
+- [ ] **TASK-9** `docs/domain/line-directions.md` を更新する。ADR の変更が無いことを確認する
+- [ ] **TASK-10** 2段目の Issue を起票し、PR を作成する（base は PR #142 のマージ前は `feat/issue136-drop-legacy-difficulty-columns`）
