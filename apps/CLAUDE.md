@@ -98,7 +98,7 @@ src/
 - DBアクセスはServer ComponentまたはServer Actions・Route Handlersのみで実施（クライアントからの直接アクセス禁止）
 - N+1問題を防ぐためにクエリを適切に最適化（`with`・`columns`の活用）
 - マイグレーションはDrizzle Kit（`db:generate` → `db:migrate`）で管理
-- スキーマ定義はすべて`packages/database/src/schema.ts`に集約されている
+- スキーマ定義は`packages/database/src/schema/`にドメイン別のファイルで置かれている（`index.ts`で再 export）
 
 ### 認証と認可
 - 認証は**admin appのみ**で実装。web appは認証不要の公開サービス
@@ -162,7 +162,7 @@ src/
 ## 実装プロセス
 1. App Routerのディレクトリ構成とデータフローを計画
 2. TypeScriptインターフェース・Zodスキーマを定義
-3. `packages/database/src/schema.ts`にDBスキーマを追加し、マイグレーションを設計
+3. `packages/database/src/schema/`の対応するドメインのファイルにDBスキーマを追加し、マイグレーションを設計
 4. Server Componentとlayout階層を実装
 5. Server ActionsとRoute Handlersを実装
 6. Client Componentを必要な箇所のみに実装

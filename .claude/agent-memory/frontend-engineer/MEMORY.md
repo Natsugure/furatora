@@ -3,7 +3,7 @@
 ## プロジェクト構造
 - `apps/admin` - 管理者用アプリ (Next.js App Router, `src/` 配下)
 - `apps/web` - フロントエンドアプリ
-- `packages/database/src/schema.ts` - 全テーブル定義の集約ファイル
+- `packages/database/src/schema/` - テーブル定義（ドメイン別のファイル。`index.ts` で再 export）
 - DBクライアントは `@furatora/database/client` からインポート
 
 ## 重要パターン: stationConnections の路線解決（旧パターンは使わない）
