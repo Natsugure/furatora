@@ -1,38 +1,20 @@
-# 実装タスク: line_directions の代表駅・終点駅の除去 — 1段目 (Issue #129)
+# タスク: packages/database の schema.ts のドメイン別分割 (Issue #149)
 
-- **参照**: [requirements.md](./requirements.md) / [design.md](./design.md)
-- **ブランチ**: `feat/issue129-line-directions-drop-representative`（`feat/issue136-drop-legacy-difficulty-columns` から作成）
-- **前提**: #136（PR #142）のマイグレーション 0015 の上に積む
-
-## フェーズ1〜2: 分析・設計
-
-- [x] **TASK-1** 両列の読み書き箇所と、`line_directions` の全列 SELECT（Web `stationDetailQuery`・Admin の一覧・API の GET・`lineEditPageQuery`）を確認する
-- [x] **TASK-2** 開発者確認（2026-09-30）: 1段目で `schema.ts` から消す方式（決定1）。ADR にせず CLAUDE.md に補足する。Issue #129 の本文を修正する
-- [x] **TASK-3** `docs/spec/` の3点セットを本 Issue 用に全面的に書き換える
-
-## フェーズ3: 実装
-
-- [x] **TASK-4** `schema.ts` から2列を削除し、`drizzle-kit generate --custom` で `0016` を作って `DROP NOT NULL` を書く（依存: なし）。
-      結果: `0016_line_directions_representative_nullable.sql`。`0016_snapshot.json` は `id`・`prevId` 以外 0015 と同一（両列が残る）
-- [x] **TASK-5** Admin の zod・ports・Repository・Query・フォーム・一覧・ページから2項目と `stations` を外す。テストを更新する（依存: TASK-4）。
-      結果: 方面フォームの `stations` と駅の取得（`getLineStations`）も削除した。REQ-4 のテストを zod・API・フォームに追加
-- [x] **TASK-6** CLAUDE.md の二段階ルールに補足する
-
-## フェーズ4: 検証
-
-- [x] **TASK-7** `pnpm run typecheck` / `lint` / `test` / `build`。2項目の参照が残っていないこと。`db:generate` を試しに実行すると DROP ×2 だけが出ること（生成物は破棄する）。
-      結果（2026-09-30）: typecheck 6・lint 4・build 2 タスク成功、test は admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42 が成功。
-      試しの `db:generate` は FK `line_directions_representative_station_id_stations_id_fk` の削除と DROP COLUMN ×2 だけを出した（破棄済み）
-- [x] **TASK-8** 開発者が development に `db:migrate` を適用する。Neon MCP で `NOT NULL` が外れ、行数・値が変わらないことを確認し、
-      Admin の方面の作成・編集・一覧、Web の駅詳細を確認する。
-      結果（2026-09-30）: 適用済みマイグレーション 16→17、`representative_station_id` の `is_nullable` が NO→YES。
-      54行・代表駅54行・終点駅7行で、`id`・両列の md5 が適用前と一致。main は15件・NOT NULL のまま。
-      Admin（Chrome DevTools MCP）: 丸ノ内線の方面一覧が9件で代表駅の表示なし・既定のバッジあり。編集画面に代表駅・終点駅の入力が無く、無変更の更新が保存され、既存の代表駅の値は残る。
-      代表駅・終点駅を含めた POST が 201 で、作成行の両列は NULL。DELETE 200 のあと md5 が適用前と一致。新規作成画面に代表駅・終点駅が無い。
-      Web の淡路町はホームの方面ボタン2つ・1番線・乗換先を表示した
-
-## フェーズ5〜6: 振り返り・引き渡し
-
-- [x] **TASK-9** `docs/domain/line-directions.md` を更新する。ADR の変更が無いことを確認する。
-      結果: モデル図から2列を外し、適用状況に除去の途中であることを書いた。0013・0014 の本番反映済みも上書きした。ADR は変更なし
-- [x] **TASK-10** 2段目の Issue を起票し、PR を作成する（base は PR #142 のマージ前は `feat/issue136-drop-legacy-difficulty-columns`） 結果: 2段目は #144
+- [x] **TASK-1** Issue #149 を作成し、`develop` からブランチ `refactor/issue149-split-database-schema` を切る
+- [x] **TASK-2** 分割前に `drizzle-kit generate` を実行し、差分が無いことを確認する（依存: TASK-1）
+  - 結果: `No schema changes, nothing to migrate`
+- [x] **TASK-3** `src/schema/` の5ファイルを作り、`schema.ts` を削除する。`package.json` の exports と `drizzle.config.ts` を直す（依存: TASK-2）
+  - 元ファイルの行範囲を `sed` で切り出して作った（手で書き写さない）
+  - `transfer.ts` 冒頭の「難易度4列は #125 のあとの別デプロイで落とす」を、#136 で完了済みの現在形に直した
+- [x] **TASK-4** 検証（依存: TASK-3）
+  - `drizzle-kit generate`: `No schema changes, nothing to migrate`。`drizzle/` に差分なし
+  - 行の並べ替え `diff`: 違いは各ファイルの見出しコメント4つと、TASK-3 のコメント修正だけ
+  - `pnpm run typecheck`（6タスク）・`pnpm run lint`（4タスク）成功
+  - `pnpm run test`: admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42 すべて成功
+  - `pnpm run build` 成功（DB に触れない）
+- [x] **TASK-5** ドキュメントのパスを直す（依存: TASK-3）
+  - `CLAUDE.md`（二段階マイグレーションの補足）・`apps/CLAUDE.md`・`packages/database/CLAUDE.md`・`.github/instructions/drizzle.instruction.md`・`.claude/agent-memory/frontend-engineer/MEMORY.md`
+  - `docs/domain/station-visibility.md`・`docs/domain/station-master-model.md`: パスの言及のみ。ドメインルールの変更は無いことを確認した
+  - ADR（0004・0005・0008）の `schema.ts` への言及は書き換えない（追記のみの運用）
+- [x] **TASK-6** `docs/adr/`: 変更なし（design.md 決定3）
+- [ ] **TASK-7** PR を `develop` 向けに作る。マイグレーションが増えないため、Vercel のビルドで流れるものは無い

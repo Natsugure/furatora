@@ -3,7 +3,7 @@
 > **適用状況**: 2026-09-08 現在、**実装済み・本番反映済み**。
 > 駅・路線マスタの初回シードは 駅データ.jp（ekidata）会員版CSV であり、
 > 本番（Neon `main`）へ投入済み（事業者162 / 路線602 / 駅10,625 / 乗換単位8,782 /
-> 隣接10,040 / 乗換接続6,946）。`packages/database/src/schema.ts` と一致する。
+> 隣接10,040 / 乗換接続6,946）。`packages/database/src/schema/` と一致する。
 > CSV の取込・突合を行った Admin の機構（`master-import` / `master-migration`）は
 > **投入完了後に削除済み**（[ADR-0007](../adr/0007-station-master-data-source.md) 決定4 / Issue #56）。
 > 以後の維持は Admin での手動編集が主経路。**駅・路線の新規作成、乗換接続・隣接の
