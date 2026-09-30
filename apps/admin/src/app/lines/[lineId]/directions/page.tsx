@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { db } from '@furatora/database/client';
-import { lines, lineDirections, stations } from '@furatora/database/schema';
-import { eq, asc, inArray } from 'drizzle-orm';
+import { lines, lineDirections } from '@furatora/database/schema';
+import { eq, asc } from 'drizzle-orm';
 import { FALLBACK_DIRECTION_LABELS } from '@furatora/transfer-difficulty/domain';
 import { Badge, Card, Group, Stack, Text, Title } from '@mantine/core';
 import { DeleteButton } from '@/components/DeleteButton';
@@ -22,14 +22,6 @@ export default async function LineDirectionsPage({
     .from(lineDirections)
     .where(eq(lineDirections.lineId, lineId))
     .orderBy(asc(lineDirections.directionType));
-
-  // Fetch representative stations
-  const stationIds = directions.map((d) => d.representativeStationId);
-  const stationList =
-    stationIds.length > 0
-      ? await db.select().from(stations).where(inArray(stations.id, stationIds))
-      : [];
-  const stationMap = Object.fromEntries(stationList.map((s) => [s.id, s.name]));
 
   return (
     <div>
@@ -71,9 +63,6 @@ export default async function LineDirectionsPage({
                   </Group>
                   <Text size="sm" c="dimmed">
                     タイプ: {FALLBACK_DIRECTION_LABELS[direction.directionType]}
-                  </Text>
-                  <Text size="sm" c="dimmed">
-                    代表駅: {stationMap[direction.representativeStationId] ?? '-'}
                   </Text>
                   {direction.notes && (
                     <Text size="sm" c="gray.5" mt="xs">{direction.notes}</Text>

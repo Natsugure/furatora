@@ -3,22 +3,20 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
-  Alert, Button, Checkbox, Group, NativeSelect, ScrollArea,
+  Alert, Button, Checkbox, Group, NativeSelect,
   Stack, Text, TextInput, Textarea,
 } from '@mantine/core';
 import type { DirectionType } from '@furatora/database/enums';
 import { FALLBACK_DIRECTION_LABELS } from '@furatora/transfer-difficulty/domain';
-import type { DirectionStationOption, LineDirectionEditContext } from '@/features/line/ports';
+import type { LineDirectionEditContext } from '@/features/line/ports';
 import { DIRECTIONS } from '@/features/transfer-connection/domain/types';
 import { describeError } from '@/features/station-publishing/describeError';
 
 type LineDirectionData = {
   id?: string;
   directionType: DirectionType;
-  representativeStationId: string;
   displayName: string;
   displayNameEn: string;
-  terminalStationIds: string[] | null;
   notes: string;
   isDefault: boolean;
 };
@@ -27,18 +25,13 @@ type Props = {
   lineId: string;
   initialData?: LineDirectionData;
   isEdit?: boolean;
-  stations: DirectionStationOption[];
   currentDefaults: LineDirectionEditContext['currentDefaults'];
 };
 
 const isDirectionType = (value: string): value is DirectionType =>
   (DIRECTIONS as readonly string[]).includes(value);
 
-function stationLabel(s: DirectionStationOption) {
-  return `${s.name}${s.nameEn ? ` (${s.nameEn})` : ''}${s.code ? ` [${s.code}]` : ''}`;
-}
-
-export function LineDirectionForm({ lineId, initialData, isEdit = false, stations, currentDefaults }: Props) {
+export function LineDirectionForm({ lineId, initialData, isEdit = false, currentDefaults }: Props) {
   const router = useRouter();
   const [directionType, setDirectionType] = useState<DirectionType>(initialData?.directionType ?? 'inbound');
   // 新規作成で、その組に既定行がまだ無ければ既定にしておく（ADR-0014。無いと「上り」「下り」で表示される）
@@ -47,22 +40,10 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
   // 利用者がチェックを触ったあとは、方面タイプを切り替えても初期値を上書きしない
   const [isDefaultTouched, setIsDefaultTouched] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
-  const [representativeStationId, setRepresentativeStationId] = useState(
-    initialData?.representativeStationId ?? ''
-  );
   const [displayName, setDisplayName] = useState(initialData?.displayName ?? '');
   const [displayNameEn, setDisplayNameEn] = useState(initialData?.displayNameEn ?? '');
-  const [terminalStationIds, setTerminalStationIds] = useState<string[]>(
-    initialData?.terminalStationIds ?? []
-  );
   const [notes, setNotes] = useState(initialData?.notes ?? '');
   const [submitting, setSubmitting] = useState(false);
-
-  function toggleTerminalStation(stationId: string) {
-    setTerminalStationIds((prev) =>
-      prev.includes(stationId) ? prev.filter((id) => id !== stationId) : [...prev, stationId]
-    );
-  }
 
   function changeDirectionType(value: string) {
     if (!isDirectionType(value)) return;
@@ -85,10 +66,8 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
 
     const payload = {
       directionType,
-      representativeStationId,
       displayName,
       displayNameEn: displayNameEn || null,
-      terminalStationIds: terminalStationIds.length > 0 ? terminalStationIds : null,
       notes: notes || null,
       isDefault,
     };
@@ -114,11 +93,6 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
       setError(describeError(body));
     }
   }
-
-  const stationSelectData = stations.map((s) => ({
-    value: s.id,
-    label: stationLabel(s),
-  }));
 
   return (
     <form onSubmit={handleSubmit}>
@@ -167,34 +141,6 @@ export function LineDirectionForm({ lineId, initialData, isEdit = false, station
               （ホームが未登録の駅では「{FALLBACK_DIRECTION_LABELS[lostDefaultType]}」と表示されます）
             </Text>
           )}
-        </div>
-
-        <NativeSelect
-          label="代表駅"
-          description="この方面を表す代表的な駅（例：渋谷方面の場合は渋谷駅）"
-          data={[{ value: '', label: '駅を選択' }, ...stationSelectData]}
-          value={representativeStationId}
-          onChange={(e) => setRepresentativeStationId(e.target.value)}
-          required
-        />
-
-        <div>
-          <Text size="sm" fw={500} mb="xs">終点駅 - 任意</Text>
-          <Text size="xs" c="dimmed" mb="xs">
-            この方面の終点となりうる駅を選択してください
-          </Text>
-          <ScrollArea.Autosize mah={240} type="auto" offsetScrollbars>
-            <Stack gap="xs">
-              {stations.map((station) => (
-                <Checkbox
-                  key={station.id}
-                  label={stationLabel(station)}
-                  checked={terminalStationIds.includes(station.id)}
-                  onChange={() => toggleTerminalStation(station.id)}
-                />
-              ))}
-            </Stack>
-          </ScrollArea.Autosize>
         </div>
 
         <Textarea

@@ -1,154 +1,67 @@
-# 設計: 乗換難易度 Web 表示の対応 (Issue #125)
+# 設計: line_directions の代表駅・終点駅の除去 — 1段目 (Issue #129)
 
 - **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
-## アーキテクチャ
+## 変更対象
 
 ```
-packages/transfer-difficulty/src/domain/
-  requirement.ts     requirementFor / isBarrierFree（#124。変更なし）
-  directionLabel.ts  resolveDirectionLabel（#130。変更なし）
-  assessment.ts      【新規】lightestRequirement / assessRoutes（重さの順序を使うのでここに置く）
-
-apps/web/src/
-  external/query/stationDetailQuery.ts   旧4列の読み取りを外し、transferPartners を組む
-  external/query/transferPartnerRows.ts  【新規】新モデルの読み取り（2段の Promise.all）と DTO の組み立て
-  features/station/domain/types.ts       TransferPartnerDTO ほか（TransferConnectionDTO を置き換え）
-  features/station/domain/transferView.ts【新規】方面のグループ化・値が異なる項目の検出（純粋関数）
-  components/TransferDifficultySection.tsx  書き換え（ペルソナ2列を維持）
-  constants/transferDifficulty.ts        【新規】状態のアイコン・色、フラグの文言
-  constants/difficulty.ts                【削除】読む箇所が無くなる
+packages/database/src/schema.ts            lineDirections から2列を削除
+packages/database/drizzle/0016_*           【新規・手書き】representative_station_id の DROP NOT NULL
+apps/admin/src/
+  lib/validations.ts                       directionSchema から2項目を削除（zod は未知のキーを捨てる）
+  features/line/ports.ts                   LineDirectionWriteInput・LineDirectionEditContext から2項目と stations を削除、
+                                           DirectionStationOption を削除
+  external/repository/lineDirectionRepository.ts   returning の列から2項目を削除
+  external/query/lineEditPageQuery.ts      getLineStations を削除（方面フォームの選択肢にしか使っていない）
+  components/LineDirectionForm.tsx         代表駅・終点駅の入力欄と stations プロパティを削除
+  app/lines/[lineId]/directions/page.tsx   代表駅の表示と駅の取得を削除
+  app/lines/[lineId]/directions/new・[directionId]/edit/page.tsx   stations の受け渡しを削除
+  各テスト                                  2項目・代表駅の選択を外す
+CLAUDE.md                                  二段階ルールに Drizzle での 1段目の意味を補足
+docs/domain/line-directions.md             モデル図から2列を外す、適用状況の更新
 ```
 
-## データフロー
-
-```mermaid
-sequenceDiagram
-  participant Page as stations/[slug]/page.tsx
-  participant Q as stationDetailQuery
-  participant DB
-  Page->>Q: getBySlug(slug)
-  Q->>DB: 1段目 stationConnections×lines / transfer_connections（S を端点に持つ）/ ほか既存
-  Q->>DB: 2段目 connection_routes⋈transfer_routes / 設備 / ホームの方面 / 既定行 / 路線
-  Q-->>Page: StationDetailDTO { transferPartners }
-  Page->>Section: partners
-  Section->>transferView: groupCombos(partner)
-  Section->>assessment: assessRoutes(persona, routes)
-```
-
-## インターフェース
-
-### パッケージ（`assessment.ts`）
-
-```ts
-export type RouteFacts = { minutes: number | null; isBaseline: boolean; facilities: readonly FacilityTypeCode[] };
-
-export function lightestRequirement(persona: Persona, requirements: readonly (Requirement | null)[]): Requirement | null;
-
-export type Assessment<R extends RouteFacts> =
-  | { kind: 'unevaluated' }
-  | { kind: 'barrierFree'; routes: R[]; detour: number | null }   // detour = routes[0] − 基準ルート（迂回度）
-  | { kind: 'undetermined'; lightest: Requirement | null }
-  | { kind: 'none'; lightest: Requirement | null };
-
-export function assessRoutes<R extends RouteFacts>(persona: Persona, routes: readonly R[]): Assessment<R>;
-```
-
-### DTO（`features/station/domain/types.ts`）
-
-```ts
-export type TransferRouteDTO = {
-  routeId: string; label: string; isBaseline: boolean; minutes: number | null;
-  isOutdoor: boolean; requiresExitGate: boolean; requiresStaff: boolean; isOfficiallyGuided: boolean;
-  notes: string | null; facilities: FacilityTypeCode[];
-};
-export type TransferComboDTO = {
-  stationDirection: DirectionType; connectedDirection: DirectionType;
-  notes: string | null; routes: TransferRouteDTO[];
-};
-export type TransferPartnerDTO = {
-  connectedStationId: string; lineName: string; lineColor: string | null;
-  stationLineName: string;
-  directionLabels: { station: Record<DirectionType, string>; connected: Record<DirectionType, string> };
-  combos: TransferComboDTO[];   // 接続行がある組み合わせだけ。空 = 未評価
-};
-```
-
-### 表示の組み立て（`transferView.ts`）
-
-```ts
-export type ComboGroup = {
-  heading: string | null;          // すべての組み合わせが同じなら null
-  routes: TransferRouteDTO[];      // 空 = 未評価のグループ
-  notes: string | null;
-};
-export function groupCombos(partner: TransferPartnerDTO): ComboGroup[];
-export type RouteField = 'minutes' | 'requirement' | 'isOutdoor' | 'requiresExitGate' | 'requiresStaff' | 'isOfficiallyGuided';
-export function differingFields(persona: Persona, routes: readonly TransferRouteDTO[]): Set<RouteField>;
-```
+Web（`stationDetailQuery` の `line_directions` の全列 SELECT を含む）は変更しない。`schema.ts` から列が消えると、全列 SELECT は2列を読まなくなる。
 
 ## 決定
 
-### 決定1: 重さの順序を使う関数はパッケージに置く
-`requirement.ts` の WEIGHT は「この関数の中だけに存在する」規約。最も軽い行為（REQ-7）は順序が要るため、Web に書かず
-パッケージに足す。状態の分類・迂回度も解釈規則なので同じ場所に置く（Admin のプレビューが将来使える）。
+### 決定1: 1段目で `schema.ts` から列を消し、`NOT NULL` の解除は手書きマイグレーションで行う
 
-### 決定2: 「確認できていない」状態を足す
-ADR-0012 は、設備0件のルートを導出にもバリアフリールートの数にも入れないと決めている。
-その結果、バリアフリールートが0本でも、未入力のルートがバリアフリーである可能性は残る。この状態を「なし」と
-断定すると事実と違うことがあるため、別の状態にする（開発者判断 2026-09-27）。恒久ルールとして domain に書く。ADR は作らない
-（ADR-0012 の帰結であり、独立した設計判断ではないため）。
+- **コンテキスト**: Drizzle は `schema.ts` にある列を、全列 SELECT（`db.select().from(t)`）と INSERT の SQL に必ず含める。
+  `schema.ts` に列を残したまま2段目で列を落とすと、2段目のデプロイ中（マイグレーション適用後〜新コードへの切り替え）に
+  旧コードが消えた列を読み書きして失敗する。`line_directions` は Web の `stationDetailQuery` が全列 SELECT しているため、公開サイトの駅詳細も含む
+- **オプション**:
+  - (a) `schema.ts` から消す（本決定）。デプロイ中の障害が起きず、あとから全列 SELECT が書かれても壊れない。
+    段階の間、`schema.ts` と Drizzle のスナップショットが食い違う
+  - (b) `schema.ts` に `nullable` で残し、全列 SELECT を列の明示に直す。スナップショットは一致するが、
+    2段目のデプロイ中に方面の INSERT が失敗し、全列 SELECT を書かない注意に頼る
+- **理論的根拠**: CLAUDE.md の1段目は「その列を読まないコード」をデプロイすることであり、Drizzle では `schema.ts` に列がある時点で
+  読み書きしている。(a) はルールの正しい読み方であって新しい決定ではないため、ADR にせず CLAUDE.md に補足する（開発者確認済み、2026-09-30）
+- **影響**:
+  - マイグレーションは `drizzle-kit generate --custom` で空のファイルを作って手で書く。スナップショットは直前と同じになり、両列が残る
+  - 2段目では `pnpm run db:generate` が両列の `DROP COLUMN` を生成する
+  - 1段目と2段目の間に `db:generate` / `db:push` を実行すると DROP が混ざる。2段目を次の作業にする
+- **レビュー**: Drizzle が全列 SELECT・INSERT の列の出し方を変えたとき
 
-### 決定3: 方面のグループ化は「ルートの組＋接続の備考」の一致で行う
-組み合わせごとに routeId・label・isBaseline の組と接続の備考が一致するものを1グループにまとめる。
-見出しは次のように決める。
-- グループが S 側の方面1つだけで決まる場合（T の両方面を含む）→「{S の路線} {S の方面}」
-- T 側の方面1つだけで決まる場合 →「{T の路線} {T の方面}」
-- それ以外 → 組み合わせごとに「{S の方面} → {T の方面}」を「、」で連結する
+### 決定2: 方面一覧の「代表駅」の表示は外す
 
-評価済みの組み合わせが4通りそろわない場合、残りの組み合わせは「未評価」のグループにする。
-全組み合わせが1グループなら見出しは null になる（現行と同じ1枚の見た目）。
-
-### 決定4: 方面ラベルは駅の最初の路線で解決する
-`docs/domain/line-directions.md` のとおり、駅は1駅1路線である。Admin の駅対編集画面と同じく、`stationLines` を路線の
-`displayOrder`、同順なら id で並べた先頭の路線で、ホームと既定行を絞る。ホームは番号の数値順に渡す。
-
-### 決定5: `PlatformTabs` とは統合しない
-ホームのタブは `line_directions.id` 単位で、乗換接続は `(駅, direction_type)` 単位。キーが違ううえに、ホームが
-登録されている駅は20駅だけである。乗換セクションの中で方面の見出しを出す。
-
-### 決定6: `constants/difficulty.ts` はこのデプロイで消す
-Web で読む箇所が無くなり、DB にも触れないため。旧4列と enum の削除は、列を読むコードが本番から消えたあとの次のデプロイで行う
-（CLAUDE.md の二段階ルール）。
-
-### 決定7: 「公式案内なし」を表示する
-移行データの `isOfficiallyGuided = false` は確認済みの値（開発者確認 2026-09-28）。false のルートに
-「駅の構内図・公式案内に載っていないルート」と表示する。
+- **コンテキスト**: 表示は1段目のあと NULL の行が増えて意味を失い、2段目で列が消える
+- **理論的根拠**: 表示の値は ODPT 由来の書き込み専用のデータで、解決規則にも使われない（ADR-0014）
+- **影響**: 一覧のカードから1行減る。駅の取得（`stations` への問い合わせ1回）も無くなる
 
 ## エラーハンドリング
 
-| 状況 | 応答 |
-|---|---|
-| 設備コードが `FACILITY_TYPE_CODES` に無い | その行を捨てる（Admin の `isFacilityCode` と同じ） |
-| 紐付けの先のルートが見つからない | その紐付けを捨てる |
-| 相手駅の路線が引けない | 既存どおり、inner join で相手駅ごと出ない |
-| 方面の文言が無い | `resolveDirectionLabel` の ③（上り/下り） |
-| DB エラー | 既存どおり、ページの error boundary に任せる |
+新しいエラー経路は無い。API は2項目を受け取っても zod が捨てる（REQ-4）。
 
 ## テスト戦略
 
-- パッケージ（vitest）: `lightestRequirement` はペルソナごとの順序・impossible と null の除外、`assessRoutes` は4状態＋未入力の混在、
-  並べ替え（null を末尾に）、`detour` は値が欠けたとき・基準ルートがバリアフリーのとき
-- Web domain（vitest）: `groupCombos`（全共通・淡路町↔小川町型・未評価の混在・単一の組み合わせ）、`differingFields`
-- コンポーネント（testing-library）: 設備0件のルートが「そのまま通れる」と出ないこと、各状態の文言、方面の見出し
-- クエリ: CI に DB が無いため、development での手動確認で押さえる
+- 型検査で読み書きの取り残しを検出する（`schema.ts` から列が消えるため、参照は型エラーになる）
+- `validations.test.ts`: 2項目なしでパースできる。2項目を送っても結果に含まれない
+- `LineDirectionForm.test.tsx`: 代表駅・終点駅の入力が無い。送信内容に2項目が無い
+- API ルート・Repository のテスト: 2項目を外して既存の期待が通る
+- development: マイグレーション適用後に `NOT NULL` が外れ、行数と値が変わらないこと。方面の作成・編集・一覧、Web の駅詳細
 
-## 恒久知識の振り分け（フェーズ5で反映）
+## 恒久知識の振り分け
 
-| 内容 | 置き場 |
-|---|---|
-| 表示の状態の分類（「確認できていない」を含む）・並べ替え・迂回度の定義 | `docs/domain/station-master-model.md`「乗換難易度」 |
-| 方面のグループ化の規則 | 同上 |
-| Web が方面ラベルを表示する（適用状況の注記を外す） | `docs/domain/line-directions.md` |
-| ADR-0012 の Accepted 化 | `docs/adr/0012-*.md` |
-| 旧4列の削除 | GitHub Issue（予定された作業） |
+- CLAUDE.md の禁止事項: Drizzle での1段目の意味（決定1）。ADR にしない理由は決定1
+- `docs/domain/line-directions.md`: モデル図から2列を外す。2段目までの適用状況を書く

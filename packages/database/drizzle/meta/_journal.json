@@ -106,6 +106,20 @@
       "when": 1790472470664,
       "tag": "0014_set_line_direction_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790633041583,
+      "tag": "0015_drop_legacy_transfer_difficulty",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790724698283,
+      "tag": "0016_line_directions_representative_nullable",
+      "breakpoints": true
     }
   ]
 }

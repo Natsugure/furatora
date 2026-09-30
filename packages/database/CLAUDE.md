@@ -13,7 +13,7 @@ Next.js のApp RouterやReact固有のAPIは使用しない。
 ```typescript
 import { db } from '@furatora/database/client'  // DBクライアント
 import { stations, lines } from '@furatora/database/schema'  // テーブル定義
-import type { StrollerDifficulty } from '@furatora/database/enums'  // Enum型
+import type { DirectionType } from '@furatora/database/enums'  // Enum型
 ```
 
 ## 接続方式

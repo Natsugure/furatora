@@ -16,7 +16,7 @@ export default async function NewDirectionPage({
   return (
     <div>
       <Title order={2} mb="lg">新規方面 - {context.lineName}</Title>
-      <LineDirectionForm lineId={lineId} stations={context.stations} currentDefaults={context.currentDefaults} />
+      <LineDirectionForm lineId={lineId} currentDefaults={context.currentDefaults} />
     </div>
   );
 }

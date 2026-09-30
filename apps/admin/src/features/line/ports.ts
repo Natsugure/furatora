@@ -30,10 +30,8 @@ export interface LineRepository {
 
 export type LineDirectionWriteInput = {
   directionType: DirectionType;
-  representativeStationId: string;
   displayName: string;
   displayNameEn: string | null;
-  terminalStationIds: string[] | null;
   notes: string | null;
   isDefault: boolean;
 };
@@ -89,24 +87,13 @@ export interface LineEditPageQuery {
 
 // --- 方面（line_directions）---
 
-export type DirectionStationOption = {
-  id: string;
-  name: string;
-  nameEn: string | null;
-  code: string | null;
-};
-
 export type LineDirectionEditContext = {
   lineName: string;
-  // その路線に属する駅（stationLines.stationOrder 順）。代表駅・終点駅の選択肢。
-  stations: DirectionStationOption[];
   direction?: {
     id: string;
     directionType: DirectionType;
-    representativeStationId: string;
     displayName: string;
     displayNameEn: string;
-    terminalStationIds: string[] | null;
     notes: string;
     isDefault: boolean;
   };

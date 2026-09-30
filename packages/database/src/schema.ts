@@ -1,5 +1,5 @@
 import { pgTable, varchar, decimal, integer, smallint, timestamp, text, uuid, boolean, primaryKey, unique, uniqueIndex, date, check } from 'drizzle-orm/pg-core';
-import type { StrollerDifficulty, WheelchairDifficulty, DirectionType, PlatformSide, StationConnectionSource } from './enums';
+import type { DirectionType, PlatformSide, StationConnectionSource } from './enums';
 import { sql } from 'drizzle-orm';
 
 // 粒度は「路線×駅」。ekidata の station_cd と 1:1 で対応する。
@@ -85,11 +85,8 @@ export const stationConnections = pgTable('station_connections', {
   // join で解決する（docs/domain/station-master-model.md「乗換接続（stationConnections）」）
   connectedStationId: uuid('connected_station_id').references(() => stations.id).notNull(),
 
-  strollerDifficulty: varchar('stroller_difficulty', { length: 20 }).$type<StrollerDifficulty>(),
-  wheelchairDifficulty: varchar('wheelchair_difficulty', { length: 20 }).$type<WheelchairDifficulty>(),
-
-  notesAboutStroller: text('notes_about_stroller'),
-  notesAboutWheelchair: text('notes_about_wheelchair'),
+  // 乗換難易度の旧4列（strollerDifficulty 等）は #136 で削除済み。難易度は
+  // transfer_connections 以下の新モデルが持つ（docs/domain/station-master-model.md「乗換難易度」）
 
   // 行の由来。'ekidata_group' は初回シードで station_g_cd から機械生成された行、
   // 'manual' は管理者が手で足した行、NULL は ODPT 時代の行。
@@ -257,10 +254,10 @@ export const lineDirections = pgTable('line_directions', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
   directionType: varchar('direction_type', { length: 20 }).notNull().$type<DirectionType>(),
-  representativeStationId: uuid('representative_station_id').references(() => stations.id).notNull(),
+  // 代表駅・終点駅（representative_station_id / terminal_station_ids）は #129 で除去中。DB には次のデプロイで
+  // DROP するまで残るが、全列 SELECT・INSERT が読み書きしないよう、ここからは先に消している（CLAUDE.md「禁止事項」）
   displayName: varchar('display_name', { length: 100 }).notNull(), // "渋谷方面"
   displayNameEn: varchar('display_name_en', { length: 100 }), // "For Shibuya"
-  terminalStationIds: uuid('terminal_station_ids').array(), // 終着駅候補（複数対応）
   // (路線, 走行方向) の既定の文言。ホームが登録されていない駅の方面ラベルに使う（ADR-0014）。
   isDefault: boolean('is_default').notNull().default(false),
   notes: text('notes'),
