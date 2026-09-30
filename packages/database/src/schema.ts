@@ -254,8 +254,6 @@ export const lineDirections = pgTable('line_directions', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   lineId: uuid('line_id').references(() => lines.id).notNull(),
   directionType: varchar('direction_type', { length: 20 }).notNull().$type<DirectionType>(),
-  // 代表駅・終点駅（representative_station_id / terminal_station_ids）は #129 で除去中。DB には次のデプロイで
-  // DROP するまで残るが、全列 SELECT・INSERT が読み書きしないよう、ここからは先に消している（CLAUDE.md「禁止事項」）
   displayName: varchar('display_name', { length: 100 }).notNull(), // "渋谷方面"
   displayNameEn: varchar('display_name_en', { length: 100 }), // "For Shibuya"
   // (路線, 走行方向) の既定の文言。ホームが登録されていない駅の方面ラベルに使う（ADR-0014）。

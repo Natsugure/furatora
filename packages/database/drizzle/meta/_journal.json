@@ -120,6 +120,13 @@
       "when": 1790724698283,
       "tag": "0016_line_directions_representative_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790807302706,
+      "tag": "0017_drop_line_directions_representative_terminal",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,8 @@
 # 方面（`line_directions`）と方面ラベルの解決
 
-> **適用状況**: 2026-09-30 現在、**スキーマ・既定行のデータ・解決関数・Admin の入力と表示・Web の乗換セクションの方面の見出しまで実装済み・本番反映済み**
+> **適用状況**: 2026-10-01 現在、**スキーマ・既定行のデータ・解決関数・Admin の入力と表示・Web の乗換セクションの方面の見出しまで実装済み**
 > （[#130](https://github.com/Natsugure/furatora/issues/130)・[#125](https://github.com/Natsugure/furatora/issues/125)）。
-> 代表駅・終点駅の列（`representative_station_id` / `terminal_station_ids`）は除去の途中である（[#129](https://github.com/Natsugure/furatora/issues/129)）。
-> コードと `schema.ts` からは消えているが、DB には次のデプロイで DROP するまで残る（`representative_station_id` は `NOT NULL` を外し済み）。
-> 値は ODPT 時代の名残で、どこからも読まれない。
+> 方面は代表駅・終点駅を持たない（ODPT 時代の列は [#129](https://github.com/Natsugure/furatora/issues/129)・[#144](https://github.com/Natsugure/furatora/issues/144) で削除した）。
 
 「路線のある走行方向を、利用者にどう呼ぶか（池袋方面・内回り など）」を持つ。
 判断の根拠と却下案は [ADR-0014](../adr/0014-direction-label-by-default-row.md)。
