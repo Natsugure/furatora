@@ -1,6 +1,6 @@
 # ADR-0015: アプリ間で共有するロジックをドメイン単位の packages に置き、共有する語彙は `@furatora/database/enums` に置く
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-02
 - **決定者**: @Natsugure
 - **関連**: [ADR-0001](./0001-layer-structure.md)「`packages/core` の抽出について」「`@furatora/database/enums` の扱い」,
