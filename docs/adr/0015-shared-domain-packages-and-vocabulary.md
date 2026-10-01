@@ -52,14 +52,21 @@
   - SQL は各アプリに残す
 - これらの制約は、各パッケージの `eslint.config.mjs` の `no-restricted-imports` で機械的に守る
 
-### 決定3: 共有する語彙は `@furatora/database/enums` に1つだけ置く
+### 決定3: 共有する語彙は、入口 `@furatora/database/enums` の1つだけから提供する
 
 - 語彙とは、DB の値とドメインの両方が使う、列挙の型と定数のこと（`DirectionType`、`PlatformSide` など）
 - ドメインのパッケージは、`@furatora/database` のうち **`enums` だけ** import してよい
   - ESLint の禁止パターンは、`enums` 以外の `@furatora/database` と `drizzle-orm` に一致する正規表現で書く
   - `group` の `!` による除外は使えない。親（`@furatora/database`）を除外すると、その配下は再び含められないため
-- `enums` は、**Drizzle にも実行時の外部パッケージにも依存しない**状態を保つ
+- 許可の対象は、ファイルではなく **import の入口** `@furatora/database/enums` である
+  - 語彙が増えたら、`schema` と同じく `src/enums/` のディレクトリにし、まとまりごとのファイルに分けてよい。`index.ts` で再 export する
+    （例: `stationMaster.ts` に `DirectionType` / `PlatformSide`、`facility.ts` に `FACILITY_TYPE_CODES`）
+  - 入口は1つに保つ。`@furatora/database/enums/facility` のような、個別のファイルへの import は許さない
+  - 入口が変わらないので、分けるのは語彙が増えたときでよい。後から分けても利用側は直さなくてよい
+- `enums` の配下はすべて、**Drizzle にも実行時の外部パッケージにも依存しない**状態を保つ
   - 型に加えて、`as const` の配列のような実行時の定数は置いてよい（#139 の `FACILITY_TYPE_CODES` を想定）
+  - ディレクトリにすると、この制約を守るファイルが増え、目視では守れなくなる。ディレクトリにするときは、`packages/database` の
+    ESLint で `src/enums/**` から `drizzle-orm`・`schema`・`client`・`tx` への import を禁止し、機械的に守る
 - ドメインのパッケージは、語彙を自前で書き写さない
   - 利用側の import を変えないために、再 export することは許す（`transfer-difficulty` の `DirectionType`）
 
@@ -108,9 +115,18 @@ ADR-0001 の「`packages/core` の抽出について」は、**`features` 層を
 
 - **良い点**: 依存関係が最もきれいになる。database もドメインのパッケージも、語彙のパッケージだけに依存する
 - **却下理由**:
-  - `enums.ts` は、今も Drizzle に依存しない末端のファイルである。新しいパッケージを作っても、得られるのは依存の見た目の整理だけになる
+  - `enums` は、今も Drizzle に依存しない末端のモジュールである。新しいパッケージを作っても、得られるのは依存の見た目の整理だけになる
   - 一方で、パッケージと設定ファイルが1組増える
   - `enums` が Drizzle や実行時の依存を必要とするようになったときに、改めて検討する（レビュー条件）
+
+### `enums` の配下の個別のファイルへの import を許す（`@furatora/database/enums/*`）
+
+- **良い点**: 利用側が必要なまとまりだけを import できる
+- **却下理由**:
+  - `package.json` の exports と ESLint の正規表現を広げる必要がある
+  - ファイルの分け方が利用側の import に漏れ、分け直すたびに利用側をすべて直すことになる
+  - `schema` も入口を1つに保っており（`src/schema/index.ts`）、それと揃わなくなる
+  - 未使用の再 export によるバンドルの増加は、型と小さな定数だけなので問題にならない
 
 ### 語彙を、それを解釈するドメインのパッケージに持たせ、database がドメインのパッケージに依存する
 
@@ -128,7 +144,7 @@ ADR-0001 の「`packages/core` の抽出について」は、**`features` 層を
   - admin の `DirectionTypesMatch` から、2つの `DirectionType` の一致を見る検査を外す
 - #139 は、`FACILITY_TYPE_CODES` を `enums` に移し、`transfer-difficulty` がそこから import する形で進められる
 - #138 は、決定2 の切り分けに従う。純粋な部分を `transfer-difficulty` に移し、SQL は各アプリに残す
-- `packages/database/CLAUDE.md` に、`enums` の制約（Drizzle と実行時の依存を持たない）を書く
+- `packages/database/CLAUDE.md` に、`enums` の制約（入口は1つ、配下は Drizzle と実行時の依存を持たない）を書く
 
 ## レビュー
 

@@ -11,5 +11,6 @@
   - ESLint の発火: 両パッケージで `@furatora/database`・`/client`・`/schema`・`drizzle-orm` がエラー、`/enums` だけ通る
   - `pnpm run typecheck`（6タスク）・`lint`（4タスク）・`test`（admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42）・`build` がすべて成功
 - [x] **TASK-7** ADR-0015 を書き、一覧に足す。`packages/database/CLAUDE.md` と `.github/instructions/drizzle.instruction.md` に `enums` の制約を書く
+- [x] **TASK-7a** 開発者確認（2026-10-02）: 許可は import の入口 `@furatora/database/enums` に対して行い、中はディレクトリに分けてよい。個別のファイルへの import は許さない。ディレクトリ化と `packages/database` の ESLint は #139 で行う。ADR-0015 決定3 と CLAUDE.md 類を更新し、#139 に追記した
 - [ ] **TASK-8** 開発者の承認後、ADR-0015 を `Accepted` にする
 - [ ] **TASK-9** PR を `develop` 向けに作る

@@ -27,7 +27,8 @@ regex: '^(@furatora/database(?!/enums$)(/.*)?|drizzle-orm(/.*)?)$',
 ## 恒久知識の振り分け
 
 - 方針と却下理由: ADR-0015
-- `enums` の制約（Drizzle と実行時の依存を持たない）: `packages/database/CLAUDE.md`（変更する人が見る場所）と ADR-0015 決定3
+- `enums` の制約（入口は1つ、配下は Drizzle と実行時の依存を持たない）: `packages/database/CLAUDE.md`（変更する人が見る場所）と ADR-0015 決定3
+- `enums` のディレクトリ化と `packages/database` への ESLint 導入: #139 に追記（語彙が増えるときに行う）
 - `docs/domain/`: 変更なし。アーキテクチャの決定であり、ドメインルールではないため
 
 ## テスト戦略

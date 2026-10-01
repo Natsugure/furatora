@@ -15,9 +15,10 @@ Next.js のApp RouterやReact固有のAPIは使用しない。
 - `db:push` は開発環境のみ使用可（本番環境では必ず migrate を使う）
 
 ## `enums` の制約
-- `src/enums.ts` はアプリとドメインの packages（`platform-diagram` / `transfer-difficulty`）が共有する語彙の置き場（ADR-0015）。
+- `@furatora/database/enums` はアプリとドメインの packages（`platform-diagram` / `transfer-difficulty`）が共有する語彙の入口（ADR-0015 決定3）。
   ドメインの packages は `@furatora/database` のうち `enums` だけを import できる
-- Drizzle にも実行時の外部パッケージにも依存させない。型と `as const` の定数だけを置く
+- 入口は1つに保つ。語彙が増えたら `src/enums/` にまとまりごとのファイルで置き、`index.ts` で再 export する。個別のファイルを exports に足さない
+- 配下はすべて Drizzle にも実行時の外部パッケージにも依存させない。型と `as const` の定数だけを置く
 
 ## 型定義
 - Drizzle の型推論 (`InferSelectModel`, `InferInsertModel`) を積極的に使用する
