@@ -1,16 +1,14 @@
 import type { DirectionType } from '@furatora/database/enums';
-import type { DirectionType as LabelDirectionType, FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
+import type { FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
 
 // 方面の2値。選択肢の列挙・入力の検証（LineDirectionForm・validations）はここから参照する
 export const DIRECTIONS = ['inbound', 'outbound'] as const satisfies readonly DirectionType[];
 export type Direction = (typeof DIRECTIONS)[number];
 
-// 走行方向は DB（@furatora/database/enums）と方面ラベルの解決規則（@furatora/transfer-difficulty。DB 非依存）が
-// それぞれ定義している。片方だけ値を増減すると、ここが型エラーになる
+// DIRECTIONS が走行方向の全値を列挙していること。DirectionType に値を足すと、ここが型エラーになる
 type AssertTrue<T extends true> = T;
 type SameUnion<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 export type DirectionTypesMatch = [
-  AssertTrue<SameUnion<DirectionType, LabelDirectionType>>,
   AssertTrue<SameUnion<Direction, DirectionType>>,
 ];
 
