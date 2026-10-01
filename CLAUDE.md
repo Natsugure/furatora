@@ -39,11 +39,11 @@
 - その列を読むコードが稼働したままの破壊的なマイグレーション（`DROP COLUMN` / `DROP TABLE` / `NOT NULL`化）。
   Vercelのビルド時にマイグレーションが走るため、必ず二段階に分けること
   （1. その列を読まないコードをデプロイ → 2. 次のデプロイで列を落とす）
-  - Drizzle は `schema.ts` にある列を全列 SELECT（`db.select().from(t)`）と INSERT の SQL に必ず含める。
-    `schema.ts` に列が残っている限り「読まないコード」ではないため、1 で `schema.ts` から列を消す。
+  - Drizzle は `packages/database/src/schema/`（テーブル定義）にある列を全列 SELECT（`db.select().from(t)`）と INSERT の SQL に必ず含める。
+    テーブル定義に列が残っている限り「読まないコード」ではないため、1 でテーブル定義から列を消す。
     `NOT NULL` の解除など、1 で要る DB 側の変更は `drizzle-kit generate --custom` の手書きマイグレーションで行い、
     2 の `pnpm run db:generate` で DROP を生成する
-  - 1 と 2 の間は `schema.ts` と Drizzle のスナップショットが食い違う。他の作業で `db:generate` / `db:push` を実行すると
+  - 1 と 2 の間はテーブル定義と Drizzle のスナップショットが食い違う。他の作業で `db:generate` / `db:push` を実行すると
     DROP が混ざるため、2 を次の作業にする
 
 ## 注意事項

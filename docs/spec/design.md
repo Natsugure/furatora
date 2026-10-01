@@ -1,67 +1,77 @@
-# 設計: line_directions の代表駅・終点駅の除去 — 1段目 (Issue #129)
+# 設計: packages/database の schema.ts のドメイン別分割 (Issue #149)
 
-- **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
-
-## 変更対象
+## 変更するファイル
 
 ```
-packages/database/src/schema.ts            lineDirections から2列を削除
-packages/database/drizzle/0016_*           【新規・手書き】representative_station_id の DROP NOT NULL
-apps/admin/src/
-  lib/validations.ts                       directionSchema から2項目を削除（zod は未知のキーを捨てる）
-  features/line/ports.ts                   LineDirectionWriteInput・LineDirectionEditContext から2項目と stations を削除、
-                                           DirectionStationOption を削除
-  external/repository/lineDirectionRepository.ts   returning の列から2項目を削除
-  external/query/lineEditPageQuery.ts      getLineStations を削除（方面フォームの選択肢にしか使っていない）
-  components/LineDirectionForm.tsx         代表駅・終点駅の入力欄と stations プロパティを削除
-  app/lines/[lineId]/directions/page.tsx   代表駅の表示と駅の取得を削除
-  app/lines/[lineId]/directions/new・[directionId]/edit/page.tsx   stations の受け渡しを削除
-  各テスト                                  2項目・代表駅の選択を外す
-CLAUDE.md                                  二段階ルールに Drizzle での 1段目の意味を補足
-docs/domain/line-directions.md             モデル図から2列を外す、適用状況の更新
+packages/database/src/schema.ts                 削除
+packages/database/src/schema/index.ts           新規。4ファイルを再 export
+packages/database/src/schema/stationMaster.ts   新規
+packages/database/src/schema/transfer.ts        新規
+packages/database/src/schema/platform.ts        新規
+packages/database/src/schema/train.ts           新規
+packages/database/package.json                  exports "./schema" → ./src/schema/index.ts
+packages/database/drizzle.config.ts             schema → ./src/schema/index.ts
+CLAUDE.md / apps/CLAUDE.md / packages/database/CLAUDE.md / .github/instructions/drizzle.instruction.md
+docs/domain/station-visibility.md / docs/domain/station-master-model.md（パスの言及のみ）
+.claude/agent-memory/frontend-engineer/MEMORY.md
 ```
 
-Web（`stationDetailQuery` の `line_directions` の全列 SELECT を含む）は変更しない。`schema.ts` から列が消えると、全列 SELECT は2列を読まなくなる。
+## ファイルの分け方
+
+`docs/domain/` の区切りに合わせる。
+
+| ファイル | テーブル | 対応する docs/domain |
+|---|---|---|
+| `stationMaster.ts` | stations, lines, stationLines, lineDirections, operators, stationGroups, stationAdjacencies | station-master-model.md / line-directions.md / station-visibility.md |
+| `transfer.ts` | stationConnections, transferConnections, transferRoutes, connectionRoutes, transferRouteFacilities | station-master-model.md「乗換接続」「乗換難易度」 |
+| `platform.ts` | platforms, platformLocations, platformLocationCells, stationFacilities, facilityConnections, facilityTypes | platform-coordinate-system.md |
+| `train.ts` | trains, trainCarStructures, trainEquipments（と型 CarStructure / FreeSpace / PrioritySeat / TrainEquipmentType）, trainStopPatterns, trainStopPatternCars | train-stop-patterns.md |
+
+ファイル内の並びは元ファイルでの相対順を保つ。
+
+### ファイル間の依存
+
+```
+stationMaster ← platform ← train
+      ↑            ↑
+      └──── transfer
+```
+
+循環しない。`.references(() => x.id)` は遅延評価なので循環しても動くが、読む人が依存の向きを追えるよう避ける。
 
 ## 決定
 
-### 決定1: 1段目で `schema.ts` から列を消し、`NOT NULL` の解除は手書きマイグレーションで行う
+### 決定1: `facilityTypes` は `platform.ts` に置く
 
-- **コンテキスト**: Drizzle は `schema.ts` にある列を、全列 SELECT（`db.select().from(t)`）と INSERT の SQL に必ず含める。
-  `schema.ts` に列を残したまま2段目で列を落とすと、2段目のデプロイ中（マイグレーション適用後〜新コードへの切り替え）に
-  旧コードが消えた列を読み書きして失敗する。`line_directions` は Web の `stationDetailQuery` が全列 SELECT しているため、公開サイトの駅詳細も含む
-- **オプション**:
-  - (a) `schema.ts` から消す（本決定）。デプロイ中の障害が起きず、あとから全列 SELECT が書かれても壊れない。
-    段階の間、`schema.ts` と Drizzle のスナップショットが食い違う
-  - (b) `schema.ts` に `nullable` で残し、全列 SELECT を列の明示に直す。スナップショットは一致するが、
-    2段目のデプロイ中に方面の INSERT が失敗し、全列 SELECT を書かない注意に頼る
-- **理論的根拠**: CLAUDE.md の1段目は「その列を読まないコード」をデプロイすることであり、Drizzle では `schema.ts` に列がある時点で
-  読み書きしている。(a) はルールの正しい読み方であって新しい決定ではないため、ADR にせず CLAUDE.md に補足する（開発者確認済み、2026-09-30）
-- **影響**:
-  - マイグレーションは `drizzle-kit generate --custom` で空のファイルを作って手で書く。スナップショットは直前と同じになり、両列が残る
-  - 2段目では `pnpm run db:generate` が両列の `DROP COLUMN` を生成する
-  - 1段目と2段目の間に `db:generate` / `db:push` を実行すると DROP が混ざる。2段目を次の作業にする
-- **レビュー**: Drizzle が全列 SELECT・INSERT の列の出し方を変えたとき
+- **コンテキスト**: `stationFacilities`（platform）と `transferRouteFacilities`（transfer）の両方が参照する
+- **オプション**: (a) `platform.ts`（本決定） / (b) 独立した `facility.ts` / (c) `transfer.ts`
+- **理論的根拠**: 設備マスタであり、駅設備と同じ場所にあるのが自然。1テーブルのためにファイルを作る (b) は細かすぎる。(c) だと platform → transfer の依存ができる
+- **影響**: `transfer.ts` が `platform.ts` を import する
+- **レビュー**: 設備コードの定数と DB の一致を仕組みで守る #139 で、設備まわりの置き場所を見直すとき
 
-### 決定2: 方面一覧の「代表駅」の表示は外す
+### 決定2: `trainStopPatterns` / `trainStopPatternCars` は `train.ts` に置く
 
-- **コンテキスト**: 表示は1段目のあと NULL の行が増えて意味を失い、2段目で列が消える
-- **理論的根拠**: 表示の値は ODPT 由来の書き込み専用のデータで、解決規則にも使われない（ADR-0014）
-- **影響**: 一覧のカードから1行減る。駅の取得（`stations` への問い合わせ1回）も無くなる
+- **コンテキスト**: `platforms` と `trains` の両方を参照する
+- **理論的根拠**: docs/domain の `train-stop-patterns.md` が列車側の文書である。`platform.ts` に置くと platform → train の依存ができ、train → platform と循環する
+- **影響**: `train.ts` が `platform.ts` を import する
 
-## エラーハンドリング
+### 決定3: ADR にしない
 
-新しいエラー経路は無い。API は2項目を受け取っても zod が捨てる（REQ-4）。
-
-## テスト戦略
-
-- 型検査で読み書きの取り残しを検出する（`schema.ts` から列が消えるため、参照は型エラーになる）
-- `validations.test.ts`: 2項目なしでパースできる。2項目を送っても結果に含まれない
-- `LineDirectionForm.test.tsx`: 代表駅・終点駅の入力が無い。送信内容に2項目が無い
-- API ルート・Repository のテスト: 2項目を外して既存の期待が通る
-- development: マイグレーション適用後に `NOT NULL` が外れ、行数と値が変わらないこと。方面の作成・編集・一覧、Web の駅詳細
+ファイルの配置は、覆すときに明示的な判断が要らず、却下した選択肢に恒久的な理由も無い。配置の規約は `packages/database/CLAUDE.md` に置く。
 
 ## 恒久知識の振り分け
 
-- CLAUDE.md の禁止事項: Drizzle での1段目の意味（決定1）。ADR にしない理由は決定1
-- `docs/domain/line-directions.md`: モデル図から2列を外す。2段目までの適用状況を書く
+- 「テーブル定義は `src/schema/` にドメイン別に置き、`index.ts` で再 export する」: `packages/database/CLAUDE.md` と `.github/instructions/drizzle.instruction.md` の規約
+- `docs/domain/`: ドメインルールの変更は無い。パスの言及のみを直す
+
+## エラーハンドリング
+
+実行時の振る舞いは変わらない。失敗しうるのは検証の段階だけで、`db:generate` が差分を出した場合は、欠けたテーブル・制約を突き合わせて直す。
+
+## テスト戦略
+
+新しいテストは追加しない。次の検証で同一性を確かめる。
+
+- `drizzle-kit generate` が「No schema changes」を返し、`drizzle/` に差分が無い
+- 旧ファイルと新ファイル（import 行を除く）の行を並べ替えて `diff` し、違いが見出しのコメントと決定したコメントの修正だけである
+- 既存の `typecheck` / `lint` / `test` / `build`

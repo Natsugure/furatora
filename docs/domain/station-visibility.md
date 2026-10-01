@@ -1,6 +1,6 @@
 # 駅・路線・事業者の公開状態
 
-> **適用状況**: 実装済み。`packages/database/src/schema.ts` および
+> **適用状況**: 実装済み。`packages/database/src/schema/stationMaster.ts` および
 > `apps/web/src/external/query/visibility.ts` と一致する。
 
 ## 可視性は `stations.publishedAt` が単独で担う

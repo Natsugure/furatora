@@ -10,7 +10,7 @@ Node.js (TypeScript) で動作するDB クライアント・スキーマ定義�
 Next.js のApp RouterやReact固有のAPIは使用しない。
 
 ## Drizzle ORM 規約
-- スキーマ定義はすべて src/schema.ts に集約する
+- スキーマ定義は `src/schema/` にドメイン別のファイル（`stationMaster` / `transfer` / `platform` / `train`）で置き、`src/schema/index.ts` で再 export する。新しいテーブルは対応するドメインのファイルに足す
 - マイグレーションは `drizzle-kit generate` → `drizzle-kit migrate` の手順で行う
 - `db:push` は開発環境のみ使用可（本番環境では必ず migrate を使う）
 
