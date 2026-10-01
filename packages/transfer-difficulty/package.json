@@ -10,6 +10,9 @@
     "lint": "eslint src/",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@furatora/database": "workspace:*"
+  },
   "devDependencies": {
     "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
