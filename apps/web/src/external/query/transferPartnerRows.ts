@@ -9,6 +9,7 @@ import {
   transferRouteFacilities,
   transferRoutes,
 } from '@furatora/database/schema';
+import { isFacilityTypeCode } from '@furatora/database/enums';
 import {
   resolveDirectionLabel,
   type DirectionType,
@@ -27,15 +28,26 @@ import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from '@/f
 const inboundDirections = alias(lineDirections, 'inbound_directions');
 const outboundDirections = alias(lineDirections, 'outbound_directions');
 
-// ルートごとの設備。未知の設備コードは DB に入らない（facility_types の CHECK 制約と外部キー。ADR-0016）ので、
-// ここでは絞り込まない
+// ルートごとの設備。稼働中のコードが知らない設備コードを含むルートは、設備を空（未入力）として扱う。
+// DB の CHECK 制約は「最後にマイグレーションを流したビルドの定数」に従うだけなので、Admin や別ビルドが先に
+// 新しいコードを保存すると、ここに届きうる（ADR-0016「残るずれ」）。表示だけで失うものは無いため、止めずに続ける。
+// そのコードだけ捨てると残りの設備で判定され、段差のあるルートを「バリアフリールートあり」と出しうる。
+// 未入力なら必要な行為を導出しない（ADR-0012）
 export function facilitiesByRoute(
-  rows: readonly { routeId: string; typeCode: FacilityTypeCode }[],
+  rows: readonly { routeId: string; typeCode: string }[],
 ): Map<string, FacilityTypeCode[]> {
   const facilitiesOf = new Map<string, FacilityTypeCode[]>();
+  const unknownRouteIds = new Set<string>();
   for (const row of rows) {
-    facilitiesOf.set(row.routeId, [...(facilitiesOf.get(row.routeId) ?? []), row.typeCode]);
+    if (!isFacilityTypeCode(row.typeCode)) {
+      unknownRouteIds.add(row.routeId);
+      continue;
+    }
+    const list = facilitiesOf.get(row.routeId) ?? [];
+    list.push(row.typeCode);
+    facilitiesOf.set(row.routeId, list);
   }
+  for (const routeId of unknownRouteIds) facilitiesOf.set(routeId, []);
   return facilitiesOf;
 }
 

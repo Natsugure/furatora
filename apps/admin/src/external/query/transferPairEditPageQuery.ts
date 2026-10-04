@@ -28,6 +28,7 @@ import type {
 } from '@/features/transfer-connection/ports';
 import { comboOfConnection } from '@/features/transfer-connection/domain/normalize';
 import { withLine } from '@/features/transfer-connection/domain/label';
+import { assertKnownFacilityCodes, knownFacilityTypeOptions } from '@/features/facility/knownFacilityCodes';
 import type { RouteBody } from '@/features/transfer-connection/domain/types';
 import {
   pairConnectionCondition,
@@ -172,6 +173,9 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       };
     };
 
+    // 保存はルートの設備を置き換える（消して入れ直す）ので、知らないコードを捨てて表示すると、保存しただけで
+    // その行が DB から消える。画面を開かせずに止める（UnknownFacilityCodeError）。候補のルートも結んで保存されうるので含める
+    assertKnownFacilityCodes(facilityRows.map((row) => row.typeCode));
     const facilitiesOf = new Map<string, FacilityTypeCode[]>();
     for (const row of facilityRows) {
       const list = facilitiesOf.get(row.routeId) ?? [];
@@ -248,7 +252,7 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       lineName: firstLineName(stationId),
       connectedLineName: firstLineName(connectedStationId),
       directionHints: { station: hints(stationId), connected: hints(connectedStationId) },
-      facilityTypes: facilityTypeRows
+      facilityTypes: knownFacilityTypeOptions(facilityTypeRows)
         .sort((x, y) => FACILITY_TYPE_CODES.indexOf(x.code) - FACILITY_TYPE_CODES.indexOf(y.code)),
       connections: pairConnections.map((c) => ({ combo: comboOfConnection(c, stationId), notes: c.notes })),
       routes,

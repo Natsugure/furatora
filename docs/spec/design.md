@@ -14,8 +14,15 @@ packages/database/src/schema/platform.ts            facility_types に CHECK、c
 packages/database/src/schema/transfer.ts            transfer_route_facilities.type_code に $type
 packages/database/drizzle/0018_*.sql と snapshot    db:generate で生成
 packages/transfer-difficulty/src/domain/requirement.ts   定数を enums から import して再 export
-apps/web/src/external/query/transferPartnerRows.ts(.test.ts)   isFacilityCode と未知のコードの扱いを削除
-apps/admin/src/external/query/transferPairEditPageQuery.ts      isFacilityCode を削除
+packages/database/src/enums/facility.ts              isFacilityTypeCode（読み取りの境界で知らないコードを見分ける）
+apps/web/src/external/query/transferPartnerRows.ts(.test.ts)   知らないコードを含むルートは未入力（isFacilityTypeCode に置き換え）
+apps/admin/src/features/facility/knownFacilityCodes.ts(.test.ts)   assertKnownFacilityCodes / knownFacilityTypeOptions
+apps/admin/src/features/facility/ports.ts            UnknownFacilityCodeError
+apps/admin/src/features/facility/components/UnknownFacilityCodeAlert.tsx   編集を止めた理由の表示
+apps/admin/src/external/query/transferPairEditPageQuery.ts      isFacilityCode を assertKnownFacilityCodes / knownFacilityTypeOptions に
+apps/admin/src/external/query/stationLayoutPageQuery.ts         assertKnownFacilityCodes
+apps/admin/src/external/query/facilityEditPageQuery.ts          設備の種類の選択肢を knownFacilityTypeOptions で絞る
+apps/admin/src/app/stations/[stationId]/layout/page.tsx と …/transfer/page.tsx   UnknownFacilityCodeError を捕まえて表示
 apps/admin/src/features/facility/schema.ts           typeCode を z.enum(FACILITY_TYPE_CODES) に
 apps/scripts/src/seed-master-data.ts                 表示名を Record<FacilityTypeCode, string> に
 ```
@@ -62,6 +69,9 @@ regex: '^(drizzle-orm(/.*)?|@furatora/database(/.*)?|\\.\\./(schema|client|tx)(/
 | Admin の駅レイアウトの保存に未知のコードがある | zod の検証で 400 |
 | Admin の駅対の保存に未知のコードがある | zod の検証で 400（既存の `z.enum(FACILITY_TYPE_CODES)`） |
 | seed の表示名が欠ける | コンパイルエラー |
+| Web が、稼働中のコードの知らないコードを読む（デプロイの途中・別ビルド） | そのルートを未入力として表示する |
+| Admin の駅対・駅レイアウトの編集画面が、知らないコードを読む | `UnknownFacilityCodeError`。ページは理由を表示し、編集させない（本番では例外メッセージが伏せられるため、ページで捕まえる） |
+| Admin の設備の種類の選択肢に、知らないコードがある | 選択肢から除く |
 
 ## 恒久知識の振り分け
 
@@ -75,7 +85,8 @@ regex: '^(drizzle-orm(/.*)?|@furatora/database(/.*)?|\\.\\./(schema|client|tx)(/
 ## テスト戦略
 
 - 既存のテスト（`requirement.test.ts` が、規則の表と定数の一致を見ている）はそのまま通す
-- `transferPartnerRows.test.ts` から、未知のコードのテスト（型の上で書けなくなる）を消す
+- `transferPartnerRows.test.ts` の、知らないコードを含むルートを未入力にするテストは残す（入力の型は `string` のまま）
+- `knownFacilityCodes.test.ts`: 知らないコードで `UnknownFacilityCodeError` を投げること、選択肢から除くこと
 - ESLint の発火確認: `eslint --stdin --stdin-filename src/enums/facility.ts` で、禁止した import がエラーになり、`./stationMaster` が通ること
 - `db:generate` を2回実行し、1回目が CHECK の ADD だけ、2回目が差分なしになること
 - 開発者が development で `db:migrate` → `db:push` を実行し、push が差分を出さないこと

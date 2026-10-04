@@ -18,3 +18,9 @@ export const FACILITY_TYPE_CODES = [
 ] as const;
 
 export type FacilityTypeCode = (typeof FACILITY_TYPE_CODES)[number];
+
+// DB の値は CHECK 制約でこの定数に従うが、それは「最後にマイグレーションを流したビルドの定数」である。
+// Web と Admin は別々にデプロイされるため、稼働中のコードが知らないコードを DB から読むことがある（ADR-0016「残るずれ」）。
+// 読み取りの境界でこれを使って見分ける
+export const isFacilityTypeCode = (code: string): code is FacilityTypeCode =>
+  (FACILITY_TYPE_CODES as readonly string[]).includes(code);

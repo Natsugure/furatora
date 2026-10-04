@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation';
+import { BackLink } from '@/components/LinkElements';
 import { parseUuidParam } from '@/shared/list/params';
 import { StationLayoutView } from '@/features/station-layout/components/StationLayoutView';
 import { resolveStationListBack } from '@/features/station/listState';
 import { stationLayoutPageQuery } from '@/di';
+import { UnknownFacilityCodeAlert } from '@/features/facility/components/UnknownFacilityCodeAlert';
+import { UnknownFacilityCodeError } from '@/features/facility/ports';
 
 /**
  * 駅レイアウト統合ページ。ホームタブ・図・設備編集を1画面に統合する。
@@ -24,10 +27,21 @@ export default async function StationLayoutPage({
   const platformId = parseUuidParam(raw.platformId);
   const patternId = parseUuidParam(raw.patternId);
 
-  const context = await stationLayoutPageQuery.getContext(stationId, { platformId, patternId });
-  if (!context) notFound();
-
   const { listState, backHref } = resolveStationListBack(raw);
+
+  let context: Awaited<ReturnType<typeof stationLayoutPageQuery.getContext>>;
+  try {
+    context = await stationLayoutPageQuery.getContext(stationId, { platformId, patternId });
+  } catch (error) {
+    if (!(error instanceof UnknownFacilityCodeError)) throw error;
+    return (
+      <div>
+        <BackLink href={backHref}>駅一覧に戻る</BackLink>
+        <UnknownFacilityCodeAlert error={error} />
+      </div>
+    );
+  }
+  if (!context) notFound();
 
   return (
     <StationLayoutView

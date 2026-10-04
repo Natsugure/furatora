@@ -32,4 +32,8 @@
     - 原因は既存の問題で、本 Issue とは関係ない。drizzle が生成する外部キー名が63文字を超え、PostgreSQL が切り詰めて保存したため、push が名前の不一致を差分と見ている
     - #154 に起票し、`packages/database/CLAUDE.md` に既知の誤検出として記載した
 - [x] **TASK-11** ADR-0016 を書く（Proposed）。`docs/domain/station-master-model.md`、`packages/database/CLAUDE.md`、`.github/instructions/drizzle.instruction.md` を更新する
+- [x] **TASK-13** レビュー指摘への対応: 稼働中のコードが知らない設備コードを読み取りの境界で扱う（ADR-0016 を更新）
+  - Web: 知らないコードを含むルートは未入力として表示する（`isFacilityTypeCode` で戻す）
+  - Admin: 駅対・駅レイアウトの編集画面は `UnknownFacilityCodeError` で止め、理由を表示する。設備の種類の選択肢からは除く
+  - 開発者確認（2026-10-04）: Admin を未入力扱いにすると、保存（消して入れ直す）で行が消えるため、Web と分けて止める
 - [ ] **TASK-12** ADR-0016 を Accepted にし（開発者の承認後）、PR を develop 向けに作る

@@ -29,7 +29,9 @@
 - **REQ-2**: 定数に無いコードを `facility_types.code` に INSERT / UPDATE した場合、DB は CHECK 制約で拒否すること
 - **REQ-3**: 定数を変更して `db:generate` を実行したとき、システムは CHECK 制約を作り直すマイグレーションを生成すること。変更が無ければ生成しないこと
 - **REQ-4**: システムは、`transfer_route_facilities.type_code`・`station_facilities.type_code`・`facility_types.code` を読むときの型を `FacilityTypeCode` にすること
-  - Web と Admin は、`isFacilityCode` でコードを絞り込まないこと
+- **REQ-10**: Web が、稼働中のコードの知らない設備コードをルートの設備として読んだ場合、システムはそのルートを未入力として表示し、ページを落とさないこと
+- **REQ-11**: Admin の駅対・駅レイアウトの編集画面が、稼働中のコードの知らない設備コードを読んだ場合、システムは編集画面を開かず、そのコードと理由を表示すること
+- **REQ-12**: Admin の設備の種類の選択肢に、稼働中のコードの知らないコードがある場合、システムはそれを選択肢から除くこと
 - **REQ-5**: 定数にあって seed の表示名に無いコードがある場合、システムはコンパイルエラーにすること
 - **REQ-6**: Admin の駅レイアウトの保存に定数に無い設備コードが含まれる場合、システムは入力検証で拒否すること
 - **REQ-7**: `src/enums/` 配下のファイルが `drizzle-orm`・`../schema`・`../client`・`../tx`・`@furatora/database` を import した場合、システムは lint エラーにすること
