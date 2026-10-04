@@ -15,7 +15,8 @@ import {
 import type { DirectionType } from '@furatora/database/enums';
 import {
   FACILITY_TYPE_CODES,
-  resolveDirectionLabel,
+  firstLineByStation,
+  resolveStationDirectionLabels,
   type FacilityTypeCode,
 } from '@furatora/transfer-difficulty/domain';
 import { and, asc, eq, inArray, not } from 'drizzle-orm';
@@ -142,36 +143,15 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
         .orderBy(asc(lines.displayOrder), asc(lines.id)),
     ]);
     const stationName = new Map(stationRows.map((s) => [s.id, s.name]));
-    const firstLineOf = new Map<string, { lineId: string; lineName: string }>();
-    for (const row of stationLineRows) {
-      if (!firstLineOf.has(row.stationId)) firstLineOf.set(row.stationId, { lineId: row.lineId, lineName: row.lineName });
-    }
+    const firstLineOf = firstLineByStation(stationLineRows);
     const firstLineName = (id: string) => firstLineOf.get(id)?.lineName ?? null;
     const label = (id: string) => withLine(stationName.get(id) ?? '（不明な駅）', firstLineName(id));
     const connectionLabel = (c: { stationAId: string; stationBId: string }) =>
       `${label(c.stationAId)} ↔ ${label(c.stationBId)}`;
 
-    // 入力の補助表示の方面文言。駅名・路線名の表示と同じく、駅の最初の路線について解決する。
-    // 路線で絞るのは、1駅が複数路線を持つようになったとき（#82）に別路線の文言が混ざらないようにするため
-    const hints = (id: string): Record<DirectionType, string> => {
-      const lineId = firstLineOf.get(id)?.lineId;
-      // ホーム番号は varchar なので、SQL の並びでは '10' が '2' より前になる。数値として並べる
-      const platformsOfLine = platformRows
-        .filter((p) => p.stationId === id && p.lineId === lineId)
-        .sort((a, b) => a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true }));
-      const resolve = (directionType: DirectionType, platformNames: (string | null)[]) =>
-        resolveDirectionLabel({
-          directionType,
-          platformNames: platformNames.filter((name): name is string => name !== null),
-          defaultName: defaultDirectionRows.find(
-            (d) => d.lineId === lineId && d.directionType === directionType,
-          )?.displayName ?? null,
-        }).label;
-      return {
-        inbound: resolve('inbound', platformsOfLine.map((p) => p.inboundName)),
-        outbound: resolve('outbound', platformsOfLine.map((p) => p.outboundName)),
-      };
-    };
+    // 入力の補助表示の方面文言。駅名・路線名の表示と同じく、駅の最初の路線について解決する
+    const hints = (id: string): Record<DirectionType, string> =>
+      resolveStationDirectionLabels({ stationId: id, firstLineOf, platformRows, defaultRows: defaultDirectionRows });
 
     // 保存はルートの設備を置き換える（消して入れ直す）ので、知らないコードを捨てて表示すると、保存しただけで
     // その行が DB から消える。画面を開かせずに止める（UnknownFacilityCodeError）。候補のルートも結んで保存されうるので含める
