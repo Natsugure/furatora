@@ -27,8 +27,10 @@ export default defineConfig([
               message: 'このパッケージは Next.js・React 非依存を保ってください',
             },
             {
-              group: ['@furatora/database', '@furatora/database/*', 'drizzle-orm'],
-              message: 'このパッケージは DB 非依存を保ってください',
+              // 共有する語彙（型・定数のみ。Drizzle も実行時の依存も持たない）の enums だけは許可する（ADR-0015）。
+              // group の '!' による除外は親（@furatora/database）を除外すると効かないため、正規表現で書く
+              regex: '^(@furatora/database(?!/enums$)(/.*)?|drizzle-orm(/.*)?)$',
+              message: 'このパッケージは DB 非依存を保ってください。使えるのは @furatora/database/enums だけです（ADR-0015）',
             },
           ],
         },

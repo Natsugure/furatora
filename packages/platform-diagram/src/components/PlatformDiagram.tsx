@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { PlatformSide } from '@furatora/database/enums';
 import { PX_PER_METER, layoutRows, type Bounds, type VerticalLayout } from '../domain/geometry';
 import type { ConcoursePlateLayout, FacingTransferLayout } from '../domain/concourseLayout';
 import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
@@ -17,7 +18,7 @@ type Props = {
   pattern: TrainStopPatternDTO;
   physicalLength: number;
   concourses: ConcourseDTO[];
-  platformSide: 'top' | 'bottom' | null;
+  platformSide: PlatformSide | null;
   bounds: Bounds;
   /** 出口・乗換プレートの配置。ホーム単位で決まるので PlatformDisplay で算出する */
   plateLayout: ConcoursePlateLayout;

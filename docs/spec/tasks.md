@@ -1,20 +1,16 @@
-# タスク: packages/database の schema.ts のドメイン別分割 (Issue #149)
+# タスク: アプリ間で共有するロジックを packages に置く方針と、共有する語彙の置き場 (Issue #152)
 
-- [x] **TASK-1** Issue #149 を作成し、`develop` からブランチ `refactor/issue149-split-database-schema` を切る
-- [x] **TASK-2** 分割前に `drizzle-kit generate` を実行し、差分が無いことを確認する（依存: TASK-1）
-  - 結果: `No schema changes, nothing to migrate`
-- [x] **TASK-3** `src/schema/` の5ファイルを作り、`schema.ts` を削除する。`package.json` の exports と `drizzle.config.ts` を直す（依存: TASK-2）
-  - 元ファイルの行範囲を `sed` で切り出して作った（手で書き写さない）
-  - `transfer.ts` 冒頭の「難易度4列は #125 のあとの別デプロイで落とす」を、#136 で完了済みの現在形に直した
-- [x] **TASK-4** 検証（依存: TASK-3）
-  - `drizzle-kit generate`: `No schema changes, nothing to migrate`。`drizzle/` に差分なし
-  - 行の並べ替え `diff`: 違いは各ファイルの見出しコメント4つと、TASK-3 のコメント修正だけ
-  - `pnpm run typecheck`（6タスク）・`pnpm run lint`（4タスク）成功
-  - `pnpm run test`: admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42 すべて成功
-  - `pnpm run build` 成功（DB に触れない）
-- [x] **TASK-5** ドキュメントのパスを直す（依存: TASK-3）
-  - `CLAUDE.md`（二段階マイグレーションの補足）・`apps/CLAUDE.md`・`packages/database/CLAUDE.md`・`.github/instructions/drizzle.instruction.md`・`.claude/agent-memory/frontend-engineer/MEMORY.md`
-  - `docs/domain/station-visibility.md`・`docs/domain/station-master-model.md`: パスの言及のみ。ドメインルールの変更は無いことを確認した
-  - ADR（0004・0005・0008）の `schema.ts` への言及は書き換えない（追記のみの運用）
-- [x] **TASK-6** `docs/adr/`: 変更なし（design.md 決定3）
-- [ ] **TASK-7** PR を `develop` 向けに作る。マイグレーションが増えないため、Vercel のビルドで流れるものは無い
+- [x] **TASK-1** 現状の調査。ドメインの packages が ESLint で `@furatora/database/*` を丸ごと禁止しており、`DirectionType`（transfer-difficulty）と `'top' | 'bottom'`（platform-diagram 3か所）が書き写されていることを確認した
+- [x] **TASK-2** 開発者確認（2026-10-02）: 語彙の置き場は「`enums` だけ例外で許可」
+- [x] **TASK-3** Issue #152 を作成し、ブランチ `refactor/issue152-shared-packages-adr` を切る
+- [x] **TASK-4** `DirectionType` / `PlatformSide` を `enums` からの import に置き換える。admin の重複の一致検査を外す（依存: TASK-2）
+- [x] **TASK-5** ESLint を `regex` にし、`package.json` に `@furatora/database` を足す（依存: TASK-2）
+  - `group` の `!@furatora/database/enums` では `enums` も禁止されたままだった（実測）ため、`regex` にした
+  - ロックファイルは、`pnpm install` が出した無関係な peer 解決の揺れを除き、追加の7行だけにした。`pnpm install --frozen-lockfile` 成功
+- [x] **TASK-6** 検証（依存: TASK-4, 5）
+  - ESLint の発火: 両パッケージで `@furatora/database`・`/client`・`/schema`・`drizzle-orm` がエラー、`/enums` だけ通る
+  - `pnpm run typecheck`（6タスク）・`lint`（4タスク）・`test`（admin 627・platform-diagram 203・transfer-difficulty 55・frontend 42）・`build` がすべて成功
+- [x] **TASK-7** ADR-0015 を書き、一覧に足す。`packages/database/CLAUDE.md` と `.github/instructions/drizzle.instruction.md` に `enums` の制約を書く
+- [x] **TASK-7a** 開発者確認（2026-10-02）: 許可は import の入口 `@furatora/database/enums` に対して行い、中はディレクトリに分けてよい。個別のファイルへの import は許さない。ディレクトリ化と `packages/database` の ESLint は #139 で行う。ADR-0015 決定3 と CLAUDE.md 類を更新し、#139 に追記した
+- [x] **TASK-8** ADR-0015 を `Accepted` にした（開発者承認 2026-10-02）
+- [ ] **TASK-9** PR を `develop` 向けに作る

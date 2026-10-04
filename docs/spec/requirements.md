@@ -1,33 +1,29 @@
-# 要件: packages/database の schema.ts のドメイン別分割 (Issue #149)
+# 要件: アプリ間で共有するロジックを packages に置く方針と、共有する語彙の置き場 (Issue #152)
 
 ## 概要
 
-- **対象**: `packages/database/src/schema.ts`（25テーブル・約400行）を、ドメイン別のファイル（`src/schema/`）に分ける。振る舞いは変えない
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) /
-  [Issue #149](https://github.com/Natsugure/furatora/issues/149)
-- **ブランチ**: `refactor/issue149-split-database-schema`
-- **信頼度**: 95%（高）。機械的な移動であり、DB スキーマの同一性は `db:generate` で検証できる
+- **対象**: アプリ間で共有するロジックを packages に置く方針を ADR-0015 として決める。共有する語彙を `@furatora/database/enums` に一本化し、ドメインの packages から `enums` だけを import できるようにする
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #152](https://github.com/Natsugure/furatora/issues/152) /
+  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) / ADR-0001 / ADR-0010
+- **ブランチ**: `refactor/issue152-shared-packages-adr`
+- **信頼度**: 90%（高）。方針は開発者と合意済み（語彙の置き場は「enums だけ例外で許可」）。コードの変更は型の置き換えと ESLint の設定だけ
 
 ## 背景
 
-モノレポのリファクタリングの1本目。1ファイルに全テーブルが並んでいて、目的のテーブルを探しにくい。
-#144（`line_directions` の DROP）が入った直後で、テーブル定義と Drizzle のスナップショットが一致しているため、
-分割の前後で `db:generate` が変更なしであることを検証に使える（二段階マイグレーションの途中だと DROP が混ざる）。
+ADR-0015「コンテキストと課題」を参照。`FACILITY_TYPE_CODES` の移動は #139、admin と web の重複の解消は #138 で行い、本 Issue には含めない。
 
 ## 要件（EARS記法）
 
-- **REQ-1**: システムは、テーブル定義を `packages/database/src/schema/` のドメイン別のファイルに置き、`index.ts` で全テーブル・型を再 export すること
-- **REQ-2**: システムは、`@furatora/database/schema` の import パスと、そこから export される名前を変えないこと
-- **REQ-3**: 分割後に `drizzle-kit generate` を実行したとき、システムはマイグレーションを生成しないこと（スナップショットと一致する）
-- **REQ-4**: システムは、テーブル定義とその不変条件のコメントを、内容を変えずに移すこと（完了済みの作業を未来形で書いた記述の修正を除く）
-- **REQ-5**: システムは、ファイル間の import を循環させないこと
-- **REQ-6**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること。`build` は DB に触れないこと
-- **REQ-7**: システムは、テーブル定義のパスに言及する現在形のドキュメント（CLAUDE.md 類・`docs/domain/`）を新しいパスに直すこと。ADR は書き換えないこと（追記のみの運用）
+- **REQ-1**: システムは、共有ロジックのパッケージの単位・入れてよいもの・語彙の置き場・新設の条件・ADR-0001 との関係を ADR-0015 に記録すること
+- **REQ-2**: ドメインのパッケージ（`platform-diagram` / `transfer-difficulty`）が `@furatora/database/enums` を import したとき、システムは lint を通すこと
+- **REQ-3**: ドメインのパッケージが `@furatora/database`・`@furatora/database/client`・`schema`・`tx`・`drizzle-orm` を import した場合、システムは lint エラーにすること
+- **REQ-4**: システムは、`DirectionType` と `PlatformSide` を `@furatora/database/enums` の1か所だけで定義すること
+- **REQ-5**: システムは、`@furatora/transfer-difficulty/domain` から `DirectionType` を export し続けること（利用側の import を変えない）
+- **REQ-6**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること
 
 ## エッジケース
 
 | ケース | 扱い |
 |---|---|
-| 分割前から `db:generate` が差分を出す | 分割の検証に使えないため、作業を止めて報告する（実測: 差分なし） |
-| `import * as schema from './schema'`（client.ts / tx.ts） | `moduleResolution: Bundler` で `schema/index.ts` に解決される。変更しない |
-| 元ファイルの末尾に改行が無い | 分割後のファイルは末尾に改行を付ける |
+| ESLint の `group` で `!@furatora/database/enums` を書く | 親の `@furatora/database` を除外すると再び含められず、`enums` も禁止される（実測）。`regex` で書く |
+| `pnpm install` がロックファイルの無関係な peer 解決（`next` の `@babel/core`）を入れ替える | 追加した依存の7行だけをロックファイルに入れ、`pnpm install --frozen-lockfile` で整合を確認する |
