@@ -1,43 +1,9 @@
-# タスク: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
+# タスク: 方面ラベルの解決・接続の向きの揃え方を transfer-difficulty に集める (Issue #138)
 
-- [x] **TASK-1** 現状の調査（Neon MCP の SELECT）
-  - main と development のどちらも、`facility_types` は7コードで、定数と一致している
-  - どちらも、マイグレーションは18件（0000〜0017）適用済み
-  - 子テーブルに未知のコードは無い
-  - Issue の「main は 0010 が未デプロイ」は解消済み
-- [x] **TASK-2** ブランチ `refactor/issue139-facility-type-codes` を切り、docs/spec を書き換える
-- [x] **TASK-3** `enums` をディレクトリにする（`stationMaster.ts` / `facility.ts` / `index.ts`）。exports を向け直す
-- [x] **TASK-4** `packages/database` に ESLint を入れ、`eslint --stdin` で発火を確かめる（依存: TASK-3）
-  - `--stdin-filename src/enums/facility.ts` での結果:
-    - エラー: `drizzle-orm`・`../schema`・`../schema/stationMaster`・`../client`・`../tx`・`@furatora/database/enums`
-    - 通る: `./stationMaster`
-  - ロックファイル: `pnpm install` が出した無関係な peer 解決の揺れ（next の `@babel/core` ほか）を戻し、追加の9行だけにした。`pnpm install --frozen-lockfile` 成功
-- [x] **TASK-5** `transfer-difficulty` が定数を `enums` から import して再 export する（依存: TASK-3）
-- [x] **TASK-6** schema に CHECK と `$type` を入れ、`db:generate` で `0018` を生成する（依存: TASK-3）
-  - `0018_facility_types_code_check.sql` は `ADD CONSTRAINT ... CHECK (... IN ('sameFloor', ...))` の1文だけ。2回目の `db:generate` は差分なし
-  - 定数を変えたときに DROP / ADD が出ることは、この作業では試していない（Issue で drizzle-kit 0.31.8 での確認済み）
-- [x] **TASK-7** Web と Admin の `isFacilityCode` を消す。Admin の駅レイアウトの入力検証を `z.enum` にする（依存: TASK-6）
-  - 開発者確認（2026-10-04）: `station_facilities.type_code` の `$type` で、駅レイアウトの保存経路が型エラーになった。型を末端まで狭める
-    - 対象: `platform-diagram` の `FacilityDTO.typeCode`、`FacilityTypeOption.code`、`FacilityDraft` と `editDraft` の引数
-    - `FACILITY_ICON_FILES` は #140 の範囲なので触らない
-- [x] **TASK-8** seed を `Record<FacilityTypeCode, string>` にする（依存: TASK-3）
-- [x] **TASK-9** 検証: `typecheck` / `lint` / `test` / `build`（依存: TASK-4〜8）
-  - `typecheck`（6タスク）・`lint`（5タスク）・`build`（2タスク）が成功した
-  - `test` も成功した: admin 628（未知のコードを拒否するテストを追加）・platform-diagram 203・transfer-difficulty 55・frontend 40（未知のコードのテスト2件を削除）
-- [x] **TASK-10** 開発者が development で `db:migrate` → `db:push` を実行し、push の誤検出と制約の適用を確かめる（依存: TASK-6）
-  - `db:migrate`: 適用済み。`__drizzle_migrations` は19件になり、`facility_types_code_known` が入った
-    - PostgreSQL は定義を `(code)::text = ANY (ARRAY[...])` に変換して保存していた
-  - `drizzle-kit push --strict`: `facility_types_code_known` の差分は出なかった。CHECK の誤検出は無い
-    - 代わりに、外部キー4本の DROP / ADD が提案された（中止した）
-    - 原因は既存の問題で、本 Issue とは関係ない。drizzle が生成する外部キー名が63文字を超え、PostgreSQL が切り詰めて保存したため、push が名前の不一致を差分と見ている
-    - #154 に起票し、`packages/database/CLAUDE.md` に既知の誤検出として記載した
-- [x] **TASK-11** ADR-0016 を書く（Proposed）。`docs/domain/station-master-model.md`、`packages/database/CLAUDE.md`、`.github/instructions/drizzle.instruction.md` を更新する
-- [x] **TASK-13** レビュー指摘への対応: 稼働中のコードが知らない設備コードを読み取りの境界で扱う（ADR-0016 を更新）
-  - Web: 知らないコードを含むルートは未入力として表示する（`isFacilityTypeCode` で戻す）
-  - Admin: 駅対・駅レイアウトの編集画面は `UnknownFacilityCodeError` で止め、理由を表示する。設備の種類の選択肢からは除く
-  - 開発者確認（2026-10-04）: Admin を未入力扱いにすると、保存（消して入れ直す）で行が消えるため、Web と分けて止める
-- [x] **TASK-12** ADR-0016 を Accepted にし（開発者の承認 2026-10-04）、PR を develop 向けに作る
-  - TASK-13 を反映した状態で再検証した
-    - `typecheck`（6）・`lint`（5）・`build`（2）が成功した
-    - `test` も成功した: admin 631・platform-diagram 203・transfer-difficulty 55・frontend 42
-    - `pnpm install --frozen-lockfile` も成功した
+- [x] **TASK-1** ブランチ `refactor/issue138-shared-transfer-rules` を切り、docs/spec を書き換える
+- [ ] **TASK-2** `transfer-difficulty` に `firstLineByStation` / `resolveStationDirectionLabels` とテストを追加する
+- [ ] **TASK-3** `transfer-difficulty` に `orientConnection`（`connection.ts`）とテストを追加し、バレルに足す
+- [ ] **TASK-4** Admin の `comboOfConnection` と `transferPairEditPageQuery` を共有関数に置き換える（依存: TASK-2, 3）
+- [ ] **TASK-5** Web の組み立てを `features/station/domain/transferPartners.ts` に切り出し、`transferPartnerRows.ts`・`stationDetailQuery.ts` を置き換える（依存: TASK-2, 3）
+- [ ] **TASK-6** 検証: `typecheck` / `lint` / `test` / `build`、`git grep` で apps に写しが残っていないこと、dev で表示が変わらないこと（依存: TASK-4, 5）
+- [ ] **TASK-7** `docs/domain/line-directions.md` の実装の所在を更新する。`station-master-model.md` は変更なしを確認する（依存: TASK-6）
