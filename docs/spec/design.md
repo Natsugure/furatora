@@ -114,5 +114,5 @@ export function assembleTransferPartners(input: {
 ## 恒久知識の振り分け
 
 - `docs/domain/line-directions.md`: 実装の所在を `resolveStationDirectionLabels` / `firstLineByStation` に上書きする（フェーズ5）
-- `docs/domain/station-master-model.md`: 向きの揃え方の記述は無いので変更なし
+- `docs/domain/station-master-model.md`: 向きの揃え方の記述は無い。未知の設備コードの Web 側の所在（ファイルパス）だけを直す
 - ADR: 新規なし。ステータス変更なし

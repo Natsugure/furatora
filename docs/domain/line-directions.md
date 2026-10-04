@@ -52,10 +52,13 @@ line_directions
 - ① で文言が複数あるとき（1つの走行方向に複数のホームが対応する駅。中野坂上 inbound の「方南町方面」「荻窪・方南町方面」）は、
   **どれか1つに決めず**、重複を除いてホーム番号の数値順（'2' → '10'）に「／」で連結する。解消は [#128](https://github.com/Natsugure/furatora/issues/128)。
 - 空文字の文言は、無いものとして次の段へ進む。
-- 実装は `packages/transfer-difficulty/src/domain/directionLabel.ts` の `resolveDirectionLabel`
-  （DB・React に依存しない純粋関数）。呼び出し側がホームと既定行を読んで渡す。
-  Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）と
-  Web の駅詳細（`apps/web/src/external/query/transferPartnerRows.ts`）が使う。規則を各アプリで書き直さない。
+- 実装は `packages/transfer-difficulty/src/domain/directionLabel.ts`（DB・React に依存しない純粋関数）。
+  - `resolveDirectionLabel`: 1つの走行方向について ①〜③ を解決する
+  - `firstLineByStation`: 駅ごとの最初の路線を決める（下記）
+  - `resolveStationDirectionLabels`: 駅の最初の路線を引き、駅と路線でホームを絞り、ホーム番号の数値順に並べて、走行方向ごとに解決する
+  - 呼び出し側はホーム・既定行・駅の路線を SQL で読んで渡すだけにする。
+    Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）と
+    Web の駅詳細（`apps/web/src/features/station/domain/transferPartners.ts`）が使う。規則を各アプリで書き直さない。
 - 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面と Web の駅詳細の乗換セクションは、駅の最初の路線（`stationLines` を路線の `displayOrder`、同順なら id で並べた先頭）について解決し、
   ホームと既定行をその路線で絞る。1駅が複数路線を持つようになったら（[#82](https://github.com/Natsugure/furatora/issues/82)）、
   解決の入力に路線を明示する必要がある。
