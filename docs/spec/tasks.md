@@ -36,4 +36,8 @@
   - Web: 知らないコードを含むルートは未入力として表示する（`isFacilityTypeCode` で戻す）
   - Admin: 駅対・駅レイアウトの編集画面は `UnknownFacilityCodeError` で止め、理由を表示する。設備の種類の選択肢からは除く
   - 開発者確認（2026-10-04）: Admin を未入力扱いにすると、保存（消して入れ直す）で行が消えるため、Web と分けて止める
-- [ ] **TASK-12** ADR-0016 を Accepted にし（開発者の承認後）、PR を develop 向けに作る
+- [x] **TASK-12** ADR-0016 を Accepted にし（開発者の承認 2026-10-04）、PR を develop 向けに作る
+  - TASK-13 を反映した状態で再検証した
+    - `typecheck`（6）・`lint`（5）・`build`（2）が成功した
+    - `test` も成功した: admin 631・platform-diagram 203・transfer-difficulty 55・frontend 42
+    - `pnpm install --frozen-lockfile` も成功した

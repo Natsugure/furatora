@@ -65,7 +65,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0013](./0013-serialize-transfer-pair-writes.md) | 駅対の乗換難易度の書き込みを、接続一覧の行ロックで1本ずつにする | Accepted   | 2026-09-27 |
 | [0014](./0014-direction-label-by-default-row.md) | 方面の表示文言を、(路線, 走行方向) ごとの既定行で解決する | Accepted   | 2026-09-27 |
 | [0015](./0015-shared-domain-packages-and-vocabulary.md) | アプリ間で共有するロジックをドメイン単位の packages に置き、共有する語彙は `@furatora/database/enums` に置く | Accepted   | 2026-10-02 |
-| [0016](./0016-facility-type-codes-constant-as-source.md) | 設備コードの一覧は定数 `FACILITY_TYPE_CODES` を正とし、DB は CHECK 制約で、seed は型で従わせる | Proposed   | 2026-10-04 |
+| [0016](./0016-facility-type-codes-constant-as-source.md) | 設備コードの一覧は定数 `FACILITY_TYPE_CODES` を正とし、DB は CHECK 制約で、seed は型で従わせる | Accepted   | 2026-10-04 |
 
 ## 関連ドキュメント
 

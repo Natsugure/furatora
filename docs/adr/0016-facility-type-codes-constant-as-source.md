@@ -1,6 +1,6 @@
 # ADR-0016: 設備コードの一覧は定数 `FACILITY_TYPE_CODES` を正とし、DB は CHECK 制約で、seed は型で従わせる
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-04
 - **決定者**: @Natsugure
 - **関連**: [ADR-0015](./0015-shared-domain-packages-and-vocabulary.md)（定数の置き場）,
