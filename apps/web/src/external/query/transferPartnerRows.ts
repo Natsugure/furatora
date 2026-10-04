@@ -10,7 +10,6 @@ import {
   transferRoutes,
 } from '@furatora/database/schema';
 import {
-  FACILITY_TYPE_CODES,
   resolveDirectionLabel,
   type DirectionType,
   type FacilityTypeCode,
@@ -28,25 +27,15 @@ import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from '@/f
 const inboundDirections = alias(lineDirections, 'inbound_directions');
 const outboundDirections = alias(lineDirections, 'outbound_directions');
 
-const isFacilityCode = (code: string): code is FacilityTypeCode =>
-  (FACILITY_TYPE_CODES as readonly string[]).includes(code);
-
-// ルートごとの設備。定数に無い設備コードを含むルートは、設備を空（未入力）として扱う。
-// そのコードだけ捨てると残りの設備で判定され、段差のあるルートを「バリアフリールートあり」と出しうる。
-// 未入力なら必要な行為を導出しない（ADR-0012）。定数と facility_types の一致を仕組みで守るのは #139
+// ルートごとの設備。未知の設備コードは DB に入らない（facility_types の CHECK 制約と外部キー。ADR-0016）ので、
+// ここでは絞り込まない
 export function facilitiesByRoute(
-  rows: readonly { routeId: string; typeCode: string }[],
+  rows: readonly { routeId: string; typeCode: FacilityTypeCode }[],
 ): Map<string, FacilityTypeCode[]> {
   const facilitiesOf = new Map<string, FacilityTypeCode[]>();
-  const unknownRouteIds = new Set<string>();
   for (const row of rows) {
-    if (!isFacilityCode(row.typeCode)) {
-      unknownRouteIds.add(row.routeId);
-      continue;
-    }
     facilitiesOf.set(row.routeId, [...(facilitiesOf.get(row.routeId) ?? []), row.typeCode]);
   }
-  for (const routeId of unknownRouteIds) facilitiesOf.set(routeId, []);
   return facilitiesOf;
 }
 

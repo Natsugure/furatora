@@ -38,9 +38,6 @@ import {
 // 駅対（自駅 S・相手駅 T）の乗換難易度の編集画面 1 枚ぶんの読み取り（ADR-0003。Query は画面ごとに1つ）。
 // DTO はルートと設備をそのまま運び、ペルソナごとの必要な行為は含めない（導出は表示層。docs/domain）。
 
-const isFacilityCode = (code: string): code is FacilityTypeCode =>
-  (FACILITY_TYPE_CODES as readonly string[]).includes(code);
-
 const inboundDirections = alias(lineDirections, 'inbound_directions');
 const outboundDirections = alias(lineDirections, 'outbound_directions');
 
@@ -177,7 +174,6 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
 
     const facilitiesOf = new Map<string, FacilityTypeCode[]>();
     for (const row of facilityRows) {
-      if (!isFacilityCode(row.typeCode)) continue;
       const list = facilitiesOf.get(row.routeId) ?? [];
       list.push(row.typeCode);
       facilitiesOf.set(row.routeId, list);
@@ -253,7 +249,6 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       connectedLineName: firstLineName(connectedStationId),
       directionHints: { station: hints(stationId), connected: hints(connectedStationId) },
       facilityTypes: facilityTypeRows
-        .filter((row): row is { code: FacilityTypeCode; name: string } => isFacilityCode(row.code))
         .sort((x, y) => FACILITY_TYPE_CODES.indexOf(x.code) - FACILITY_TYPE_CODES.indexOf(y.code)),
       connections: pairConnections.map((c) => ({ combo: comboOfConnection(c, stationId), notes: c.notes })),
       routes,

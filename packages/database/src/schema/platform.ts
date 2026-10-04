@@ -1,8 +1,8 @@
 // ホームと設備（ホーム・場所・アクセス点・設備・設備マスタ）。
 // docs/domain/platform-coordinate-system.md 参照
-import { pgTable, varchar, decimal, timestamp, text, uuid, boolean, unique } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, decimal, timestamp, text, uuid, boolean, unique, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import type { PlatformSide } from '../enums';
+import { FACILITY_TYPE_CODES, type FacilityTypeCode, type PlatformSide } from '../enums';
 import { stations, lines, lineDirections } from './stationMaster';
 
 export const platforms = pgTable('platforms', {
@@ -42,7 +42,7 @@ export const platformLocationCells = pgTable('platform_location_cells', {
 export const stationFacilities = pgTable('station_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformLocationCellId: uuid('platform_location_cell_id').references(() => platformLocationCells.id, { onDelete: 'cascade' }).notNull(),
-  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
+  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull().$type<FacilityTypeCode>(),
   isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
   isStrollerAccessible: boolean('is_stroller_accessible').default(true),
   notes: text('notes'),
@@ -66,7 +66,17 @@ export const facilityConnections = pgTable('facility_connections', {
   unique('unique_facility_connection').on(t.platformLocationId, t.connectedStationId),
 ]);
 
+// 設備の種類のマスタ。code の一覧の正は enums の FACILITY_TYPE_CODES で、この表は CHECK 制約で従う（ADR-0016）。
+// station_facilities / transfer_route_facilities の type_code は外部キーでここを参照するので、子に CHECK は要らない
 export const facilityTypes = pgTable('facility_types', {
-  code: varchar('code', { length: 20 }).primaryKey(),
+  code: varchar('code', { length: 20 }).primaryKey().$type<FacilityTypeCode>(),
   name: varchar('name', { length: 100 }).notNull(),
-});
+}, (t) => [
+  // 【値は sql.raw でリテラルとして展開すること】${} でそのまま埋め込む書き方や inArray は、
+  // drizzle-kit が IN ($1, $2) を出力してマイグレーションが壊れる。sql.raw を使ってよいのは、
+  // 値が利用者の入力ではなくコード内の定数だから。定数を変えると db:generate が DROP / ADD を出力する
+  check(
+    'facility_types_code_known',
+    sql`${t.code} IN (${sql.raw(FACILITY_TYPE_CODES.map((code) => `'${code}'`).join(', '))})`,
+  ),
+]);

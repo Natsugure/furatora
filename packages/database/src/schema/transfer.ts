@@ -1,7 +1,7 @@
 // 乗換（接続一覧と乗換難易度）。docs/domain/station-master-model.md「乗換接続」「乗換難易度」参照
 import { pgTable, varchar, smallint, timestamp, text, uuid, boolean, unique, uniqueIndex, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import type { DirectionType, StationConnectionSource } from '../enums';
+import type { DirectionType, FacilityTypeCode, StationConnectionSource } from '../enums';
 import { stations } from './stationMaster';
 import { facilityTypes } from './platform';
 
@@ -123,7 +123,7 @@ export const connectionRoutes = pgTable('connection_routes', {
 export const transferRouteFacilities = pgTable('transfer_route_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   routeId: uuid('route_id').references(() => transferRoutes.id, { onDelete: 'cascade' }).notNull(),
-  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull(),
+  typeCode: varchar('type_code').references(() => facilityTypes.code).notNull().$type<FacilityTypeCode>(),
 }, (t) => [
   unique('unique_transfer_route_facility_type').on(t.routeId, t.typeCode),
 ]);

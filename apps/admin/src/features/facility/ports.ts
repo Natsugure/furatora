@@ -1,3 +1,4 @@
+import type { FacilityTypeCode } from '@furatora/database/enums';
 import type { PlatformLocationInput } from './schema';
 
 export type PlatformLocationRecord = {
@@ -21,7 +22,7 @@ export interface PlatformLocationRepository {
 // 読み取り: Query Service（ADR-0003）。stationLayoutPageQuery が選択肢データ
 // （設備種別・乗換候補駅）を組み立てる際に再利用する型。
 
-export type FacilityTypeOption = { code: string; name: string };
+export type FacilityTypeOption = { code: FacilityTypeCode; name: string };
 
 export type ConnectedStationOption = {
   id: string;
