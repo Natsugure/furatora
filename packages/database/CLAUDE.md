@@ -42,7 +42,7 @@ import type { DirectionType } from '@furatora/database/enums'  // Enum型
 - 構成: `stationMaster.ts`（`DirectionType` / `PlatformSide` / `StationConnectionSource`）、
   `facility.ts`（`FACILITY_TYPE_CODES` / `FacilityTypeCode`）、`index.ts`（再 export）
 - 設備コードの一覧の正は `FACILITY_TYPE_CODES` で、`facility_types` は CHECK 制約 `facility_types_code_known` で従う（ADR-0016）。
-  種類を足す手順は `facility.ts` のコメントを見る
+  種類を足す・消す・名前を変える手順（マイグレーションの順序）は `facility.ts` のコメントを見る
 
 ## 型定義
 - Drizzle の型推論 (`InferSelectModel`, `InferInsertModel`) を積極的に使用する

@@ -74,7 +74,8 @@ export const facilityTypes = pgTable('facility_types', {
 }, (t) => [
   // 【値は sql.raw でリテラルとして展開すること】${} でそのまま埋め込む書き方や inArray は、
   // drizzle-kit が IN ($1, $2) を出力してマイグレーションが壊れる。sql.raw を使ってよいのは、
-  // 値が利用者の入力ではなくコード内の定数だから。定数を変えると db:generate が DROP / ADD を出力する
+  // 値が利用者の入力ではなくコード内の定数だから。定数を変えると db:generate が DROP / ADD を出力する。
+  // ADD は既存の行も検査するので、手書きの INSERT / DELETE との順序を守ること（手順は enums/facility.ts）
   check(
     'facility_types_code_known',
     sql`${t.code} IN (${sql.raw(FACILITY_TYPE_CODES.map((code) => `'${code}'`).join(', '))})`,

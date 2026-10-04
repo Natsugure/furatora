@@ -241,11 +241,23 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
     - Admin: 駅対の編集画面と駅レイアウトの編集画面は、`UnknownFacilityCodeError` で止め、理由を表示して編集させない。
       保存が設備を置き換える（消して入れ直す）ので、捨てて表示すると保存だけで行が消えるため（`apps/admin/src/features/facility/knownFacilityCodes.ts`）
     - Admin の設備の種類の選択肢からは、知らないコードを除く
-  - 種類を足すときは、次の3つを行う
+  - 定数を変えるマイグレーションは、**CHECK を広げてから行を足す。行を消してから CHECK を狭める。**
+    CHECK の作り直し（`ADD CONSTRAINT`）は既存の行も検査し、マイグレーションは番号順に流れるため、
+    順序を誤ると Vercel のビルドが落ちる。手順の詳細は `packages/database/src/enums/facility.ts` のコメントにある
+  - 種類を足すときは、次の3つをこの順で行う
     1. 定数に足し、判定の規則（`packages/transfer-difficulty` の `REQUIREMENT_BY_FACILITY`）と seed の表示名を書く。どちらも書き忘れるとコンパイルエラーになる
     2. `pnpm run db:generate` で、CHECK を作り直すマイグレーションを作る
-    3. `facility_types` への INSERT を、手書きのマイグレーションで足す（例: `0010`）
+    3. `facility_types` への INSERT を、手書きのマイグレーション（`drizzle-kit generate --custom`）で足す（例: `0010`）。
+       2 より先に作ると番号が前になり、INSERT が古い CHECK に違反する
   - 3 を忘れると、そのコードを保存したときに外部キーのエラーになる（黙って誤判定はしない）
+  - 種類を消すときは逆順に行う
+    1. 手書きのマイグレーションで、子（`transfer_route_facilities` / `station_facilities`）の行を片付けてから `facility_types` の行を消す。
+       子の行を別の種類に置き換えるか消すかで判定が変わるので、データを見て決める
+    2. 定数から消し、`pnpm run db:generate` で CHECK を狭める
+    - 二段階のデプロイは要らない。古いコードが消した種類を保存しても外部キーのエラーになり、
+      読んでも `isFacilityTypeCode` で見分けられるため
+  - 名前を変えるときは「新しい種類を足す（INSERT と同じマイグレーションで子の行を UPDATE する）→ 古い種類を消す」に分ける。
+    定数を一度に書き換えると、生成される CHECK が新旧どちらの行とも矛盾する
 - **設備は種類の集合で持つ。順序も回数も持たない。** 1行は「このルートは、この種類の設備を
   すべて通る」を意味し、同種の設備が何か所あっても1行になる。必要な行為は、ルート上の設備すべてから
   ペルソナにとって最も重いものを選んで導出するため、順序に依存しない。回数が表示に必要に
