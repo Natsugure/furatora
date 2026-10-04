@@ -26,3 +26,58 @@ export function resolveDirectionLabel(input: {
   if (input.defaultName) return { label: input.defaultName, source: 'default' };
   return { label: FALLBACK_DIRECTION_LABELS[input.directionType], source: 'fallback' };
 }
+
+// 駅ごとの「最初の路線」。行は呼び出し側の SQL で lines.displayOrder, lines.id 順に並べてあること。
+// 1駅が複数路線を持っても（#82）、読み込みのたびに変わらないようにするため、この順の先頭を採る
+export function firstLineByStation(
+  rows: readonly { stationId: string; lineId: string; lineName: string }[],
+): Map<string, { lineId: string; lineName: string }> {
+  const firstLineOf = new Map<string, { lineId: string; lineName: string }>();
+  for (const row of rows) {
+    if (!firstLineOf.has(row.stationId)) firstLineOf.set(row.stationId, { lineId: row.lineId, lineName: row.lineName });
+  }
+  return firstLineOf;
+}
+
+/**
+ * 駅の方面ラベル。駅は現在1駅1路線なので、駅の最初の路線（firstLineByStation）について解決する。
+ * 路線で絞るのは、1駅が複数路線を持つようになったとき（#82）に別路線の文言が混ざらないようにするため
+ */
+export function resolveStationDirectionLabels(input: {
+  stationId: string;
+  firstLineOf: ReadonlyMap<string, { lineId: string }>;
+  /** ①: ホームの枠ごとの方面。全駅分をそのまま渡してよい */
+  platformRows: readonly {
+    stationId: string;
+    lineId: string;
+    platformNumber: string;
+    inboundName: string | null;
+    outboundName: string | null;
+  }[];
+  /** ②: 路線の既定行 */
+  defaultRows: readonly { lineId: string; directionType: DirectionType; displayName: string }[];
+}): Record<DirectionType, string> {
+  const lineId = input.firstLineOf.get(input.stationId)?.lineId;
+  // 路線の無い駅は、ホームや既定行があっても使わない（どの路線の文言かを決められない）
+  const platformsOfLine =
+    lineId === undefined
+      ? []
+      : input.platformRows
+          .filter((p) => p.stationId === input.stationId && p.lineId === lineId)
+          // ホーム番号は varchar なので、SQL の並びでは '10' が '2' より前になる。数値として並べる
+          .sort((a, b) => a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true }));
+  const resolve = (directionType: DirectionType, names: (string | null)[]) =>
+    resolveDirectionLabel({
+      directionType,
+      platformNames: names.filter((name): name is string => name !== null),
+      defaultName:
+        lineId === undefined
+          ? null
+          : (input.defaultRows.find((d) => d.lineId === lineId && d.directionType === directionType)?.displayName ??
+            null),
+    }).label;
+  return {
+    inbound: resolve('inbound', platformsOfLine.map((p) => p.inboundName)),
+    outbound: resolve('outbound', platformsOfLine.map((p) => p.outboundName)),
+  };
+}
