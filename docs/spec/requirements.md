@@ -1,29 +1,49 @@
-# 要件: アプリ間で共有するロジックを packages に置く方針と、共有する語彙の置き場 (Issue #152)
+# 要件: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
 
 ## 概要
 
-- **対象**: アプリ間で共有するロジックを packages に置く方針を ADR-0015 として決める。共有する語彙を `@furatora/database/enums` に一本化し、ドメインの packages から `enums` だけを import できるようにする
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #152](https://github.com/Natsugure/furatora/issues/152) /
-  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) / ADR-0001 / ADR-0010
-- **ブランチ**: `refactor/issue152-shared-packages-adr`
-- **信頼度**: 90%（高）。方針は開発者と合意済み（語彙の置き場は「enums だけ例外で許可」）。コードの変更は型の置き換えと ESLint の設定だけ
+- **対象**: 設備コードの一覧を定数 `FACILITY_TYPE_CODES` に一本化し、DB（`facility_types` の CHECK 制約）と seed（型）をそれに従わせる。あわせて `@furatora/database/enums` をディレクトリにし、`packages/database` に ESLint を入れる
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #139](https://github.com/Natsugure/furatora/issues/139) /
+  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) / ADR-0011 / ADR-0012
+- **ブランチ**: `refactor/issue139-facility-type-codes`
+- **信頼度**: 85%（高〜中）
+  - 方針は Issue と ADR-0015 で決まっている
+  - 未確定は `db:push` が CHECK 制約を毎回差分と誤認するかどうかだけ。development で確かめる
 
 ## 背景
 
-ADR-0015「コンテキストと課題」を参照。`FACILITY_TYPE_CODES` の移動は #139、admin と web の重複の解消は #138 で行い、本 Issue には含めない。
+設備コードの一覧は3か所にあり、一致しているかは人が確かめるしかない。
+
+1. 定数 `FACILITY_TYPE_CODES`（`packages/transfer-difficulty`）
+2. `facility_types` テーブル
+3. seed
+
+定数に無いコードが DB に入ると、問題が2つ起きる。
+
+- Web と Admin は、そのコードを `isFacilityCode` で黙って捨てる。そのため、誤った案内を出しうる
+- Admin では、そのルートの駅対を開いて保存しただけで、そのコードの行が消える
 
 ## 要件（EARS記法）
 
-- **REQ-1**: システムは、共有ロジックのパッケージの単位・入れてよいもの・語彙の置き場・新設の条件・ADR-0001 との関係を ADR-0015 に記録すること
-- **REQ-2**: ドメインのパッケージ（`platform-diagram` / `transfer-difficulty`）が `@furatora/database/enums` を import したとき、システムは lint を通すこと
-- **REQ-3**: ドメインのパッケージが `@furatora/database`・`@furatora/database/client`・`schema`・`tx`・`drizzle-orm` を import した場合、システムは lint エラーにすること
-- **REQ-4**: システムは、`DirectionType` と `PlatformSide` を `@furatora/database/enums` の1か所だけで定義すること
-- **REQ-5**: システムは、`@furatora/transfer-difficulty/domain` から `DirectionType` を export し続けること（利用側の import を変えない）
-- **REQ-6**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること
+- **REQ-1**: システムは、設備コードの一覧を `@furatora/database/enums` の `FACILITY_TYPE_CODES` の1か所だけで定義すること
+- **REQ-2**: 定数に無いコードを `facility_types.code` に INSERT / UPDATE した場合、DB は CHECK 制約で拒否すること
+- **REQ-3**: 定数を変更して `db:generate` を実行したとき、システムは CHECK 制約を作り直すマイグレーションを生成すること。変更が無ければ生成しないこと
+- **REQ-4**: システムは、`transfer_route_facilities.type_code`・`station_facilities.type_code`・`facility_types.code` を読むときの型を `FacilityTypeCode` にすること
+- **REQ-10**: Web が、稼働中のコードの知らない設備コードをルートの設備として読んだ場合、システムはそのルートを未入力として表示し、ページを落とさないこと
+- **REQ-11**: Admin の駅対・駅レイアウトの編集画面が、稼働中のコードの知らない設備コードを読んだ場合、システムは編集画面を開かず、そのコードと理由を表示すること
+- **REQ-12**: Admin の設備の種類の選択肢に、稼働中のコードの知らないコードがある場合、システムはそれを選択肢から除くこと
+- **REQ-5**: 定数にあって seed の表示名に無いコードがある場合、システムはコンパイルエラーにすること
+- **REQ-6**: Admin の駅レイアウトの保存に定数に無い設備コードが含まれる場合、システムは入力検証で拒否すること
+- **REQ-7**: `src/enums/` 配下のファイルが `drizzle-orm`・`../schema`・`../client`・`../tx`・`@furatora/database` を import した場合、システムは lint エラーにすること
+- **REQ-8**: システムは、`@furatora/database/enums` を唯一の入口に保つこと。`@furatora/transfer-difficulty/domain` から `FACILITY_TYPE_CODES` / `FacilityTypeCode` を export し続けること
+- **REQ-9**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること。`build` は DB に触れないこと
 
 ## エッジケース
 
 | ケース | 扱い |
 |---|---|
-| ESLint の `group` で `!@furatora/database/enums` を書く | 親の `@furatora/database` を除外すると再び含められず、`enums` も禁止される（実測）。`regex` で書く |
-| `pnpm install` がロックファイルの無関係な peer 解決（`next` の `@babel/core`）を入れ替える | 追加した依存の7行だけをロックファイルに入れ、`pnpm install --frozen-lockfile` で整合を確認する |
+| 値を `${}` や `inArray` で埋め込む | drizzle-kit が `IN ($1, …)` を出力し、マイグレーションが壊れる。`sql.raw` でリテラルとして展開する |
+| PostgreSQL が `IN (...)` を `= ANY (ARRAY[...])` に変換して保存する | `db:push` が毎回差分と誤認するかもしれない。development で確かめる |
+| 既存の環境に、定数に無いコードの行がある | 制約の追加が失敗する。main と development に無いことを SELECT で確認した（7コード） |
+| 定数にコードを足し、`facility_types` への INSERT を忘れる | CHECK では検出できない。Admin の保存時に外部キーのエラーになる（黙って誤判定はしない） |
+| 子テーブル（`transfer_route_facilities` / `station_facilities`）に未知のコードを入れる | 外部キーで `facility_types` を参照しており、親の CHECK だけで防げる |

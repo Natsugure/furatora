@@ -1,15 +1,19 @@
 import { db } from '@furatora/database/client';
 import { facilityTypes, operators } from '@furatora/database/schema';
+import { FACILITY_TYPE_CODES, type FacilityTypeCode } from '@furatora/database/enums';
 
-const FACILITY_TYPES = [
-  { code: 'elevator', name: 'エレベーター' },
-  { code: 'escalator', name: 'エスカレーター' },
-  { code: 'stairs', name: '階段' },
-  { code: 'ramp', name: 'スロープ'},
-  { code: 'stairLift', name: '階段昇降機' },
-  { code: 'sameFloor', name: '同一階層'},
-  { code: 'wheelchairEscalator', name: '車いす対応エスカレーター' },
-];
+// 設備コードの一覧の正は FACILITY_TYPE_CODES（ADR-0016）。Record にしているので、表示名の足し忘れはコンパイルエラーになる
+const FACILITY_TYPE_NAMES: Record<FacilityTypeCode, string> = {
+  sameFloor: '同一階層',
+  elevator: 'エレベーター',
+  ramp: 'スロープ',
+  wheelchairEscalator: '車いす対応エスカレーター',
+  escalator: 'エスカレーター',
+  stairLift: '階段昇降機',
+  stairs: '階段',
+};
+
+const FACILITY_TYPES = FACILITY_TYPE_CODES.map((code) => ({ code, name: FACILITY_TYPE_NAMES[code] }));
 
 const OPERATORS = [
   {

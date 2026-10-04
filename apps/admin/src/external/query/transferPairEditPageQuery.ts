@@ -28,6 +28,7 @@ import type {
 } from '@/features/transfer-connection/ports';
 import { comboOfConnection } from '@/features/transfer-connection/domain/normalize';
 import { withLine } from '@/features/transfer-connection/domain/label';
+import { assertKnownFacilityCodes, knownFacilityTypeOptions } from '@/features/facility/knownFacilityCodes';
 import type { RouteBody } from '@/features/transfer-connection/domain/types';
 import {
   pairConnectionCondition,
@@ -37,9 +38,6 @@ import {
 
 // 駅対（自駅 S・相手駅 T）の乗換難易度の編集画面 1 枚ぶんの読み取り（ADR-0003。Query は画面ごとに1つ）。
 // DTO はルートと設備をそのまま運び、ペルソナごとの必要な行為は含めない（導出は表示層。docs/domain）。
-
-const isFacilityCode = (code: string): code is FacilityTypeCode =>
-  (FACILITY_TYPE_CODES as readonly string[]).includes(code);
 
 const inboundDirections = alias(lineDirections, 'inbound_directions');
 const outboundDirections = alias(lineDirections, 'outbound_directions');
@@ -175,9 +173,11 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       };
     };
 
+    // 保存はルートの設備を置き換える（消して入れ直す）ので、知らないコードを捨てて表示すると、保存しただけで
+    // その行が DB から消える。画面を開かせずに止める（UnknownFacilityCodeError）。候補のルートも結んで保存されうるので含める
+    assertKnownFacilityCodes(facilityRows.map((row) => row.typeCode));
     const facilitiesOf = new Map<string, FacilityTypeCode[]>();
     for (const row of facilityRows) {
-      if (!isFacilityCode(row.typeCode)) continue;
       const list = facilitiesOf.get(row.routeId) ?? [];
       list.push(row.typeCode);
       facilitiesOf.set(row.routeId, list);
@@ -252,8 +252,7 @@ export const dbTransferPairEditPageQuery: TransferPairEditPageQuery = {
       lineName: firstLineName(stationId),
       connectedLineName: firstLineName(connectedStationId),
       directionHints: { station: hints(stationId), connected: hints(connectedStationId) },
-      facilityTypes: facilityTypeRows
-        .filter((row): row is { code: FacilityTypeCode; name: string } => isFacilityCode(row.code))
+      facilityTypes: knownFacilityTypeOptions(facilityTypeRows)
         .sort((x, y) => FACILITY_TYPE_CODES.indexOf(x.code) - FACILITY_TYPE_CODES.indexOf(y.code)),
       connections: pairConnections.map((c) => ({ combo: comboOfConnection(c, stationId), notes: c.notes })),
       routes,

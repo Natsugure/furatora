@@ -20,7 +20,7 @@ describe('facilitiesByRoute', () => {
     expect(result.get('r2')).toEqual(['sameFloor']);
   });
 
-  it('定数に無い設備コードを含むルートは、既知の設備があっても設備を空（未入力）にする', async () => {
+  it('稼働中のコードが知らない設備コードを含むルートは、既知の設備があっても設備を空（未入力）にする', async () => {
     const { facilitiesByRoute } = await import('./transferPartnerRows');
 
     // 未知のコードの前後どちらに既知の設備があっても空になる
@@ -37,7 +37,7 @@ describe('facilitiesByRoute', () => {
     expect(result.get('r3')).toEqual(['elevator']);
   });
 
-  it('定数に無い設備コードだけのルートも設備を空（未入力）にする', async () => {
+  it('知らない設備コードだけのルートも設備を空（未入力）にする', async () => {
     const { facilitiesByRoute } = await import('./transferPartnerRows');
 
     const result = facilitiesByRoute([{ routeId: 'r1', typeCode: 'unknownStep' }]);

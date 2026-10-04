@@ -215,6 +215,7 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 | 基準ルートは接続あたり高々1本 | `unique_connection_baseline`（`connection_routes` への部分ユニーク `(connectionId) where is_baseline`） | 外すと迂回度（基準ルートとの所要時分の差）の分母が一意に定まらない。0本は許容 |
 | 同一接続内でルート名が重複しない | `unique_connection_route_label (connectionId, label)` | 属性（フラグ等）を一意キーに含めない。事実の訂正が制約に阻まれる |
 | 同じルートを同じ接続に2回結ばない | `unique_connection_route (connectionId, routeId)` | — |
+| 設備コードは定数 `FACILITY_TYPE_CODES` にあるものだけ | `facility_types_code_known`（`facility_types.code` への CHECK。定数から `sql.raw` で組み立てる）＋子テーブル（`transfer_route_facilities` / `station_facilities`）の `type_code` の外部キー | 外すと、読み取り側が知らないコードが入り、判定から黙って抜け落ちる（[ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md)） |
 | 同じルートに同じ種類の設備を2行入れない | `unique_transfer_route_facility_type (routeId, typeCode)` | 外すと同種の設備が重複し、集合の一致判定（重複ルートの検出）が崩れる |
 | 設備の種類の集合と4フラグが一致するルートの二重登録に気づける | **アプリ層**（Admin。`features/transfer-connection/domain/duplicates.ts`）。保存時に、S か T を端点に持つ接続のルート（候補）と同じ画面のカードとの一致を検出し（**適用先が重ならないカードどうしは、所要時分か備考が違えば一致に数えない**。方面を分けた結果であり、統合すると分けた差が消える）、「共有する」か「別ルートとして作る」かを選ばせる。**提示であり、保存は止めない**（中身が一致しても別の物理経路でありうる。例: 池袋の各線のエレベーター経由）。**設備0件（未入力）のルートは対象外**（未入力どうしは中身が分からず、「一致」とは言えない） | 集合の一意性は DB 制約で書けない。中断（ハードブロック）にすると、別経路のルートを作れなくなる |
 | 基準ルートの付け替えが中途半端に終わらない | Repository + `withTransaction`（[ADR-0005](../adr/0005-write-atomicity-driver.md)）。Admin の保存は駅対の最終状態を1回で送り、`savePair` が紐付けを**全部消してから入れ直す**ので、降格と昇格の順序は問題にならない | 降格と昇格の2文になる |
@@ -231,6 +232,32 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 - 設備は `facility_types` の7値: `sameFloor` / `elevator` / `ramp` / `wheelchairEscalator` /
   `escalator` / `stairLift` / `stairs`。**コードはキャメルケース**で、`wheelchairEscalator` は
   車いす対応・係員操作のエスカレーター。
+- **設備コードの一覧の正は、定数 `FACILITY_TYPE_CODES`（`@furatora/database/enums`）である。**
+  `facility_types` は CHECK 制約で、seed は `Record<FacilityTypeCode, string>` の型で、これに従う
+  （[ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md)）。
+  - CHECK が保証するのは「最後にマイグレーションを流したビルドの定数」までである。Web と Admin は別々にデプロイされるため、
+    稼働中のコードが知らないコードを DB から読むことがある。読み取りの境界で `isFacilityTypeCode` を使って見分ける
+    - Web: 知らないコードを含むルートは、設備を空（未入力）として表示する（`apps/web/src/external/query/transferPartnerRows.ts`）
+    - Admin: 駅対の編集画面と駅レイアウトの編集画面は、`UnknownFacilityCodeError` で止め、理由を表示して編集させない。
+      保存が設備を置き換える（消して入れ直す）ので、捨てて表示すると保存だけで行が消えるため（`apps/admin/src/features/facility/knownFacilityCodes.ts`）
+    - Admin の設備の種類の選択肢からは、知らないコードを除く
+  - 定数を変えるマイグレーションは、**CHECK を広げてから行を足す。行を消してから CHECK を狭める。**
+    CHECK の作り直し（`ADD CONSTRAINT`）は既存の行も検査し、マイグレーションは番号順に流れるため、
+    順序を誤ると Vercel のビルドが落ちる。手順の詳細は `packages/database/src/enums/facility.ts` のコメントにある
+  - 種類を足すときは、次の3つをこの順で行う
+    1. 定数に足し、判定の規則（`packages/transfer-difficulty` の `REQUIREMENT_BY_FACILITY`）と seed の表示名を書く。どちらも書き忘れるとコンパイルエラーになる
+    2. `pnpm run db:generate` で、CHECK を作り直すマイグレーションを作る
+    3. `facility_types` への INSERT を、手書きのマイグレーション（`drizzle-kit generate --custom`）で足す（例: `0010`）。
+       2 より先に作ると番号が前になり、INSERT が古い CHECK に違反する
+  - 3 を忘れると、そのコードを保存したときに外部キーのエラーになる（黙って誤判定はしない）
+  - 種類を消すときは逆順に行う
+    1. 手書きのマイグレーションで、子（`transfer_route_facilities` / `station_facilities`）の行を片付けてから `facility_types` の行を消す。
+       子の行を別の種類に置き換えるか消すかで判定が変わるので、データを見て決める
+    2. 定数から消し、`pnpm run db:generate` で CHECK を狭める
+    - 二段階のデプロイは要らない。古いコードが消した種類を保存しても外部キーのエラーになり、
+      読んでも `isFacilityTypeCode` で見分けられるため
+  - 名前を変えるときは「新しい種類を足す（INSERT と同じマイグレーションで子の行を UPDATE する）→ 古い種類を消す」に分ける。
+    定数を一度に書き換えると、生成される CHECK が新旧どちらの行とも矛盾する
 - **設備は種類の集合で持つ。順序も回数も持たない。** 1行は「このルートは、この種類の設備を
   すべて通る」を意味し、同種の設備が何か所あっても1行になる。必要な行為は、ルート上の設備すべてから
   ペルソナにとって最も重いものを選んで導出するため、順序に依存しない。回数が表示に必要に
@@ -247,10 +274,6 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
   表示層は設備0件のルートについて必要な行為を導出せず、バリアフリールートにも数えないこと
   （Web での見せ方は下記「Web の表示の規則」）。「接続が無い＝未評価」と同型の、行が無いことによる表現である
   （[ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md)）。
-- **Web は、定数 `FACILITY_TYPE_CODES` に無い設備コードを含むルートを「設備未入力」として扱う**
-  （`apps/web/src/external/query/transferPartnerRows.ts` の `facilitiesByRoute`）。そのコードだけを捨てると、
-  残りの設備で判定されて実際より軽い行為に丸められるため。定数と `facility_types` の一致は現在、人が確かめており、
-  仕組みで守るのは [#139](https://github.com/Natsugure/furatora/issues/139)。Admin の駅対編集画面は未知のコードを捨てたままである（#139 で解消する）。
 
 ### Web の表示の規則
 
@@ -388,4 +411,5 @@ Admin の入力欄には、出発地・目的地に依存する比較を書か�
 - [ADR-0001](../adr/0001-layer-structure.md) — feature 間の一方向依存
 - [ADR-0011](../adr/0011-transfer-route-facilities-as-set.md) — 乗換ルートの設備を種類の集合で持つ理由と却下案
 - [ADR-0012](../adr/0012-zero-facility-route-as-not-entered.md) — 設備0件のルートを「設備未入力」とする理由と却下案
+- [ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md) — 設備コードの一覧を定数で持ち、DB を CHECK 制約で従わせる理由と却下案
 - [line-directions.md](./line-directions.md) — 乗換接続の方面の文言の解決規則（[ADR-0014](../adr/0014-direction-label-by-default-row.md)）

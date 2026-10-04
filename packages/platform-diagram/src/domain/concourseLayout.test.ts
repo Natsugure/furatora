@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { FacilityTypeCode } from '@furatora/database/enums';
 import {
   PLATE_GAP_PX,
   PLATE_MAX_WIDTH_PX,
@@ -216,7 +217,7 @@ describe('layoutConcoursePlates', () => {
     });
 
     it('設備の種別名を重複なく持つ（束ね線との対応を文章で示すため）', () => {
-      const facility = (typeCode: string, typeName: string) => ({
+      const facility = (typeCode: FacilityTypeCode, typeName: string) => ({
         id: typeCode,
         typeCode,
         typeName,
