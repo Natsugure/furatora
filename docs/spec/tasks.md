@@ -9,7 +9,7 @@
   - `facilitiesByRoute` も移し、`transferPartnerRows.test.ts` の3ケースを `transferPartners.test.ts` へ移した（`DATABASE_URL` のダミー設定と動的 import は不要になった）
 - [ ] **TASK-6** 検証: `typecheck` / `lint` / `test` / `build`、`git grep` で apps に写しが残っていないこと、dev で表示が変わらないこと（依存: TASK-4, 5）
   - `typecheck` / `lint` / `test`（15タスク）・`build`（2タスク）が成功した
-  - `test`: transfer-difficulty 63（+8）・admin 631（変化なし）・frontend 47（+7。移した3件を含め、組み立ての5件を追加）・platform-diagram 203
+  - `test`: transfer-difficulty 63（+8）・admin 631（テストの追加・削除なし）・frontend 47（+5。`facilitiesByRoute` の3件を移し、組み立ての5件を追加）・platform-diagram 203
   - `git grep -n "localeCompare(b.platformNumber\|stationAId.toLowerCase() ===" -- apps/`: 該当なし
   - dev での表示確認: 未（開発者が確認する）
 - [x] **TASK-7** `docs/domain/` の実装の所在を更新する（依存: TASK-6）
