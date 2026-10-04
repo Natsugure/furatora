@@ -24,6 +24,12 @@
 - [x] **TASK-9** 検証: `typecheck` / `lint` / `test` / `build`（依存: TASK-4〜8）
   - `typecheck`（6タスク）・`lint`（5タスク）・`build`（2タスク）が成功した
   - `test` も成功した: admin 628（未知のコードを拒否するテストを追加）・platform-diagram 203・transfer-difficulty 55・frontend 40（未知のコードのテスト2件を削除）
-- [ ] **TASK-10** 開発者が development で `db:migrate` → `db:push` を実行し、push の誤検出と制約の適用を確かめる（依存: TASK-6）
+- [x] **TASK-10** 開発者が development で `db:migrate` → `db:push` を実行し、push の誤検出と制約の適用を確かめる（依存: TASK-6）
+  - `db:migrate`: 適用済み。`__drizzle_migrations` は19件になり、`facility_types_code_known` が入った
+    - PostgreSQL は定義を `(code)::text = ANY (ARRAY[...])` に変換して保存していた
+  - `drizzle-kit push --strict`: `facility_types_code_known` の差分は出なかった。CHECK の誤検出は無い
+    - 代わりに、外部キー4本の DROP / ADD が提案された（中止した）
+    - 原因は既存の問題で、本 Issue とは関係ない。drizzle が生成する外部キー名が63文字を超え、PostgreSQL が切り詰めて保存したため、push が名前の不一致を差分と見ている
+    - #154 に起票し、`packages/database/CLAUDE.md` に既知の誤検出として記載した
 - [x] **TASK-11** ADR-0016 を書く（Proposed）。`docs/domain/station-master-model.md`、`packages/database/CLAUDE.md`、`.github/instructions/drizzle.instruction.md` を更新する
 - [ ] **TASK-12** ADR-0016 を Accepted にし（開発者の承認後）、PR を develop 向けに作る
