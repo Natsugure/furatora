@@ -23,11 +23,7 @@ describe('orientConnection', () => {
   });
 
   it('uuid の大文字小文字が違っても同じ駅として扱い、返す ID は行のまま', () => {
-    expect(orientConnection(row, LOW.toUpperCase())).toEqual({
-      connectedStationId: HIGH,
-      stationDirection: 'inbound',
-      connectedDirection: 'outbound',
-    });
+    expect(orientConnection(row, LOW.toUpperCase())).toEqual(orientConnection(row, LOW));
     const upperRow = { ...row, stationBId: HIGH.toUpperCase() };
     expect(orientConnection(upperRow, LOW).connectedStationId).toBe(HIGH.toUpperCase());
   });

@@ -4,6 +4,7 @@ import {
   firstLineByStation,
   resolveDirectionLabel,
   resolveStationDirectionLabels,
+  type PlatformDirectionRow,
 } from './index';
 
 describe('resolveDirectionLabel: ① ホームの文言', () => {
@@ -97,9 +98,7 @@ describe('firstLineByStation', () => {
 
 describe('resolveStationDirectionLabels', () => {
   const firstLineOf = new Map([['s1', { lineId: 'L1' }]]);
-  const platform = (
-    over: Partial<{ stationId: string; lineId: string; platformNumber: string; inboundName: string | null; outboundName: string | null }>,
-  ) => ({ stationId: 's1', lineId: 'L1', platformNumber: '1', inboundName: null, outboundName: null, ...over });
+  const platform = (over: Partial<PlatformDirectionRow>): PlatformDirectionRow => ({ stationId: 's1', lineId: 'L1', platformNumber: '1', inboundName: null, outboundName: null, ...over });
 
   it('駅の最初の路線のホームだけを、ホーム番号の数値順に並べる', () => {
     expect(

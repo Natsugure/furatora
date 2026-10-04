@@ -3,8 +3,10 @@ import {
   firstLineByStation,
   orientConnection,
   resolveStationDirectionLabels,
+  type DefaultDirectionRow,
   type DirectionType,
   type FacilityTypeCode,
+  type PlatformDirectionRow,
 } from '@furatora/transfer-difficulty/domain';
 import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from './types';
 
@@ -60,24 +62,17 @@ export function assembleTransferPartners(input: {
   facilityRows: readonly { routeId: string; typeCode: string }[];
   /** 駅の路線。lines.displayOrder, lines.id 順に並べてあること（firstLineByStation） */
   stationLineRows: readonly { stationId: string; lineId: string; lineName: string }[];
-  /** 方面ラベルの ①: ホームの枠ごとの方面 */
-  platformRows: readonly {
-    stationId: string;
-    lineId: string;
-    platformNumber: string;
-    inboundName: string | null;
-    outboundName: string | null;
-  }[];
-  /** 方面ラベルの ②: 路線の既定行 */
-  defaultDirectionRows: readonly { lineId: string; directionType: DirectionType; displayName: string }[];
+  platformRows: readonly PlatformDirectionRow[];
+  defaultDirectionRows: readonly DefaultDirectionRow[];
 }): TransferPartnerDTO[] {
   const { stationId } = input;
 
   const facilitiesOf = facilitiesByRoute(input.facilityRows);
   const routesOf = new Map<string, TransferRouteDTO[]>();
   for (const { connectionId, ...route } of input.routeRows) {
-    const dto: TransferRouteDTO = { ...route, facilities: facilitiesOf.get(route.routeId) ?? [] };
-    routesOf.set(connectionId, [...(routesOf.get(connectionId) ?? []), dto]);
+    const list = routesOf.get(connectionId) ?? [];
+    list.push({ ...route, facilities: facilitiesOf.get(route.routeId) ?? [] });
+    routesOf.set(connectionId, list);
   }
 
   // 相手駅の ID は uuid の大文字小文字が食い違いうるので、小文字をキーにする（orientConnection と同じ理由）
@@ -85,13 +80,9 @@ export function assembleTransferPartners(input: {
   for (const row of input.connectionRows) {
     const { connectedStationId, stationDirection, connectedDirection } = orientConnection(row, stationId);
     const key = connectedStationId.toLowerCase();
-    const combo: TransferComboDTO = {
-      stationDirection,
-      connectedDirection,
-      notes: row.notes,
-      routes: routesOf.get(row.id) ?? [],
-    };
-    combosOf.set(key, [...(combosOf.get(key) ?? []), combo]);
+    const list = combosOf.get(key) ?? [];
+    list.push({ stationDirection, connectedDirection, notes: row.notes, routes: routesOf.get(row.id) ?? [] });
+    combosOf.set(key, list);
   }
 
   const firstLineOf = firstLineByStation(input.stationLineRows);
