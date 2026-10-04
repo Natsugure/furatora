@@ -22,7 +22,8 @@ export default defineConfig([
   {
     // src/enums/ はアプリとドメインの packages が共有する語彙の置き場で、ドメインの packages はここだけを import できる
     // （ADR-0015 決定3）。配下が Drizzle や DB クライアントに依存すると、その依存がドメインの packages に漏れる。
-    // @furatora/database 自身も禁止する（自分自身の exports を経由して schema を読む抜け道になるため）
+    // 禁止するものを並べると、外部パッケージや ../../schema・拡張子付きのパスが漏れるため、
+    // 同じディレクトリのファイル（./ で始まり .. を含まないパス）だけを許す。型だけの import も対象にする
     files: ['src/enums/**/*.ts'],
     rules: {
       'no-restricted-imports': [
@@ -30,8 +31,8 @@ export default defineConfig([
         {
           patterns: [
             {
-              regex: '^(drizzle-orm(/.*)?|@furatora/database(/.*)?|\\.\\./(schema|client|tx)(/.*)?)$',
-              message: 'src/enums/ は Drizzle と DB クライアントに依存させないでください（ADR-0015 決定3）',
+              regex: '^(?!\\./)|\\.\\.',
+              message: 'src/enums/ は同じディレクトリのファイルだけを import できます。Drizzle・DB クライアント・外部パッケージに依存させないでください（ADR-0015 決定3）',
             },
           ],
         },
