@@ -1,4 +1,5 @@
 import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
+import type { FacilityTypeCode } from '@furatora/database/enums';
 import type { PlatformLocationInput } from '@/features/facility/schema';
 import type { TrainStopPatternInput } from '@/features/stop-pattern/schema';
 import type {
@@ -23,7 +24,7 @@ export const MIN_CAR_METERS = 0.5;
 const DEFAULT_FACILITY_ACCESSIBILITY = { isWheelchairAccessible: true, isStrollerAccessible: true };
 
 export type FacilityDraft = {
-  typeCode: string;
+  typeCode: FacilityTypeCode;
   isWheelchairAccessible: boolean | null;
   isStrollerAccessible: boolean | null;
   notes: string | null;
@@ -194,7 +195,7 @@ export function removeCell(draft: ConcourseDraft, cellId: string): ConcourseDraf
  * アクセス点に設備タイプを追加する。
  * 既に同じtypeCodeがあれば何もしない（トグルの対になる removeCellFacility を使うこと）。
  */
-export function addCellFacility(draft: ConcourseDraft, cellId: string, typeCode: string): ConcourseDraft {
+export function addCellFacility(draft: ConcourseDraft, cellId: string, typeCode: FacilityTypeCode): ConcourseDraft {
   return {
     ...draft,
     cells: draft.cells.map((cell) => {
@@ -208,7 +209,7 @@ export function addCellFacility(draft: ConcourseDraft, cellId: string, typeCode:
 }
 
 /** アクセス点から設備タイプを1件外す */
-export function removeCellFacility(draft: ConcourseDraft, cellId: string, typeCode: string): ConcourseDraft {
+export function removeCellFacility(draft: ConcourseDraft, cellId: string, typeCode: FacilityTypeCode): ConcourseDraft {
   return {
     ...draft,
     cells: draft.cells.map((cell) => (
@@ -223,7 +224,7 @@ export function removeCellFacility(draft: ConcourseDraft, cellId: string, typeCo
 export function updateCellFacility(
   draft: ConcourseDraft,
   cellId: string,
-  typeCode: string,
+  typeCode: FacilityTypeCode,
   patch: Partial<Omit<FacilityDraft, 'typeCode'>>,
 ): ConcourseDraft {
   return {
@@ -493,7 +494,7 @@ export function toStopPatternPayload(
 }
 
 export type ConcourseDisplayLookups = {
-  facilityTypeName: (code: string) => string;
+  facilityTypeName: (code: FacilityTypeCode) => string;
   connectedStation: (stationId: string) => {
     name: string;
     lines: { name: string; color: string | null }[];

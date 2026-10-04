@@ -1,0 +1,1 @@
+ALTER TABLE "facility_types" ADD CONSTRAINT "facility_types_code_known" CHECK ("facility_types"."code" IN ('sameFloor', 'elevator', 'ramp', 'wheelchairEscalator', 'escalator', 'stairLift', 'stairs'));

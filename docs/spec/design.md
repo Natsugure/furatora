@@ -1,77 +1,92 @@
-# 設計: packages/database の schema.ts のドメイン別分割 (Issue #149)
+# 設計: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
+
+「定数が正で、DB と seed が従う」という決定と却下した案は [ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md) に置く。
+語彙の置き場は [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定3 による。ここには実装だけを書く。
 
 ## 変更するファイル
 
 ```
-packages/database/src/schema.ts                 削除
-packages/database/src/schema/index.ts           新規。4ファイルを再 export
-packages/database/src/schema/stationMaster.ts   新規
-packages/database/src/schema/transfer.ts        新規
-packages/database/src/schema/platform.ts        新規
-packages/database/src/schema/train.ts           新規
-packages/database/package.json                  exports "./schema" → ./src/schema/index.ts
-packages/database/drizzle.config.ts             schema → ./src/schema/index.ts
-CLAUDE.md / apps/CLAUDE.md / packages/database/CLAUDE.md / .github/instructions/drizzle.instruction.md
-docs/domain/station-visibility.md / docs/domain/station-master-model.md（パスの言及のみ）
-.claude/agent-memory/frontend-engineer/MEMORY.md
+packages/database/src/enums.ts                      削除
+packages/database/src/enums/{index,stationMaster,facility}.ts   新規（stationMaster は旧 enums.ts の中身）
+packages/database/package.json                      "./enums" → ./src/enums/index.ts、lint スクリプトと ESLint の devDependencies
+packages/database/eslint.config.mjs                 新規。src/enums/** の import を制限
+packages/database/src/schema/platform.ts            facility_types に CHECK、code と station_facilities.type_code に $type
+packages/database/src/schema/transfer.ts            transfer_route_facilities.type_code に $type
+packages/database/drizzle/0018_*.sql と snapshot    db:generate で生成
+packages/transfer-difficulty/src/domain/requirement.ts   定数を enums から import して再 export
+packages/database/src/enums/facility.ts              isFacilityTypeCode（読み取りの境界で知らないコードを見分ける）
+apps/web/src/external/query/transferPartnerRows.ts(.test.ts)   知らないコードを含むルートは未入力（isFacilityTypeCode に置き換え）
+apps/admin/src/features/facility/knownFacilityCodes.ts(.test.ts)   assertKnownFacilityCodes / knownFacilityTypeOptions
+apps/admin/src/features/facility/ports.ts            UnknownFacilityCodeError
+apps/admin/src/features/facility/components/UnknownFacilityCodeAlert.tsx   編集を止めた理由の表示
+apps/admin/src/external/query/transferPairEditPageQuery.ts      isFacilityCode を assertKnownFacilityCodes / knownFacilityTypeOptions に
+apps/admin/src/external/query/stationLayoutPageQuery.ts         assertKnownFacilityCodes
+apps/admin/src/external/query/facilityEditPageQuery.ts          設備の種類の選択肢を knownFacilityTypeOptions で絞る
+apps/admin/src/app/stations/[stationId]/layout/page.tsx と …/transfer/page.tsx   UnknownFacilityCodeError を捕まえて表示
+apps/admin/src/features/facility/schema.ts           typeCode を z.enum(FACILITY_TYPE_CODES) に
+apps/scripts/src/seed-master-data.ts                 表示名を Record<FacilityTypeCode, string> に
 ```
 
-## ファイルの分け方
-
-`docs/domain/` の区切りに合わせる。
-
-| ファイル | テーブル | 対応する docs/domain |
-|---|---|---|
-| `stationMaster.ts` | stations, lines, stationLines, lineDirections, operators, stationGroups, stationAdjacencies | station-master-model.md / line-directions.md / station-visibility.md |
-| `transfer.ts` | stationConnections, transferConnections, transferRoutes, connectionRoutes, transferRouteFacilities | station-master-model.md「乗換接続」「乗換難易度」 |
-| `platform.ts` | platforms, platformLocations, platformLocationCells, stationFacilities, facilityConnections, facilityTypes | platform-coordinate-system.md |
-| `train.ts` | trains, trainCarStructures, trainEquipments（と型 CarStructure / FreeSpace / PrioritySeat / TrainEquipmentType）, trainStopPatterns, trainStopPatternCars | train-stop-patterns.md |
-
-ファイル内の並びは元ファイルでの相対順を保つ。
-
-### ファイル間の依存
+## データの流れ
 
 ```
-stationMaster ← platform ← train
-      ↑            ↑
-      └──── transfer
+FACILITY_TYPE_CODES（@furatora/database/enums/facility.ts）
+ ├─ schema/platform.ts の CHECK（sql.raw で展開）→ db:generate → マイグレーション → facility_types
+ │     └─ 外部キー ← transfer_route_facilities.type_code / station_facilities.type_code
+ ├─ $type<FacilityTypeCode>() → Drizzle が読む値の型
+ ├─ seed の Record<FacilityTypeCode, string> → 新しい環境の facility_types
+ └─ transfer-difficulty が再 export → Web / Admin の判定と入力検証
 ```
 
-循環しない。`.references(() => x.id)` は遅延評価なので循環しても動くが、読む人が依存の向きを追えるよう避ける。
+## CHECK 制約
 
-## 決定
+```ts
+check(
+  'facility_types_code_known',
+  sql`${t.code} IN (${sql.raw(FACILITY_TYPE_CODES.map((code) => `'${code}'`).join(', '))})`,
+)
+```
 
-### 決定1: `facilityTypes` は `platform.ts` に置く
+- `sql.raw` を使ってよいのは、値がコード内の定数（利用者の入力ではない）だからである
+- 制約は親の `facility_types` だけに付ける。子は外部キーで守られる
 
-- **コンテキスト**: `stationFacilities`（platform）と `transferRouteFacilities`（transfer）の両方が参照する
-- **オプション**: (a) `platform.ts`（本決定） / (b) 独立した `facility.ts` / (c) `transfer.ts`
-- **理論的根拠**: 設備マスタであり、駅設備と同じ場所にあるのが自然。1テーブルのためにファイルを作る (b) は細かすぎる。(c) だと platform → transfer の依存ができる
-- **影響**: `transfer.ts` が `platform.ts` を import する
-- **レビュー**: 設備コードの定数と DB の一致を仕組みで守る #139 で、設備まわりの置き場所を見直すとき
+## ESLint（packages/database）
 
-### 決定2: `trainStopPatterns` / `trainStopPatternCars` は `train.ts` に置く
+`files: ['src/enums/**/*.ts']` に次を設定する。
 
-- **コンテキスト**: `platforms` と `trains` の両方を参照する
-- **理論的根拠**: docs/domain の `train-stop-patterns.md` が列車側の文書である。`platform.ts` に置くと platform → train の依存ができ、train → platform と循環する
-- **影響**: `train.ts` が `platform.ts` を import する
+```js
+regex: '^(drizzle-orm(/.*)?|@furatora/database(/.*)?|\\.\\./(schema|client|tx)(/.*)?)$'
+```
 
-### 決定3: ADR にしない
+- `@furatora/database` 自身も禁止する。自分自身を経由して `schema` を読む抜け道になるため
 
-ファイルの配置は、覆すときに明示的な判断が要らず、却下した選択肢に恒久的な理由も無い。配置の規約は `packages/database/CLAUDE.md` に置く。
+## エラーマトリックス
+
+| 状況 | 結果 |
+|---|---|
+| 未知のコードを `facility_types` に入れる | DB が CHECK 違反で拒否する |
+| 未知のコードを子テーブルに入れる | DB が外部キー違反で拒否する |
+| Admin の駅レイアウトの保存に未知のコードがある | zod の検証で 400 |
+| Admin の駅対の保存に未知のコードがある | zod の検証で 400（既存の `z.enum(FACILITY_TYPE_CODES)`） |
+| seed の表示名が欠ける | コンパイルエラー |
+| Web が、稼働中のコードの知らないコードを読む（デプロイの途中・別ビルド） | そのルートを未入力として表示する |
+| Admin の駅対・駅レイアウトの編集画面が、知らないコードを読む | `UnknownFacilityCodeError`。ページは理由を表示し、編集させない（本番では例外メッセージが伏せられるため、ページで捕まえる） |
+| Admin の設備の種類の選択肢に、知らないコードがある | 選択肢から除く |
 
 ## 恒久知識の振り分け
 
-- 「テーブル定義は `src/schema/` にドメイン別に置き、`index.ts` で再 export する」: `packages/database/CLAUDE.md` と `.github/instructions/drizzle.instruction.md` の規約
-- `docs/domain/`: ドメインルールの変更は無い。パスの言及のみを直す
-
-## エラーハンドリング
-
-実行時の振る舞いは変わらない。失敗しうるのは検証の段階だけで、`db:generate` が差分を出した場合は、欠けたテーブル・制約を突き合わせて直す。
+- 「定数が正で、DB と seed が従う」と却下した案: ADR-0016（新規）
+- CHECK 制約・外部キーで守っていることと、設備の種類を足すときの手順:
+  - `docs/domain/station-master-model.md`（制約の表と「ルートと設備」）
+  - `facility.ts` のコメント
+- `src/enums/` の構成と ESLint で守っていること: `packages/database/CLAUDE.md` と `.github/instructions/drizzle.instruction.md`
+- `db:push` の挙動（確認の結果）: 問題があれば `docs/domain/` と `packages/database/CLAUDE.md` に書く
 
 ## テスト戦略
 
-新しいテストは追加しない。次の検証で同一性を確かめる。
-
-- `drizzle-kit generate` が「No schema changes」を返し、`drizzle/` に差分が無い
-- 旧ファイルと新ファイル（import 行を除く）の行を並べ替えて `diff` し、違いが見出しのコメントと決定したコメントの修正だけである
-- 既存の `typecheck` / `lint` / `test` / `build`
+- 既存のテスト（`requirement.test.ts` が、規則の表と定数の一致を見ている）はそのまま通す
+- `transferPartnerRows.test.ts` の、知らないコードを含むルートを未入力にするテストは残す（入力の型は `string` のまま）
+- `knownFacilityCodes.test.ts`: 知らないコードで `UnknownFacilityCodeError` を投げること、選択肢から除くこと
+- ESLint の発火確認: `eslint --stdin --stdin-filename src/enums/facility.ts` で、禁止した import がエラーになり、`./stationMaster` が通ること
+- `db:generate` を2回実行し、1回目が CHECK の ADD だけ、2回目が差分なしになること
+- 開発者が development で `db:migrate` → `db:push` を実行し、push が差分を出さないこと

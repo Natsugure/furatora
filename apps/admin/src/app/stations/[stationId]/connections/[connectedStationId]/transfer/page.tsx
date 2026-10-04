@@ -3,6 +3,8 @@ import { Text, Title } from '@mantine/core';
 import { BackLink } from '@/components/LinkElements';
 import { transferPairEditPageQuery } from '@/di';
 import { TransferPairEditor } from '@/features/transfer-connection/components/TransferPairEditor';
+import { UnknownFacilityCodeAlert } from '@/features/facility/components/UnknownFacilityCodeAlert';
+import { UnknownFacilityCodeError } from '@/features/facility/ports';
 import { parseUuidParam } from '@/shared/list/params';
 
 type Props = {
@@ -18,7 +20,18 @@ export default async function TransferPairEditPage({ params }: Props) {
     notFound();
   }
 
-  const context = await transferPairEditPageQuery.getContext(stationId, connectedStationId);
+  let context: Awaited<ReturnType<typeof transferPairEditPageQuery.getContext>>;
+  try {
+    context = await transferPairEditPageQuery.getContext(stationId, connectedStationId);
+  } catch (error) {
+    if (!(error instanceof UnknownFacilityCodeError)) throw error;
+    return (
+      <div>
+        <BackLink href={`/stations/${stationId}/edit`}>駅の編集に戻る</BackLink>
+        <UnknownFacilityCodeAlert error={error} />
+      </div>
+    );
+  }
   if (!context) {
     notFound();
   }

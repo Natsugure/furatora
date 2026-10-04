@@ -4,12 +4,15 @@ import {
 } from '@furatora/database/schema';
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { ConnectedStationOption } from '@/features/facility/ports';
+import { knownFacilityTypeOptions } from '@/features/facility/knownFacilityCodes';
 
 // stationLayoutPageQuery が乗換可能な駅・設備種別の選択肢データとして再利用する
 // Query Service。接続候補駅ごとに platforms/directions を1本ずつ投げるN+1を避け、
 // 接続候補駅の集合に対して inArray で1本ずつ引き、アプリ側で駅ごとに畳む。
 export async function getFacilityTypeOptions() {
-  return db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes);
+  return knownFacilityTypeOptions(
+    await db.select({ code: facilityTypes.code, name: facilityTypes.name }).from(facilityTypes),
+  );
 }
 
 export async function getConnectedStationOptions(stationId: string): Promise<ConnectedStationOption[]> {

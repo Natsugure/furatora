@@ -1,33 +1,49 @@
-# 要件: packages/database の schema.ts のドメイン別分割 (Issue #149)
+# 要件: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
 
 ## 概要
 
-- **対象**: `packages/database/src/schema.ts`（25テーブル・約400行）を、ドメイン別のファイル（`src/schema/`）に分ける。振る舞いは変えない
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) /
-  [Issue #149](https://github.com/Natsugure/furatora/issues/149)
-- **ブランチ**: `refactor/issue149-split-database-schema`
-- **信頼度**: 95%（高）。機械的な移動であり、DB スキーマの同一性は `db:generate` で検証できる
+- **対象**: 設備コードの一覧を定数 `FACILITY_TYPE_CODES` に一本化し、DB（`facility_types` の CHECK 制約）と seed（型）をそれに従わせる。あわせて `@furatora/database/enums` をディレクトリにし、`packages/database` に ESLint を入れる
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #139](https://github.com/Natsugure/furatora/issues/139) /
+  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) / ADR-0011 / ADR-0012
+- **ブランチ**: `refactor/issue139-facility-type-codes`
+- **信頼度**: 85%（高〜中）
+  - 方針は Issue と ADR-0015 で決まっている
+  - 未確定は `db:push` が CHECK 制約を毎回差分と誤認するかどうかだけ。development で確かめる
 
 ## 背景
 
-モノレポのリファクタリングの1本目。1ファイルに全テーブルが並んでいて、目的のテーブルを探しにくい。
-#144（`line_directions` の DROP）が入った直後で、テーブル定義と Drizzle のスナップショットが一致しているため、
-分割の前後で `db:generate` が変更なしであることを検証に使える（二段階マイグレーションの途中だと DROP が混ざる）。
+設備コードの一覧は3か所にあり、一致しているかは人が確かめるしかない。
+
+1. 定数 `FACILITY_TYPE_CODES`（`packages/transfer-difficulty`）
+2. `facility_types` テーブル
+3. seed
+
+定数に無いコードが DB に入ると、問題が2つ起きる。
+
+- Web と Admin は、そのコードを `isFacilityCode` で黙って捨てる。そのため、誤った案内を出しうる
+- Admin では、そのルートの駅対を開いて保存しただけで、そのコードの行が消える
 
 ## 要件（EARS記法）
 
-- **REQ-1**: システムは、テーブル定義を `packages/database/src/schema/` のドメイン別のファイルに置き、`index.ts` で全テーブル・型を再 export すること
-- **REQ-2**: システムは、`@furatora/database/schema` の import パスと、そこから export される名前を変えないこと
-- **REQ-3**: 分割後に `drizzle-kit generate` を実行したとき、システムはマイグレーションを生成しないこと（スナップショットと一致する）
-- **REQ-4**: システムは、テーブル定義とその不変条件のコメントを、内容を変えずに移すこと（完了済みの作業を未来形で書いた記述の修正を除く）
-- **REQ-5**: システムは、ファイル間の import を循環させないこと
-- **REQ-6**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること。`build` は DB に触れないこと
-- **REQ-7**: システムは、テーブル定義のパスに言及する現在形のドキュメント（CLAUDE.md 類・`docs/domain/`）を新しいパスに直すこと。ADR は書き換えないこと（追記のみの運用）
+- **REQ-1**: システムは、設備コードの一覧を `@furatora/database/enums` の `FACILITY_TYPE_CODES` の1か所だけで定義すること
+- **REQ-2**: 定数に無いコードを `facility_types.code` に INSERT / UPDATE した場合、DB は CHECK 制約で拒否すること
+- **REQ-3**: 定数を変更して `db:generate` を実行したとき、システムは CHECK 制約を作り直すマイグレーションを生成すること。変更が無ければ生成しないこと
+- **REQ-4**: システムは、`transfer_route_facilities.type_code`・`station_facilities.type_code`・`facility_types.code` を読むときの型を `FacilityTypeCode` にすること
+- **REQ-10**: Web が、稼働中のコードの知らない設備コードをルートの設備として読んだ場合、システムはそのルートを未入力として表示し、ページを落とさないこと
+- **REQ-11**: Admin の駅対・駅レイアウトの編集画面が、稼働中のコードの知らない設備コードを読んだ場合、システムは編集画面を開かず、そのコードと理由を表示すること
+- **REQ-12**: Admin の設備の種類の選択肢に、稼働中のコードの知らないコードがある場合、システムはそれを選択肢から除くこと
+- **REQ-5**: 定数にあって seed の表示名に無いコードがある場合、システムはコンパイルエラーにすること
+- **REQ-6**: Admin の駅レイアウトの保存に定数に無い設備コードが含まれる場合、システムは入力検証で拒否すること
+- **REQ-7**: `src/enums/` 配下のファイルが `drizzle-orm`・`../schema`・`../client`・`../tx`・`@furatora/database` を import した場合、システムは lint エラーにすること
+- **REQ-8**: システムは、`@furatora/database/enums` を唯一の入口に保つこと。`@furatora/transfer-difficulty/domain` から `FACILITY_TYPE_CODES` / `FacilityTypeCode` を export し続けること
+- **REQ-9**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること。`build` は DB に触れないこと
 
 ## エッジケース
 
 | ケース | 扱い |
 |---|---|
-| 分割前から `db:generate` が差分を出す | 分割の検証に使えないため、作業を止めて報告する（実測: 差分なし） |
-| `import * as schema from './schema'`（client.ts / tx.ts） | `moduleResolution: Bundler` で `schema/index.ts` に解決される。変更しない |
-| 元ファイルの末尾に改行が無い | 分割後のファイルは末尾に改行を付ける |
+| 値を `${}` や `inArray` で埋め込む | drizzle-kit が `IN ($1, …)` を出力し、マイグレーションが壊れる。`sql.raw` でリテラルとして展開する |
+| PostgreSQL が `IN (...)` を `= ANY (ARRAY[...])` に変換して保存する | `db:push` が毎回差分と誤認するかもしれない。development で確かめる |
+| 既存の環境に、定数に無いコードの行がある | 制約の追加が失敗する。main と development に無いことを SELECT で確認した（7コード） |
+| 定数にコードを足し、`facility_types` への INSERT を忘れる | CHECK では検出できない。Admin の保存時に外部キーのエラーになる（黙って誤判定はしない） |
+| 子テーブル（`transfer_route_facilities` / `station_facilities`）に未知のコードを入れる | 外部キーで `facility_types` を参照しており、親の CHECK だけで防げる |

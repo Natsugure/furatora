@@ -23,6 +23,7 @@ import type { StopPatternCarDTO } from '@furatora/platform-diagram/domain';
 import { getLinesWithDirections } from '@/external/query/platformEditPageQuery';
 import { getFacilityTypeOptions, getConnectedStationOptions } from '@/external/query/facilityEditPageQuery';
 import { getAllTrainOptions } from '@/external/query/stopPatternPageQuery';
+import { assertKnownFacilityCodes } from '@/features/facility/knownFacilityCodes';
 
 // apps/web/src/external/query/stationDetailQuery.ts がベース。
 // admin は未公開駅も編集対象のため publishedStation() を通さない。
@@ -99,6 +100,9 @@ async function getConcourses(platformId: string): Promise<LayoutConcourseDTO[]> 
     getLinesByConnectedStation([...new Set(connectionRows.map((c) => c.connectedStationId))]),
   ]);
 
+  // 保存はアクセス点の設備を置き換える（消して入れ直す）。知らないコードを捨てて表示すると、保存しただけで
+  // その行が DB から消えるため、画面を開かせずに止める（UnknownFacilityCodeError）
+  assertKnownFacilityCodes(facilityList.map((f) => f.typeCode));
   const facilityTypeMap = Object.fromEntries(facilityTypeList.map((t) => [t.code, t.name]));
   const facilitiesByCell = new Map(cellIds.map((id) => [id, facilityList.filter((f) => f.platformLocationCellId === id)]));
   const cellsByLocation = new Map(locationIds.map((id) => [id, cellList.filter((c) => c.platformLocationId === id)]));

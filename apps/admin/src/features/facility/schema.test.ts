@@ -32,6 +32,14 @@ describe('platformLocationSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('設備コードが FACILITY_TYPE_CODES に無い場合は失敗する（外部キーエラーの前に 400 で弾く）', () => {
+    const result = platformLocationSchema.safeParse({
+      platformId: VALID_UUID,
+      cells: [{ facilities: [{ typeCode: 'unknownStep' }] }],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('xPositionMetersがnullのセル（コンコース全体）でも正常にパースされる', () => {
     const result = platformLocationSchema.safeParse({
       platformId: VALID_UUID,

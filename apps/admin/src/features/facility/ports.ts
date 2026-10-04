@@ -1,3 +1,4 @@
+import type { FacilityTypeCode } from '@furatora/database/enums';
 import type { PlatformLocationInput } from './schema';
 
 export type PlatformLocationRecord = {
@@ -21,7 +22,7 @@ export interface PlatformLocationRepository {
 // 読み取り: Query Service（ADR-0003）。stationLayoutPageQuery が選択肢データ
 // （設備種別・乗換候補駅）を組み立てる際に再利用する型。
 
-export type FacilityTypeOption = { code: string; name: string };
+export type FacilityTypeOption = { code: FacilityTypeCode; name: string };
 
 export type ConnectedStationOption = {
   id: string;
@@ -36,3 +37,15 @@ export type ConnectedStationOption = {
   directions: { id: string; displayName: string }[];
 };
 
+
+/**
+ * DB に、稼働中の Admin が知らない設備コードがある（デプロイの途中や、DB を共有する別ビルドが先に保存した場合）。
+ * 編集画面は、読み込んだ設備で保存時に置き換える（消して入れ直す）。知らないコードを捨てて表示すると、
+ * 保存しただけでその行が消えるため、画面を開かせない（ADR-0016「残るずれ」）
+ */
+export class UnknownFacilityCodeError extends Error {
+  constructor(readonly codes: readonly string[]) {
+    super(`稼働中の Admin が知らない設備コードが DB にあります: ${codes.join(', ')}`);
+    this.name = 'UnknownFacilityCodeError';
+  }
+}

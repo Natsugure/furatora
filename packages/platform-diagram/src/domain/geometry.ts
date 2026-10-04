@@ -1,3 +1,4 @@
+import type { PlatformSide } from '@furatora/database/enums';
 import type { ConcourseDTO, TrainStopPatternDTO } from './types';
 
 // SVG viewBox の左右に余白として加えるマージン（メートル）。
@@ -170,7 +171,7 @@ export type VerticalLayout = {
  *   加算せず、viewHeight は束ね線導入前と完全に一致する。
  */
 export function layoutRows(
-  platformSide: 'top' | 'bottom' | null,
+  platformSide: PlatformSide | null,
   options: { hasConcourseLeaders?: boolean } = {},
 ): VerticalLayout {
   const isTop = platformSide === 'top';

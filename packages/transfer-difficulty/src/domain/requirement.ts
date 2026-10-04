@@ -2,19 +2,11 @@
 // ペルソナ別の可否・必要な行為はデータとして保存せず、表示層でここから導出する
 // （docs/domain/station-master-model.md「乗換難易度」）。Admin のプレビューと Web が同じ関数を使う。
 
-// facility_types の code と一致させること（キャメルケース）。DB とこの定数の一致は
-// 自動テストでは守れない（CI に DB が無い）ため、設備の種類を足すときは両方を直す
-export const FACILITY_TYPE_CODES = [
-  'sameFloor',
-  'elevator',
-  'ramp',
-  'wheelchairEscalator',
-  'escalator',
-  'stairLift',
-  'stairs',
-] as const;
+import { FACILITY_TYPE_CODES, type FacilityTypeCode } from '@furatora/database/enums';
 
-export type FacilityTypeCode = (typeof FACILITY_TYPE_CODES)[number];
+// 設備コードの一覧の正は @furatora/database/enums の FACILITY_TYPE_CODES で、facility_types は CHECK 制約で
+// それに従う（ADR-0016）。利用側の import を変えないため再 export する（ADR-0015）
+export { FACILITY_TYPE_CODES, type FacilityTypeCode };
 
 export type Persona = 'stroller' | 'wheelchair';
 

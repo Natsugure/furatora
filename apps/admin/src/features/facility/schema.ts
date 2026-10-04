@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { FACILITY_TYPE_CODES } from '@furatora/database/enums';
 
 const facilitySchema = z.object({
-  typeCode: z.string().min(1),
+  // 定数に無いコードは facility_types の外部キーで落ちる前に 400 で弾く（ADR-0016）
+  typeCode: z.enum(FACILITY_TYPE_CODES),
   // nullable: PUTはコンコース全体をdelete→insertする全置換のため、駅レイアウト
   // 統合ページが座標のドラッグだけで再送するときもnull（未設定）をそのまま送れる
   // 必要がある。omit/undefinedにするとrepository側でtrueに埋められてしまい、
