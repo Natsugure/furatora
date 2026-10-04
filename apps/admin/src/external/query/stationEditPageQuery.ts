@@ -1,5 +1,6 @@
 import { db } from '@furatora/database/client';
 import { operators, stations, stationConnections, stationLines, lines } from '@furatora/database/schema';
+import { firstLineByStation } from '@furatora/transfer-difficulty/domain';
 import { asc, eq, inArray } from 'drizzle-orm';
 import type {
   StationEditPageQuery, StationEditContext, ConnectionRow,
@@ -29,33 +30,30 @@ export const dbStationEditPageQuery: StationEditPageQuery = {
       .map((c) => c.connectedStationId)
       .filter((id): id is string => id !== null);
 
-    // connectedRailwayId 列は廃止済み（ADR-0007 決定3）。路線名は stationLines 経由で解決する。
+    // connectedRailwayId 列は廃止済み（ADR-0007 決定3）。路線名は stationLines 経由で、駅の最初の路線
+    // （firstLineByStation。駅対編集画面・Web の駅詳細と同じ規則）について解決する
     const [connectedStationList, connectedLineRows] = await Promise.all([
       connectedStationIds.length > 0
         ? db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, connectedStationIds))
         : Promise.resolve([]),
       connectedStationIds.length > 0
         ? db
-            .select({ stationId: stationLines.stationId, lineName: lines.name })
+            .select({ stationId: stationLines.stationId, lineId: lines.id, lineName: lines.name })
             .from(stationLines)
             .innerJoin(lines, eq(lines.id, stationLines.lineId))
             .where(inArray(stationLines.stationId, connectedStationIds))
+            .orderBy(asc(lines.displayOrder), asc(lines.id))
         : Promise.resolve([]),
     ]);
 
     const stationNameMap = new Map(connectedStationList.map((s) => [s.id, s.name]));
-    const lineNameByStationId = new Map<string, string>();
-    for (const row of connectedLineRows) {
-      if (!lineNameByStationId.has(row.stationId)) {
-        lineNameByStationId.set(row.stationId, row.lineName);
-      }
-    }
+    const firstLineOf = firstLineByStation(connectedLineRows);
 
     const connections: ConnectionRow[] = connectionRows.map((c) => ({
       id: c.id,
       connectedStationId: c.connectedStationId,
       connectedStationName: c.connectedStationId ? (stationNameMap.get(c.connectedStationId) ?? null) : null,
-      connectedLineName: c.connectedStationId ? (lineNameByStationId.get(c.connectedStationId) ?? null) : null,
+      connectedLineName: c.connectedStationId ? (firstLineOf.get(c.connectedStationId)?.lineName ?? null) : null,
     }));
 
     const context: StationEditContext = {

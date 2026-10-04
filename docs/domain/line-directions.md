@@ -60,7 +60,8 @@ line_directions
     Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）と
     Web の駅詳細（`apps/web/src/features/station/domain/transferPartners.ts`）が使う。規則を各アプリで書き直さない。
 - 駅は現在、路線×駅の粒度で1駅1路線である。駅対編集画面と Web の駅詳細の乗換セクションは、駅の最初の路線（`stationLines` を路線の `displayOrder`、同順なら id で並べた先頭）について解決し、
-  ホームと既定行をその路線で絞る。1駅が複数路線を持つようになったら（[#82](https://github.com/Natsugure/furatora/issues/82)）、
+  ホームと既定行をその路線で絞る。駅名に添える路線名も同じ「最初の路線」を使い、Admin の駅編集画面の接続駅一覧
+  （`apps/admin/src/external/query/stationEditPageQuery.ts`）も `firstLineByStation` で決める。1駅が複数路線を持つようになったら（[#82](https://github.com/Natsugure/furatora/issues/82)）、
   解決の入力に路線を明示する必要がある。
   - `transfer_connections` の端点は「駅＋方面」で路線を持たないため、複数路線を持つ相手駅では、接続がどの路線への乗換かを区別できない。
     Web の乗換セクションは相手駅の路線ごとに選択肢を出すが、どの路線を選んでも同じ接続（同じルート）と最初の路線の方面名が出る。
