@@ -1,92 +1,122 @@
-# 設計: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
+# 設計: 方面ラベルの解決・接続の向きの揃え方を transfer-difficulty に集める (Issue #138)
 
-「定数が正で、DB と seed が従う」という決定と却下した案は [ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md) に置く。
-語彙の置き場は [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定3 による。ここには実装だけを書く。
+純粋な部分をパッケージへ移し SQL を各アプリに残す判断は [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定2 による。
+方面ラベルの解決順（①ホーム ②既定行 ③フォールバック）は [ADR-0014](../adr/0014-direction-label-by-default-row.md) と
+[docs/domain/line-directions.md](../domain/line-directions.md) による。ここには実装だけを書く。
 
 ## 変更するファイル
 
 ```
-packages/database/src/enums.ts                      削除
-packages/database/src/enums/{index,stationMaster,facility}.ts   新規（stationMaster は旧 enums.ts の中身）
-packages/database/package.json                      "./enums" → ./src/enums/index.ts、lint スクリプトと ESLint の devDependencies
-packages/database/eslint.config.mjs                 新規。src/enums/** の import を制限
-packages/database/src/schema/platform.ts            facility_types に CHECK、code と station_facilities.type_code に $type
-packages/database/src/schema/transfer.ts            transfer_route_facilities.type_code に $type
-packages/database/drizzle/0018_*.sql と snapshot    db:generate で生成
-packages/transfer-difficulty/src/domain/requirement.ts   定数を enums から import して再 export
-packages/database/src/enums/facility.ts              isFacilityTypeCode（読み取りの境界で知らないコードを見分ける）
-apps/web/src/external/query/transferPartnerRows.ts(.test.ts)   知らないコードを含むルートは未入力（isFacilityTypeCode に置き換え）
-apps/admin/src/features/facility/knownFacilityCodes.ts(.test.ts)   assertKnownFacilityCodes / knownFacilityTypeOptions
-apps/admin/src/features/facility/ports.ts            UnknownFacilityCodeError
-apps/admin/src/features/facility/components/UnknownFacilityCodeAlert.tsx   編集を止めた理由の表示
-apps/admin/src/external/query/transferPairEditPageQuery.ts      isFacilityCode を assertKnownFacilityCodes / knownFacilityTypeOptions に
-apps/admin/src/external/query/stationLayoutPageQuery.ts         assertKnownFacilityCodes
-apps/admin/src/external/query/facilityEditPageQuery.ts          設備の種類の選択肢を knownFacilityTypeOptions で絞る
-apps/admin/src/app/stations/[stationId]/layout/page.tsx と …/transfer/page.tsx   UnknownFacilityCodeError を捕まえて表示
-apps/admin/src/features/facility/schema.ts           typeCode を z.enum(FACILITY_TYPE_CODES) に
-apps/scripts/src/seed-master-data.ts                 表示名を Record<FacilityTypeCode, string> に
+packages/transfer-difficulty/src/domain/directionLabel.ts(.test.ts)   firstLineByStation / resolveStationDirectionLabels を追加
+packages/transfer-difficulty/src/domain/connection.ts(.test.ts)       新規。orientConnection
+packages/transfer-difficulty/src/domain/index.ts                     バレルに connection を追加
+apps/admin/src/features/transfer-connection/domain/normalize.ts       comboOfConnection を orientConnection で実装
+apps/admin/src/external/query/transferPairEditPageQuery.ts            firstLineOf・hints() を共有関数に置き換え
+apps/web/src/features/station/domain/transferPartners.ts(.test.ts)    新規。assembleTransferPartners / facilitiesByRoute / PartnerLine
+apps/web/src/external/query/transferPartnerRows.ts                    SQL を実行して assembleTransferPartners を呼ぶだけにする
+apps/web/src/external/query/transferPartnerRows.test.ts               削除（transferPartners.test.ts へ移す）
+apps/web/src/external/query/stationDetailQuery.ts                     PartnerLine の import 元を変える
 ```
 
 ## データの流れ
 
 ```
-FACILITY_TYPE_CODES（@furatora/database/enums/facility.ts）
- ├─ schema/platform.ts の CHECK（sql.raw で展開）→ db:generate → マイグレーション → facility_types
- │     └─ 外部キー ← transfer_route_facilities.type_code / station_facilities.type_code
- ├─ $type<FacilityTypeCode>() → Drizzle が読む値の型
- ├─ seed の Record<FacilityTypeCode, string> → 新しい環境の facility_types
- └─ transfer-difficulty が再 export → Web / Admin の判定と入力検証
+Web: stationDetailQuery
+  └─ buildTransferPartners (external/query/transferPartnerRows.ts)
+       ├─ SQL 5本（ルート・設備・駅の路線・ホーム・既定行）  ← 変更なし
+       └─ assembleTransferPartners (features/station/domain/transferPartners.ts)  ← 純関数
+            ├─ facilitiesByRoute
+            ├─ orientConnection                 ─┐
+            ├─ firstLineByStation                ├─ @furatora/transfer-difficulty/domain
+            └─ resolveStationDirectionLabels    ─┘
+
+Admin: transferPairEditPageQuery.getContext  ← SQL は変更なし
+  ├─ firstLineByStation / resolveStationDirectionLabels
+  └─ comboOfConnection (features/transfer-connection/domain/normalize.ts) → orientConnection
 ```
 
-## CHECK 制約
+## インターフェース
+
+### `packages/transfer-difficulty/src/domain/directionLabel.ts`
 
 ```ts
-check(
-  'facility_types_code_known',
-  sql`${t.code} IN (${sql.raw(FACILITY_TYPE_CODES.map((code) => `'${code}'`).join(', '))})`,
-)
+// 行は呼び出し側の SQL で lines.displayOrder, lines.id 順に並べてある前提。駅ごとに先頭を採る
+export type StationFirstLineLookup = { get(stationId: string): StationFirstLine | undefined };
+export function firstLineByStation(
+  rows: readonly ({ stationId: string } & StationFirstLine)[],
+): StationFirstLineLookup;  // uuid の大文字小文字に依らず引ける
+
+export function resolveStationDirectionLabels(input: {
+  stationId: string;
+  firstLineOf: { get(stationId: string): { lineId: string } | undefined };
+  platformRows: readonly {
+    stationId: string; lineId: string; platformNumber: string;
+    inboundName: string | null; outboundName: string | null;
+  }[];
+  defaultRows: readonly { lineId: string; directionType: DirectionType; displayName: string }[];
+}): Record<DirectionType, string>;
 ```
 
-- `sql.raw` を使ってよいのは、値がコード内の定数（利用者の入力ではない）だからである
-- 制約は親の `facility_types` だけに付ける。子は外部キーで守られる
+- 駅が `firstLineOf` に無いときは、ホーム・既定行を見ずに `resolveDirectionLabel` に空のホームと `null` の既定行を渡す
+  （現行コードは `lineId === undefined` との比較で偶然一致しないだけだったので、明示的に分岐する）
+- ホームの行の駅 ID は小文字で比べる（`orientConnection` と同じ理由）
+- ホーム番号は varchar なので `localeCompare(..., 'ja', { numeric: true })` で並べる（'2' → '10'）
 
-## ESLint（packages/database）
+### `packages/transfer-difficulty/src/domain/connection.ts`
 
-`files: ['src/enums/**/*.ts']` に次を設定する。
-
-```js
-regex: '^(drizzle-orm(/.*)?|@furatora/database(/.*)?|\\.\\./(schema|client|tx)(/.*)?)$'
+```ts
+export function orientConnection(
+  row: { stationAId: string; directionA: DirectionType; stationBId: string; directionB: DirectionType },
+  stationId: string,
+): { connectedStationId: string; stationDirection: DirectionType; connectedDirection: DirectionType };
 ```
 
-- `@furatora/database` 自身も禁止する。自分自身を経由して `schema` を読む抜け道になるため
+- uuid は小文字で比べる（Zod の uuid は大文字も通すため）。返す ID は入力のまま
+- 同一駅どうしの接続（#82 で正当になりうる）は扱わない。stationId の一致だけで A/B を決める
+- 自駅が A 側にも B 側にも無い行は例外にする（黙って B 側として扱うと、相手駅と向きを取り違えた表示になる）
 
-## エラーマトリックス
+### `apps/web/src/features/station/domain/transferPartners.ts`
 
-| 状況 | 結果 |
+```ts
+export type PartnerLine = Pick<TransferPartnerDTO, 'connectedStationId' | 'connectedStationName' | 'lineName' | 'lineColor'>;
+export function facilitiesByRoute(rows: readonly { routeId: string; typeCode: string }[]): Map<string, FacilityTypeCode[]>;
+export function assembleTransferPartners(input: {
+  stationId: string;
+  partnerLines: readonly PartnerLine[];
+  connectionRows: readonly { id; stationAId; directionA; stationBId; directionB; notes }[];
+  routeRows: readonly ({ connectionId: string } & Omit<TransferRouteDTO, 'facilities'>)[];
+  facilityRows: readonly { routeId: string; typeCode: string }[];
+  stationLineRows: readonly { stationId; lineId; lineName }[];
+  platformRows: ...;   // resolveStationDirectionLabels と同じ
+  defaultDirectionRows: ...;
+}): TransferPartnerDTO[];
+```
+
+- 入力の行型は構造的な最小型で定義し、features から external・schema の型を import しない（ADR-0001）
+- `routeRows` の並び（`label` 昇順）はそのまま接続ごとのルートの並びになる。順序を変えない
+- `partnerLines` が空なら `[]`（SQL を発行しない早期 return は external 側に残す）
+
+## エラーハンドリング
+
+| 状況 | 振る舞い |
 |---|---|
-| 未知のコードを `facility_types` に入れる | DB が CHECK 違反で拒否する |
-| 未知のコードを子テーブルに入れる | DB が外部キー違反で拒否する |
-| Admin の駅レイアウトの保存に未知のコードがある | zod の検証で 400 |
-| Admin の駅対の保存に未知のコードがある | zod の検証で 400（既存の `z.enum(FACILITY_TYPE_CODES)`） |
-| seed の表示名が欠ける | コンパイルエラー |
-| Web が、稼働中のコードの知らないコードを読む（デプロイの途中・別ビルド） | そのルートを未入力として表示する |
-| Admin の駅対・駅レイアウトの編集画面が、知らないコードを読む | `UnknownFacilityCodeError`。ページは理由を表示し、編集させない（本番では例外メッセージが伏せられるため、ページで捕まえる） |
-| Admin の設備の種類の選択肢に、知らないコードがある | 選択肢から除く |
-
-## 恒久知識の振り分け
-
-- 「定数が正で、DB と seed が従う」と却下した案: ADR-0016（新規）
-- CHECK 制約・外部キーで守っていることと、設備の種類を足すときの手順:
-  - `docs/domain/station-master-model.md`（制約の表と「ルートと設備」）
-  - `facility.ts` のコメント
-- `src/enums/` の構成と ESLint で守っていること: `packages/database/CLAUDE.md` と `.github/instructions/drizzle.instruction.md`
-- `db:push` の挙動（確認の結果）: 問題があれば `docs/domain/` と `packages/database/CLAUDE.md` に書く
+| 駅が路線を持たない | 方面ラベルはフォールバック（上り／下り）、路線名は `''`（Web）/ `null`（Admin） |
+| 相手駅の接続行が無い | `combos: []`（未評価） |
+| 知らない設備コードを含むルート | Web は設備を空（未入力）にする（#139 の挙動を維持）。Admin は従来どおり編集画面を止める |
+| uuid の大文字小文字が食い違う | 小文字で比べて同じ駅として扱う（組み合わせ・方面ラベル・路線名のすべて） |
+| 自駅に接しない接続行を `orientConnection` に渡す | 例外にする（呼び出し側の誤り。現在の呼び出し側はすべて自駅に接する行だけを読む） |
 
 ## テスト戦略
 
-- 既存のテスト（`requirement.test.ts` が、規則の表と定数の一致を見ている）はそのまま通す
-- `transferPartnerRows.test.ts` の、知らないコードを含むルートを未入力にするテストは残す（入力の型は `string` のまま）
-- `knownFacilityCodes.test.ts`: 知らないコードで `UnknownFacilityCodeError` を投げること、選択肢から除くこと
-- ESLint の発火確認: `eslint --stdin --stdin-filename src/enums/facility.ts` で、禁止した import がエラーになり、`./stationMaster` が通ること
-- `db:generate` を2回実行し、1回目が CHECK の ADD だけ、2回目が差分なしになること
-- 開発者が development で `db:migrate` → `db:push` を実行し、push が差分を出さないこと
+- `directionLabel.test.ts`: 駅で絞る／路線で絞る／'10' と '2' の順／null の除外／既定行・フォールバック／
+  駅が `firstLineOf` に無いときフォールバック／`firstLineByStation` が先頭を採る／大文字小文字違いの駅 ID でも引ける・解決できる
+- `connection.test.ts`: A 側／B 側／大文字 uuid の一致／返す ID は入力のまま／自駅に接しない行は例外
+- `transferPartners.test.ts`: 既存の `facilitiesByRoute` 3ケースを移す。大文字小文字違いの uuid で combo と方面ラベルが相手駅に紐づく（自駅も同様）／
+  未評価の相手は combos 空／方面ラベル／ルートの label 順が保たれる／知らない設備コードのルートは設備が空
+- Admin の `normalize.test.ts` は変更せずに通ること（`comboOfConnection` のシグネチャ不変）
+
+## 恒久知識の振り分け
+
+- `docs/domain/line-directions.md`: 実装の所在を `resolveStationDirectionLabels` / `firstLineByStation` に上書きする（フェーズ5）
+- `docs/domain/station-master-model.md`: 向きの揃え方の記述は無い。未知の設備コードの Web 側の所在（ファイルパス）だけを直す
+- ADR: 新規なし。ステータス変更なし

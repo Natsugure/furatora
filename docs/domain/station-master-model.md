@@ -237,7 +237,7 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
   （[ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md)）。
   - CHECK が保証するのは「最後にマイグレーションを流したビルドの定数」までである。Web と Admin は別々にデプロイされるため、
     稼働中のコードが知らないコードを DB から読むことがある。読み取りの境界で `isFacilityTypeCode` を使って見分ける
-    - Web: 知らないコードを含むルートは、設備を空（未入力）として表示する（`apps/web/src/external/query/transferPartnerRows.ts`）
+    - Web: 知らないコードを含むルートは、設備を空（未入力）として表示する（`apps/web/src/features/station/domain/transferPartners.ts` の `facilitiesByRoute`）
     - Admin: 駅対の編集画面と駅レイアウトの編集画面は、`UnknownFacilityCodeError` で止め、理由を表示して編集させない。
       保存が設備を置き換える（消して入れ直す）ので、捨てて表示すると保存だけで行が消えるため（`apps/admin/src/features/facility/knownFacilityCodes.ts`）
     - Admin の設備の種類の選択肢からは、知らないコードを除く
