@@ -95,11 +95,27 @@ describe('assembleTransferPartners', () => {
     expect(toT.combos[0]).toMatchObject({ stationDirection: 'inbound', connectedDirection: 'outbound', notes: '備考' });
   });
 
-  it('相手駅の uuid の大文字小文字が接続行と違っても、組み合わせを紐づける', () => {
+  it('相手駅の uuid の大文字小文字が接続行と違っても、組み合わせと方面ラベルを紐づける', () => {
     const { toT } = assemble({ ...base, partnerLines: [partner(T.toUpperCase(), '小川町')] });
 
     expect(toT.connectedStationId).toBe(T.toUpperCase());
     expect(toT.combos).toHaveLength(1);
+    expect(toT.directionLabels.connected).toEqual(assemble().toT.directionLabels.connected);
+  });
+
+  it('自駅の uuid の大文字小文字が行と違っても、自駅の方面ラベルと路線名を解決する', () => {
+    const { toT } = assemble({ ...base, stationId: S.toUpperCase() });
+    const { toT: expected } = assemble();
+
+    expect(toT.combos).toEqual(expected.combos);
+    expect(toT.directionLabels.station).toEqual(expected.directionLabels.station);
+    expect(toT.stationLineName).toBe('丸ノ内線');
+  });
+
+  it('同じ相手駅が複数の路線で現れても、それぞれに同じ方面ラベルを付ける', () => {
+    const { toT, toU } = assemble({ ...base, partnerLines: [partner(T, '小川町'), partner(T.toUpperCase(), '小川町')] });
+
+    expect(toU?.directionLabels.connected).toEqual(toT.directionLabels.connected);
   });
 
   it('接続行の無い相手駅は、組み合わせが空（未評価）になる', () => {

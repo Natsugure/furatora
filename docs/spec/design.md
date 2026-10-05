@@ -41,13 +41,14 @@ Admin: transferPairEditPageQuery.getContext  ← SQL は変更なし
 
 ```ts
 // 行は呼び出し側の SQL で lines.displayOrder, lines.id 順に並べてある前提。駅ごとに先頭を採る
-export function firstLineByStation<Row extends { stationId: string; lineId: string; lineName: string }>(
-  rows: readonly Row[],
-): Map<string, { lineId: string; lineName: string }>;
+export type StationFirstLineLookup = { get(stationId: string): StationFirstLine | undefined };
+export function firstLineByStation(
+  rows: readonly ({ stationId: string } & StationFirstLine)[],
+): StationFirstLineLookup;  // uuid の大文字小文字に依らず引ける
 
 export function resolveStationDirectionLabels(input: {
   stationId: string;
-  firstLineOf: ReadonlyMap<string, { lineId: string }>;
+  firstLineOf: { get(stationId: string): { lineId: string } | undefined };
   platformRows: readonly {
     stationId: string; lineId: string; platformNumber: string;
     inboundName: string | null; outboundName: string | null;
@@ -58,6 +59,7 @@ export function resolveStationDirectionLabels(input: {
 
 - 駅が `firstLineOf` に無いときは、ホーム・既定行を見ずに `resolveDirectionLabel` に空のホームと `null` の既定行を渡す
   （現行コードは `lineId === undefined` との比較で偶然一致しないだけだったので、明示的に分岐する）
+- ホームの行の駅 ID は小文字で比べる（`orientConnection` と同じ理由）
 - ホーム番号は varchar なので `localeCompare(..., 'ja', { numeric: true })` で並べる（'2' → '10'）
 
 ### `packages/transfer-difficulty/src/domain/connection.ts`
@@ -71,6 +73,7 @@ export function orientConnection(
 
 - uuid は小文字で比べる（Zod の uuid は大文字も通すため）。返す ID は入力のまま
 - 同一駅どうしの接続（#82 で正当になりうる）は扱わない。stationId の一致だけで A/B を決める
+- 自駅が A 側にも B 側にも無い行は例外にする（黙って B 側として扱うと、相手駅と向きを取り違えた表示になる）
 
 ### `apps/web/src/features/station/domain/transferPartners.ts`
 
@@ -100,14 +103,15 @@ export function assembleTransferPartners(input: {
 | 駅が路線を持たない | 方面ラベルはフォールバック（上り／下り）、路線名は `''`（Web）/ `null`（Admin） |
 | 相手駅の接続行が無い | `combos: []`（未評価） |
 | 知らない設備コードを含むルート | Web は設備を空（未入力）にする（#139 の挙動を維持）。Admin は従来どおり編集画面を止める |
-| uuid の大文字小文字が食い違う | 小文字で比べて同じ駅として扱う |
+| uuid の大文字小文字が食い違う | 小文字で比べて同じ駅として扱う（組み合わせ・方面ラベル・路線名のすべて） |
+| 自駅に接しない接続行を `orientConnection` に渡す | 例外にする（呼び出し側の誤り。現在の呼び出し側はすべて自駅に接する行だけを読む） |
 
 ## テスト戦略
 
 - `directionLabel.test.ts`: 駅で絞る／路線で絞る／'10' と '2' の順／null の除外／既定行・フォールバック／
-  駅が `firstLineOf` に無いときフォールバック／`firstLineByStation` が先頭を採る
-- `connection.test.ts`: A 側／B 側／大文字 uuid の一致／返す ID は入力のまま
-- `transferPartners.test.ts`: 既存の `facilitiesByRoute` 3ケースを移す。大文字小文字違いの uuid で combo が相手駅に紐づく／
+  駅が `firstLineOf` に無いときフォールバック／`firstLineByStation` が先頭を採る／大文字小文字違いの駅 ID でも引ける・解決できる
+- `connection.test.ts`: A 側／B 側／大文字 uuid の一致／返す ID は入力のまま／自駅に接しない行は例外
+- `transferPartners.test.ts`: 既存の `facilitiesByRoute` 3ケースを移す。大文字小文字違いの uuid で combo と方面ラベルが相手駅に紐づく（自駅も同様）／
   未評価の相手は combos 空／方面ラベル／ルートの label 順が保たれる／知らない設備コードのルートは設備が空
 - Admin の `normalize.test.ts` は変更せずに通ること（`comboOfConnection` のシグネチャ不変）
 

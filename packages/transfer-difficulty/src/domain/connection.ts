@@ -4,6 +4,7 @@
 // 【uuid は小文字で比べる】Zod の uuid は大文字も通すため、入力の大文字小文字が DB と食い違いうる。
 // 返す駅 ID は入力のまま（大文字小文字を変えない）。
 // 【同一駅どうしの接続（#82 で正当になりうる）は扱わない】stationId の一致だけで A/B を判定する
+// 【自駅に接しない行は例外にする】黙って B 側として扱うと、相手駅と向きを取り違えた表示になるため
 
 import type { DirectionType } from '@furatora/database/enums';
 
@@ -11,7 +12,12 @@ export function orientConnection(
   row: { stationAId: string; directionA: DirectionType; stationBId: string; directionB: DirectionType },
   stationId: string,
 ): { connectedStationId: string; stationDirection: DirectionType; connectedDirection: DirectionType } {
-  return row.stationAId.toLowerCase() === stationId.toLowerCase()
-    ? { connectedStationId: row.stationBId, stationDirection: row.directionA, connectedDirection: row.directionB }
-    : { connectedStationId: row.stationAId, stationDirection: row.directionB, connectedDirection: row.directionA };
+  const self = stationId.toLowerCase();
+  if (row.stationAId.toLowerCase() === self) {
+    return { connectedStationId: row.stationBId, stationDirection: row.directionA, connectedDirection: row.directionB };
+  }
+  if (row.stationBId.toLowerCase() === self) {
+    return { connectedStationId: row.stationAId, stationDirection: row.directionB, connectedDirection: row.directionA };
+  }
+  throw new Error(`接続行 (${row.stationAId}, ${row.stationBId}) は駅 ${stationId} に接していません`);
 }

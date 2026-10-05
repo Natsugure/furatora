@@ -56,6 +56,7 @@ line_directions
   - `resolveDirectionLabel`: 1つの走行方向について ①〜③ を解決する
   - `firstLineByStation`: 駅ごとの最初の路線を決める（下記）
   - `resolveStationDirectionLabels`: 駅の最初の路線を引き、駅と路線でホームを絞り、ホーム番号の数値順に並べて、走行方向ごとに解決する
+  - 駅 ID は uuid の大文字小文字に依らず同じ駅として扱う（Zod の uuid は大文字も通すため。接続の向きを揃える `orientConnection` と同じ規則）
   - 呼び出し側はホーム・既定行・駅の路線を SQL で読んで渡すだけにする。
     Admin の駅対編集画面（`apps/admin/src/external/query/transferPairEditPageQuery.ts`）と
     Web の駅詳細（`apps/web/src/features/station/domain/transferPartners.ts`）が使う。規則を各アプリで書き直さない。

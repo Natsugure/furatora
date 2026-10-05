@@ -41,16 +41,20 @@ export type PlatformDirectionRow = {
 /** 方面ラベルの ②: 路線の既定行（line_directions の is_default 行） */
 export type DefaultDirectionRow = { lineId: string; directionType: DirectionType; displayName: string };
 
+/** 駅 ID から「最初の路線」を引く。uuid の大文字小文字に依らず引ける（orientConnection と同じ理由） */
+export type StationFirstLineLookup = { get(stationId: string): StationFirstLine | undefined };
+
 // 駅ごとの「最初の路線」。行は呼び出し側の SQL で lines.displayOrder, lines.id 順に並べてあること。
 // 1駅が複数路線を持っても（#82）、読み込みのたびに変わらないようにするため、この順の先頭を採る
 export function firstLineByStation(
   rows: readonly ({ stationId: string } & StationFirstLine)[],
-): Map<string, StationFirstLine> {
+): StationFirstLineLookup {
   const firstLineOf = new Map<string, StationFirstLine>();
   for (const row of rows) {
-    if (!firstLineOf.has(row.stationId)) firstLineOf.set(row.stationId, { lineId: row.lineId, lineName: row.lineName });
+    const key = row.stationId.toLowerCase();
+    if (!firstLineOf.has(key)) firstLineOf.set(key, { lineId: row.lineId, lineName: row.lineName });
   }
-  return firstLineOf;
+  return { get: (stationId) => firstLineOf.get(stationId.toLowerCase()) };
 }
 
 /**
@@ -59,7 +63,7 @@ export function firstLineByStation(
  */
 export function resolveStationDirectionLabels(input: {
   stationId: string;
-  firstLineOf: ReadonlyMap<string, { lineId: string }>;
+  firstLineOf: { get(stationId: string): { lineId: string } | undefined };
   /** 全駅分をそのまま渡してよい */
   platformRows: readonly PlatformDirectionRow[];
   defaultRows: readonly DefaultDirectionRow[];
@@ -67,8 +71,10 @@ export function resolveStationDirectionLabels(input: {
   const lineId = input.firstLineOf.get(input.stationId)?.lineId;
   // 路線の無い駅は、ホームや既定行があっても使わない（どの路線の文言かを決められない）
   if (lineId === undefined) return { ...FALLBACK_DIRECTION_LABELS };
+  // uuid は小文字で比べる（firstLineByStation・orientConnection と同じ理由）
+  const stationId = input.stationId.toLowerCase();
   const platformsOfLine = input.platformRows
-    .filter((p) => p.stationId === input.stationId && p.lineId === lineId)
+    .filter((p) => p.stationId.toLowerCase() === stationId && p.lineId === lineId)
     // ホーム番号は varchar なので、SQL の並びでは '10' が '2' より前になる。数値として並べる
     .sort((a, b) => a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true }));
   const resolve = (directionType: DirectionType, names: (string | null)[]) =>

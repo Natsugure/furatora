@@ -20,3 +20,12 @@
   - `line-directions.md`: 方面ラベルの実装の所在を `resolveDirectionLabel` / `firstLineByStation` / `resolveStationDirectionLabels` と Web の `transferPartners.ts` に上書きした
   - `station-master-model.md`: 向きの揃え方の記述は無い。ただし未知の設備コードの Web 側の所在が旧パス（`transferPartnerRows.ts`）を指していたので、`transferPartners.ts` の `facilitiesByRoute` に直した
   - ADR: 新規・ステータス変更なし
+- [x] **TASK-8** PR #157 のレビュー指摘に対応する（依存: TASK-7）
+  - 方面ラベル・最初の路線の解決で、駅 ID の大文字小文字を区別していた。組み合わせ（`orientConnection`）と食い違い、
+    大文字の uuid では組み合わせだけ合って方面ラベルが「上り／下り」に、路線名が空に落ちていた。
+    `firstLineByStation` を大文字小文字に依らず引ける形（`StationFirstLineLookup`）にし、`resolveStationDirectionLabels` のホームの絞り込みも小文字で比べる
+  - `orientConnection` は自駅に接しない行を例外にする（呼び出し側はすべて自駅に接する行だけを読むので、挙動は変わらない）
+  - Web の `assembleTransferPartners` は、相手駅の方面ラベルを駅ごとに一度だけ解決する
+  - 修正前のコードで追加したテスト5件が落ち、修正後に通ることを確かめた
+  - `typecheck` / `lint` / `test`（13タスク）が成功した。`test`: transfer-difficulty 66（+3）・admin 631・frontend 49（+2）
+  - 対象外として起票: 最初の路線の並び順を呼び出し側の SQL に頼っていること（#158）、方面ラベルの入力の SQL が Web と Admin で重複していること（#159）

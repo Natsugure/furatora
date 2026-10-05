@@ -86,13 +86,21 @@ export function assembleTransferPartners(input: {
   }
 
   const firstLineOf = firstLineByStation(input.stationLineRows);
-  const directionLabelsOf = (id: string) =>
-    resolveStationDirectionLabels({
+  // 複数路線を持つ相手駅は partnerLines に複数回現れるので、駅ごとに一度だけ解決する
+  const directionLabelsCache = new Map<string, Record<DirectionType, string>>();
+  const directionLabelsOf = (id: string) => {
+    const key = id.toLowerCase();
+    const cached = directionLabelsCache.get(key);
+    if (cached) return cached;
+    const labels = resolveStationDirectionLabels({
       stationId: id,
       firstLineOf,
       platformRows: input.platformRows,
       defaultRows: input.defaultDirectionRows,
     });
+    directionLabelsCache.set(key, labels);
+    return labels;
+  };
 
   const stationDirectionLabels = directionLabelsOf(stationId);
   const stationLineName = firstLineOf.get(stationId)?.lineName ?? '';

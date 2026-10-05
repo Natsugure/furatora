@@ -27,4 +27,8 @@ describe('orientConnection', () => {
     const upperRow = { ...row, stationBId: HIGH.toUpperCase() };
     expect(orientConnection(upperRow, LOW).connectedStationId).toBe(HIGH.toUpperCase());
   });
+
+  it('自駅が A 側にも B 側にも無い行は、向きを決めずに例外にする', () => {
+    expect(() => orientConnection(row, '11111111-1111-1111-1111-111111111111')).toThrow();
+  });
 });

@@ -92,7 +92,12 @@ describe('firstLineByStation', () => {
     ]);
     expect(firstLineOf.get('s1')).toEqual({ lineId: 'L2', lineName: '丸ノ内線' });
     expect(firstLineOf.get('s2')).toEqual({ lineId: 'L3', lineName: '新宿線' });
-    expect(firstLineOf.has('s3')).toBe(false);
+    expect(firstLineOf.get('s3')).toBeUndefined();
+  });
+
+  it('駅 ID の大文字小文字に依らず引ける', () => {
+    const firstLineOf = firstLineByStation([{ stationId: 'ab-cd', lineId: 'L1', lineName: '銀座線' }]);
+    expect(firstLineOf.get('AB-CD')).toEqual({ lineId: 'L1', lineName: '銀座線' });
   });
 });
 
@@ -151,5 +156,16 @@ describe('resolveStationDirectionLabels', () => {
         defaultRows: [{ lineId: 'L1', directionType: 'outbound', displayName: '荻窪方面' }],
       }),
     ).toEqual({ inbound: '上り', outbound: '下り' });
+  });
+
+  it('駅 ID の大文字小文字がホームの行や路線の引き先と違っても、同じ駅として解決する', () => {
+    expect(
+      resolveStationDirectionLabels({
+        stationId: 'S1',
+        firstLineOf: firstLineByStation([{ stationId: 's1', lineId: 'L1', lineName: '丸ノ内線' }]),
+        platformRows: [platform({ stationId: 's1', inboundName: '池袋方面' })],
+        defaultRows: [{ lineId: 'L1', directionType: 'outbound', displayName: '荻窪方面' }],
+      }),
+    ).toEqual({ inbound: '池袋方面', outbound: '荻窪方面' });
   });
 });
