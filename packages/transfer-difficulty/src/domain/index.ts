@@ -2,3 +2,4 @@
 export * from './requirement';
 export * from './directionLabel';
 export * from './assessment';
+export * from './connection';

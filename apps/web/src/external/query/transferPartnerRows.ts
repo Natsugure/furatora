@@ -9,17 +9,13 @@ import {
   transferRouteFacilities,
   transferRoutes,
 } from '@furatora/database/schema';
-import { isFacilityTypeCode } from '@furatora/database/enums';
-import {
-  resolveDirectionLabel,
-  type DirectionType,
-  type FacilityTypeCode,
-} from '@furatora/transfer-difficulty/domain';
 import { alias } from 'drizzle-orm/pg-core';
 import { and, asc, eq, inArray, or } from 'drizzle-orm';
-import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
+import type { TransferPartnerDTO } from '@/features/station/domain/types';
+import { assembleTransferPartners, type PartnerLine } from '@/features/station/domain/transferPartners';
 
 // 駅詳細の乗換難易度（新モデル: 接続 → ルート → 設備）の読み取り。stationDetailQuery から呼ぶ。
+// ここは SQL だけを持ち、組み立ては features/station/domain/transferPartners.ts の純関数に任せる。
 // DTO はルートと設備をそのまま運び、ペルソナで絞らない（docs/domain/station-master-model.md「乗換難易度」）。
 //
 // 相手駅には publishedStation() を通さない（stationDetailQuery の getStationConnectionRows と同じ理由。
@@ -27,29 +23,6 @@ import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from '@/f
 
 const inboundDirections = alias(lineDirections, 'inbound_directions');
 const outboundDirections = alias(lineDirections, 'outbound_directions');
-
-// ルートごとの設備。稼働中のコードが知らない設備コードを含むルートは、設備を空（未入力）として扱う。
-// DB の CHECK 制約は「最後にマイグレーションを流したビルドの定数」に従うだけなので、Admin や別ビルドが先に
-// 新しいコードを保存すると、ここに届きうる（ADR-0016「残るずれ」）。表示だけで失うものは無いため、止めずに続ける。
-// そのコードだけ捨てると残りの設備で判定され、段差のあるルートを「バリアフリールートあり」と出しうる。
-// 未入力なら必要な行為を導出しない（ADR-0012）
-export function facilitiesByRoute(
-  rows: readonly { routeId: string; typeCode: string }[],
-): Map<string, FacilityTypeCode[]> {
-  const facilitiesOf = new Map<string, FacilityTypeCode[]>();
-  const unknownRouteIds = new Set<string>();
-  for (const row of rows) {
-    if (!isFacilityTypeCode(row.typeCode)) {
-      unknownRouteIds.add(row.routeId);
-      continue;
-    }
-    const list = facilitiesOf.get(row.routeId) ?? [];
-    list.push(row.typeCode);
-    facilitiesOf.set(row.routeId, list);
-  }
-  for (const routeId of unknownRouteIds) facilitiesOf.set(routeId, []);
-  return facilitiesOf;
-}
 
 // transfer_connections は端点を正規化順（A < B）で持つので、S が A 側・B 側の両方を見る
 export async function getTransferConnectionRows(stationId: string) {
@@ -60,21 +33,6 @@ export async function getTransferConnectionRows(stationId: string) {
 }
 
 type ConnectionRow = Awaited<ReturnType<typeof getTransferConnectionRows>>[number];
-
-/** 接続一覧（station_connections）の相手駅と、その路線 */
-export type PartnerLine = Pick<
-  TransferPartnerDTO,
-  'connectedStationId' | 'connectedStationName' | 'lineName' | 'lineColor'
->;
-
-// 接続行を S から見た向きに直す。uuid の大文字小文字の違いで取り違えないよう小文字で比べる
-// （apps/admin の comboOfConnection と同じ規則）
-function orient(row: ConnectionRow, stationId: string) {
-  const stationIsA = row.stationAId.toLowerCase() === stationId.toLowerCase();
-  return stationIsA
-    ? { connectedStationId: row.stationBId, stationDirection: row.directionA, connectedDirection: row.directionB }
-    : { connectedStationId: row.stationAId, stationDirection: row.directionB, connectedDirection: row.directionA };
-}
 
 export async function buildTransferPartners(
   stationId: string,
@@ -149,59 +107,14 @@ export async function buildTransferPartners(
       .where(and(inArray(stationLines.stationId, stationIds), eq(lineDirections.isDefault, true))),
   ]);
 
-  const firstLineOf = new Map<string, { lineId: string; lineName: string }>();
-  for (const row of stationLineRows) {
-    if (!firstLineOf.has(row.stationId)) firstLineOf.set(row.stationId, { lineId: row.lineId, lineName: row.lineName });
-  }
-
-  // 駅は現在1駅1路線なので、駅の最初の路線について解決する。路線で絞るのは、1駅が複数路線を持つように
-  // なったとき（#82）に別路線の文言が混ざらないようにするため
-  const directionLabelsOf = (id: string): Record<DirectionType, string> => {
-    const lineId = firstLineOf.get(id)?.lineId;
-    // ホーム番号は varchar なので、SQL の並びでは '10' が '2' より前になる。数値として並べる
-    const platformsOfLine = platformRows
-      .filter((p) => p.stationId === id && p.lineId === lineId)
-      .sort((a, b) => a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true }));
-    const resolve = (directionType: DirectionType, names: (string | null)[]) =>
-      resolveDirectionLabel({
-        directionType,
-        platformNames: names.filter((name): name is string => name !== null),
-        defaultName:
-          defaultDirectionRows.find((d) => d.lineId === lineId && d.directionType === directionType)?.displayName ??
-          null,
-      }).label;
-    return {
-      inbound: resolve('inbound', platformsOfLine.map((p) => p.inboundName)),
-      outbound: resolve('outbound', platformsOfLine.map((p) => p.outboundName)),
-    };
-  };
-
-  const facilitiesOf = facilitiesByRoute(facilityRows);
-  const routesOf = new Map<string, TransferRouteDTO[]>();
-  for (const { connectionId, ...route } of linkRows) {
-    const dto: TransferRouteDTO = { ...route, facilities: facilitiesOf.get(route.routeId) ?? [] };
-    routesOf.set(connectionId, [...(routesOf.get(connectionId) ?? []), dto]);
-  }
-
-  const combosOf = new Map<string, TransferComboDTO[]>();
-  for (const row of connectionRows) {
-    const { connectedStationId, stationDirection, connectedDirection } = orient(row, stationId);
-    const key = connectedStationId.toLowerCase();
-    const combo: TransferComboDTO = {
-      stationDirection,
-      connectedDirection,
-      notes: row.notes,
-      routes: routesOf.get(row.id) ?? [],
-    };
-    combosOf.set(key, [...(combosOf.get(key) ?? []), combo]);
-  }
-
-  const stationDirectionLabels = directionLabelsOf(stationId);
-  const stationLineName = firstLineOf.get(stationId)?.lineName ?? '';
-  return partnerLines.map((p) => ({
-    ...p,
-    stationLineName,
-    directionLabels: { station: stationDirectionLabels, connected: directionLabelsOf(p.connectedStationId) },
-    combos: combosOf.get(p.connectedStationId.toLowerCase()) ?? [],
-  }));
+  return assembleTransferPartners({
+    stationId,
+    partnerLines,
+    connectionRows,
+    routeRows: linkRows,
+    facilityRows,
+    stationLineRows,
+    platformRows,
+    defaultDirectionRows,
+  });
 }

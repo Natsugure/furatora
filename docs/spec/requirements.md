@@ -1,49 +1,43 @@
-# 要件: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
+# 要件: 方面ラベルの解決・接続の向きの揃え方を transfer-difficulty に集める (Issue #138)
 
 ## 概要
 
-- **対象**: 設備コードの一覧を定数 `FACILITY_TYPE_CODES` に一本化し、DB（`facility_types` の CHECK 制約）と seed（型）をそれに従わせる。あわせて `@furatora/database/enums` をディレクトリにし、`packages/database` に ESLint を入れる
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #139](https://github.com/Natsugure/furatora/issues/139) /
-  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) / ADR-0011 / ADR-0012
-- **ブランチ**: `refactor/issue139-facility-type-codes`
-- **信頼度**: 85%（高〜中）
-  - 方針は Issue と ADR-0015 で決まっている
-  - 未確定は `db:push` が CHECK 制約を毎回差分と誤認するかどうかだけ。development で確かめる
+- **対象**: Admin と Web に重複している「駅の方面ラベルの解決」と「接続行を自駅から見た向きに揃える」規則を
+  `packages/transfer-difficulty` の純関数に移し、両アプリから使う。あわせて Web の乗換セクションの組み立てを純関数に切り出す
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #138](https://github.com/Natsugure/furatora/issues/138) /
+  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定2 / [ADR-0014](../adr/0014-direction-label-by-default-row.md)
+- **ブランチ**: `refactor/issue138-shared-transfer-rules`
+- **信頼度**: 90%（高）
+  - 振る舞いを変えないリファクタリング。方針は ADR-0015 決定2（純粋な部分をパッケージへ、SQL は各アプリに残す）で決まっている
+  - 新規 ADR は不要
 
 ## 背景
 
-設備コードの一覧は3か所にあり、一致しているかは人が確かめるしかない。
+#125 で Web に乗換セクションを作ったとき、Admin の query / feature 層の規則を Web に書き写した。
 
-1. 定数 `FACILITY_TYPE_CODES`（`packages/transfer-difficulty`）
-2. `facility_types` テーブル
-3. seed
+1. 方面ラベルの解決: 駅の最初の路線で絞る・ホーム番号を数値順に並べる・既定行へフォールバックする
+   （Admin `transferPairEditPageQuery.ts` の `hints()` と Web `transferPartnerRows.ts` の `directionLabelsOf()`）
+2. 接続行の向き: 端点 A/B のどちらが自駅かを uuid の小文字比較で判定する
+   （Admin `normalize.ts` の `comboOfConnection` と Web `transferPartnerRows.ts` の `orient()`）
 
-定数に無いコードが DB に入ると、問題が2つ起きる。
+規則を変えると2アプリを直す必要があり、Web の方面ラベル・向きの揃え方にはテストが無い
+（既存の `transferPartnerRows.test.ts` は `facilitiesByRoute` だけを見る）。
 
-- Web と Admin は、そのコードを `isFacilityCode` で黙って捨てる。そのため、誤った案内を出しうる
-- Admin では、そのルートの駅対を開いて保存しただけで、そのコードの行が消える
+### 対象外
+
+- Issue の修正3（`isFacilityTypeCode` の共有）: #139 で `@furatora/database/enums` に移し、Web・Admin とも既に使っている
 
 ## 要件（EARS記法）
 
-- **REQ-1**: システムは、設備コードの一覧を `@furatora/database/enums` の `FACILITY_TYPE_CODES` の1か所だけで定義すること
-- **REQ-2**: 定数に無いコードを `facility_types.code` に INSERT / UPDATE した場合、DB は CHECK 制約で拒否すること
-- **REQ-3**: 定数を変更して `db:generate` を実行したとき、システムは CHECK 制約を作り直すマイグレーションを生成すること。変更が無ければ生成しないこと
-- **REQ-4**: システムは、`transfer_route_facilities.type_code`・`station_facilities.type_code`・`facility_types.code` を読むときの型を `FacilityTypeCode` にすること
-- **REQ-10**: Web が、稼働中のコードの知らない設備コードをルートの設備として読んだ場合、システムはそのルートを未入力として表示し、ページを落とさないこと
-- **REQ-11**: Admin の駅対・駅レイアウトの編集画面が、稼働中のコードの知らない設備コードを読んだ場合、システムは編集画面を開かず、そのコードと理由を表示すること
-- **REQ-12**: Admin の設備の種類の選択肢に、稼働中のコードの知らないコードがある場合、システムはそれを選択肢から除くこと
-- **REQ-5**: 定数にあって seed の表示名に無いコードがある場合、システムはコンパイルエラーにすること
-- **REQ-6**: Admin の駅レイアウトの保存に定数に無い設備コードが含まれる場合、システムは入力検証で拒否すること
-- **REQ-7**: `src/enums/` 配下のファイルが `drizzle-orm`・`../schema`・`../client`・`../tx`・`@furatora/database` を import した場合、システムは lint エラーにすること
-- **REQ-8**: システムは、`@furatora/database/enums` を唯一の入口に保つこと。`@furatora/transfer-difficulty/domain` から `FACILITY_TYPE_CODES` / `FacilityTypeCode` を export し続けること
-- **REQ-9**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること。`build` は DB に触れないこと
-
-## エッジケース
-
-| ケース | 扱い |
-|---|---|
-| 値を `${}` や `inArray` で埋め込む | drizzle-kit が `IN ($1, …)` を出力し、マイグレーションが壊れる。`sql.raw` でリテラルとして展開する |
-| PostgreSQL が `IN (...)` を `= ANY (ARRAY[...])` に変換して保存する | `db:push` が毎回差分と誤認するかもしれない。development で確かめる |
-| 既存の環境に、定数に無いコードの行がある | 制約の追加が失敗する。main と development に無いことを SELECT で確認した（7コード） |
-| 定数にコードを足し、`facility_types` への INSERT を忘れる | CHECK では検出できない。Admin の保存時に外部キーのエラーになる（黙って誤判定はしない） |
-| 子テーブル（`transfer_route_facilities` / `station_facilities`）に未知のコードを入れる | 外部キーで `facility_types` を参照しており、親の CHECK だけで防げる |
+- **REQ-1**: システムは、駅の方面ラベルの解決（駅の最初の路線を引く → 駅と路線でホームを絞る → ホーム番号の数値順に並べる →
+  ①ホーム ②既定行 ③フォールバックで解決する）を `@furatora/transfer-difficulty/domain` の1か所で定義すること
+- **REQ-2**: システムは、駅の最初の路線の決め方（呼び出し側が `lines.displayOrder, lines.id` 順に並べた行の先頭）を同パッケージの1か所で定義すること
+- **REQ-3**: システムは、接続行を自駅から見た向き（相手駅・自駅の方面・相手駅の方面）に揃える規則を同パッケージの1か所で定義すること。
+  uuid は大文字小文字を区別せずに比べ、返す駅 ID は入力のままにすること。自駅に接しない行が渡された場合は、向きを決めずに例外にすること
+- **REQ-3a**: 駅 ID の uuid の大文字小文字が行と食い違う場合も、システムは REQ-1・REQ-2（方面ラベル・最初の路線）を REQ-3 の組み合わせと同じ駅として解決すること
+- **REQ-4**: 駅が路線を持たない場合、システムはその駅のホームや既定行があってもそれらを使わず、フォールバック（上り／下り）の表記にすること
+- **REQ-5**: システムは、Admin の駅対編集画面の方面の補助表示・組み合わせと、Web の駅詳細の乗換セクションを、変更前と同じ内容で表示すること
+- **REQ-6**: システムは、Web の乗換セクションの組み立て（ルートの設備・接続ごとのルート・向き・方面ラベル・相手駅へのマージ）を
+  DB に依存しない純関数で行い、ユニットテストで検証できること
+- **REQ-7**: `apps/` 配下に REQ-1〜3 の規則の写しが残っている場合、それは本 Issue の未完了として扱うこと
+- **REQ-8**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること
