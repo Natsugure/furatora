@@ -76,7 +76,6 @@
   --color-text-secondary:   var(--neutral-500);
   --color-text-disabled:    var(--neutral-300);
   --color-text-on-primary:  var(--neutral-0);
-  --color-text-on-accent:   var(--neutral-0);
   --color-text-link:        var(--brand-600);
   --color-text-link-hover:  var(--brand-700);
 
@@ -88,21 +87,8 @@
   --color-primary-muted:    var(--brand-100);
   --color-primary-text:     var(--brand-700);
 
-  --color-accent:           var(--vermilion-500);
-  --color-accent-hover:     var(--vermilion-700);
-  --color-accent-active:    var(--vermilion-700);
-  --color-accent-disabled:  var(--vermilion-200);
-  --color-accent-subtle:    var(--vermilion-50);
-  --color-accent-muted:     var(--vermilion-200);
-  --color-accent-text:      var(--vermilion-700);
-
-  --color-warning:          var(--amber-500);
-  --color-warning-subtle:   var(--amber-50);
-  --color-warning-text:     var(--amber-700);
-
-  --color-success:          var(--sage-500);
-  --color-success-subtle:   var(--sage-50);
-  --color-success-text:     var(--sage-700);
+  /* accent・warning・success のような汎用の名前は置かない。意味色を一般の警告やボタンに
+     流用すると、優先席やルートなしと見分けがつかなくなる（ADR-0018）。意味の名前で使う */
 }
 
 @theme inline {

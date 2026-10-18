@@ -15,7 +15,8 @@
 
 :root {
   /* カード・図の背景・枠線・文字色。apps/web の globals.css にも同じ名前があり、
-     web では後に読む globals.css が勝つ。両方で同じ値にしておくこと（ADR-0017） */
+     web では後に読む globals.css が勝つ。両方で同じ値にしておくこと（ADR-0017）。
+     apps/web の globals.test.ts が一致を確かめる */
   --color-bg-card: #ffffff;
   --color-border-default: #ebe4e7;
   --color-border-strong: #c9bec2;
@@ -40,8 +41,9 @@
 
   --sign-transfer-bg: #ffffff;
   --sign-transfer-edge: #111111;
-  --sign-transfer-ink: #222222;
-  --sign-transfer-note: #666666;
+  /* 乗換プレートの文字は図の見出しと同じ色にする（純黒・純グレーを混ぜない。ADR-0017 決定2） */
+  --sign-transfer-ink: var(--color-text-primary);
+  --sign-transfer-note: var(--color-text-secondary);
 
   --sign-boarding-mark: #aaaaaa; /* 乗車位置目標（通常のドア） */
   --sign-leader: #aaaaaa; /* 束ね線と引き出し線 */

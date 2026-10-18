@@ -60,9 +60,13 @@ apps/web/src/theme/mantineTheme.test.ts   複製した値と globals.css の --b
 | `--color-text-primary` / `-secondary` / `-disabled` | `--neutral-900` / `-500` / `-300` |
 | `--color-primary` / `-hover` / `-active` | `--brand-600` / `-700` / `-800` |
 | `--color-primary-subtle` / `-muted` / `-text` | `--brand-50` / `-100` / `-700` |
-| `--color-accent*` | `--vermilion-*` |
-| `--color-warning*` | `--amber-*` |
-| `--color-success*` | `--sage-*` |
+
+汎用の `--color-accent*` / `--color-warning*` / `--color-success*` / `--color-text-on-accent` は消す（参照なし）。
+意味色に付け替えると、一般の警告やボタンに優先席・ルートなしの色が流用されるため（ADR-0018）。
+
+ホーム図の乗換プレートの文字（`--sign-transfer-ink` / `-note`）は、`styles.css` で `--color-text-primary` / `-secondary` を参照する。
+`globals.css` と `styles.css` に重複する5つの値（`--color-bg-card` / `--color-border-default` / `-strong` / `--color-text-primary` / `-secondary`）は、
+`apps/web/src/app/globals.test.ts` で一致を確かめる。
 
 角丸・影・見出しの書体は Tailwind からしか使わないので、`:root` ではなく Tailwind のテーマに直接書く（次節）。
 同じ名前を `:root` と `@theme inline` の両方に書くと `--x: var(--x)` の循環になるため、置き場を1か所にする。
