@@ -107,19 +107,24 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
     const url = isEdit ? `/api/trains/${initialData!.id}` : '/api/trains';
     const method = isEdit ? 'PUT' : 'POST';
 
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    if (res.ok) {
-      router.push('/trains');
-      router.refresh();
-    } else {
-      setSubmitting(false);
-      alert('保存に失敗しました');
+      if (res.ok) {
+        // 遷移するまで送信中のままにし、二重送信を防ぐ
+        router.push('/trains');
+        router.refresh();
+        return;
+      }
+    } catch {
+      // 通信断で reject しても、送信中のまま止めない
     }
+    setSubmitting(false);
+    alert('保存に失敗しました');
   }
 
   const lineSelectData = lines.map((l) => ({ value: l.id, label: l.name }));
