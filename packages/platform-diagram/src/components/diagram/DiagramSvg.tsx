@@ -124,7 +124,7 @@ export function DiagramSvg({
         .map((cell, idx) =>
           cell.facilities.map((facility, fIdx) => {
             const x = cell.xPositionMeters! + (fIdx - (cell.facilities.length - 1) / 2) * FACILITY_ICON_PITCH;
-            const iconFile = FACILITY_ICON_FILES[facility.typeCode];
+            const iconFile = facility.typeCode !== null ? FACILITY_ICON_FILES[facility.typeCode] : undefined;
             return iconFile ? (
               <image
                 key={`${cell.concourseId}-${idx}-${fIdx}`}

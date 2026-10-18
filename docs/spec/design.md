@@ -6,7 +6,10 @@
 ## 変更するファイル
 
 ```
-packages/platform-diagram/src/components/diagram/DiagramSvg.tsx   FACILITY_ICON_FILES を Record<FacilityTypeCode, string> にし、wheelchairEscalator を追加
+packages/platform-diagram/src/components/diagram/DiagramSvg.tsx   FACILITY_ICON_FILES を Record<FacilityTypeCode, string> にし、wheelchairEscalator を追加。typeCode が null なら 📍
+packages/platform-diagram/src/domain/types.ts                     FacilityDTO.typeCode を FacilityTypeCode | null にする
+apps/web/src/external/query/stationDetailQuery.ts                 isFacilityTypeCode で見分け、知らないコードは typeCode を null にする
+apps/admin/src/features/station-layout/ports.ts                   LayoutFacilityDTO の typeCode を FacilityTypeCode に絞る
 apps/admin/public/icons/wheelchair_escalator.png                   新規。apps/web/public/icons/ と同一のファイル
 packages/platform-diagram/README.md                                「アイコンの複製について」を7ファイルにし、種類を足すときの注意を追記
 packages/database/src/enums/facility.ts                            「種類を足すとき」の手順に 3. アイコンの追加を追記
@@ -15,9 +18,12 @@ packages/database/src/enums/facility.ts                            「種類を�
 ## 設計上の判断
 
 - `FacilityTypeCode` は `@furatora/database/enums` から import する。`platform-diagram` は既に `domain/types.ts` で同じ入口に依存しており、依存の向きは変わらない
-- 描画側の `iconFile ? <image> : <text>📍</text>` の分岐は残す。型の上では常にアイコンが引けるが、
-  Web の `stationDetailQuery.ts` は `station_facilities.type_code` を `isFacilityTypeCode` で検査しておらず、
-  別デプロイの新しいコードが DB に入ると実行時に未知のコードが来うる（ADR-0016「残るずれ」）
+- schema の `$type<FacilityTypeCode>()` は実行時に検査しないため、別デプロイの新しいコードが DB に入ると
+  未知のコードが来うる（ADR-0016「残るずれ」）。Web の `stationDetailQuery.ts` で `isFacilityTypeCode` によって見分け、
+  知らないコードは `FacilityDTO.typeCode` を `null` にして渡す。描画側は `null` のとき 📍 で描く。
+  こうすると、📍 のフォールバックは型の上でも使われる分岐になる
+- Admin の `LayoutFacilityDTO` は `typeCode` を `FacilityTypeCode`（null なし）に絞る。
+  Admin は読み取りで `assertKnownFacilityCodes` によって止めるため、知らないコードは届かない
 - 画像の置き忘れは型で検出できない。手順コメントと README で補う
 
 ## エラーマトリックス
