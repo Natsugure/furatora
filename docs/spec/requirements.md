@@ -1,25 +1,43 @@
-# 要件: ホーム図の設備アイコンに wheelchairEscalator を足す (Issue #140)
+# 要件: admin の API GET を整理し、残る1本を Query Service 化する (Issue #48)
 
 ## 概要
 
-- **対象**: ホーム図（`packages/platform-diagram` の `DiagramSvg`）の設備アイコンの対応表 `FACILITY_ICON_FILES` に
-  `wheelchairEscalator` を足し、今後の登録漏れをコンパイルエラーにする。Admin の `public/icons/` に画像を置く
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #140](https://github.com/Natsugure/furatora/issues/140) /
-  [ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md) / [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定3
-- **ブランチ**: `fix/issue140-wheelchair-escalator-icon`
-- **信頼度**: 95%（高）
-  - 変更は対応表の型と1行、画像1枚。前提の #139（`FacilityTypeCode` を `@furatora/database/enums` へ）は完了済み
-  - 新規 ADR は不要（ADR-0016 の方針の適用）
+- **対象**: admin の API GET のうち、db を直接読んでいる5本
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #48](https://github.com/Natsugure/furatora/issues/48) /
+  [ADR-0003](../adr/0003-read-write-separation.md)
+- **ブランチ**: `refactor/issue48-admin-get-query-service`
+- **信頼度**: 90%（高）
+  - 呼び出し元は grep で確定できる。新しい抽象は作らず、既存の `TrainEditPageQuery` を広げる
+  - 新規 ADR は不要（ADR-0003 の適用）
 
 ## 背景
 
-`wheelchairEscalator`（#122 / マイグレーション 0010）を足したとき、対応表を更新していなかった。
-対応表の型が `Record<string, string>` のため、登録漏れがコンパイルエラーにならない。
-画像は Web にはあるが Admin に無い。該当する `station_facilities` の行は 0 件で、実害は無い。
+#90（Issue #49）でフォームを props 化し、選択肢は `external/query/*EditPageQuery.ts` から読むようになった。
+その結果、次の GET は呼び出し元が無くなっている。
+
+| エンドポイント（GET） | 呼び出し元 |
+|---|---|
+| `api/stations/[stationId]/platform-locations` | なし（レイアウト編集画面は `stationLayoutPageQuery` で読む） |
+| `api/stations/[stationId]/train-stop-patterns` | なし（同上） |
+| `api/stations/[stationId]/platforms/[platformId]` | なし（`PlatformInspector` は PUT/POST だけ使う） |
+| `api/trains` | なし（`app/trains/page.tsx` はページで直接読む） |
+| `api/trains/[trainId]` | `components/DuplicateButton.tsx`（列車の複製） |
+
+`GET /api/trains/[trainId]` は `carLength`（`decimal(5,2)`）を文字列のまま返す。
+複製はこれを `POST /api/trains` に送るが、`trainSchema` は `carLength` を数値として検証するため、
+号車の長さを入れた列車の複製は 400 で失敗する。
+
+一覧の N+1 解消は #94 に移管済みで、本 Issue の範囲外。
 
 ## 要件（EARS記法）
 
-- **REQ-1**: アクセス点の設備が `wheelchairEscalator` のとき、システムはホーム図に `wheelchair_escalator.png` のアイコンを描画すること（Web・Admin とも）
-- **REQ-2**: `FACILITY_TYPE_CODES` に対応表のキーが無い設備の種類がある場合、システムは typecheck でエラーにすること
-- **REQ-3**: 稼働中のコードが知らない設備の種類が DB から来た場合、システムは従来どおり代替の記号（📍）で描画し、エラーにしないこと
-- **REQ-4**: システムは、設備の種類を足す手順（`packages/database/src/enums/facility.ts` のコメント）と `platform-diagram` の README に、アイコンの追加を含めること
+- **REQ-1**: システムは、呼び出し元の無い GET（`platform-locations` / `train-stop-patterns` / `platforms/[platformId]` / `trains`）を持たないこと。同じパスの POST/PUT/DELETE は従来どおり動くこと
+- **REQ-2**: `GET /api/trains/[trainId]` を受けたとき、システムは Query Service（`TrainEditPageQuery`）を通して、編集ページと同じ形の列車 DTO を返すこと（`operatorId` / `lineIds` / `carLength: number | null`）
+- **REQ-3**: 指定した列車が無い場合、システムは `GET /api/trains/[trainId]` で 404 を返すこと
+- **REQ-4**: 号車の長さを入れた列車を複製するとき、システムは号車構成・設備・路線を引き継いだ列車を作成すること
+- **REQ-5**: システムは、`@furatora/database` を直接 import しなくなった route を ESLint の移行中の除外から外し、依存ルールを効かせること
+
+## 範囲外
+
+- 列車の書き込み（`trains` の POST/PUT/DELETE）の Repository 化。別 Issue に起票する
+- 一覧の N+1 解消（#94）

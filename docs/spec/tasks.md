@@ -1,13 +1,10 @@
-# タスク: ホーム図の設備アイコンに wheelchairEscalator を足す (Issue #140)
+# タスク: admin の API GET を整理し、残る1本を Query Service 化する (Issue #48)
 
-- [x] **TASK-1** ブランチ `fix/issue140-wheelchair-escalator-icon` を切り、docs/spec を書き換える
-- [x] **TASK-2** `FACILITY_ICON_FILES` を `Record<FacilityTypeCode, string>` にし、`wheelchairEscalator` を足す。Admin に画像を複製する
-  - 画像は `cmp` で Web のものと同一であることを確かめた
-- [x] **TASK-3** `platform-diagram` の README と `facility.ts` の手順コメントにアイコンの追加を書く
-- [x] **TASK-4** 検証（依存: TASK-2）
-  - 対応表から `wheelchairEscalator` の行を一時的に外すと、`platform-diagram` の typecheck が TS2741（`Property 'wheelchairEscalator' is missing`）で失敗することを確かめ、戻した
-  - `turbo run typecheck lint test`（15タスク）・`pnpm run build`（2タスク）が成功した
-  - dev での目視は省略: 該当データが 0 件で、変更は静的ファイルの追加と型・対応表の1行のみ
-- [x] **TASK-5** `docs/domain/` を確認する
-  - 変更なし: 設備の種類の一覧（7値）は `station-master-model.md` に既に記載済みで、ドメインルールは変わらない。アイコンの対応は実装の詳細として README に置く
-  - ADR: 新規・ステータス変更なし
+- [x] **TASK-1** ブランチ `refactor/issue48-admin-get-query-service` を切り、docs/spec を書き換える
+- [ ] **TASK-2** `TrainDTO` と `TrainEditPageQuery.getTrain` を足し、`getEditContext` を `getTrain` で組み立てる
+- [ ] **TASK-3** `GET /api/trains/[trainId]` を `getTrain` に置き換え、`DuplicateButton` を DTO に合わせる。テストを書く（依存: TASK-2）
+- [ ] **TASK-4** 呼び出し元の無い GET 4本を削除し、ESLint の除外を外す
+- [ ] **TASK-5** 検証（依存: TASK-3, TASK-4）
+  - `turbo run typecheck lint test`・`pnpm run build`
+  - dev で、号車の長さが入った列車を複製する。レイアウト編集画面で保存・削除できることを確かめる
+- [ ] **TASK-6** `docs/domain/` を確認し、列車の書き込みの Repository 化を Issue に起票する
