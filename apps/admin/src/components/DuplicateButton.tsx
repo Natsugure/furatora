@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ActionIcon, Button, Group, Modal, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { CopyPlus } from 'lucide-react';
+import type { TrainDTO } from '@/features/train/ports';
 
 type Props = {
   trainId: string;
@@ -40,15 +41,15 @@ export function DuplicateButton({ trainId, trainName }: Props) {
       return;
     }
 
-    const original = await res.json();
+    const original: TrainDTO = await res.json();
 
     const createRes = await fetch('/api/trains', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: newName,
-        operatorId: original.operators,
-        lineIds: original.lines,
+        operatorId: original.operatorId,
+        lineIds: original.lineIds,
         carCount: original.carCount,
         carStructure: original.carStructure,
         freeSpaces: original.freeSpaces,

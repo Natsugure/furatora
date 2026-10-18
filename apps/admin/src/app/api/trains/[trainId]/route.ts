@@ -3,6 +3,7 @@ import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { trainSchema } from '@/features/train/schema';
+import { trainEditPageQuery } from '@/di';
 
 function shapeTrainWithEquipments(
   train: typeof trains.$inferSelect,
@@ -29,15 +30,11 @@ export async function GET(
 ) {
   try {
     const { trainId } = await params;
-    const [train] = await db.select().from(trains).where(eq(trains.id, trainId));
+    const train = await trainEditPageQuery.getTrain(trainId);
     if (!train) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    const [equipments, carStructureRows] = await Promise.all([
-      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
-      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
-    ]);
-    return NextResponse.json(shapeTrainWithEquipments(train, equipments, carStructureRows));
+    return NextResponse.json(train);
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
