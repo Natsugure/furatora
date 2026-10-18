@@ -94,10 +94,14 @@
 }
 
 @theme inline {
-  /* 意味のある名前のユーティリティ（bg-canvas / bg-surface / text-ink / text-muted / bg-brand-600 …）。
-     既定の色（gray・blue など）はまだ共存させる。置き換えが終わったら --color-*: initial で無効にする。
+  /* 意味のある名前のユーティリティ（bg-canvas / bg-surface / text-ink / text-muted / bg-brand-600 …）だけを出す。
+     既定の色（gray・blue など）は無効にする。残っていると色が付かなくなるだけでエラーにならないため、
+     src/theme/defaultColorClasses.test.ts で既定の色クラスが無いことを確かめている（REQ-4）。
      ADR-0018 の意味色は、意味の名前で出す（bg-exit-100 / text-wheelchair-700 / bg-route-ok-50 …）。
      slate・amber は Tailwind の既定の名前と同じで、一部の段階だけ上書きすると既定の値と混ざるため */
+  --color-*: initial;
+  --color-white: var(--neutral-0);  /* 路線色の丸の上の文字など */
+
   --color-canvas:   var(--color-bg-app);
   --color-surface:  var(--color-bg-card);
   --color-subtle:   var(--color-bg-subtle);
