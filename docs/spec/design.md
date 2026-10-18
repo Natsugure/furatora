@@ -171,7 +171,9 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 2 | `components/SearchTabs.tsx` | 角丸のセグメント（選択中は白地・ローズ文字・影） |
 | 2 | `components/StationSearch.tsx` | 白い検索欄（角丸 18px、影、ローズの虫眼鏡） |
 | 2 | `components/StationCard.tsx` | 路線の駅一覧のタイムライン（`isFirst` / `isLast` で線の端を切る）。右端は淡いローズの丸に山形 |
-| 2 | `components/OperatorList.tsx` | 事業者のチップ |
+| 2 | `components/OperatorList.tsx` | 事業者のアコーディオンの色・角丸（開閉の動きは変えない。`operators` に色の列が無く、見本のチップの色の丸は描けないため） |
+| 2 | `components/LineAccordion.tsx` | 路線の行。路線色は縦線だけに使い、路線名は `text-ink`（路線色の文字は白地とのコントラストが足りない。REQ-10） |
+| 2 | `app/lines/[slug]/stations/page.tsx` | 駅の行の間の隙間（`space-y-2`）だけを外す（タイムラインの線が途切れるため。他は PR 3） |
 | 3 | `app/page.tsx` | 見出し「どの駅へ行きますか？」（一部をローズ）、できることの一覧（丸アイコン＋点線） |
 | 3 | `app/lines/[slug]/stations/page.tsx` | 路線の見出し（路線記号の丸＋路線名＋英語名・駅数）、本文エリアの構成 |
 | 3 | `app/stations/[slug]/page.tsx` | 駅の見出し、路線のチップ、ご利用案内 |

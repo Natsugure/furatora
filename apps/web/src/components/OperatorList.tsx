@@ -19,7 +19,7 @@ export function OperatorList({ operators }: Props) {
       {operators.map((operator) => (
         <div
           key={operator.id}
-          className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          className="bg-surface rounded-card border border-line shadow-card overflow-hidden"
         >
           <button
             onClick={() =>
@@ -27,27 +27,27 @@ export function OperatorList({ operators }: Props) {
                 expandedOperator === operator.id ? null : operator.id
               )
             }
-            className="w-full px-5 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
+            className="w-full px-5 py-4 text-left flex justify-between items-center hover:bg-subtle transition-colors"
           >
-            <span className="font-semibold text-base text-gray-900">
+            <span className="font-display font-bold text-base text-ink">
               {operator.name}
             </span>
             <ChevronDown
               size={20}
-              className={`text-gray-400 transition-transform duration-200 ${
+              className={`text-muted transition-transform duration-200 ${
                 expandedOperator === operator.id ? 'rotate-180' : ''
               }`}
             />
           </button>
 
           {expandedOperator === operator.id && (
-            <div className="px-4 pb-3 border-t border-gray-100">
+            <div className="px-4 pb-3 border-t border-line">
               {operator.lines.length > 0 ? (
                 operator.lines.map((line) => (
                   <LineAccordion key={line.id} line={line} />
                 ))
               ) : (
-                <p className="text-gray-500 text-sm py-3">路線がありません</p>
+                <p className="text-muted text-sm py-3">路線がありません</p>
               )}
             </div>
           )}

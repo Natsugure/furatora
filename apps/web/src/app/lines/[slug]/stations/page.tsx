@@ -57,7 +57,7 @@ export default async function StationListPage({ params }: Props) {
         駅を選択
       </h2>
       {stations.length > 0 ? (
-        <div className="space-y-2">
+        <div>
           {stations.map((station, index) => (
             <StationCard
               key={station.id}
