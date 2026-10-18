@@ -2,11 +2,11 @@ import { db } from '@furatora/database/client';
 import { operators, lines, trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { asc, eq } from 'drizzle-orm';
 import type {
-  TrainEditPageQuery, TrainEditContext, OperatorOption, TrainLineOption,
+  TrainEditPageQuery, TrainDTO, OperatorOption, TrainLineOption,
 } from '@/features/train/ports';
 
-// admin 全体の Query Service 化は #48。ここは #49（フォームのクライアント側 fetch 廃止）で
-// 先行導入したもの。src/app/** は ESLint の依存ルールで @furatora/database を直接 import できない。
+// src/app/** は ESLint の依存ルールで @furatora/database を直接 import できないため、
+// 列車の新規・編集ページと複製（GET /api/trains/[trainId]）はここを通して読む。
 
 async function getOperatorOptions(): Promise<OperatorOption[]> {
   return db
@@ -28,6 +28,39 @@ async function getLineOptions(): Promise<TrainLineOption[]> {
   return rows.map((r) => ({ ...r, nameEn: r.nameEn ?? '' }));
 }
 
+async function getTrain(trainId: string): Promise<TrainDTO | null> {
+  const [train] = await db.select().from(trains).where(eq(trains.id, trainId));
+  if (!train) return null;
+
+  const [equipments, carStructureRows] = await Promise.all([
+    db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
+    db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
+  ]);
+
+  return {
+    id: train.id,
+    name: train.name,
+    // trains テーブルの列名は operators（単一FK）/ lines（uuid配列）
+    operatorId: train.operators,
+    lineIds: train.lines,
+    carCount: train.carCount,
+    carStructure: carStructureRows.length > 0
+      ? carStructureRows.map((cs) => ({
+          carNumber: cs.carNumber,
+          doorCount: cs.doorCount,
+          // decimal は文字列で返るため、trainSchema（数値）に合わせて変換する
+          carLength: cs.carLength != null ? Number(cs.carLength) : null,
+        }))
+      : null,
+    freeSpaces: equipments
+      .filter((e) => e.type === 'free_space')
+      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
+    prioritySeats: equipments
+      .filter((e) => e.type === 'priority_seat')
+      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
+  };
+}
+
 export const dbTrainEditPageQuery: TrainEditPageQuery = {
   async getCreateContext() {
     const [operatorOptions, lineOptions] = await Promise.all([
@@ -38,41 +71,14 @@ export const dbTrainEditPageQuery: TrainEditPageQuery = {
   },
 
   async getEditContext(trainId) {
-    const [train] = await db.select().from(trains).where(eq(trains.id, trainId));
-    if (!train) return null;
-
-    const [operatorOptions, lineOptions, equipments, carStructureRows] = await Promise.all([
+    const [train, operatorOptions, lineOptions] = await Promise.all([
+      getTrain(trainId),
       getOperatorOptions(),
       getLineOptions(),
-      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
-      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
     ]);
-
-    const context: TrainEditContext = {
-      operators: operatorOptions,
-      lines: lineOptions,
-      train: {
-        id: train.id,
-        name: train.name,
-        // trains テーブルの列名は operators（単一FK）/ lines（uuid配列）
-        operatorId: train.operators,
-        lineIds: train.lines,
-        carCount: train.carCount,
-        carStructure: carStructureRows.length > 0
-          ? carStructureRows.map((cs) => ({
-              carNumber: cs.carNumber,
-              doorCount: cs.doorCount,
-              carLength: cs.carLength != null ? Number(cs.carLength) : null,
-            }))
-          : null,
-        freeSpaces: equipments
-          .filter((e) => e.type === 'free_space')
-          .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-        prioritySeats: equipments
-          .filter((e) => e.type === 'priority_seat')
-          .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-      },
-    };
-    return context;
+    if (!train) return null;
+    return { operators: operatorOptions, lines: lineOptions, train };
   },
+
+  getTrain,
 };
