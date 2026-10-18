@@ -14,12 +14,13 @@
 */
 
 :root {
-  /* カード・図の背景・枠線・文字色 */
+  /* カード・図の背景・枠線・文字色。apps/web の globals.css にも同じ名前があり、
+     web では後に読む globals.css が勝つ。両方で同じ値にしておくこと（ADR-0017） */
   --color-bg-card: #ffffff;
-  --color-border-default: #e0e0e0;
-  --color-border-strong: #cccccc;
-  --color-text-primary: #222222;
-  --color-text-secondary: #666666;
+  --color-border-default: #ebe4e7;
+  --color-border-strong: #c9bec2;
+  --color-text-primary: #2a2326;
+  --color-text-secondary: #7a6e72;
 
   /* 号車 */
   --color-train-car-bg: #d6d3d1;

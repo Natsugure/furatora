@@ -81,7 +81,8 @@ apps/web/src/theme/mantineTheme.test.ts   複製した値と globals.css の --b
   --color-ink: var(--color-text-primary);
   --color-ink-soft: var(--neutral-700);
   --color-muted: var(--color-text-secondary);
-  --color-brand-50: var(--brand-50);  /* … 900 まで。butter / slate / sage / amber / vermilion も同様 */
+  --color-brand-50: var(--brand-50);  /* … 900 まで */
+  --color-exit-100: var(--butter-100); /* 意味色は意味の名前で出す: exit / wheelchair / route-ok / route-none / priority */
   /* 既存の --font-sans と同じ書き方。var() の第2引数で宣言全体の無効化を防ぐ（Issue #107） */
   --font-display: var(--font-zen-maru-gothic, "Zen Maru Gothic"), var(--font-noto-sans-jp, "Noto Sans JP"), system-ui, sans-serif;
 }
@@ -98,6 +99,15 @@ apps/web/src/theme/mantineTheme.test.ts   複製した値と globals.css の --b
 
 `--color-*: initial` は、置き換えが終わる PR 3 の最後で入れる。それまでは既定の色と共存させる。
 
+ADR-0018 の意味色は、Tailwind では意味の名前で出す（`butter` → `exit`、`slate` → `wheelchair`、`sage` → `route-ok`、`amber` → `route-none`、`vermilion` → `priority`）。
+`slate`・`amber` は Tailwind の既定パレットにもあり、一部の段階（`amber-50` など）だけを上書きすると、
+同じ画面で既定の `amber-200` と混ざる（`stations/[slug]/page.tsx` が `bg-amber-50 border-amber-200` を使っている）。
+CSS 変数のプリミティブ名（`--butter-*` など）は ADR のとおり。
+
+`globals.css` の使われていない別名（`--btn-*` / `--banner-*` / `--card-exit-*` / `--color-prio-*` / `--color-train-empty-*` /
+`--color-same-floor-fallback` / `--color-connector-line` / `--color-background` / `--color-foreground`）は消す。
+どのファイルからも参照されておらず、消すプリミティブ（`--gray-*` など）を参照していたため。
+
 ### Mantine（`apps/web/src/theme/mantineTheme.ts`）
 
 ```ts
@@ -111,7 +121,7 @@ export const mantineTheme = createTheme({
   primaryShade: 6,
   fontFamily: 'var(--font-sans)',
   headings: { fontFamily: 'var(--font-display)' },
-  defaultRadius: 'xl',
+  defaultRadius: 'lg', // 16px（入力欄）。xl は 32px で大きすぎる
 });
 ```
 

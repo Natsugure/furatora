@@ -10,14 +10,16 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 - [x] **TASK-0.3** ADR-0017・0018・0019 を `Proposed` で書き、`docs/adr/README.md` の一覧に足す
 - [x] **TASK-0.4** デザインキャンバスの見本（PNG とソース）を `docs/adr/assets/0017/` に残し、ADR から参照する
 
-## PR 1: 土台（PoC）
+## PR 1: 土台（PoC）（`feat/issue166-pr1-tokens`）
 
-- [ ] **TASK-1.1** `globals.css` のプリミティブを差し替え、意味のトークンの参照先を変える（design.md「インターフェース」）
-- [ ] **TASK-1.2** `@theme inline` に意味のある色の名前と書体、`@theme` に角丸と影を足す（`--color-*: initial` はまだ入れない）
-- [ ] **TASK-1.3** `layout.tsx` に Zen Maru Gothic を足し、変数クラスを `<html>` に付ける
-- [ ] **TASK-1.4** Web の `layout.tsx` で `@furatora/platform-diagram/styles.css` を読み込み、`globals.css` からホーム図のトークンを消す。汎用トークンの値を `styles.css` と揃える
-- [ ] **TASK-1.5** `theme/mantineTheme.ts` と `mantineTheme.test.ts` を作り、`providers.tsx` に渡す（依存: TASK-1.1）
-- [ ] **TASK-1.6** 検証: typecheck・lint・test・build。dev のトップ画面で、背景・文字色・書体・Mantine の部品が新しい値になることを確かめる（PoC の成功基準）
+- [x] **TASK-1.1** `globals.css` のプリミティブを差し替え、意味のトークンの参照先を変える（design.md「インターフェース」）
+- [x] **TASK-1.2** `@theme inline` に意味のある色の名前と書体、`@theme` に角丸と影を足す（`--color-*: initial` はまだ入れない）
+- [x] **TASK-1.3** `layout.tsx` に Zen Maru Gothic を足し、変数クラスを `<html>` に付ける
+- [x] **TASK-1.4** Web の `layout.tsx` で `@furatora/platform-diagram/styles.css` を読み込み、`globals.css` からホーム図のトークンを消す。汎用トークンの値を `styles.css` と揃える
+- [x] **TASK-1.5** `theme/mantineTheme.ts` と `mantineTheme.test.ts` を作り、`providers.tsx` に渡す（依存: TASK-1.1）
+- [x] **TASK-1.6** 検証: typecheck・lint・test・build。dev のトップ画面で、背景・文字色・書体・Mantine の部品が新しい値になることを確かめる（PoC の成功基準）
+  - 結果: 成功。背景 `#FAF6F7`、文字 `#2A2326`、本文 Noto Sans JP・字間 0.02em、`--font-display` が Zen Maru Gothic に解決され 700 が読み込める、
+    Mantine の主色 `#C63D71`・本文と見出しの書体・既定の角丸 16px。ホーム図は `styles.css` の値で従来どおり描ける
 
 ## PR 2: 共通部品（依存: PR 1）
 

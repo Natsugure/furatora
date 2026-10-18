@@ -6,194 +6,169 @@
 @source "../../../../packages/platform-diagram/src";
 
 /* ============================================================
-   Design Tokens — Global Color System
-   ============================================================ */
+   Design Tokens — Soft Rose（ADR-0017・ADR-0018）
+   ============================================================
+   値の正はこのファイルの :root。Tailwind へは下の @theme で、Mantine へは
+   src/theme/mantineTheme.ts で渡す（--brand-* は mantineTheme.ts に複製し、
+   mantineTheme.test.ts で一致を確かめている。変えるときは両方を直す）。
+   ホーム図のトークン（号車・フリースペース・出口・サイン書体）は
+   @furatora/platform-diagram/styles.css にあり、layout.tsx がこのファイルより前に読む。 */
 
 :root {
 
-  /* Primitive Scale */
-  --blue-50:  #EBF1FA;
-  --blue-100: #C8D9F0;
-  --blue-200: #A5C0E6;
-  --blue-300: #7BA5D8;
-  --blue-400: #5A8CC8;
-  --blue-500: #4072B3;
-  --blue-600: #335A91;
-  --blue-700: #264370;
-  --blue-800: #1A2D4E;
-  --blue-900: #0E1929;
+  /* Primitive — Brand（アイコンのローズ #DF5286 = 500）
+     白い文字を載せる面は 600 を使う（500 と白は 3.69:1 で本文の基準に届かない） */
+  --brand-50:  #FDF3F6;
+  --brand-100: #FAE3EB;
+  --brand-200: #F5C5D6;
+  --brand-300: #EE9FBA;
+  --brand-400: #E6789E;
+  --brand-500: #DF5286;
+  --brand-600: #C63D71;
+  --brand-700: #A02F5B;
+  --brand-800: #6E2140;
+  --brand-900: #4A1630;
 
-  --red-50:   #FDF2F2;
-  --red-100:  #FAD9D9;
-  --red-200:  #F4AEAE;
-  --red-300:  #EE8888;
-  --red-400:  #EB8686;
-  --red-500:  #D96060;
-  --red-600:  #C14545;
-  --red-700:  #9B3030;
-  --red-800:  #6E1F1F;
-  --red-900:  #3F0E0E;
+  /* Primitive — Warm Neutral（わずかにローズを含む。真っ白な背景・真っ黒な文字は使わない） */
+  --neutral-0:   #FFFFFF;
+  --neutral-25:  #FAF6F7;
+  --neutral-50:  #F4EFF1;
+  --neutral-100: #EBE4E7;
+  --neutral-300: #C9BEC2;
+  --neutral-500: #7A6E72;
+  --neutral-700: #4A4044;
+  --neutral-900: #2A2326;
 
-  /* Orange (Priority Seat / Exit) */
-  --orange-50:  #FFF8E1;
-  --orange-100: #FFECB3;
-  --orange-200: #FFE082;
-  --orange-300: #FFE082;
-  --orange-400: #FFCA28;
-  --orange-500: #FFC107;
-  --orange-600: #FFB300;
-  --orange-700: #FFA000;
-  --orange-800: #FF8F00;
-  --orange-900: #FF6F00;
+  /* Primitive — 意味色（ADR-0018。それぞれの意味にだけ使う） */
+  --butter-100: #FBF3D2;   /* 出口 */
+  --butter-300: #F0DC85;
+  --butter-700: #6B5A0E;
+  --butter-900: #4A3F0A;
 
-  --gray-0:   #FFFFFF;
-  --gray-50:  #F9F9F9;
-  --gray-100: #F0F0F0;
-  --gray-200: #E0E0E0;
-  --gray-300: #CCCCCC;
-  --gray-400: #AAAAAA;
-  --gray-500: #888888;
-  --gray-600: #666666;
-  --gray-700: #444444;
-  --gray-800: #222222;
-  --gray-900: #111111;
+  --slate-50:  #EEF3F8;    /* 車いす */
+  --slate-500: #5B7FA6;
+  --slate-700: #3F5F82;
 
-  --green-400: #4CAF50;
-  --green-600: #388E3C;
+  --sage-50:  #ECF5F0;     /* 乗換: バリアフリールートあり（◎） */
+  --sage-500: #4E9A7A;
+  --sage-700: #2F6E54;
+
+  --amber-50:  #FBF1E3;    /* 乗換: バリアフリールートなし（×）。赤は路線色とぶつかるので使わない */
+  --amber-500: #C98A1B;
+  --amber-700: #8E5A12;
+
+  --vermilion-50:  #FCEEE8; /* 優先席 */
+  --vermilion-200: #F4C3B1;
+  --vermilion-500: #D9481C;
+  --vermilion-700: #A3361A;
 
   /* Semantic Tokens */
-  --color-bg-app:           var(--gray-50);
-  --color-bg-card:          var(--gray-0);
-  --color-bg-subtle:        var(--gray-100);
-  --color-bg-overlay:       rgba(0, 0, 0, 0.4);
+  --color-bg-app:           var(--neutral-25);
+  --color-bg-card:          var(--neutral-0);
+  --color-bg-subtle:        var(--neutral-50);
+  --color-bg-overlay:       rgba(42, 35, 38, 0.4);
 
-  --color-border-default:   var(--gray-200);
-  --color-border-strong:    var(--gray-300);
-  --color-border-focus:     var(--blue-500);
+  --color-border-default:   var(--neutral-100);
+  --color-border-strong:    var(--neutral-300);
+  --color-border-focus:     var(--brand-300);
 
-  --color-text-primary:     var(--gray-800);
-  --color-text-secondary:   var(--gray-600);
-  --color-text-disabled:    var(--gray-400);
-  --color-text-on-primary:  var(--gray-0);
-  --color-text-on-accent:   var(--gray-0);
-  --color-text-link:        var(--blue-500);
-  --color-text-link-hover:  var(--blue-700);
+  --color-text-primary:     var(--neutral-900);
+  --color-text-secondary:   var(--neutral-500);
+  --color-text-disabled:    var(--neutral-300);
+  --color-text-on-primary:  var(--neutral-0);
+  --color-text-on-accent:   var(--neutral-0);
+  --color-text-link:        var(--brand-600);
+  --color-text-link-hover:  var(--brand-700);
 
-  --color-primary:          var(--blue-500);
-  --color-primary-hover:    var(--blue-600);
-  --color-primary-active:   var(--blue-700);
-  --color-primary-disabled: var(--blue-200);
-  --color-primary-subtle:   var(--blue-50);
-  --color-primary-muted:    var(--blue-100);
-  --color-primary-text:     var(--blue-700);
+  --color-primary:          var(--brand-600);
+  --color-primary-hover:    var(--brand-700);
+  --color-primary-active:   var(--brand-800);
+  --color-primary-disabled: var(--brand-200);
+  --color-primary-subtle:   var(--brand-50);
+  --color-primary-muted:    var(--brand-100);
+  --color-primary-text:     var(--brand-700);
 
-  --color-accent:           var(--red-400);
-  --color-accent-hover:     var(--red-500);
-  --color-accent-active:    var(--red-600);
-  --color-accent-disabled:  var(--red-100);
-  --color-accent-subtle:    var(--red-50);
-  --color-accent-muted:     var(--red-100);
-  --color-accent-text:      var(--red-600);
+  --color-accent:           var(--vermilion-500);
+  --color-accent-hover:     var(--vermilion-700);
+  --color-accent-active:    var(--vermilion-700);
+  --color-accent-disabled:  var(--vermilion-200);
+  --color-accent-subtle:    var(--vermilion-50);
+  --color-accent-muted:     var(--vermilion-200);
+  --color-accent-text:      var(--vermilion-700);
 
-  --color-warning:          var(--orange-400);
-  --color-warning-subtle:   var(--orange-50);
-  --color-warning-muted:    var(--orange-200);
-  --color-warning-text:     var(--orange-600);
+  --color-warning:          var(--amber-500);
+  --color-warning-subtle:   var(--amber-50);
+  --color-warning-text:     var(--amber-700);
 
-  --color-success:          var(--green-400);
-  --color-success-text:     var(--green-600);
-
-  /* Train / Platform */
-  --color-train-car-bg:         #D6D3D1;
-  --color-train-car-border:     #A8A29E;
-  --color-train-empty-bg:       var(--gray-100);
-  --color-train-empty-border:   var(--gray-200);
-  --color-car-number-bg:        rgba(255, 255, 255, 0.9);
-
-  --color-free-standard:         var(--blue-500);
-  --color-free-standard-text:    var(--gray-0);
-  --color-free-nonstandard:      var(--blue-200);
-  --color-free-nonstandard-text: var(--blue-800);
-
-  --color-prio-standard:         var(--orange-700);
-  --color-prio-standard-text:    var(--gray-0);
-  --color-prio-nonstandard:      var(--orange-100);
-  --color-prio-nonstandard-text: var(--orange-900);
-
-  --color-same-floor-fallback:   var(--orange-400);
-  --color-connector-line:        var(--gray-400);
-
-  /* Component Aliases */
-  --btn-primary-bg:             var(--color-primary);
-  --btn-primary-bg-hover:       var(--color-primary-hover);
-  --btn-primary-bg-active:      var(--color-primary-active);
-  --btn-primary-bg-disabled:    var(--color-primary-disabled);
-  --btn-primary-text:           var(--color-text-on-primary);
-  --btn-primary-text-disabled:  var(--gray-0);
-
-  --btn-secondary-border:           var(--color-primary);
-  --btn-secondary-border-hover:     var(--color-primary-hover);
-  --btn-secondary-border-disabled:  var(--color-primary-disabled);
-  --btn-secondary-text:             var(--color-primary);
-  --btn-secondary-text-disabled:    var(--color-primary-disabled);
-
-  --btn-danger-bg:              var(--color-accent);
-  --btn-danger-bg-hover:        var(--color-accent-hover);
-  --btn-danger-bg-disabled:     var(--color-accent-disabled);
-  --btn-danger-text:            var(--color-text-on-accent);
-
-  --banner-info-bg:             var(--color-primary-subtle);
-  --banner-info-border:         var(--color-primary);
-  --banner-info-text:           var(--color-primary-text);
-
-  --card-exit-bg:               var(--orange-50);
-  --card-exit-border:           var(--orange-900);
-  --card-exit-heading:          var(--orange-900);
-
-  --card-transfer-bg:           var(--color-primary-subtle);
-  --card-transfer-border:       var(--color-primary);
-  --card-transfer-heading:      var(--color-primary-text);
-
-  --card-prio-bg:               var(--color-warning-subtle);
-  --card-prio-border:           var(--color-warning-muted);
-  --card-prio-heading:          var(--color-warning-text);
-
-  /* ------------------------------------------------------------
-     Platform Signage — ホーム図のサイン様式
-     実際の駅サインの語彙に合わせる。出口は黄地に黒、乗換は白地に黒枠。
-     この黄は図の中で出口だけに使う（他と共有しない）。
-     ------------------------------------------------------------ */
-  --sign-exit-bg:               #FFD400;
-  --sign-exit-ink:              #111111;  /* 黄地とのコントラスト比 約13:1 */
-  --sign-exit-edge:             #C99A00;  /* 白背景から浮かせないための輪郭 */
-
-  --sign-transfer-bg:           var(--gray-0);
-  --sign-transfer-edge:         #111111;
-  --sign-transfer-ink:          var(--color-text-primary);
-  --sign-transfer-note:         var(--color-text-secondary);
-
-  --sign-boarding-mark:         var(--gray-400);   /* 乗車位置目標（通常のドア） */
-  --sign-leader:                var(--gray-400);   /* 束ね線と引き出し線 */
-
-  /* 日本語のサイン用書体。駅名・路線名・出口名は公共サインでの判読性に優れた
-     UD ゴシック（BIZ UDPGothic）を図・サイン内に優先適用。
-     next/font/google により全端末で統一表示。
-     この --font-sign は :root で宣言されており、中の var() は :root 時点で解決される。
-     next/font の変数クラス（--font-biz-udpgothic 等）は layout.tsx で <html> に
-     付けること。<body> に付けると :root では未定義となりこの宣言全体が無効になる
-     （Issue #107）。var() の第2引数はその保険で、変数クラスの位置を間違えても
-     宣言全体を無効にせず後続のフォールバックへ処理を継続させる。 */
-  --font-sign: var(--font-biz-udpgothic, "BIZ UDPGothic"), "BIZ UDPGothic", "BIZ UDGothic",
-               "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "YuGothic",
-               var(--font-noto-sans-jp, "Noto Sans JP"), system-ui, sans-serif;
+  --color-success:          var(--sage-500);
+  --color-success-subtle:   var(--sage-50);
+  --color-success-text:     var(--sage-700);
 }
 
 @theme inline {
-  --color-background: var(--color-bg-app);
-  --color-foreground: var(--color-text-primary);
-  /* Tailwind v4 はこの変数を :root に出力する。--font-noto-sans-jp が未定義だと
-     宣言全体が無効になる点は --font-sign と同じ（Issue #107）。 */
-  --font-sans: var(--font-noto-sans-jp, "Noto Sans JP"), system-ui, sans-serif;
+  /* 意味のある名前のユーティリティ（bg-canvas / bg-surface / text-ink / text-muted / bg-brand-600 …）。
+     既定の色（gray・blue など）はまだ共存させる。置き換えが終わったら --color-*: initial で無効にする。
+     ADR-0018 の意味色は、意味の名前で出す（bg-exit-100 / text-wheelchair-700 / bg-route-ok-50 …）。
+     slate・amber は Tailwind の既定の名前と同じで、一部の段階だけ上書きすると既定の値と混ざるため */
+  --color-canvas:   var(--color-bg-app);
+  --color-surface:  var(--color-bg-card);
+  --color-subtle:   var(--color-bg-subtle);
+  --color-line:     var(--color-border-default);
+  --color-line-strong: var(--color-border-strong);
+  --color-ink:      var(--color-text-primary);
+  --color-ink-soft: var(--neutral-700);
+  --color-muted:    var(--color-text-secondary);
+
+  --color-brand-50:  var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-exit-100: var(--butter-100);
+  --color-exit-300: var(--butter-300);
+  --color-exit-700: var(--butter-700);
+  --color-exit-900: var(--butter-900);
+
+  --color-wheelchair-50:  var(--slate-50);
+  --color-wheelchair-500: var(--slate-500);
+  --color-wheelchair-700: var(--slate-700);
+
+  --color-route-ok-50:  var(--sage-50);
+  --color-route-ok-500: var(--sage-500);
+  --color-route-ok-700: var(--sage-700);
+
+  --color-route-none-50:  var(--amber-50);
+  --color-route-none-500: var(--amber-500);
+  --color-route-none-700: var(--amber-700);
+
+  --color-priority-50:  var(--vermilion-50);
+  --color-priority-200: var(--vermilion-200);
+  --color-priority-500: var(--vermilion-500);
+  --color-priority-700: var(--vermilion-700);
+
+  /* Tailwind v4 はこの変数を :root に出力する。中の var() が未定義だと宣言全体が無効になるため、
+     第2引数で保険をかける。next/font の変数クラスは layout.tsx で <html> に付けること（Issue #107） */
+  --font-sans: var(--font-noto-sans-jp, "Noto Sans JP"), "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  /* 見出し・数字（Zen Maru Gothic）。Mantine の見出しもこれを使う */
+  --font-display: var(--font-zen-maru-gothic, "Zen Maru Gothic"), var(--font-noto-sans-jp, "Noto Sans JP"),
+                  "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+}
+
+/* 角丸・影は Tailwind からしか使わないので、:root ではなくここにだけ置く
+   （同じ名前を :root と @theme inline の両方に書くと --x: var(--x) の循環になる） */
+@theme {
+  --radius-tag: 10px;     /* rounded-tag */
+  --radius-input: 16px;   /* rounded-input */
+  --radius-card: 22px;    /* rounded-card */
+  --radius-sheet: 28px;   /* rounded-t-sheet（本文エリアの上端） */
+  --shadow-card: 0 6px 24px rgba(110, 33, 64, 0.06);    /* shadow-card。影はローズを含む */
+  --shadow-raised: 0 2px 8px rgba(110, 33, 64, 0.10);   /* shadow-raised */
 }
 
 *,
@@ -207,6 +182,7 @@ body {
   background: var(--color-bg-app);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+  letter-spacing: 0.02em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

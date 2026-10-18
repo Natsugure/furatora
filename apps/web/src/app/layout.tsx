@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Noto_Sans_JP, BIZ_UDPGothic } from 'next/font/google';
+import { Noto_Sans_JP, BIZ_UDPGothic, Zen_Maru_Gothic } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -7,17 +7,26 @@ import { Train } from 'lucide-react';
 import { Providers } from './providers';
 import { Container } from '@/components/ui/Container';
 import '@mantine/core/styles.css';
+// ホーム図のトークン。globals.css より前に読む（同じ名前の汎用トークンは globals.css を勝たせる）
+import '@furatora/platform-diagram/styles.css';
 import './globals.css';
 import iconSvg from './icon.svg';
 
-// 本文書体（Noto Sans JP）・ホーム図のサイン用書体（BIZ UDPGothic）。
-// 変数クラスは <html> に付けること。globals.css の --font-sans / --font-sign は
+// 本文書体（Noto Sans JP）・見出しと数字の書体（Zen Maru Gothic）・ホーム図のサイン用書体（BIZ UDPGothic）。
+// 変数クラスは <html> に付けること。globals.css の --font-sans / --font-display と styles.css の --font-sign は
 // :root で宣言されており、中の var() は :root 時点で解決される。<body> に付けると
 // :root では未定義となり宣言全体が無効になる（Issue #107）
 const notoSansJP = Noto_Sans_JP({
   subsets: ['latin'],
   weight: ['400', '500', '700'],
   variable: '--font-noto-sans-jp',
+  display: 'swap',
+});
+
+const zenMaruGothic = Zen_Maru_Gothic({
+  subsets: ['latin'],
+  weight: ['500', '700'],
+  variable: '--font-zen-maru-gothic',
   display: 'swap',
 });
 
@@ -39,7 +48,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja" className={`${notoSansJP.variable} ${bizUdpGothic.variable}`}>
+    <html lang="ja" className={`${notoSansJP.variable} ${zenMaruGothic.variable} ${bizUdpGothic.variable}`}>
       <body className="font-sans antialiased flex flex-col min-h-screen">
         <Providers>
           {/* Header */}
