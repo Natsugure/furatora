@@ -21,13 +21,19 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
   - 結果: 成功。背景 `#FAF6F7`、文字 `#2A2326`、本文 Noto Sans JP・字間 0.02em、`--font-display` が Zen Maru Gothic に解決され 700 が読み込める、
     Mantine の主色 `#C63D71`・本文と見出しの書体・既定の角丸 16px。ホーム図は `styles.css` の値で従来どおり描ける
 
-## PR 2: 共通部品（依存: PR 1）
+## PR 2: 共通部品（依存: PR 1）（`feat/issue166-pr2-components`）
 
-- [ ] **TASK-2.1** ヘッダー・フッター（`layout.tsx`）
-- [ ] **TASK-2.2** `StationBadge`・`BackButton`
-- [ ] **TASK-2.3** `SearchTabs`・`StationSearch`
-- [ ] **TASK-2.4** `StationCard`（タイムライン）・`OperatorList`
-- [ ] **TASK-2.5** 検証: typecheck・lint・test・build、dev で部品を含む画面を目視
+- [x] **TASK-2.1** ヘッダー・フッター（`layout.tsx`）
+- [x] **TASK-2.2** `StationBadge`・`BackButton`
+- [x] **TASK-2.3** `SearchTabs`・`StationSearch`
+- [x] **TASK-2.4** `StationCard`（タイムライン）・`OperatorList`（アコーディオンのまま色・角丸だけ）・`LineAccordion`
+- [x] **TASK-2.5** 検証: typecheck・lint・test・build、dev で部品を含む画面を目視
+  - 結果: 成功（テスト 57 件）。390px / 1280px で、トップ（2つのタブ、検索の結果・エラー）、路線の駅一覧（先頭・末尾で線の端が切れる）、
+    駅の詳細（バッジ・戻る）を確かめた
+  - 目視で見つけた PR 1 の不具合を PR 1 のブランチで直した: Mantine の `styles.css`（レイヤー外）の `button, input { font: inherit }` が
+    Tailwind のユーティリティに勝ち、ボタン・入力欄の `font-bold` / `text-sm` が効いていなかった。
+    `app/layers.css` でレイヤーの順序（`theme, base, mantine, components, utilities`）を最初に宣言し、`@mantine/core/styles.layer.css` を読む
+  - 検索欄（`type="search"`）のブラウザ標準の青い消去ボタンを隠した
 
 ## PR 3: 各画面（依存: PR 2）
 
