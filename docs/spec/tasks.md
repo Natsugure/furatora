@@ -1,30 +1,54 @@
-# タスク: admin の API GET を整理し、残る1本を Query Service 化する (Issue #48)
+# タスク: Web アプリのデザインシステムを Soft Rose に刷新する (Issue #166)
 
-- [x] **TASK-1** ブランチ `refactor/issue48-admin-get-query-service` を切り、docs/spec を書き換える
-- [x] **TASK-2** `TrainDTO` と `TrainEditPageQuery.getTrain` を足し、`getEditContext` を `getTrain` で組み立てる
-- [x] **TASK-3** `GET /api/trains/[trainId]` を `getTrain` に置き換え、`DuplicateButton` を DTO に合わせる。テストを書く（依存: TASK-2）
-  - `app/api/trains/[trainId]/route.test.ts`（200 / 404 / 500）、`components/DuplicateButton.test.tsx`（POST の body、取得失敗）
-- [x] **TASK-4** 呼び出し元の無い GET 4本を削除し、ESLint の除外を外す
-  - 削除前に `apps/admin/src`・`apps/admin/e2e`・`apps/web`・`apps/scripts` を grep し、GET の呼び出し元が無いことを確かめた
-- [x] **TASK-5** 検証（依存: TASK-3, TASK-4）
-  - [x] `turbo run typecheck lint test`（15タスク、admin 636 テスト）・`pnpm run build`（2タスク）が成功した
-  - [x] dev（読み取りのみ）: `GET /api/trains/[丸ノ内線]` が 200 で、`carLength: 18` を数値で返す。`operatorId` / `lineIds` / 号車構成6両 / 設備12件を含む
-  - [x] dev（読み取りのみ）: 削除した GET 4本が 405 を返す。レイアウト編集画面（国会議事堂前）はホーム・停車位置・設備を表示する
-  - [x] dev（development）: 「丸ノ内線」（6両すべてに `car_length` あり）を複製すると、GET 200 → POST 201 で作成された。
-        複製先は事業者・路線・号車構成（18.00m × 6両）・設備12件が複製元と一致した。確認後に複製先を削除し、列車は10件に戻った
-  - [x] dev（development）: レイアウト編集画面（国会議事堂前 1番線）で銀座線の停車位置を追加して保存（POST 201）し、削除した。
-        停車パターンは24件に戻り、既存の丸ノ内線の停車位置は残っている
-- [x] **TASK-6** `docs/domain/` を確認し、列車の書き込みの Repository 化を Issue に起票する
-  - [x] `docs/domain/` は変更なし: 削除した GET への言及は無く、ドメインルールも変わらない
-  - [x] ADR: 新規・ステータス変更なし（ADR-0003 の適用）
-  - [x] フォローアップ Issue: #163
-- [x] **TASK-7** PR #164 のレビュー指摘（1〜3・6・7）を直す（依存: TASK-5）
-  - 指摘 3 と同じ欠陥（try/catch 無し）があった `TrainForm.handleSubmit` も直す（開発者の指示）
-  - 指摘 4（トランザクション）は #163 の範囲。指摘 5（複製のサーバー側への移動）は新しい Issue にするか開発者が判断する
-  - 指摘 7 は直さない。6 と両立せず、早期 return にすると編集ページの正常時が2往復に戻るため（開発者が承認）
-  - [x] `turbo run typecheck lint test`（admin 52 ファイル）・`pnpm run build` が成功した。追加したテストは修正前のコードで失敗することを確かめた
-  - [x] dev（読み取りのみ）: 全10列車の `GET /api/trains/[id]` で、号車構成・フリースペース・優先席が号車順に並ぶ。存在しない ID は 404
-  - [x] dev（development）: 銀座線の編集画面で 1〜6号車が順に並ぶ。変えずに保存すると PUT が 200 `{"success":true}` を返し、一覧に戻る。
-        保存後も号車構成6両・設備12件は変わらない
-  - [x] dev（development）: 銀座線を複製すると GET 200 → POST 201。複製先は名前と ID 以外が複製元と一致した。確認後に削除し、列車は10件に戻った
-  - [x] `docs/domain/` は変更なし: API の応答形と並び順はドメインルールではない
+PR ごとにブランチを分け、前の PR のブランチから順に切る（`gh-stack` で積む）。
+PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途中の状態では新旧の色が混ざるため）。
+
+## PR 0: 仕様と決定（`feat/issue166-design-system-soft-rose`）
+
+- [x] **TASK-0.1** Issue #166 を起票し、ブランチを切る
+- [x] **TASK-0.2** `docs/spec/` の3点を書き換える
+- [x] **TASK-0.3** ADR-0017・0018・0019 を `Proposed` で書き、`docs/adr/README.md` の一覧に足す
+
+## PR 1: 土台（PoC）
+
+- [ ] **TASK-1.1** `globals.css` のプリミティブを差し替え、意味のトークンの参照先を変える（design.md「インターフェース」）
+- [ ] **TASK-1.2** `@theme inline` に意味のある色の名前と書体、`@theme` に角丸と影を足す（`--color-*: initial` はまだ入れない）
+- [ ] **TASK-1.3** `layout.tsx` に Zen Maru Gothic を足し、変数クラスを `<html>` に付ける
+- [ ] **TASK-1.4** Web の `layout.tsx` で `@furatora/platform-diagram/styles.css` を読み込み、`globals.css` からホーム図のトークンを消す。汎用トークンの値を `styles.css` と揃える
+- [ ] **TASK-1.5** `theme/mantineTheme.ts` と `mantineTheme.test.ts` を作り、`providers.tsx` に渡す（依存: TASK-1.1）
+- [ ] **TASK-1.6** 検証: typecheck・lint・test・build。dev のトップ画面で、背景・文字色・書体・Mantine の部品が新しい値になることを確かめる（PoC の成功基準）
+
+## PR 2: 共通部品（依存: PR 1）
+
+- [ ] **TASK-2.1** ヘッダー・フッター（`layout.tsx`）
+- [ ] **TASK-2.2** `StationBadge`・`BackButton`
+- [ ] **TASK-2.3** `SearchTabs`・`StationSearch`
+- [ ] **TASK-2.4** `StationCard`（タイムライン）・`OperatorList`
+- [ ] **TASK-2.5** 検証: typecheck・lint・test・build、dev で部品を含む画面を目視
+
+## PR 3: 各画面（依存: PR 2）
+
+- [ ] **TASK-3.1** トップ（`app/page.tsx`）
+- [ ] **TASK-3.2** 路線の駅一覧（`app/lines/[slug]/stations/page.tsx`）
+- [ ] **TASK-3.3** 駅の詳細（`app/stations/[slug]/page.tsx`）、`TransferDifficultySection` の切り替え、`transferDifficulty.ts` の状態の色。テストを書き換える
+- [ ] **TASK-3.4** `PlatformTabs`・`PlatformDisplay`、`loading.tsx`・`error.tsx`・`not-found.tsx`
+- [ ] **TASK-3.5** `--color-*: initial` を入れ、`defaultColorClasses.test.ts` を足す（依存: TASK-3.1〜3.4）
+- [ ] **TASK-3.6** 検証: typecheck・lint・test・build、全画面の目視（390px / 1280px）、Lighthouse のアクセシビリティ監査
+
+## PR 4: ホーム図パッケージ（依存: PR 1）
+
+- [ ] **TASK-4.1** `packages/platform-diagram/src/styles.css` の値を変える（design.md の表）。出口のコメントを ADR-0018 参照に書き換える
+- [ ] **TASK-4.2** 検証: Web と Admin のホーム図を目視。出口のプレートが白地から浮くかを確かめ、足りなければ `--sign-exit-edge` を濃くする
+
+## PR 5: アイコン（依存: なし。清書したデータが要る）
+
+- [ ] **TASK-5.1** 清書したアイコンのデータを受け取る（別 Issue）
+- [ ] **TASK-5.2** `icon.svg`・`apple-icon.png`・`favicon.ico`・`android-chrome-*.png` を差し替える（32px 以下は文字なしの版）
+- [ ] **TASK-5.3** `manifest.json` のパスを `/icons/…` に直し、`name` / `short_name` を入れる
+- [ ] **TASK-5.4** 検証: ブラウザのタブ、iOS のホーム画面に追加したときの表示
+
+## フェーズ5: ドキュメント（最後の PR に含める）
+
+- [ ] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。`docs/domain/README.md` の一覧に足す
+- [ ] **TASK-6.2** ADR-0017・0018 を、開発者の承認を得て `Accepted` にする。ADR-0019 はアイコン差し替えの後に `Accepted` にする
+- [ ] **TASK-6.3** 範囲外の作業を Issue に起票する（requirements.md「範囲外」）
