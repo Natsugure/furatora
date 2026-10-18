@@ -61,7 +61,7 @@ export function StationSearch() {
           onChange={(e) => { setQuery(e.target.value); setHasError(false); }}
           placeholder="駅名で検索（例：茅場町）"
           aria-label="駅名"
-          className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300"
+          className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300 [&::-webkit-search-cancel-button]:appearance-none"
         />
       </div>
 
