@@ -10,6 +10,8 @@
 //   2. そのあとで、facility_types への INSERT を手書きのマイグレーション（drizzle-kit generate --custom）で足す
 //      （例: drizzle/0010。既存の環境には seed が届かない）。先に作ると番号が CHECK より前になり、INSERT が古い CHECK に違反する
 //      忘れると、その種類を保存したときに外部キーのエラーになる
+//   3. ホーム図のアイコン（packages/platform-diagram の FACILITY_ICON_FILES と、図を使う各アプリの public/icons/）を足す。
+//      対応表は足し忘れるとコンパイルエラーになるが、画像の置き忘れは表示が欠けるだけで気づけない（platform-diagram の README 参照）
 // 種類を消すとき（足すときと逆順）:
 //   1. 手書きのマイグレーションで、子（transfer_route_facilities / station_facilities）の行を片付けてから facility_types の行を消す。
 //      子の行を別の種類に置き換えるか消すかで判定が変わるので、データを見て決める。子が残っていると外部キーで消せない
