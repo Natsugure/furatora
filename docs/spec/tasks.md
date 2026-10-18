@@ -57,14 +57,30 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
     空白だけの入力のテストが `trim` を外すと失敗することを確かめた。
     dev（390px）で、切り替えの見た目が以前と同じこと、矢印キーで切り替わること、路線の駅一覧の縦線に路線色が出ることを確かめた
 
-## PR 3: 各画面（依存: PR 2）
+## PR 3: 各画面（依存: PR 2）（`feat/issue166-pr3-screens`）
 
-- [ ] **TASK-3.1** トップ（`app/page.tsx`）
-- [ ] **TASK-3.2** 路線の駅一覧（`app/lines/[slug]/stations/page.tsx`）。最初に駅一覧のタイムラインを `StationTimeline` に部品化する（design.md「駅一覧のタイムラインの部品化」）
-- [ ] **TASK-3.3** 駅の詳細（`app/stations/[slug]/page.tsx`）、`TransferDifficultySection` の切り替え、`transferDifficulty.ts` の状態の色。テストを書き換える
-- [ ] **TASK-3.4** `PlatformTabs`・`PlatformDisplay`、`loading.tsx`・`error.tsx`・`not-found.tsx`
-- [ ] **TASK-3.5** `--color-*: initial` を入れ、`defaultColorClasses.test.ts` を足す（依存: TASK-3.1〜3.4）
-- [ ] **TASK-3.6** 検証: typecheck・lint・test・build、全画面の目視（390px / 1280px）、Lighthouse のアクセシビリティ監査
+- [x] **TASK-3.1** トップ（`app/page.tsx`）
+  - 上部に見出しと検索、`Sheet`（新規。上端を丸めた白い本文エリア）にできることの一覧と事業者のチップ
+- [x] **TASK-3.2** 路線の駅一覧（`app/lines/[slug]/stations/page.tsx`）。最初に駅一覧のタイムラインを `StationTimeline` に部品化する（design.md「駅一覧のタイムラインの部品化」）
+  - `StationTimeline`（`<ol>`）に行の部品を閉じ込め、`StationCard` を消した。バッジの直径は `STATION_BADGE_SIZE`（TS の定数）。線の中心とバッジの中心が一致（実測 43px / 43px）
+  - 路線記号の丸 `LineSymbol`（`line.lineCode`、無ければ駅番号の英字）。戻るボタンは `BackButton` に `href` を足してトップへのリンクにした
+- [x] **TASK-3.3** 駅の詳細（`app/stations/[slug]/page.tsx`）、`TransferDifficultySection` の切り替え、`transferDifficulty.ts` の状態の色。テストを書き換える
+  - 路線のチップ `stationLineChips()`（ホーム＋乗換先、路線名で重複を除く）
+  - 移動手段を `SegmentedControl`（`radiogroup`「移動手段」）で切り替え、選んだ側だけを描く。初期はベビーカー。乗換先と移動手段の選択は互いに保たれる
+  - テストは `MantineProvider` で包む。「何も表示しない」は、Mantine が `<style>` を差し込むため見出しとグループが無いことで確かめる
+- [x] **TASK-3.4** `PlatformTabs`・`PlatformDisplay`、`loading.tsx`・`error.tsx`・`not-found.tsx`
+  - `PlatformTabs` は方面が多いと横スクロールが要るため、`SegmentedControl` にせず色だけ置き換えた
+  - `loading.tsx` は3つとも、本体と同じ「上部＋本文エリア」の骨組みにした
+- [x] **TASK-3.5** `--color-*: initial` を入れ、`defaultColorClasses.test.ts` を足す（依存: TASK-3.1〜3.4）
+  - テストを先に足し、3.4 の対象（PlatformTabs・PlatformDisplay・loading・error・not-found）の既定の色クラスと `#6b7280` で失敗することを確かめてから直した
+  - 許可リスト: `mantineTheme.ts`（ADR-0017 決定5 の複製）、`platform-diagram` の `DEFAULT_LINE_COLOR`（PR 4 で見直す）
+  - ビルドの CSS に `--color-gray-*` などが無く、新しいユーティリティ（`bg-wheelchair-50` など）が出ていることを確かめた
+- [x] **TASK-3.6** 検証: typecheck・lint・test・build、全画面の目視（390px / 1280px）、Lighthouse のアクセシビリティ監査
+  - 結果: 成功（テスト 18 ファイル・123 件、typecheck・lint・build）。Lighthouse のアクセシビリティは、トップ・路線の駅一覧（銀座線）・駅の詳細（春日）で 100（指摘 0 件）
+  - 目視: トップ、路線の駅一覧、駅の詳細（ベビーカー → 車いすの切り替え）、404、読み込み中。乗換の評価がある駅は春日などに限られる
+  - 目視で見つけて直した: `<main>` を flex にしたことで `Container`（`mx-auto`）が内容の幅に縮んでいた → `w-full` を足した
+  - 残る点: 乗換先の多い駅（渋谷）では路線のチップが13個並ぶ。ホームの無い駅（春日）では自駅の路線がチップに出ない。
+    路線記号の丸の白い文字は路線色の上に載るため、路線によってはコントラストが 3:1 に届かない（`role="img"` と `aria-label` で路線記号を読み上げる）
 
 ## PR 4: ホーム図パッケージ（依存: PR 1）
 

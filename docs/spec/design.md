@@ -174,19 +174,27 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 2 | `components/OperatorList.tsx` | 事業者のアコーディオンの色・角丸（開閉の動きは変えない。`operators` に色の列が無く、見本のチップの色の丸は描けないため） |
 | 2 | `components/LineAccordion.tsx` | 路線の行。路線色は縦線だけに使い、路線名は `text-ink`（路線色の文字は白地とのコントラストが足りない。REQ-10） |
 | 2 | `app/lines/[slug]/stations/page.tsx` | 駅の行の間の隙間（`space-y-2`）だけを外す（タイムラインの線が途切れるため。他は PR 3） |
+| 3 | `components/ui/Sheet.tsx`（新規）／ `app/layout.tsx` | 上端を丸めた白い本文エリア（REQ-5）。3画面で共用する。画面の下端まで伸ばすため `<main>` を flex の縦並びにし、`Container` に `w-full` を足す |
 | 3 | `app/page.tsx` | 見出し「どの駅へ行きますか？」（一部をローズ）、できることの一覧（丸アイコン＋点線） |
 | 3 | `app/lines/[slug]/stations/page.tsx` | 路線の見出し（路線記号の丸＋路線名＋英語名・駅数）、本文エリアの構成 |
 | 3 | `components/StationTimeline.tsx`（新規）／ `components/StationCard.tsx`（削除） | 駅一覧のタイムラインを一覧ごと部品にする（下の「駅一覧のタイムラインの部品化」） |
-| 3 | `app/stations/[slug]/page.tsx` | 駅の見出し、路線のチップ、ご利用案内 |
+| 3 | `app/stations/[slug]/page.tsx` | 駅の見出し、路線のチップ（下の「路線のチップ」）、ご利用案内 |
 | 3 | `components/TransferDifficultySection.tsx` | ベビーカー／車いすを Mantine の `SegmentedControl` で切り替える。状態の色を ADR-0018 に揃える |
-| 3 | `constants/transferDifficulty.ts` | `iconColorHex` を `--sage-500` / `--amber-500` / `--neutral-500` の値にする |
+| 3 | `constants/transferDifficulty.ts` | `iconColorHex` を `iconColor` に改め、`var(--sage-500)` / `var(--amber-500)` / `var(--neutral-500)` を参照する。状態の文言の色（`labelClassName`）を足す |
 | 3 | `features/platform/components/PlatformTabs.tsx` / `PlatformDisplay.tsx` | ホームのタブ・見出しの色 |
 | 3 | `app/**/loading.tsx` / `error.tsx` / `not-found.tsx` | スケルトン・エラー画面の色 |
 | 4 | `packages/platform-diagram/src/styles.css` | 上の表のとおり |
 | 4 | `packages/platform-diagram/src/components/PlatformDiagram.tsx` | 凡例の見本の色（トークン経由なので値の変更だけで足りるかを確かめる） |
 | 5 | `app/icon.svg` / `apple-icon.png` / `favicon.ico` / `public/icons/android-chrome-*.png` / `app/manifest.json` | ADR-0019 の図柄。manifest のパスを `/icons/…` に直し、`name` / `short_name` を入れる |
 
-路線記号（銀座線の「G」など）は、駅番号の先頭の英字から取る。DB の列は増やさない。
+路線記号（銀座線の「G」など）は、`lines.line_code`（`Line.lineCode`）を使う。null の路線だけ、先頭の駅の駅番号の英字にフォールバックする（`components/ui/LineSymbol.tsx`）。
+DB の列は増やさない。
+
+### 路線のチップ（駅の詳細）
+
+駅の路線一覧は `StationDetailDTO` に無いため、クエリは増やさず、ホームの路線（`platforms[].lineName/lineColor`）→ 乗換先の路線（`transferPartners[].lineName/lineColor`）の順に、
+路線名で重複を除いて並べる（`features/station/domain/stationLineChips.ts`）。乗換先は相手駅の路線なので、自駅の路線と相手駅の路線が同じ並びに入る。
+路線記号は DTO に無いため、チップは路線色の丸と路線名だけにする。
 
 ### 駅一覧のタイムラインの部品化（PR 3）
 
@@ -202,7 +210,8 @@ PR 3 で、この2つを一覧の部品の中に閉じ込める。
   - `isFirst` / `isLast` はこの部品の中で決める。行を詰めて並べるのもこの部品の責任にする
   - 行の部品（今の `StationCard` の中身）はこのファイルの中に置き、export しない（単独で使えないようにする）
 - 線の位置と太さは、バッジの直径から求める（`left = 直径 / 2 − 線の太さ / 2`）。バッジの直径は1か所で定義し、`StationBadge` と線の両方がそれを参照する
-  - 持ち方は、TS の定数（`StationBadge.tsx` から `STATION_BADGE_SIZE` を export）か、`globals.css` の CSS 変数（`calc()` で線の位置を書く）のどちらか。PR 3 で決める
+  - TS の定数（`StationBadge.tsx` から `STATION_BADGE_SIZE` を export）で持ち、バッジの幅・高さと線の `left` / `width` を style で当てる。
+    CSS 変数ではなく TS にしたのは、単体テスト（jsdom）で線の位置とバッジの直径を数値で確かめられるため
   - `StationBadge` は駅の詳細ページの見出しでも使っているため、どちらの方法でも両方の画面で同じ直径になる
 - `app/lines/[slug]/stations/page.tsx` は `<StationTimeline stations={stations} lineColor={line.color} />` を置くだけにする
 - `StationCard.tsx` と `StationCard.test.tsx` は消す。テストは `StationTimeline.test.tsx` に移し、駅の配列を渡して、先頭・途中・末尾の線の有無を1回の描画で確かめる
