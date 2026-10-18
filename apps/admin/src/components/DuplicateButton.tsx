@@ -34,36 +34,41 @@ export function DuplicateButton({ trainId, trainName }: Props) {
     setLoading(true);
     setError('');
 
-    const res = await fetch(`/api/trains/${trainId}`);
-    if (!res.ok) {
-      setError('列車データの取得に失敗しました');
-      setLoading(false);
-      return;
-    }
+    try {
+      const res = await fetch(`/api/trains/${trainId}`);
+      if (!res.ok) {
+        setError('列車データの取得に失敗しました');
+        return;
+      }
 
-    const original: TrainDTO = await res.json();
+      const original: TrainDTO = await res.json();
 
-    const createRes = await fetch('/api/trains', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newName,
-        operatorId: original.operatorId,
-        lineIds: original.lineIds,
-        carCount: original.carCount,
-        carStructure: original.carStructure,
-        freeSpaces: original.freeSpaces,
-        prioritySeats: original.prioritySeats,
-      }),
-    });
+      const createRes = await fetch('/api/trains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          operatorId: original.operatorId,
+          lineIds: original.lineIds,
+          carCount: original.carCount,
+          carStructure: original.carStructure,
+          freeSpaces: original.freeSpaces,
+          prioritySeats: original.prioritySeats,
+        }),
+      });
 
-    if (createRes.ok) {
-      close();
-      router.refresh();
-    } else {
+      if (createRes.ok) {
+        close();
+        router.refresh();
+      } else {
+        setError('複製に失敗しました');
+      }
+    } catch {
+      // 通信断や JSON でない応答で reject しても、loading のまま止めない
       setError('複製に失敗しました');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (

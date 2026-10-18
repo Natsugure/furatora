@@ -84,4 +84,18 @@ describe('DuplicateButton', () => {
     expect(await screen.findByText('列車データの取得に失敗しました')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('通信が失敗しても、エラーを出して複製ボタンを押せる状態に戻す', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    renderWithMantine(<DuplicateButton trainId="train-1" trainName="10000系" />);
+
+    await user.click(screen.getByRole('button'));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: '複製' }));
+
+    expect(await screen.findByText('複製に失敗しました')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '複製' })).toBeEnabled();
+  });
 });
