@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { SegmentedControl } from '@mantine/core';
+import { ChevronDown } from 'lucide-react';
 import {
   PERSONA_LABEL,
   REQUIREMENT_LABEL,
@@ -19,15 +21,24 @@ type Props = {
   partners: TransferPartnerDTO[];
 };
 
+const PERSONAS: Persona[] = ['stroller', 'wheelchair'];
+
+// SegmentedControl の onChange は string を返すため、Persona に絞り込む
+function isPersona(value: string): value is Persona {
+  return PERSONAS.some((p) => p === value);
+}
+
+// 移動手段ごとの面と強調の色。ベビーカーはブランドのローズ、車いすはスレート（ADR-0018）。
 // Tailwind はクラス名を静的に拾うので、クラス名は組み立てずに文字列リテラルで持つ
-const PERSONA_STYLE: Record<Persona, { backgroundColor: string; divideClass: string }> = {
-  stroller: { backgroundColor: '#FCE4EC', divideClass: 'divide-pink-200' },
-  wheelchair: { backgroundColor: '#E3F2FD', divideClass: 'divide-blue-200' },
+const PERSONA_STYLE: Record<Persona, { cardClass: string; activeClass: string }> = {
+  stroller: { cardClass: 'bg-brand-50', activeClass: 'data-[active]:text-brand-600' },
+  wheelchair: { cardClass: 'bg-wheelchair-50', activeClass: 'data-[active]:text-wheelchair-700' },
 };
 
-const HIGHLIGHT = 'bg-yellow-100 font-semibold';
+// ルートが複数あるときに、ルートの間で違う項目を目立たせる
+const HIGHLIGHT = 'bg-brand-100 text-brand-800 font-semibold';
 
-function StatusIcon({ iconPath, iconColorHex }: { iconPath: string; iconColorHex: string }) {
+function StatusIcon({ iconPath, iconColor }: { iconPath: string; iconColor: string }) {
   return (
     <span
       aria-hidden
@@ -36,7 +47,7 @@ function StatusIcon({ iconPath, iconColorHex }: { iconPath: string; iconColorHex
         display: 'inline-block',
         width: 20,
         height: 20,
-        backgroundColor: iconColorHex,
+        backgroundColor: iconColor,
         WebkitMaskImage: `url(${iconPath})`,
         WebkitMaskSize: 'contain',
         WebkitMaskRepeat: 'no-repeat',
@@ -51,8 +62,8 @@ function StatusIcon({ iconPath, iconColorHex }: { iconPath: string; iconColorHex
 function Chip({ children, highlighted }: { children: React.ReactNode; highlighted: boolean }) {
   return (
     <span
-      className={`inline-block rounded px-1.5 py-0.5 text-[11px] leading-tight border border-gray-200 ${
-        highlighted ? HIGHLIGHT : 'bg-white/70 text-gray-700'
+      className={`inline-block rounded-tag px-2 py-1 text-[11px] font-bold leading-tight ${
+        highlighted ? HIGHLIGHT : 'bg-surface text-ink-soft'
       }`}
     >
       {children}
@@ -76,15 +87,15 @@ function RouteItem({
   ];
   return (
     <li className="py-2 first:pt-0 last:pb-0">
-      <p className="text-xs text-gray-800 font-medium">
+      <p className="font-display font-bold text-[15px] leading-snug text-ink">
         {route.label}
         {route.minutes !== null && (
-          <span className={`ml-1.5 font-normal ${highlights.has('minutes') ? HIGHLIGHT : 'text-gray-600'}`}>
+          <span className={`ml-1.5 font-normal ${highlights.has('minutes') ? HIGHLIGHT : 'text-muted'}`}>
             {route.minutes}分
           </span>
         )}
       </p>
-      <div className="mt-1 flex flex-wrap gap-1">
+      <div className="mt-1.5 flex flex-wrap gap-1">
         <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
         {flags.map(
           ([field, shown, label]) =>
@@ -95,7 +106,7 @@ function RouteItem({
             ),
         )}
       </div>
-      {route.notes && <p className="mt-1 text-xs text-gray-600 whitespace-pre-wrap">{route.notes}</p>}
+      {route.notes && <p className="mt-1 text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
     </li>
   );
 }
@@ -107,21 +118,21 @@ function detourText(minutes: number): string {
 
 type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barrierFree' }>;
 
-function BarrierFreeDetail({ persona, assessment }: { persona: Persona; assessment: BarrierFreeAssessment }) {
+function BarrierFreeDetail({ assessment }: { assessment: BarrierFreeAssessment }) {
   const { routes, detour } = assessment;
   const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
   // routes は1本以上あり、先頭が最短
   const shortest = routes[0]!;
   return (
     <>
-      <ul className={`mt-2 divide-y ${PERSONA_STYLE[persona].divideClass}`}>
+      <ul className="mt-3 divide-y divide-ink/10">
         {routes.map((assessed) => (
           <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} />
         ))}
       </ul>
       {/* 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある） */}
       {detour !== null && (
-        <p className="mt-2 text-xs text-gray-700">
+        <p className="mt-3 text-xs text-ink-soft">
           最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortest.requirement]}）
         </p>
       )}
@@ -142,7 +153,7 @@ function lightestText(assessment: Extract<Assessment<TransferRouteDTO>, { kind: 
 function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
   const assessment = assessRoutes(persona, routes);
   if (assessment.kind === 'unevaluated') {
-    return <p className="text-xs text-gray-500 italic">情報なし</p>;
+    return <p className="text-sm text-muted">情報なし</p>;
   }
 
   const meta = TRANSFER_STATUS_META[assessment.kind];
@@ -150,16 +161,16 @@ function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRo
   return (
     <>
       <div className="flex items-start gap-2">
-        <StatusIcon iconPath={meta.iconPath} iconColorHex={meta.iconColorHex} />
-        <p className="text-xs text-gray-700 leading-snug">
+        <StatusIcon iconPath={meta.iconPath} iconColor={meta.iconColor} />
+        <p className={`text-[15px] font-bold leading-snug ${meta.labelClassName}`}>
           {meta.label}
           {assessment.kind === 'barrierFree' && assessment.routes.length > 1 && `（${assessment.routes.length}本）`}
         </p>
       </div>
       {assessment.kind === 'barrierFree' ? (
-        <BarrierFreeDetail persona={persona} assessment={assessment} />
+        <BarrierFreeDetail assessment={assessment} />
       ) : (
-        text && <p className="mt-1 text-xs text-gray-700">{text}</p>
+        text && <p className="mt-1.5 text-xs text-ink-soft">{text}</p>
       )}
     </>
   );
@@ -167,12 +178,7 @@ function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRo
 
 function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRouteDTO[] }) {
   return (
-    <section
-      aria-label={PERSONA_LABEL[persona]}
-      className="rounded-lg border border-gray-100 p-3"
-      style={{ backgroundColor: PERSONA_STYLE[persona].backgroundColor }}
-    >
-      <p className="text-xs font-semibold text-gray-600 mb-2">{PERSONA_LABEL[persona]}</p>
+    <section aria-label={PERSONA_LABEL[persona]} className={`rounded-card p-5 ${PERSONA_STYLE[persona].cardClass}`}>
       <PersonaBody persona={persona} routes={routes} />
     </section>
   );
@@ -180,6 +186,8 @@ function PersonaCard({ persona, routes }: { persona: Persona; routes: TransferRo
 
 export function TransferDifficultySection({ stationName, partners: allPartners }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  // 開いた直後はベビーカー（REQ-7）。選択は URL に載せない（design.md「データフロー」）
+  const [persona, setPersona] = useState<Persona>('stroller');
 
   // 未評価は「ルートが0本」（docs/domain/station-master-model.md）。接続行の有無ではなくルートの有無で判定する
   const isEvaluated = (p: TransferPartnerDTO) => p.combos.some((c) => c.routes.length > 0);
@@ -194,56 +202,70 @@ export function TransferDifficultySection({ stationName, partners: allPartners }
   const groups = groupCombos(selected);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-5">
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-        バリアフリールート整備状況
+    <section className="flex flex-col gap-4">
+      <h2 className="font-display font-bold text-lg text-ink">
+        乗り換えのバリアフリールート
       </h2>
 
       {/* 路線ドロップダウン */}
       {partners.length > 1 ? (
-        <div className="mb-4">
-          <label htmlFor="transfer-partner" className="block text-xs text-gray-500 mb-1">乗換先路線</label>
-          <select
-            id="transfer-partner"
-            value={selectedIndex}
-            onChange={(e) => setSelectedIndex(Number(e.target.value))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            {partners.map((partner, i) => (
-              <option key={`${partner.connectedStationId}:${partner.lineName}`} value={i}>
-                {partner.connectedStationName === stationName
-                  ? partner.lineName
-                  : `${partner.lineName}（${partner.connectedStationName}）`}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="transfer-partner" className="text-xs font-medium text-muted">乗換先路線</label>
+          <div className="relative">
+            <select
+              id="transfer-partner"
+              value={selectedIndex}
+              onChange={(e) => setSelectedIndex(Number(e.target.value))}
+              className="w-full h-13.5 pl-4.5 pr-11 rounded-input bg-canvas shadow-[inset_0_0_0_1.5px_var(--color-border-default)] text-base text-ink appearance-none"
+            >
+              {partners.map((partner, i) => (
+                <option key={`${partner.connectedStationId}:${partner.lineName}`} value={i}>
+                  {partner.connectedStationName === stationName
+                    ? partner.lineName
+                    : `${partner.lineName}（${partner.connectedStationName}）`}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={18} strokeWidth={2.4} aria-hidden className="absolute right-4.5 top-1/2 -translate-y-1/2 text-brand-600 pointer-events-none" />
+          </div>
         </div>
       ) : (
-        <div className="mb-4 flex items-center gap-2">
+        <div className="flex items-center gap-2">
           {selected.lineColor && (
             <span
-              className="w-3 h-3 rounded-full flex-shrink-0"
+              className="size-3 rounded-full flex-shrink-0"
               style={{ backgroundColor: selected.lineColor }}
             />
           )}
-          <span className="text-sm font-medium text-gray-700">{selected.lineName}</span>
+          <span className="text-sm font-medium text-ink">{selected.lineName}</span>
         </div>
       )}
 
-      <div className="space-y-4">
+      {/* 移動手段の切り替え。SearchTabs と同じ部品（ラジオボタンのグループ）にそろえる */}
+      <SegmentedControl
+        fullWidth
+        aria-label="移動手段"
+        value={persona}
+        onChange={(value) => { if (isPersona(value)) setPersona(value); }}
+        data={PERSONAS.map((p) => ({ value: p, label: PERSONA_LABEL[p] }))}
+        classNames={{
+          root: 'p-1 rounded-full bg-subtle',
+          indicator: 'rounded-full bg-surface shadow-raised',
+          label: `flex items-center justify-center h-11.5 py-0 rounded-full text-sm font-medium text-ink-soft hover:text-ink data-[active]:font-bold ${PERSONA_STYLE[persona].activeClass}`,
+        }}
+      />
+
+      <div className="flex flex-col gap-4">
         {groups.map((group, i) => (
           <div key={group.heading ?? i}>
-            {group.heading && <h3 className="text-xs font-semibold text-gray-700 mb-2">{group.heading}</h3>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <PersonaCard persona="stroller" routes={group.routes} />
-              <PersonaCard persona="wheelchair" routes={group.routes} />
-            </div>
+            {group.heading && <h3 className="text-sm font-bold text-ink-soft mb-2">{group.heading}</h3>}
+            <PersonaCard persona={persona} routes={group.routes} />
             {group.notes && (
-              <p className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{group.notes}</p>
+              <p className="text-xs text-ink-soft mt-2 whitespace-pre-wrap">{group.notes}</p>
             )}
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
