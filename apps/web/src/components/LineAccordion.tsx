@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import type { Line } from '@/types';
+import { railLineColor } from '@/theme/railLineColor';
 
 type Props = {
   line: Line;
@@ -13,7 +14,7 @@ export function LineAccordion({ line }: Props) {
         {/* Line color bar */}
         <div
           className="w-1 h-10 rounded-full flex-shrink-0"
-          style={{ backgroundColor: line.color || 'var(--color-rail-line-fallback)' }}
+          style={{ backgroundColor: railLineColor(line.color) }}
         />
         <div className="flex-1 min-w-0">
           {/* 路線色は縦線だけに使う。文字に使うと銀座線などで白地とのコントラストが足りない */}

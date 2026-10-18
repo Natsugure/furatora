@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { getVisibleLineWithStations } from '@/external/query/lineStationsQuery';
 import { StationCard } from '@/components/StationCard';
 import { Container } from '@/components/ui/Container';
+import { railLineColor } from '@/theme/railLineColor';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -35,7 +36,7 @@ export default async function StationListPage({ params }: Props) {
         <div className="flex items-center gap-4">
           <div
             className="w-1.5 h-12 rounded-full flex-shrink-0"
-            style={{ backgroundColor: line.color || '#888888' }}
+            style={{ backgroundColor: railLineColor(line.color) }}
           />
           <div>
             <h1

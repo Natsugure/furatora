@@ -168,7 +168,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 2 | `components/ui/Container.tsx` | 余白（スマホ 16px）は変えない |
 | 2 | `components/ui/StationBadge.tsx` | 路線色のリング＋白地＋Zen Maru Gothic の数字。路線色が無いときは `--color-rail-line-fallback`（= `--neutral-300`） |
 | 2 | `components/BackButton.tsx` | 白い丸（44px）に左向きの山形 |
-| 2 | `components/SearchTabs.tsx` | 角丸のセグメント（選択中は白地・ローズ文字・影） |
+| 2 | `components/SearchTabs.tsx` | Mantine の `SegmentedControl`（ラジオボタンのグループ）で、角丸のセグメント（選択中は白地・ローズ文字・影）。`TransferDifficultySection`（PR 3）と同じ部品にそろえる |
 | 2 | `components/StationSearch.tsx` | 白い検索欄（角丸 18px、影、ローズの虫眼鏡） |
 | 2 | `components/StationCard.tsx` | 路線の駅一覧のタイムライン（`isFirst` / `isLast` で線の端を切る）。右端は淡いローズの丸に山形 |
 | 2 | `components/OperatorList.tsx` | 事業者のアコーディオンの色・角丸（開閉の動きは変えない。`operators` に色の列が無く、見本のチップの色の丸は描けないため） |

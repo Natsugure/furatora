@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Search, ChevronRight, Loader2 } from 'lucide-react';
 import type { StationGroup, StationSearchApiResponse } from '@/types';
+import { railLineColor } from '@/theme/railLineColor';
 
 const cardClassName = 'bg-surface rounded-card border border-line shadow-card';
 const statusCardClassName = `${cardClassName} px-4 py-5 text-sm`;
@@ -12,12 +13,15 @@ export function StationSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [groups, setGroups] = useState<StationGroup[]>([]);
-  const [fetchedFor, setFetchedFor] = useState('');
-  const [hasError, setHasError] = useState(false);
+  // 最後に検索が終わったクエリと、その検索が失敗したか。
+  // エラーはクエリと組で持つ。入力のたびに消すと、確定クエリが変わらない入力（末尾の空白など）で
+  // 再検索されないままエラーだけ消え、前のクエリの結果や「見つかりませんでした」が出てしまう
+  const [fetched, setFetched] = useState<{ query: string; failed: boolean }>({ query: '', failed: false });
   const containerRef = useRef<HTMLDivElement>(null);
 
   // debouncedQuery が変わった瞬間に loading=true となるよう派生させる
-  const loading = debouncedQuery !== '' && fetchedFor !== debouncedQuery;
+  const loading = debouncedQuery !== '' && fetched.query !== debouncedQuery;
+  const hasError = !loading && fetched.failed;
   const displayedGroups = debouncedQuery ? groups : [];
   const showResults = debouncedQuery.length > 0;
 
@@ -37,13 +41,12 @@ export function StationSearch() {
         return res.json() as Promise<StationSearchApiResponse>;
       })
       .then((data) => {
-        if (!cancelled) setGroups(data.stationGroups);
+        if (cancelled) return;
+        setGroups(data.stationGroups);
+        setFetched({ query: debouncedQuery, failed: false });
       })
       .catch(() => {
-        if (!cancelled) setHasError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setFetchedFor(debouncedQuery);
+        if (!cancelled) setFetched({ query: debouncedQuery, failed: true });
       });
     return () => { cancelled = true; };
   }, [debouncedQuery]);
@@ -61,7 +64,7 @@ export function StationSearch() {
         <input
           type="search"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setHasError(false); }}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="駅名で検索（例：茅場町）"
           aria-label="駅名"
           className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300"
@@ -120,7 +123,7 @@ function StationGroupCard({ group }: { group: StationGroup }) {
             <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-50 transition-colors group">
               <div
                 className="w-1 h-8 rounded-full flex-shrink-0"
-                style={{ backgroundColor: station.lineColor || 'var(--color-rail-line-fallback)' }}
+                style={{ backgroundColor: railLineColor(station.lineColor) }}
               />
               <div className="flex-1 min-w-0">
                 {/* 路線色は縦線だけに使う。文字に使うと銀座線などで白地とのコントラストが足りない */}

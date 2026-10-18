@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StationSearch } from './StationSearch';
 import type { StationGroup, StationInGroup, StationSearchApiResponse } from '@/types';
@@ -42,6 +42,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   fetchMock.mockReset();
   vi.unstubAllGlobals();
 });
@@ -101,11 +102,34 @@ describe('StationSearch', () => {
     expect(await screen.findByText(/検索中にエラーが発生しました/)).toBeInTheDocument();
   });
 
-  it('空白だけの入力では検索しない', async () => {
+  it('検索に失敗した後、確定するクエリが変わらない入力をしても、前の検索の結果を出さない', async () => {
+    const ginzaBody: StationSearchApiResponse = { stationGroups: [ginza], total: 1 };
+    fetchMock.mockImplementation(async (input) =>
+      String(input).includes(encodeURIComponent('渋谷'))
+        ? new Response('', { status: 500 })
+        : new Response(JSON.stringify(ginzaBody), { status: 200 }));
     render(<StationSearch />);
-    await typeQuery('   ');
-    // 入力の確定（300ms）を待ってから確かめる
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    const searchbox = screen.getByRole('searchbox', { name: '駅名' });
+
+    await userEvent.type(searchbox, '銀座');
+    await screen.findByRole('link', { name: /東京メトロ銀座線/ });
+    await userEvent.clear(searchbox);
+    await userEvent.type(searchbox, '渋谷');
+    expect(await screen.findByText(/検索中にエラーが発生しました/)).toBeInTheDocument();
+
+    // trim すると「渋谷」のままなので、再検索はされない
+    await userEvent.type(searchbox, ' ');
+    expect(screen.getByText(/検索中にエラーが発生しました/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /東京メトロ銀座線/ })).not.toBeInTheDocument();
+  });
+
+  it('空白だけの入力では検索しない', () => {
+    vi.useFakeTimers();
+    render(<StationSearch />);
+    // user-event の非同期の操作は、偽のタイマーの下では RTL が setTimeout で待ったまま進まない。同期の fireEvent で入力する
+    fireEvent.change(screen.getByRole('searchbox', { name: '駅名' }), { target: { value: '   ' } });
+    // 入力の確定（300ms）まで時計を進めてから確かめる
+    act(() => { vi.advanceTimersByTime(300); });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });

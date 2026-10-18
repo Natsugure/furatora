@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { StationBadge } from './ui/StationBadge';
 import type { StationWithOrder } from '@/types';
+import { railLineColor } from '@/theme/railLineColor';
 
 type Props = {
   station: StationWithOrder;
@@ -16,7 +17,7 @@ const segmentClassName = 'absolute left-6 w-[5px] opacity-55';
 // 路線の駅一覧のタイムラインの1行。線は行ごとに上半分・下半分を描き、先頭・末尾で端を切る。
 // 行の間に隙間があると線が途切れるため、呼び出し側は行を詰めて並べること
 export function StationCard({ station, lineColor, isFirst, isLast }: Props) {
-  const lineStyle = { backgroundColor: lineColor || 'var(--color-rail-line-fallback)' };
+  const lineStyle = { backgroundColor: railLineColor(lineColor) };
 
   return (
     <Link

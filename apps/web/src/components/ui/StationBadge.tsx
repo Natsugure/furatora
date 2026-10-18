@@ -1,3 +1,5 @@
+import { railLineColor } from '@/theme/railLineColor';
+
 type Props = {
   code: string | null;
   color: string | null;
@@ -8,7 +10,7 @@ const badgeClassName =
 
 export function StationBadge({ code, color }: Props) {
   // 路線色は DB から来る。無いときはニュートラルの輪にする
-  const borderColor = color || 'var(--color-rail-line-fallback)';
+  const borderColor = railLineColor(color);
 
   if (!code) {
     return (

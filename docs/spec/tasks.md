@@ -40,6 +40,22 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
   - `OperatorList` の開閉ボタンに `aria-expanded` を足し、開閉を状態で確かめる
   - PR 1 側に `app/layers.test.ts`（レイヤーの順序と、`layout.tsx` が `layers.css` を最初に読むこと）を足した
   - `layout.tsx` のヘッダー・フッターは `next/font` を使う Server Component のため単体テストの対象外（目視で確かめた）
+- [x] **TASK-2.7** PR #170 のレビューの指摘を直す
+  - `SearchTabs` を Mantine の `SegmentedControl` に置き換えた。`aria-pressed`（オン・オフの切り替え）をやめ、
+    `radiogroup`（名前「検索方法」）と `radio` にする。矢印キーで選び直せる。見た目は Tailwind のクラスで当て、以前と同じ
+    （高さ 44px、白地・ローズ文字・影）。`TransferDifficultySection`（PR 3）と部品をそろえる
+  - テストの環境に `ResizeObserver` の代わりを足した（`SegmentedControl` の選択中の背景が位置を測るため）。
+    `SearchTabs.test.tsx` は `MantineProvider` で包む
+  - `StationSearch` のエラーを、検索が終わったクエリと組で持つようにした。入力のたびにエラーを消していたため、
+    確定するクエリが変わらない入力（末尾の空白など）でエラーだけが消え、前の検索の結果や「見つかりませんでした」が出ていた
+  - 路線色の代わりの色の決め方を `theme/railLineColor.ts` の `railLineColor()` にまとめ、`StationBadge` / `StationCard` /
+    `LineAccordion` / `StationSearch` と、路線の駅一覧の見出しの縦線（`#888888` が残っていた）をこれに置き換えた。
+    見出しの路線名の文字色（`line.color || '#111827'`）と `PlatformDisplay` の `#6b7280` は、画面ごと PR 3 で直す
+  - `StationSearch.test.tsx` の空白だけの入力のテストを、400ms 実際に待つのをやめ、偽のタイマーで 300ms 進めて確かめる形にした。
+    user-event の非同期の操作は、Vitest の偽のタイマーの下では RTL が `setTimeout` で待ったまま止まるため、このテストだけ `fireEvent` で入力する
+  - 結果: 成功（テスト 17 ファイル・103 件、typecheck・lint）。追加したテストが修正前のコードで失敗すること、
+    空白だけの入力のテストが `trim` を外すと失敗することを確かめた。
+    dev（390px）で、切り替えの見た目が以前と同じこと、矢印キーで切り替わること、路線の駅一覧の縦線に路線色が出ることを確かめた
 
 ## PR 3: 各画面（依存: PR 2）
 
