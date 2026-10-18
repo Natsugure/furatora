@@ -44,7 +44,7 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 ## PR 3: 各画面（依存: PR 2）
 
 - [ ] **TASK-3.1** トップ（`app/page.tsx`）
-- [ ] **TASK-3.2** 路線の駅一覧（`app/lines/[slug]/stations/page.tsx`）
+- [ ] **TASK-3.2** 路線の駅一覧（`app/lines/[slug]/stations/page.tsx`）。最初に駅一覧のタイムラインを `StationTimeline` に部品化する（design.md「駅一覧のタイムラインの部品化」）
 - [ ] **TASK-3.3** 駅の詳細（`app/stations/[slug]/page.tsx`）、`TransferDifficultySection` の切り替え、`transferDifficulty.ts` の状態の色。テストを書き換える
 - [ ] **TASK-3.4** `PlatformTabs`・`PlatformDisplay`、`loading.tsx`・`error.tsx`・`not-found.tsx`
 - [ ] **TASK-3.5** `--color-*: initial` を入れ、`defaultColorClasses.test.ts` を足す（依存: TASK-3.1〜3.4）

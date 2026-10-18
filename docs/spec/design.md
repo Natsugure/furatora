@@ -166,7 +166,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 |---|---|---|
 | 2 | `app/layout.tsx` | ヘッダー（アイコン＋ふらとら＋説明）・フッターの色と書体。右端の `Train` アイコンは消す（意味を持たない装飾のため） |
 | 2 | `components/ui/Container.tsx` | 余白（スマホ 16px）は変えない |
-| 2 | `components/ui/StationBadge.tsx` | 路線色のリング＋白地＋Zen Maru Gothic の数字。路線色が無いときは `--neutral-300` |
+| 2 | `components/ui/StationBadge.tsx` | 路線色のリング＋白地＋Zen Maru Gothic の数字。路線色が無いときは `--color-rail-line-fallback`（= `--neutral-300`） |
 | 2 | `components/BackButton.tsx` | 白い丸（44px）に左向きの山形 |
 | 2 | `components/SearchTabs.tsx` | 角丸のセグメント（選択中は白地・ローズ文字・影） |
 | 2 | `components/StationSearch.tsx` | 白い検索欄（角丸 18px、影、ローズの虫眼鏡） |
@@ -176,6 +176,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 2 | `app/lines/[slug]/stations/page.tsx` | 駅の行の間の隙間（`space-y-2`）だけを外す（タイムラインの線が途切れるため。他は PR 3） |
 | 3 | `app/page.tsx` | 見出し「どの駅へ行きますか？」（一部をローズ）、できることの一覧（丸アイコン＋点線） |
 | 3 | `app/lines/[slug]/stations/page.tsx` | 路線の見出し（路線記号の丸＋路線名＋英語名・駅数）、本文エリアの構成 |
+| 3 | `components/StationTimeline.tsx`（新規）／ `components/StationCard.tsx`（削除） | 駅一覧のタイムラインを一覧ごと部品にする（下の「駅一覧のタイムラインの部品化」） |
 | 3 | `app/stations/[slug]/page.tsx` | 駅の見出し、路線のチップ、ご利用案内 |
 | 3 | `components/TransferDifficultySection.tsx` | ベビーカー／車いすを Mantine の `SegmentedControl` で切り替える。状態の色を ADR-0018 に揃える |
 | 3 | `constants/transferDifficulty.ts` | `iconColorHex` を `--sage-500` / `--amber-500` / `--neutral-500` の値にする |
@@ -186,6 +187,28 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 5 | `app/icon.svg` / `apple-icon.png` / `favicon.ico` / `public/icons/android-chrome-*.png` / `app/manifest.json` | ADR-0019 の図柄。manifest のパスを `/icons/…` に直し、`name` / `short_name` を入れる |
 
 路線記号（銀座線の「G」など）は、駅番号の先頭の英字から取る。DB の列は増やさない。
+
+### 駅一覧のタイムラインの部品化（PR 3）
+
+PR 2 の `StationCard` は1行だけの部品で、次の2つの前提を呼び出し側と手書きの値に頼っている。
+
+- 行の間に隙間があると線が途切れる。守るのは呼び出し側（`page.tsx`）で、コメントで注意しているだけ
+- 線の位置 `left-6`（24px）と太さ `w-[5px]` は、バッジの直径 54px（`StationBadge` の `w-13.5`）に合わせた手書きの値。
+  バッジの大きさを変えると線が中心からずれる（今も線の中心は 26.5px、バッジの中心は 27px で 0.5px ずれている）
+
+PR 3 で、この2つを一覧の部品の中に閉じ込める。
+
+- `components/StationTimeline.tsx` を作る。`{ stations: StationWithOrder[]; lineColor: string | null }` を受け取り、`<ol>` / `<li>` で並べる
+  - `isFirst` / `isLast` はこの部品の中で決める。行を詰めて並べるのもこの部品の責任にする
+  - 行の部品（今の `StationCard` の中身）はこのファイルの中に置き、export しない（単独で使えないようにする）
+- 線の位置と太さは、バッジの直径から求める（`left = 直径 / 2 − 線の太さ / 2`）。バッジの直径は1か所で定義し、`StationBadge` と線の両方がそれを参照する
+  - 持ち方は、TS の定数（`StationBadge.tsx` から `STATION_BADGE_SIZE` を export）か、`globals.css` の CSS 変数（`calc()` で線の位置を書く）のどちらか。PR 3 で決める
+  - `StationBadge` は駅の詳細ページの見出しでも使っているため、どちらの方法でも両方の画面で同じ直径になる
+- `app/lines/[slug]/stations/page.tsx` は `<StationTimeline stations={stations} lineColor={line.color} />` を置くだけにする
+- `StationCard.tsx` と `StationCard.test.tsx` は消す。テストは `StationTimeline.test.tsx` に移し、駅の配列を渡して、先頭・途中・末尾の線の有無を1回の描画で確かめる
+- 線の描き方（行ごとに上半分・下半分を描き、先頭・末尾で端を切る）は変えない。一覧全体に1本の線を引く方法は、
+  先頭と末尾のバッジの中心で線の端を止めるのに行の高さの固定が要る。英語名が折り返すと行が高くなるため採らない
+- 見た目の変化は、線が 0.5px 右へ寄ってバッジのちょうど中心を通ることだけ
 
 ## データフロー
 
