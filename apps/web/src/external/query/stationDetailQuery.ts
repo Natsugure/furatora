@@ -1,4 +1,5 @@
 import { db } from '@furatora/database/client';
+import { isFacilityTypeCode } from '@furatora/database/enums';
 import {
   stations,
   stationLines,
@@ -319,7 +320,8 @@ export const dbStationDetailQuery: StationDetailQuery = {
           xPositionMeters: cell.xPositionMeters !== null ? Number(cell.xPositionMeters) : null,
           facilities: (facilitiesByCell.get(cell.id) ?? []).map((f) => ({
             id: f.id,
-            typeCode: f.typeCode,
+            // schema の $type<FacilityTypeCode>() は実行時に検査しないので、ここで見分ける（FacilityDTO.typeCode）
+            typeCode: isFacilityTypeCode(f.typeCode) ? f.typeCode : null,
             typeName: facilityTypeMap[f.typeCode] ?? f.typeCode,
             isWheelchairAccessible: f.isWheelchairAccessible,
             isStrollerAccessible: f.isStrollerAccessible,

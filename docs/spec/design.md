@@ -1,122 +1,40 @@
-# 設計: 方面ラベルの解決・接続の向きの揃え方を transfer-difficulty に集める (Issue #138)
+# 設計: ホーム図の設備アイコンに wheelchairEscalator を足す (Issue #140)
 
-純粋な部分をパッケージへ移し SQL を各アプリに残す判断は [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定2 による。
-方面ラベルの解決順（①ホーム ②既定行 ③フォールバック）は [ADR-0014](../adr/0014-direction-label-by-default-row.md) と
-[docs/domain/line-directions.md](../domain/line-directions.md) による。ここには実装だけを書く。
+設備コードの一覧の正を `FACILITY_TYPE_CODES` とし、知らないコードを読み取りの境界で見分ける方針は
+[ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md) による。ここには実装だけを書く。
 
 ## 変更するファイル
 
 ```
-packages/transfer-difficulty/src/domain/directionLabel.ts(.test.ts)   firstLineByStation / resolveStationDirectionLabels を追加
-packages/transfer-difficulty/src/domain/connection.ts(.test.ts)       新規。orientConnection
-packages/transfer-difficulty/src/domain/index.ts                     バレルに connection を追加
-apps/admin/src/features/transfer-connection/domain/normalize.ts       comboOfConnection を orientConnection で実装
-apps/admin/src/external/query/transferPairEditPageQuery.ts            firstLineOf・hints() を共有関数に置き換え
-apps/web/src/features/station/domain/transferPartners.ts(.test.ts)    新規。assembleTransferPartners / facilitiesByRoute / PartnerLine
-apps/web/src/external/query/transferPartnerRows.ts                    SQL を実行して assembleTransferPartners を呼ぶだけにする
-apps/web/src/external/query/transferPartnerRows.test.ts               削除（transferPartners.test.ts へ移す）
-apps/web/src/external/query/stationDetailQuery.ts                     PartnerLine の import 元を変える
+packages/platform-diagram/src/components/diagram/DiagramSvg.tsx   FACILITY_ICON_FILES を Record<FacilityTypeCode, string> にし、wheelchairEscalator を追加。typeCode が null なら 📍
+packages/platform-diagram/src/domain/types.ts                     FacilityDTO.typeCode を FacilityTypeCode | null にする
+apps/web/src/external/query/stationDetailQuery.ts                 isFacilityTypeCode で見分け、知らないコードは typeCode を null にする
+apps/admin/src/features/station-layout/ports.ts                   LayoutFacilityDTO の typeCode を FacilityTypeCode に絞る
+apps/admin/public/icons/wheelchair_escalator.png                   新規。apps/web/public/icons/ と同一のファイル
+packages/platform-diagram/README.md                                「アイコンの複製について」を7ファイルにし、種類を足すときの注意を追記
+packages/database/src/enums/facility.ts                            「種類を足すとき」の手順に 3. アイコンの追加を追記
 ```
 
-## データの流れ
+## 設計上の判断
 
-```
-Web: stationDetailQuery
-  └─ buildTransferPartners (external/query/transferPartnerRows.ts)
-       ├─ SQL 5本（ルート・設備・駅の路線・ホーム・既定行）  ← 変更なし
-       └─ assembleTransferPartners (features/station/domain/transferPartners.ts)  ← 純関数
-            ├─ facilitiesByRoute
-            ├─ orientConnection                 ─┐
-            ├─ firstLineByStation                ├─ @furatora/transfer-difficulty/domain
-            └─ resolveStationDirectionLabels    ─┘
+- `FacilityTypeCode` は `@furatora/database/enums` から import する。`platform-diagram` は既に `domain/types.ts` で同じ入口に依存しており、依存の向きは変わらない
+- schema の `$type<FacilityTypeCode>()` は実行時に検査しないため、別デプロイの新しいコードが DB に入ると
+  未知のコードが来うる（ADR-0016「残るずれ」）。Web の `stationDetailQuery.ts` で `isFacilityTypeCode` によって見分け、
+  知らないコードは `FacilityDTO.typeCode` を `null` にして渡す。描画側は `null` のとき 📍 で描く。
+  こうすると、📍 のフォールバックは型の上でも使われる分岐になる
+- Admin の `LayoutFacilityDTO` は `typeCode` を `FacilityTypeCode`（null なし）に絞る。
+  Admin は読み取りで `assertKnownFacilityCodes` によって止めるため、知らないコードは届かない
+- 画像の置き忘れは型で検出できない。手順コメントと README で補う
 
-Admin: transferPairEditPageQuery.getContext  ← SQL は変更なし
-  ├─ firstLineByStation / resolveStationDirectionLabels
-  └─ comboOfConnection (features/transfer-connection/domain/normalize.ts) → orientConnection
-```
+## エラーマトリックス
 
-## インターフェース
-
-### `packages/transfer-difficulty/src/domain/directionLabel.ts`
-
-```ts
-// 行は呼び出し側の SQL で lines.displayOrder, lines.id 順に並べてある前提。駅ごとに先頭を採る
-export type StationFirstLineLookup = { get(stationId: string): StationFirstLine | undefined };
-export function firstLineByStation(
-  rows: readonly ({ stationId: string } & StationFirstLine)[],
-): StationFirstLineLookup;  // uuid の大文字小文字に依らず引ける
-
-export function resolveStationDirectionLabels(input: {
-  stationId: string;
-  firstLineOf: { get(stationId: string): { lineId: string } | undefined };
-  platformRows: readonly {
-    stationId: string; lineId: string; platformNumber: string;
-    inboundName: string | null; outboundName: string | null;
-  }[];
-  defaultRows: readonly { lineId: string; directionType: DirectionType; displayName: string }[];
-}): Record<DirectionType, string>;
-```
-
-- 駅が `firstLineOf` に無いときは、ホーム・既定行を見ずに `resolveDirectionLabel` に空のホームと `null` の既定行を渡す
-  （現行コードは `lineId === undefined` との比較で偶然一致しないだけだったので、明示的に分岐する）
-- ホームの行の駅 ID は小文字で比べる（`orientConnection` と同じ理由）
-- ホーム番号は varchar なので `localeCompare(..., 'ja', { numeric: true })` で並べる（'2' → '10'）
-
-### `packages/transfer-difficulty/src/domain/connection.ts`
-
-```ts
-export function orientConnection(
-  row: { stationAId: string; directionA: DirectionType; stationBId: string; directionB: DirectionType },
-  stationId: string,
-): { connectedStationId: string; stationDirection: DirectionType; connectedDirection: DirectionType };
-```
-
-- uuid は小文字で比べる（Zod の uuid は大文字も通すため）。返す ID は入力のまま
-- 同一駅どうしの接続（#82 で正当になりうる）は扱わない。stationId の一致だけで A/B を決める
-- 自駅が A 側にも B 側にも無い行は例外にする（黙って B 側として扱うと、相手駅と向きを取り違えた表示になる）
-
-### `apps/web/src/features/station/domain/transferPartners.ts`
-
-```ts
-export type PartnerLine = Pick<TransferPartnerDTO, 'connectedStationId' | 'connectedStationName' | 'lineName' | 'lineColor'>;
-export function facilitiesByRoute(rows: readonly { routeId: string; typeCode: string }[]): Map<string, FacilityTypeCode[]>;
-export function assembleTransferPartners(input: {
-  stationId: string;
-  partnerLines: readonly PartnerLine[];
-  connectionRows: readonly { id; stationAId; directionA; stationBId; directionB; notes }[];
-  routeRows: readonly ({ connectionId: string } & Omit<TransferRouteDTO, 'facilities'>)[];
-  facilityRows: readonly { routeId: string; typeCode: string }[];
-  stationLineRows: readonly { stationId; lineId; lineName }[];
-  platformRows: ...;   // resolveStationDirectionLabels と同じ
-  defaultDirectionRows: ...;
-}): TransferPartnerDTO[];
-```
-
-- 入力の行型は構造的な最小型で定義し、features から external・schema の型を import しない（ADR-0001）
-- `routeRows` の並び（`label` 昇順）はそのまま接続ごとのルートの並びになる。順序を変えない
-- `partnerLines` が空なら `[]`（SQL を発行しない早期 return は external 側に残す）
-
-## エラーハンドリング
-
-| 状況 | 振る舞い |
+| 状況 | 結果 |
 |---|---|
-| 駅が路線を持たない | 方面ラベルはフォールバック（上り／下り）、路線名は `''`（Web）/ `null`（Admin） |
-| 相手駅の接続行が無い | `combos: []`（未評価） |
-| 知らない設備コードを含むルート | Web は設備を空（未入力）にする（#139 の挙動を維持）。Admin は従来どおり編集画面を止める |
-| uuid の大文字小文字が食い違う | 小文字で比べて同じ駅として扱う（組み合わせ・方面ラベル・路線名のすべて） |
-| 自駅に接しない接続行を `orientConnection` に渡す | 例外にする（呼び出し側の誤り。現在の呼び出し側はすべて自駅に接する行だけを読む） |
+| 定数に種類を足し、対応表を足し忘れた | typecheck エラー |
+| 対応表に足し、あるアプリの `public/icons/` に画像を置き忘れた | そのアプリでアイコンが壊れた画像になる（検出不可。手順で補う） |
+| 稼働中のコードが知らない種類が DB にある | 📍 で描画（従来どおり） |
 
 ## テスト戦略
 
-- `directionLabel.test.ts`: 駅で絞る／路線で絞る／'10' と '2' の順／null の除外／既定行・フォールバック／
-  駅が `firstLineOf` に無いときフォールバック／`firstLineByStation` が先頭を採る／大文字小文字違いの駅 ID でも引ける・解決できる
-- `connection.test.ts`: A 側／B 側／大文字 uuid の一致／返す ID は入力のまま／自駅に接しない行は例外
-- `transferPartners.test.ts`: 既存の `facilitiesByRoute` 3ケースを移す。大文字小文字違いの uuid で combo と方面ラベルが相手駅に紐づく（自駅も同様）／
-  未評価の相手は combos 空／方面ラベル／ルートの label 順が保たれる／知らない設備コードのルートは設備が空
-- Admin の `normalize.test.ts` は変更せずに通ること（`comboOfConnection` のシグネチャ不変）
-
-## 恒久知識の振り分け
-
-- `docs/domain/line-directions.md`: 実装の所在を `resolveStationDirectionLabels` / `firstLineByStation` に上書きする（フェーズ5）
-- `docs/domain/station-master-model.md`: 向きの揃え方の記述は無い。未知の設備コードの Web 側の所在（ファイルパス）だけを直す
-- ADR: 新規なし。ステータス変更なし
+`DiagramSvg` には描画のテストが無く、対応表の網羅は型で保証する。
+一時的に `wheelchairEscalator` の行を外して typecheck が失敗することを確かめる。

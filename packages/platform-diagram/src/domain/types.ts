@@ -5,7 +5,8 @@ import type { FacilityTypeCode, PlatformSide } from '@furatora/database/enums';
 
 export type FacilityDTO = {
   id: string;
-  typeCode: FacilityTypeCode;
+  // null は稼働中のコードが知らない種類（ADR-0016「残るずれ」）。図では代替の記号で描く
+  typeCode: FacilityTypeCode | null;
   typeName: string;
   isWheelchairAccessible: boolean | null;
   isStrollerAccessible: boolean | null;
