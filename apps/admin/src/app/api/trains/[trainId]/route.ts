@@ -83,7 +83,7 @@ export async function PUT(
       await db.insert(trainEquipments).values(equipmentRows);
     }
 
-    return NextResponse.json(await trainEditPageQuery.getTrain(trainId));
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
