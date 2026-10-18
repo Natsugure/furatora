@@ -1,18 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
-import { asc } from 'drizzle-orm';
 import { trainSchema } from '@/features/train/schema';
 import { requireInserted } from '@/external/requireInserted';
-
-export async function GET() {
-  try {
-    const result = await db.select().from(trains).orderBy(asc(trains.name));
-    return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
 
 export async function POST(request: Request) {
   try {
