@@ -71,6 +71,8 @@
   --color-border-default:   var(--neutral-100);
   --color-border-strong:    var(--neutral-300);
   --color-border-focus:     var(--brand-300);
+  /* DB に路線色が無い路線の、線・輪の代わりの色 */
+  --color-rail-line-fallback: var(--neutral-300);
 
   --color-text-primary:     var(--neutral-900);
   --color-text-secondary:   var(--neutral-500);
@@ -171,6 +173,12 @@ body {
   letter-spacing: 0.02em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ブラウザ標準の青い消去ボタン。デザインに合わないため、type="search" の欄すべてで隠す */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  appearance: none;
 }
 
 :focus-visible {

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { Search, ChevronRight, Loader2 } from 'lucide-react';
 import type { StationGroup, StationSearchApiResponse } from '@/types';
 
+const cardClassName = 'bg-surface rounded-card border border-line shadow-card';
+const statusCardClassName = `${cardClassName} px-4 py-5 text-sm`;
+
 export function StationSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -61,7 +64,7 @@ export function StationSearch() {
           onChange={(e) => { setQuery(e.target.value); setHasError(false); }}
           placeholder="駅名で検索（例：茅場町）"
           aria-label="駅名"
-          className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300 [&::-webkit-search-cancel-button]:appearance-none"
+          className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300"
         />
       </div>
 
@@ -69,16 +72,16 @@ export function StationSearch() {
       {showResults && (
         <div className="mt-3 space-y-3">
           {loading && displayedGroups.length === 0 ? (
-            <div className="bg-surface rounded-card border border-line shadow-card px-4 py-5 flex flex-col items-center gap-2 text-sm text-muted">
+            <div className={`${statusCardClassName} flex flex-col items-center gap-2 text-muted`}>
               <Loader2 size={20} className="animate-spin text-brand-400" />
               <span>検索中…</span>
             </div>
           ) : hasError ? (
-            <div className="bg-surface rounded-card border border-line shadow-card px-4 py-5 text-sm text-center text-ink-soft">
+            <div className={`${statusCardClassName} text-center text-ink-soft`}>
               検索中にエラーが発生しました。しばらくしてから再度お試しください。
             </div>
           ) : displayedGroups.length === 0 ? (
-            <div className="bg-surface rounded-card border border-line shadow-card px-4 py-5 text-sm text-center text-muted">
+            <div className={`${statusCardClassName} text-center text-muted`}>
               「{debouncedQuery}」に一致する駅が見つかりませんでした
             </div>
           ) : (
@@ -101,7 +104,7 @@ export function StationSearch() {
 
 function StationGroupCard({ group }: { group: StationGroup }) {
   return (
-    <div className="bg-surface rounded-card border border-line shadow-card overflow-hidden">
+    <div className={`${cardClassName} overflow-hidden`}>
       <div className="px-4 pt-3 pb-2">
         <p className="font-display font-bold text-base text-ink">{group.name}</p>
         {group.nameEn && (
@@ -117,7 +120,7 @@ function StationGroupCard({ group }: { group: StationGroup }) {
             <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-50 transition-colors group">
               <div
                 className="w-1 h-8 rounded-full flex-shrink-0"
-                style={{ backgroundColor: station.lineColor ?? 'var(--neutral-300)' }}
+                style={{ backgroundColor: station.lineColor || 'var(--color-rail-line-fallback)' }}
               />
               <div className="flex-1 min-w-0">
                 {/* 路線色は縦線だけに使う。文字に使うと銀座線などで白地とのコントラストが足りない */}

@@ -26,6 +26,6 @@ describe('StationBadge', () => {
 
   it('路線色が無ければ、輪をニュートラルの色で描く', () => {
     render(<StationBadge code="G01" color={null} />);
-    expect(screen.getByText('G').parentElement?.style.borderColor).toBe('var(--neutral-300)');
+    expect(screen.getByText('G').parentElement?.style.borderColor).toBe('var(--color-rail-line-fallback)');
   });
 });

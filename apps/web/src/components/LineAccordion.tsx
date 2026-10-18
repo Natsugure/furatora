@@ -13,7 +13,7 @@ export function LineAccordion({ line }: Props) {
         {/* Line color bar */}
         <div
           className="w-1 h-10 rounded-full flex-shrink-0"
-          style={{ backgroundColor: line.color || 'var(--neutral-300)' }}
+          style={{ backgroundColor: line.color || 'var(--color-rail-line-fallback)' }}
         />
         <div className="flex-1 min-w-0">
           {/* 路線色は縦線だけに使う。文字に使うと銀座線などで白地とのコントラストが足りない */}

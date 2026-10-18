@@ -4,11 +4,11 @@ type Props = {
 };
 
 const badgeClassName =
-  'w-13.5 h-13.5 rounded-full border-4 flex items-center justify-center bg-surface font-display font-bold text-ink flex-shrink-0';
+  'w-13.5 h-13.5 rounded-full border-4 flex items-center justify-center bg-surface font-display font-bold flex-shrink-0';
 
 export function StationBadge({ code, color }: Props) {
   // 路線色は DB から来る。無いときはニュートラルの輪にする
-  const borderColor = color || 'var(--neutral-300)';
+  const borderColor = color || 'var(--color-rail-line-fallback)';
 
   if (!code) {
     return (
@@ -22,7 +22,7 @@ export function StationBadge({ code, color }: Props) {
   const match = code.match(/^([A-Z]+)(\d+)$/);
 
   return (
-    <div className={`${badgeClassName} flex-col`} style={{ borderColor }}>
+    <div className={`${badgeClassName} flex-col text-ink`} style={{ borderColor }}>
       {match ? (
         <>
           <span className="text-[11px] leading-none">

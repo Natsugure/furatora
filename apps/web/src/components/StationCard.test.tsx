@@ -14,9 +14,9 @@ const station: StationWithOrder = {
   stationOrder: 1,
 };
 
-function renderCard(props: { isFirst: boolean; isLast: boolean; lineColor?: string | null }) {
+function renderCard({ isFirst, isLast, lineColor = '#F39700' }: { isFirst: boolean; isLast: boolean; lineColor?: string | null }) {
   const { container } = render(
-    <StationCard station={station} lineColor={props.lineColor === undefined ? '#F39700' : props.lineColor} isFirst={props.isFirst} isLast={props.isLast} />,
+    <StationCard station={station} lineColor={lineColor} isFirst={isFirst} isLast={isLast} />,
   );
   const segment = (side: 'up' | 'down') => container.querySelector<HTMLElement>(`[data-timeline="${side}"]`);
   return { segment };
@@ -68,6 +68,6 @@ describe('StationCard', () => {
 
   it('路線色が無ければ、線をニュートラルの色で描く', () => {
     const { segment } = renderCard({ isFirst: false, isLast: false, lineColor: null });
-    expect(segment('up')?.style.backgroundColor).toBe('var(--neutral-300)');
+    expect(segment('up')?.style.backgroundColor).toBe('var(--color-rail-line-fallback)');
   });
 });

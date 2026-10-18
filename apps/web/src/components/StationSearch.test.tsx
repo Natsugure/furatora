@@ -33,6 +33,10 @@ function respondWith(groups: StationGroup[]) {
   fetchMock.mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
 }
 
+function typeQuery(text: string) {
+  return userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), text);
+}
+
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -52,7 +56,7 @@ describe('StationSearch', () => {
   it('入力した駅名で検索し、駅ごとに路線の行をリンクで出す', async () => {
     respondWith([ginza]);
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '銀座');
+    await typeQuery('銀座');
 
     const link = await screen.findByRole('link', { name: /東京メトロ銀座線/ });
     expect(link).toHaveAttribute('href', '/stations/tokyometro-ginza-ginza');
@@ -65,41 +69,41 @@ describe('StationSearch', () => {
   it('路線名が無い駅は「不明な路線」と出す', async () => {
     respondWith([ginza]);
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '銀座');
+    await typeQuery('銀座');
     expect(await screen.findByRole('link', { name: /不明な路線/ })).toHaveAttribute('href', '/stations/unknown-ginza');
   });
 
   it('路線名の文字には路線色を使わない（白地とのコントラストが足りない路線色があるため）', async () => {
     respondWith([ginza]);
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '銀座');
+    await typeQuery('銀座');
     expect((await screen.findByText('東京メトロ銀座線')).style.color).toBe('');
   });
 
   it('一致する駅が無ければ、その旨を出す', async () => {
     respondWith([]);
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), 'ない駅');
+    await typeQuery('ない駅');
     expect(await screen.findByText('「ない駅」に一致する駅が見つかりませんでした')).toBeInTheDocument();
   });
 
   it('API がエラーを返したら、エラーの文言を出す', async () => {
     fetchMock.mockResolvedValue(new Response('', { status: 500 }));
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '銀座');
+    await typeQuery('銀座');
     expect(await screen.findByText(/検索中にエラーが発生しました/)).toBeInTheDocument();
   });
 
   it('通信に失敗したら、エラーの文言を出す', async () => {
     fetchMock.mockRejectedValue(new TypeError('network'));
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '銀座');
+    await typeQuery('銀座');
     expect(await screen.findByText(/検索中にエラーが発生しました/)).toBeInTheDocument();
   });
 
   it('空白だけの入力では検索しない', async () => {
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '   ');
+    await typeQuery('   ');
     // 入力の確定（300ms）を待ってから確かめる
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(fetchMock).not.toHaveBeenCalled();
@@ -109,7 +113,7 @@ describe('StationSearch', () => {
   it('続けて入力したときは、入力が止まってから1回だけ検索する', async () => {
     respondWith([ginza]);
     render(<StationSearch />);
-    await userEvent.type(screen.getByRole('searchbox', { name: '駅名' }), '銀座');
+    await typeQuery('銀座');
     await screen.findByRole('link', { name: /東京メトロ銀座線/ });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
