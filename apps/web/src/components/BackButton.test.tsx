@@ -17,4 +17,10 @@ describe('BackButton', () => {
     await userEvent.click(screen.getByRole('button', { name: '戻る' }));
     expect(back).toHaveBeenCalledTimes(1);
   });
+
+  it('行き先を渡すと、「戻る」という名前のその行き先へのリンクになる', () => {
+    render(<BackButton href="/" />);
+    expect(screen.getByRole('link', { name: '戻る' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

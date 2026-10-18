@@ -70,12 +70,12 @@ export default function RootLayout({
           </header>
 
           {/* Main content */}
-          <main className="flex-1">
+          <main className="flex-1 flex flex-col">
             {children}
           </main>
 
           {/* Footer */}
-          <footer className="bg-surface border-t border-line mt-8">
+          <footer className="bg-surface border-t border-line">
             <Container className="py-4 text-center">
               <p className="text-xs text-muted">
                 Copyright © ふらとら All Rights Reserved

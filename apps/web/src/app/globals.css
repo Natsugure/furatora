@@ -157,6 +157,7 @@
   --radius-sheet: 28px;   /* rounded-t-sheet（本文エリアの上端） */
   --shadow-card: 0 6px 24px rgba(110, 33, 64, 0.06);    /* shadow-card。影はローズを含む */
   --shadow-raised: 0 2px 8px rgba(110, 33, 64, 0.10);   /* shadow-raised */
+  --shadow-sheet: 0 -4px 24px rgba(110, 33, 64, 0.05);   /* shadow-sheet（本文エリアの上端） */
 }
 
 *,
