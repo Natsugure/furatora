@@ -3,7 +3,6 @@ import { Noto_Sans_JP, BIZ_UDPGothic, Zen_Maru_Gothic } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Train } from 'lucide-react';
 import { Providers } from './providers';
 import { Container } from '@/components/ui/Container';
 // レイヤーの順序を最初に宣言する（layers.css のコメント）
@@ -54,22 +53,19 @@ export default function RootLayout({
       <body className="font-sans antialiased flex flex-col min-h-screen">
         <Providers>
           {/* Header */}
-          <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-            <Container className="h-20 flex items-center justify-between">
+          <header className="bg-canvas sticky top-0 z-50">
+            <Container className="h-20 flex items-center">
               <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                <div className="flex items-end gap-1 text-blue-500">
-                  <Image src={iconSvg} alt="ふらとらアイコン" width={30} height={30} unoptimized />
-                </div>
+                <Image src={iconSvg} alt="ふらとらアイコン" width={36} height={36} unoptimized />
                 <div>
-                  <p className="font-bold text-lg leading-tight text-gray-900">
+                  <p className="font-display font-bold text-xl leading-tight text-ink">
                     ふらとら
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted">
                     首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを表示
                   </p>
                 </div>
               </Link>
-              <Train size={28} className="text-gray-300 flex-shrink-0" />
             </Container>
           </header>
 
@@ -79,9 +75,9 @@ export default function RootLayout({
           </main>
 
           {/* Footer */}
-          <footer className="bg-white border-t border-gray-200 mt-8">
+          <footer className="bg-surface border-t border-line mt-8">
             <Container className="py-4 text-center">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted">
                 Copyright © ふらとら All Rights Reserved
               </p>
             </Container>
