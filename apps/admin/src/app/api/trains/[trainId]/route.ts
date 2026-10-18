@@ -5,25 +5,6 @@ import { eq } from 'drizzle-orm';
 import { trainSchema } from '@/features/train/schema';
 import { trainEditPageQuery } from '@/di';
 
-function shapeTrainWithEquipments(
-  train: typeof trains.$inferSelect,
-  equipments: (typeof trainEquipments.$inferSelect)[],
-  carStructureRows: (typeof trainCarStructures.$inferSelect)[]
-) {
-  return {
-    ...train,
-    carStructure: carStructureRows.length > 0
-      ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount, carLength: cs.carLength }))
-      : null,
-    freeSpaces: equipments
-      .filter((e) => e.type === 'free_space')
-      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-    prioritySeats: equipments
-      .filter((e) => e.type === 'priority_seat')
-      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-  };
-}
-
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ trainId: string }> }
@@ -102,11 +83,7 @@ export async function PUT(
       await db.insert(trainEquipments).values(equipmentRows);
     }
 
-    const [equipments, carStructureRows] = await Promise.all([
-      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
-      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
-    ]);
-    return NextResponse.json(shapeTrainWithEquipments(updated, equipments, carStructureRows));
+    return NextResponse.json(await trainEditPageQuery.getTrain(trainId));
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
