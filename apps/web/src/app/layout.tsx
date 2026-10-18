@@ -6,7 +6,9 @@ import Image from 'next/image';
 import { Train } from 'lucide-react';
 import { Providers } from './providers';
 import { Container } from '@/components/ui/Container';
-import '@mantine/core/styles.css';
+// レイヤーの順序を最初に宣言する（layers.css のコメント）
+import './layers.css';
+import '@mantine/core/styles.layer.css';
 // ホーム図のトークン。globals.css より前に読む（同じ名前の汎用トークンは globals.css を勝たせる）
 import '@furatora/platform-diagram/styles.css';
 import './globals.css';
