@@ -1,4 +1,5 @@
 import type { DirectionType } from '@furatora/database/enums';
+import { orientConnection } from '@furatora/transfer-difficulty/domain';
 import type { ComboKey } from './types';
 
 export type TransferEndpoint = {
@@ -55,12 +56,11 @@ export function endpointsOfCombo(
 }
 
 // DB の接続行（端点は正規化順）を、S 基準の組み合わせに戻す。
-// 【同一駅どうしの接続（#82 で正当になりうる）は扱わない】stationId の一致だけで A/B を判定する
+// 向きの揃え方（uuid の比較・同一駅の接続を扱わないこと）は orientConnection に従う
 export function comboOfConnection(
   row: { stationAId: string; directionA: DirectionType; stationBId: string; directionB: DirectionType },
   stationId: string,
 ): ComboKey {
-  return row.stationAId.toLowerCase() === stationId.toLowerCase()
-    ? comboKeyOf(row.directionA, row.directionB)
-    : comboKeyOf(row.directionB, row.directionA);
+  const { stationDirection, connectedDirection } = orientConnection(row, stationId);
+  return comboKeyOf(stationDirection, connectedDirection);
 }

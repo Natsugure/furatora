@@ -1,6 +1,7 @@
 import type {
   PlatformDTO, TrainStopPatternDTO, FacilityDTO, ConcourseCellDTO, FacilityConnectionDTO, ConcourseDTO,
 } from '@furatora/platform-diagram/domain';
+import type { FacilityTypeCode } from '@furatora/database/enums';
 import type { LineWithDirections } from '@/features/platform/ports';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
@@ -23,8 +24,11 @@ export type LayoutStopPatternDTO = TrainStopPatternDTO & {
 // packages/platform-diagram の types.ts には足さない（web への供給義務が生じ、
 // パッケージが編集用フィールドを抱え込むことになる。ADR-0010「レビュー」節参照）。
 
-/** stationFacilities.notes を追加した設備DTO */
-export type LayoutFacilityDTO = FacilityDTO & { notes: string | null };
+/**
+ * stationFacilities.notes を追加した設備DTO。
+ * 知らないコードは読み取りで止める（assertKnownFacilityCodes）ので、typeCode は null を取らない
+ */
+export type LayoutFacilityDTO = Omit<FacilityDTO, 'typeCode'> & { typeCode: FacilityTypeCode; notes: string | null };
 
 /** platformLocationCells.id を追加したアクセス点DTO（draftのキー・React keyに使う） */
 export type LayoutCellDTO = Omit<ConcourseCellDTO, 'facilities'> & {

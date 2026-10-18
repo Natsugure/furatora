@@ -1,49 +1,25 @@
-# 要件: 設備コードの定数と facility_types・seed の一致を仕組みで守る (Issue #139)
+# 要件: ホーム図の設備アイコンに wheelchairEscalator を足す (Issue #140)
 
 ## 概要
 
-- **対象**: 設備コードの一覧を定数 `FACILITY_TYPE_CODES` に一本化し、DB（`facility_types` の CHECK 制約）と seed（型）をそれに従わせる。あわせて `@furatora/database/enums` をディレクトリにし、`packages/database` に ESLint を入れる
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #139](https://github.com/Natsugure/furatora/issues/139) /
-  [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) / ADR-0011 / ADR-0012
-- **ブランチ**: `refactor/issue139-facility-type-codes`
-- **信頼度**: 85%（高〜中）
-  - 方針は Issue と ADR-0015 で決まっている
-  - 未確定は `db:push` が CHECK 制約を毎回差分と誤認するかどうかだけ。development で確かめる
+- **対象**: ホーム図（`packages/platform-diagram` の `DiagramSvg`）の設備アイコンの対応表 `FACILITY_ICON_FILES` に
+  `wheelchairEscalator` を足し、今後の登録漏れをコンパイルエラーにする。Admin の `public/icons/` に画像を置く
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #140](https://github.com/Natsugure/furatora/issues/140) /
+  [ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md) / [ADR-0015](../adr/0015-shared-domain-packages-and-vocabulary.md) 決定3
+- **ブランチ**: `fix/issue140-wheelchair-escalator-icon`
+- **信頼度**: 95%（高）
+  - 変更は対応表の型と1行、画像1枚。前提の #139（`FacilityTypeCode` を `@furatora/database/enums` へ）は完了済み
+  - 新規 ADR は不要（ADR-0016 の方針の適用）
 
 ## 背景
 
-設備コードの一覧は3か所にあり、一致しているかは人が確かめるしかない。
-
-1. 定数 `FACILITY_TYPE_CODES`（`packages/transfer-difficulty`）
-2. `facility_types` テーブル
-3. seed
-
-定数に無いコードが DB に入ると、問題が2つ起きる。
-
-- Web と Admin は、そのコードを `isFacilityCode` で黙って捨てる。そのため、誤った案内を出しうる
-- Admin では、そのルートの駅対を開いて保存しただけで、そのコードの行が消える
+`wheelchairEscalator`（#122 / マイグレーション 0010）を足したとき、対応表を更新していなかった。
+対応表の型が `Record<string, string>` のため、登録漏れがコンパイルエラーにならない。
+画像は Web にはあるが Admin に無い。該当する `station_facilities` の行は 0 件で、実害は無い。
 
 ## 要件（EARS記法）
 
-- **REQ-1**: システムは、設備コードの一覧を `@furatora/database/enums` の `FACILITY_TYPE_CODES` の1か所だけで定義すること
-- **REQ-2**: 定数に無いコードを `facility_types.code` に INSERT / UPDATE した場合、DB は CHECK 制約で拒否すること
-- **REQ-3**: 定数を変更して `db:generate` を実行したとき、システムは CHECK 制約を作り直すマイグレーションを生成すること。変更が無ければ生成しないこと
-- **REQ-4**: システムは、`transfer_route_facilities.type_code`・`station_facilities.type_code`・`facility_types.code` を読むときの型を `FacilityTypeCode` にすること
-- **REQ-10**: Web が、稼働中のコードの知らない設備コードをルートの設備として読んだ場合、システムはそのルートを未入力として表示し、ページを落とさないこと
-- **REQ-11**: Admin の駅対・駅レイアウトの編集画面が、稼働中のコードの知らない設備コードを読んだ場合、システムは編集画面を開かず、そのコードと理由を表示すること
-- **REQ-12**: Admin の設備の種類の選択肢に、稼働中のコードの知らないコードがある場合、システムはそれを選択肢から除くこと
-- **REQ-5**: 定数にあって seed の表示名に無いコードがある場合、システムはコンパイルエラーにすること
-- **REQ-6**: Admin の駅レイアウトの保存に定数に無い設備コードが含まれる場合、システムは入力検証で拒否すること
-- **REQ-7**: `src/enums/` 配下のファイルが `drizzle-orm`・`../schema`・`../client`・`../tx`・`@furatora/database` を import した場合、システムは lint エラーにすること
-- **REQ-8**: システムは、`@furatora/database/enums` を唯一の入口に保つこと。`@furatora/transfer-difficulty/domain` から `FACILITY_TYPE_CODES` / `FacilityTypeCode` を export し続けること
-- **REQ-9**: `typecheck` / `lint` / `test` / `build` を実行したとき、システムはすべて成功すること。`build` は DB に触れないこと
-
-## エッジケース
-
-| ケース | 扱い |
-|---|---|
-| 値を `${}` や `inArray` で埋め込む | drizzle-kit が `IN ($1, …)` を出力し、マイグレーションが壊れる。`sql.raw` でリテラルとして展開する |
-| PostgreSQL が `IN (...)` を `= ANY (ARRAY[...])` に変換して保存する | `db:push` が毎回差分と誤認するかもしれない。development で確かめる |
-| 既存の環境に、定数に無いコードの行がある | 制約の追加が失敗する。main と development に無いことを SELECT で確認した（7コード） |
-| 定数にコードを足し、`facility_types` への INSERT を忘れる | CHECK では検出できない。Admin の保存時に外部キーのエラーになる（黙って誤判定はしない） |
-| 子テーブル（`transfer_route_facilities` / `station_facilities`）に未知のコードを入れる | 外部キーで `facility_types` を参照しており、親の CHECK だけで防げる |
+- **REQ-1**: アクセス点の設備が `wheelchairEscalator` のとき、システムはホーム図に `wheelchair_escalator.png` のアイコンを描画すること（Web・Admin とも）
+- **REQ-2**: `FACILITY_TYPE_CODES` に対応表のキーが無い設備の種類がある場合、システムは typecheck でエラーにすること
+- **REQ-3**: 稼働中のコードが知らない設備の種類が DB から来た場合、システムは従来どおり代替の記号（📍）で描画し、エラーにしないこと
+- **REQ-4**: システムは、設備の種類を足す手順（`packages/database/src/enums/facility.ts` のコメント）と `platform-diagram` の README に、アイコンの追加を含めること

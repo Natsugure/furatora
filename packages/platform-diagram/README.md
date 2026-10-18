@@ -55,11 +55,15 @@ import '@furatora/platform-diagram/styles.css'; // layout.tsx で1回だけ impo
 `DiagramSvg` は設備アイコンを `<img>`/`<image>` の `href` で参照する。Next.js の
 `public/` はアプリごとに独立配信されるため、パッケージからアイコンを配信することは
 できない。**`iconBasePath` prop（既定値 `/icons`）で配信元を注入する**ので、
-このパッケージを使う各アプリは自分の `public/icons/` に以下の6ファイルを置くこと。
+このパッケージを使う各アプリは自分の `public/icons/` に以下の7ファイルを置くこと。
 
 ```
-elevator.png, escalator.png, stairs.png, wheelchair_ramp.png, stair_lift.png, wheelchair.png
+elevator.png, escalator.png, stairs.png, wheelchair_ramp.png, stair_lift.png, wheelchair.png,
+wheelchair_escalator.png
 ```
+
+対応表 `FACILITY_ICON_FILES`（`DiagramSvg.tsx`）のキーは `FacilityTypeCode` なので、設備の種類を足すと
+ここがコンパイルエラーになる。対応表に足すときは、各アプリの `public/icons/` にも画像を置くこと。
 
 `apps/web/public/icons/` にあるものと同一のファイルを `apps/admin/public/icons/` にも
 複製している。将来アイコンを更新するときは両方を更新すること。

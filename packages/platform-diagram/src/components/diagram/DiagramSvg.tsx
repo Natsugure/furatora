@@ -1,3 +1,4 @@
+import type { FacilityTypeCode } from '@furatora/database/enums';
 import {
   CONCOURSE_TICK_HEIGHT,
   FACILITY_ICON_PITCH,
@@ -19,13 +20,16 @@ import type { ConcourseDTO, StopPatternCarDTO } from '../../domain/types';
 // ファイル名だけを持つ。配信元は iconBasePath prop（既定 '/icons'）で決まる。
 // public/ はアプリごとに独立配信されるため、このパッケージを使う各アプリが
 // 自分の public/icons/ に同名ファイルを置く必要がある（README.md 参照）。
-const FACILITY_ICON_FILES: Record<string, string> = {
+// キーを FacilityTypeCode にして、設備の種類の足し忘れをコンパイルエラーにする。
+// それでも稼働中のコードが知らない種類が DB から来うる（ADR-0016「残るずれ」）ので、描画側のフォールバックは残す。
+const FACILITY_ICON_FILES: Record<FacilityTypeCode, string> = {
   elevator: 'elevator.png',
   escalator: 'escalator.png',
   stairs: 'stairs.png',
   ramp: 'wheelchair_ramp.png',
   stairLift: 'stair_lift.png',
   sameFloor: 'wheelchair.png',
+  wheelchairEscalator: 'wheelchair_escalator.png',
 };
 
 const NOSE_INSET_RATIO = 0.15;
@@ -120,7 +124,7 @@ export function DiagramSvg({
         .map((cell, idx) =>
           cell.facilities.map((facility, fIdx) => {
             const x = cell.xPositionMeters! + (fIdx - (cell.facilities.length - 1) / 2) * FACILITY_ICON_PITCH;
-            const iconFile = FACILITY_ICON_FILES[facility.typeCode];
+            const iconFile = facility.typeCode !== null ? FACILITY_ICON_FILES[facility.typeCode] : undefined;
             return iconFile ? (
               <image
                 key={`${cell.concourseId}-${idx}-${fIdx}`}
