@@ -6,7 +6,7 @@
 - **関連**: [ADR-0018](./0018-semantic-colors-for-facilities.md)（設備・状態の意味色）,
   [ADR-0019](./0019-app-icon-train-on-flat-line.md)（アプリアイコン）,
   [ADR-0010](./0010-platform-diagram-package-edit-layer.md)（ホーム図パッケージのトークン）,
-  GitHub Issue #166
+  GitHub Issue #166, [見本](./assets/0017/README.md)
 
 ---
 
@@ -83,6 +83,14 @@ Web アプリの見た目に、次の問題があった。
     HEX・RGB・HSL・OKLCH の値で、CSS 変数は受け付けない（Mantine 8.3 のドキュメント「Supported color formats」）
   - 複製した値が CSS 変数と一致することを、テストで確かめる
 - 移行が終わったら、Tailwind の既定の色（`gray`・`blue` など）は使わない
+
+## 見本
+
+決めたときのデザインキャンバスを [assets/0017/](./assets/0017/README.md) に残した（PNG と HTML のソース）。
+
+![デザインシステムの一覧](./assets/0017/01-design-system.png)
+
+画面の構成（決定4）は、トップ・路線の駅一覧・駅の詳細・ホーム図の4画面の見本を見る。
 
 ## 却下した選択肢
 

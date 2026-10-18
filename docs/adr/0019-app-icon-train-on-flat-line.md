@@ -3,7 +3,8 @@
 - **ステータス**: Proposed
 - **日付**: 2026-10-18
 - **決定者**: @Natsugure
-- **関連**: [ADR-0017](./0017-soft-rose-palette-and-typography.md)（配色）, GitHub Issue #166
+- **関連**: [ADR-0017](./0017-soft-rose-palette-and-typography.md)（配色）, GitHub Issue #166,
+  [見本](./assets/0017/06-app-icon.png)
 
 ---
 

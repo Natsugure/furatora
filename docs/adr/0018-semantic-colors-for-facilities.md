@@ -5,7 +5,7 @@
 - **決定者**: @Natsugure
 - **関連**: [ADR-0017](./0017-soft-rose-palette-and-typography.md)（配色の土台）,
   [ADR-0010](./0010-platform-diagram-package-edit-layer.md)（ホーム図パッケージ）,
-  GitHub Issue #166
+  GitHub Issue #166, [見本](./assets/0017/README.md)（ホーム図: `05-platform.png`、駅の詳細: `04-station-*.png`）
 
 ---
 

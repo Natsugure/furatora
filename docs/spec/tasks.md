@@ -8,6 +8,7 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 - [x] **TASK-0.1** Issue #166 を起票し、ブランチを切る
 - [x] **TASK-0.2** `docs/spec/` の3点を書き換える
 - [x] **TASK-0.3** ADR-0017・0018・0019 を `Proposed` で書き、`docs/adr/README.md` の一覧に足す
+- [x] **TASK-0.4** デザインキャンバスの見本（PNG とソース）を `docs/adr/assets/0017/` に残し、ADR から参照する
 
 ## PR 1: 土台（PoC）
 
@@ -49,6 +50,6 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 
 ## フェーズ5: ドキュメント（最後の PR に含める）
 
-- [ ] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。`docs/domain/README.md` の一覧に足す
+- [ ] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。決定時点の見本として `docs/adr/assets/0017/` を参照する。`docs/domain/README.md` の一覧に足す
 - [ ] **TASK-6.2** ADR-0017・0018 を、開発者の承認を得て `Accepted` にする。ADR-0019 はアイコン差し替えの後に `Accepted` にする
 - [ ] **TASK-6.3** 範囲外の作業を Issue に起票する（requirements.md「範囲外」）
