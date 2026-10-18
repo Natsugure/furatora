@@ -29,13 +29,18 @@ async function getLineOptions(): Promise<TrainLineOption[]> {
 }
 
 async function getTrain(trainId: string): Promise<TrainDTO | null> {
-  const [train] = await db.select().from(trains).where(eq(trains.id, trainId));
-  if (!train) return null;
-
-  const [equipments, carStructureRows] = await Promise.all([
-    db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
-    db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
+  // neon-http は await 1回が HTTP 1往復になるため、3本を並列に読んでから列車の有無を見る。
+  // TrainForm は配列の順に描画するので、号車・設備は並び順を指定する
+  const [[train], equipments, carStructureRows] = await Promise.all([
+    db.select().from(trains).where(eq(trains.id, trainId)),
+    db.select().from(trainEquipments)
+      .where(eq(trainEquipments.trainId, trainId))
+      .orderBy(asc(trainEquipments.carNumber), asc(trainEquipments.nearDoor)),
+    db.select().from(trainCarStructures)
+      .where(eq(trainCarStructures.trainId, trainId))
+      .orderBy(asc(trainCarStructures.carNumber)),
   ]);
+  if (!train) return null;
 
   return {
     id: train.id,
@@ -71,6 +76,7 @@ export const dbTrainEditPageQuery: TrainEditPageQuery = {
   },
 
   async getEditContext(trainId) {
+    // 正常時を 1 往復にするため、列車が無い（404）ときに選択肢を読む無駄は許している
     const [train, operatorOptions, lineOptions] = await Promise.all([
       getTrain(trainId),
       getOperatorOptions(),
