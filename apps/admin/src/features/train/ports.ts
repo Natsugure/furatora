@@ -1,7 +1,5 @@
 // 読み取り: Query Service（ADR-0003）。列車の新規・編集ページが必要とする
 // 選択肢（事業者・路線）と、編集時は列車本体・号車構成・設備を1画面分の DTO で返す。
-// admin 全体の Query Service 化は #48 だが、フォームのクライアント側 fetch 廃止（#49）に
-// 伴い、src/app/** から @furatora/database を直接 import できない親ページのために先行導入する。
 
 export type OperatorOption = { id: string; name: string };
 
@@ -26,23 +24,29 @@ export type TrainEquipmentDTO = {
   isStandard: boolean;
 };
 
+export type TrainDTO = {
+  id: string;
+  name: string;
+  operatorId: string;
+  lineIds: string[];
+  carCount: number;
+  carStructure: TrainCarStructureDTO[] | null;
+  freeSpaces: TrainEquipmentDTO[];
+  prioritySeats: TrainEquipmentDTO[];
+};
+
 export type TrainEditContext = {
   operators: OperatorOption[];
   lines: TrainLineOption[];
-  train?: {
-    id: string;
-    name: string;
-    operatorId: string;
-    lineIds: string[];
-    carCount: number;
-    carStructure: TrainCarStructureDTO[] | null;
-    freeSpaces: TrainEquipmentDTO[];
-    prioritySeats: TrainEquipmentDTO[];
-  };
+  train?: TrainDTO;
 };
 
 export interface TrainEditPageQuery {
   getCreateContext(): Promise<TrainEditContext>;
   // 該当列車が無ければ null（ページは notFound() する）
   getEditContext(trainId: string): Promise<TrainEditContext | null>;
+  // 列車の複製（DuplicateButton）が GET /api/trains/[trainId] 経由で使う。
+  // 複製元をそのまま POST /api/trains に送るため、編集ページと同じ DTO を返す。
+  // 該当列車が無ければ null
+  getTrain(trainId: string): Promise<TrainDTO | null>;
 }

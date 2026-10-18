@@ -3,25 +3,7 @@ import { db } from '@furatora/database/client';
 import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { trainSchema } from '@/features/train/schema';
-
-function shapeTrainWithEquipments(
-  train: typeof trains.$inferSelect,
-  equipments: (typeof trainEquipments.$inferSelect)[],
-  carStructureRows: (typeof trainCarStructures.$inferSelect)[]
-) {
-  return {
-    ...train,
-    carStructure: carStructureRows.length > 0
-      ? carStructureRows.map((cs) => ({ carNumber: cs.carNumber, doorCount: cs.doorCount, carLength: cs.carLength }))
-      : null,
-    freeSpaces: equipments
-      .filter((e) => e.type === 'free_space')
-      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-    prioritySeats: equipments
-      .filter((e) => e.type === 'priority_seat')
-      .map((e) => ({ carNumber: e.carNumber, nearDoor: e.nearDoor, isStandard: e.isStandard })),
-  };
-}
+import { trainEditPageQuery } from '@/di';
 
 export async function GET(
   _request: Request,
@@ -29,15 +11,11 @@ export async function GET(
 ) {
   try {
     const { trainId } = await params;
-    const [train] = await db.select().from(trains).where(eq(trains.id, trainId));
+    const train = await trainEditPageQuery.getTrain(trainId);
     if (!train) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    const [equipments, carStructureRows] = await Promise.all([
-      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
-      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
-    ]);
-    return NextResponse.json(shapeTrainWithEquipments(train, equipments, carStructureRows));
+    return NextResponse.json(train);
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -105,11 +83,7 @@ export async function PUT(
       await db.insert(trainEquipments).values(equipmentRows);
     }
 
-    const [equipments, carStructureRows] = await Promise.all([
-      db.select().from(trainEquipments).where(eq(trainEquipments.trainId, trainId)),
-      db.select().from(trainCarStructures).where(eq(trainCarStructures.trainId, trainId)),
-    ]);
-    return NextResponse.json(shapeTrainWithEquipments(updated, equipments, carStructureRows));
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
