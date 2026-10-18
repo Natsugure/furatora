@@ -3,15 +3,16 @@ type Props = {
   color: string | null;
 };
 
+const badgeClassName =
+  'w-13.5 h-13.5 rounded-full border-4 flex items-center justify-center bg-surface font-display font-bold text-ink flex-shrink-0';
+
 export function StationBadge({ code, color }: Props) {
-  const borderColor = color || '#888888';
+  // 路線色は DB から来る。無いときはニュートラルの輪にする
+  const borderColor = color || 'var(--neutral-300)';
 
   if (!code) {
     return (
-      <div
-        className="w-12 h-12 rounded-full border-4 flex items-center justify-center bg-white text-gray-400 text-xs flex-shrink-0"
-        style={{ borderColor }}
-      >
+      <div className={`${badgeClassName} text-muted text-xs`} style={{ borderColor }}>
         -
       </div>
     );
@@ -21,16 +22,13 @@ export function StationBadge({ code, color }: Props) {
   const match = code.match(/^([A-Z]+)(\d+)$/);
 
   return (
-    <div
-      className="w-12 h-12 rounded-full border-4 flex flex-col items-center justify-center bg-white font-bold flex-shrink-0"
-      style={{ borderColor }}
-    >
+    <div className={`${badgeClassName} flex-col`} style={{ borderColor }}>
       {match ? (
         <>
-          <span className="text-xs leading-none">
+          <span className="text-[11px] leading-none">
             {match[1]}
           </span>
-          <span className="text-sm leading-none">{match[2]}</span>
+          <span className="text-[17px] leading-none">{match[2]}</span>
         </>
       ) : (
         <span className="text-xs">{code}</span>
