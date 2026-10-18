@@ -9,6 +9,7 @@ import {
   type PlatformDTO,
 } from '@furatora/platform-diagram/domain';
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
+import { railLineColor } from '@/theme/railLineColor';
 
 type Props = {
   platform: PlatformDTO;
@@ -19,7 +20,7 @@ export function PlatformDisplay({ platform }: Props) {
     .filter(Boolean)
     .join(' / ');
 
-  const lineColor = platform.lineColor || '#6b7280';
+  const lineColor = railLineColor(platform.lineColor);
   const bounds = computeBounds(platform.physicalLength, platform.stopPatterns, platform.concourses);
   // コンコースはホーム単位の情報で停車位置パターンごとに変わらない。ここで1度だけ算出し
   // 全パターンに同じものを渡す（パターンごとに算出すると段の割り当てがずれる）
@@ -31,7 +32,7 @@ export function PlatformDisplay({ platform }: Props) {
   const undrawable = platform.concourses.filter((c) => !isDrawable(c) && hasDisplayableInfo(c));
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-card border-[1.5px] border-subtle bg-surface">
       <div className="flex items-stretch">
         {/* Left color bar */}
         <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: lineColor }} />
@@ -42,16 +43,16 @@ export function PlatformDisplay({ platform }: Props) {
           {/* Platform header */}
           <div className="mb-4 flex items-center gap-3">
             <div
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full font-display text-base font-bold text-white"
               style={{ backgroundColor: lineColor }}
             >
               {platform.platformNumber}
             </div>
             <div>
-              <h3 className="text-lg font-semibold leading-tight text-gray-900">
+              <h3 className="font-display text-lg font-bold leading-tight text-ink">
                 {platform.platformNumber}番線
               </h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-[13px] text-muted">
                 {platform.lineName}
                 {directions && ` — ${directions}`}
               </p>
@@ -60,12 +61,12 @@ export function PlatformDisplay({ platform }: Props) {
 
           {/* Trains stopping at this platform */}
           {platform.physicalLength === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+            <div className="rounded-input bg-canvas p-4 text-center text-sm text-muted">
               ホーム長が未登録のため図を表示できません
             </div>
           ) : platform.stopPatterns.length > 0 ? (
             <div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <p className="mb-3 text-xs font-bold text-muted">
                 列車・ホーム設備
               </p>
               <div className="space-y-4">
@@ -84,16 +85,16 @@ export function PlatformDisplay({ platform }: Props) {
               </div>
             </div>
           ) : (
-            <p className="text-sm italic text-gray-400">列車情報がありません</p>
+            <p className="text-sm text-muted">列車情報がありません</p>
           )}
 
           {/* 位置が登録されていないコンコース。図に描けないぶんをここで補う */}
           {undrawable.length > 0 && (
-            <div className="mt-4 border-t border-gray-200 pt-4">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="mt-4 border-t border-line pt-4">
+              <p className="mb-1 text-xs font-bold text-muted">
                 位置未登録の設備・乗換
               </p>
-              <p className="mb-3 text-xs text-gray-400">
+              <p className="mb-3 text-xs text-muted">
                 ホーム上の位置が登録されていないため、図には表示していません。
               </p>
               <div className="space-y-3">
@@ -106,16 +107,16 @@ export function PlatformDisplay({ platform }: Props) {
 
                   return (
                     <div key={concourse.id}>
-                      {exits && <p className="text-sm font-medium text-gray-700">{exits}</p>}
+                      {exits && <p className="text-sm font-medium text-ink">{exits}</p>}
                       {connections.length > 0 && (
-                        <p className="text-sm text-gray-600">
-                          <span className="text-gray-400">乗換: </span>
+                        <p className="text-sm text-ink-soft">
+                          <span className="text-muted">乗換: </span>
                           {connections.join('・')}
                         </p>
                       )}
                       {facilityNames.length > 0 && (
-                        <p className="text-sm text-gray-600">
-                          <span className="text-gray-400">設備: </span>
+                        <p className="text-sm text-ink-soft">
+                          <span className="text-muted">設備: </span>
                           {facilityNames.join('・')}
                         </p>
                       )}
@@ -128,7 +129,7 @@ export function PlatformDisplay({ platform }: Props) {
 
           {/* Platform notes */}
           {platform.notes && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="mt-4 rounded-input bg-subtle p-3 text-sm text-ink-soft">
               {platform.notes}
             </div>
           )}
