@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getVisibleLineWithStations } from '@/external/query/lineStationsQuery';
-import { StationCard } from '@/components/StationCard';
+import { StationTimeline } from '@/components/StationTimeline';
 import { Container } from '@/components/ui/Container';
 import { railLineColor } from '@/theme/railLineColor';
 
@@ -58,17 +58,7 @@ export default async function StationListPage({ params }: Props) {
         駅を選択
       </h2>
       {stations.length > 0 ? (
-        <div>
-          {stations.map((station, index) => (
-            <StationCard
-              key={station.id}
-              station={station}
-              lineColor={line.color}
-              isFirst={index === 0}
-              isLast={index === stations.length - 1}
-            />
-          ))}
-        </div>
+        <StationTimeline stations={stations} lineColor={line.color} />
       ) : (
         <div className="text-center text-gray-500 py-12">
           <p>この路線の駅データがありません</p>
