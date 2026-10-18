@@ -34,6 +34,12 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
     Tailwind のユーティリティに勝ち、ボタン・入力欄の `font-bold` / `text-sm` が効いていなかった。
     `app/layers.css` でレイヤーの順序（`theme, base, mantine, components, utilities`）を最初に宣言し、`@mantine/core/styles.layer.css` を読む
   - 検索欄（`type="search"`）のブラウザ標準の青い消去ボタンを隠した
+- [x] **TASK-2.6** 共通部品のテストを足す（React Testing Library。クラス名ではなく役割・名前・文言で確かめる）
+  - `StationBadge` / `BackButton` / `SearchTabs` / `StationSearch` / `StationCard` / `OperatorList` / `LineAccordion`（36 件）
+  - `StationCard` の線は装飾（`aria-hidden`）で役割を持たないため、`data-timeline="up" | "down"` で上下を見分ける
+  - `OperatorList` の開閉ボタンに `aria-expanded` を足し、開閉を状態で確かめる
+  - PR 1 側に `app/layers.test.ts`（レイヤーの順序と、`layout.tsx` が `layers.css` を最初に読むこと）を足した
+  - `layout.tsx` のヘッダー・フッターは `next/font` を使う Server Component のため単体テストの対象外（目視で確かめた）
 
 ## PR 3: 各画面（依存: PR 2）
 

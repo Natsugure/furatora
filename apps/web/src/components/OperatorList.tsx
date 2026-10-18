@@ -22,6 +22,8 @@ export function OperatorList({ operators }: Props) {
           className="bg-surface rounded-card border border-line shadow-card overflow-hidden"
         >
           <button
+            type="button"
+            aria-expanded={expandedOperator === operator.id}
             onClick={() =>
               setExpandedOperator(
                 expandedOperator === operator.id ? null : operator.id

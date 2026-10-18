@@ -22,10 +22,10 @@ export function StationCard({ station, lineColor, isFirst, isLast }: Props) {
     >
       {/* 線はバッジ（54px）の中心を通す */}
       {!isFirst && (
-        <span aria-hidden className="absolute left-6 top-0 bottom-1/2 w-[5px] opacity-55" style={lineStyle} />
+        <span aria-hidden data-timeline="up" className="absolute left-6 top-0 bottom-1/2 w-[5px] opacity-55" style={lineStyle} />
       )}
       {!isLast && (
-        <span aria-hidden className="absolute left-6 top-1/2 bottom-0 w-[5px] opacity-55" style={lineStyle} />
+        <span aria-hidden data-timeline="down" className="absolute left-6 top-1/2 bottom-0 w-[5px] opacity-55" style={lineStyle} />
       )}
       <div className="relative">
         <StationBadge code={station.code} color={lineColor} />
