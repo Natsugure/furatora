@@ -127,6 +127,11 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
   - 済み: typecheck・lint・test（22 ファイル・148 件）・build。書き出した PNG を拡大して目視（512・180 で文字が読める、60 でかろうじて読める、32・16 で電車と線が見分けられる）。
     dev で、ヘッダーに新しいアイコンが出ること、`icon.svg`・`favicon.ico`・`apple-touch-icon` の `<link>` が出ること、manifest と各アイコンが 200 で返ること
   - 開発者が、PR #180 の Vercel のプレビューを iOS のホーム画面に追加し、新しいアイコンが出ることを実機で確かめた
+- [x] **TASK-5.5** PR #180 のレビュー対応
+  - `app/icon.svg` を `icon-source/app-icon-16.svg` に移し、タブのアイコンを `favicon.ico`（16・32・48）だけにする
+  - `manifest.json` に `id`・`start_url`・`scope`（いずれも `/`）を足し、`manifest.test.ts` で検査する
+  - 結果: 成功（typecheck・lint・test 149 件・build）。build の HTML で、`<link rel="icon">` が `favicon.ico` の 1 本だけになり、`icon.svg` が出ないことを確かめた。
+    `favicon.ico` の 3 枚を拡大して目視した
 
 ## フェーズ5: ドキュメント（最後の PR に含める）
 

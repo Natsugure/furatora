@@ -101,13 +101,16 @@ Web は `styles.css` を `globals.css` より前に読む。同じ名前のト�
 | ファイル | 版 | 角 |
 |---|---|---|
 | `apps/web/icon-source/app-icon.svg` | 文字あり（PNG の元データ。文字はパス） | 正方形 |
-| `apps/web/src/app/icon.svg` | 文字なし・16px 用（脚と線が太く、前照灯なし）。タブのファビコン | 丸める |
+| `apps/web/icon-source/app-icon-16.svg` | 文字なし・16px 用（脚と線が太く、前照灯なし。`favicon.ico` の 16 の元データ） | 丸める |
 | `apps/web/src/assets/app-icon-mark.svg` | 文字なし。ヘッダー（36px） | 丸める |
-| `apps/web/src/app/favicon.ico` | 16: `icon.svg` ／ 32: `app-icon-mark.svg` | 丸める |
+| `apps/web/src/app/favicon.ico` | 16: `app-icon-16.svg` ／ 32・48: `app-icon-mark.svg`。タブのファビコン | 丸める |
 | `apps/web/src/app/apple-icon.png`（180） | 文字あり | 正方形・透過なし |
 | `apps/web/public/icons/android-chrome-192x192.png` / `-512x512.png` | 文字あり | 正方形・透過なし |
 
 - 60px 未満で出す所は、文字なしの版を使う
+- タブのアイコンは `favicon.ico` だけにし、`src/app/icon.svg` は置かない。Next は `app/icon.svg` を `sizes="any"` で出し、
+  SVG に対応したブラウザはどの大きさでもそれを使うため、16px 用の版が 32px 以上でも出てしまう
+- `manifest.json` の `id`・`start_url`・`scope` は `/`。`id` を変えると、インストール済みのアプリとは別のアプリになる
 - iOS・Android 向けは、角を OS が丸める。透過した角は iOS で黒くなるため、地を正方形に塗る
 - 文字が maskable の安全領域からはみ出すため、`manifest.json` のアイコンは `purpose: "any"` だけにする
   （`src/app/manifest.test.ts`）

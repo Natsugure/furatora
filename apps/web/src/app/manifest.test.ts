@@ -11,8 +11,11 @@ interface ManifestIcon {
 }
 
 interface Manifest {
+  id?: string;
   name: string;
   short_name: string;
+  start_url?: string;
+  scope?: string;
   icons: ManifestIcon[];
 }
 
@@ -22,6 +25,13 @@ describe('manifest.json', () => {
   it('name と short_name が空でない', () => {
     expect(manifest.name).not.toBe('');
     expect(manifest.short_name).not.toBe('');
+  });
+
+  // 無いと、ホーム画面に追加した時のページから毎回起動する。id は後から変えると別のアプリになる
+  it('id・start_url・scope がトップページ', () => {
+    expect(manifest.id).toBe('/');
+    expect(manifest.start_url).toBe('/');
+    expect(manifest.scope).toBe('/');
   });
 
   it.each(manifest.icons.map((icon) => icon.src))('%s が public/ にある', (src) => {

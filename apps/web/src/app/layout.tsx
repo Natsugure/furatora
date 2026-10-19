@@ -11,7 +11,7 @@ import '@mantine/core/styles.layer.css';
 // ホーム図のトークン。globals.css より前に読む（同じ名前の汎用トークンは globals.css を勝たせる）
 import '@furatora/platform-diagram/styles.css';
 import './globals.css';
-// app/icon.svg はタブ用の 16px 版（線が太い）。ヘッダーは案のままの文字なし版を使う（ADR-0019）
+// ヘッダーは案のままの文字なし版を使う。タブの 16px 版（線が太い）は favicon.ico にだけ入れる（ADR-0019）
 import iconSvg from '@/assets/app-icon-mark.svg';
 
 // 本文書体（Noto Sans JP）・見出しと数字の書体（Zen Maru Gothic）・ホーム図のサイン用書体（BIZ UDPGothic）。
