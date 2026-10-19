@@ -69,7 +69,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0017](./0017-soft-rose-palette-and-typography.md) | Web アプリの配色と書体を「Soft Rose」にし、トークンを Tailwind と Mantine の両方へ同じ値で渡す | Accepted   | 2026-10-18 |
 | [0018](./0018-semantic-colors-for-facilities.md) | フリースペース・優先席・出口・移動手段・状態の意味色を決め、出口を駅サインの黄からバター色に変える | Accepted   | 2026-10-18 |
 | [0019](./0019-app-icon-train-on-flat-line.md) | アプリアイコンを「正面の電車＋平らな線＋ふらっと」にし、小さいサイズでは文字を外す | Accepted   | 2026-10-18 |
-| [0020](./0020-main-only-long-lived-branch.md) | 長命ブランチを main のみにし、PR はマージコミットで main へ入れる | Proposed   | 2026-10-20 |
+| [0020](./0020-main-only-long-lived-branch.md) | 長命ブランチを main のみにし、PR はマージコミットで main へ入れる | Accepted   | 2026-10-20 |
 
 ## 関連ドキュメント
 
