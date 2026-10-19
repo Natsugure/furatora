@@ -167,7 +167,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 2 | `app/layout.tsx` | ヘッダー（アイコン＋ふらとら＋説明）・フッターの色と書体。右端の `Train` アイコンは消す（意味を持たない装飾のため） |
 | 2 | `components/ui/Container.tsx` | 余白（スマホ 16px）は変えない |
 | 2 | `components/ui/StationBadge.tsx` | 路線色のリング＋白地＋Zen Maru Gothic の数字。路線色が無いときは `--color-rail-line-fallback`（= `--neutral-300`） |
-| 2 | `components/BackButton.tsx` | 白い丸（44px）に左向きの山形 |
+| 2 | `components/BackButton.tsx` | 白い丸（44px）に左向きの山形（戻り方は下の「戻るボタン」の段落。PR 3） |
 | 2 | `components/SearchTabs.tsx` | Mantine の `SegmentedControl`（ラジオボタンのグループ）で、角丸のセグメント（選択中は白地・ローズ文字・影）。`TransferDifficultySection`（PR 3）と同じ部品にそろえる |
 | 2 | `components/StationSearch.tsx` | 白い検索欄（角丸 18px、影、ローズの虫眼鏡） |
 | 2 | `components/StationCard.tsx` | 路線の駅一覧のタイムライン（`isFirst` / `isLast` で線の端を切る）。右端は淡いローズの丸に山形 |
@@ -188,6 +188,14 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 5 | `app/icon.svg` / `apple-icon.png` / `favicon.ico` / `public/icons/android-chrome-*.png` / `app/manifest.json` | ADR-0019 の図柄。manifest のパスを `/icons/…` に直し、`name` / `short_name` を入れる |
 
 路線記号（銀座線の「G」など）は、`lines.line_code`（`Line.lineCode`）を使う。null の路線だけ、先頭の駅の駅番号の英字にフォールバックする（`components/ui/LineSymbol.tsx`）。
+駅番号の英字と番号への分け方は `features/station/domain/stationCode.ts` の `parseStationCode()` にまとめ、`StationBadge` と共有する。
+
+路線色の丸に白い文字を載せない。銀座線（`#F39700`）や日比谷線など明るい路線色、路線色の無い路線の代わりの色（`neutral-300`）は、
+白とのコントラストが 3:1 にも届かない（REQ-10）。文字を載せる路線色の印（路線記号・番線・駅のバッジ）は、路線色を輪だけに使い、白地に `text-ink` で書く。
+路線色で塗ってよいのは、文字を載せない線・帯・小さな丸だけにする。
+
+戻るボタン（`BackButton`）は、行き先（`href`）へのリンクにする。`navigation.canGoBack`（同じオリジンの履歴）があるときだけ、
+リンク先へ行かずに前の画面に戻る。共有されたリンクを直接開いたときにも行き先がある。`history.length` はサイトの外の履歴も数えるため使わない。
 DB の列は増やさない。
 
 ### 路線のチップ（駅の詳細）

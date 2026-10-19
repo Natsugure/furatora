@@ -29,7 +29,8 @@ export default async function StationDetailPage({ params }: Props) {
   return (
     <>
       <Container className="pt-2 pb-6">
-        <BackButton />
+        {/* 履歴が無いとき（直接開いたとき）はトップへ。駅の詳細は複数の路線から来るため、路線の駅一覧には決められない */}
+        <BackButton href="/" />
 
         <div className="flex items-center gap-4">
           {station.code && (

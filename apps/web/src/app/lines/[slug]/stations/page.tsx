@@ -23,7 +23,7 @@ export default async function StationListPage({ params }: Props) {
   return (
     <>
       <Container className="pt-2 pb-6">
-        {/* 路線一覧（トップ）へ戻る。直接開いたときも行き先があるよう、履歴ではなくリンクにする */}
+        {/* 履歴が無いとき（直接開いたとき）は路線一覧（トップ）へ */}
         <BackButton href="/" />
 
         <div className="flex items-center gap-4">

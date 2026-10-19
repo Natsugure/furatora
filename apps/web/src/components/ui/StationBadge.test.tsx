@@ -9,6 +9,12 @@ describe('StationBadge', () => {
     expect(screen.getByText('01')).toBeInTheDocument();
   });
 
+  it('小文字を含む路線記号（方南町支線の Mb03）も分けて表示する', () => {
+    render(<StationBadge code="Mb03" color="#E60012" />);
+    expect(screen.getByText('Mb')).toBeInTheDocument();
+    expect(screen.getByText('03')).toBeInTheDocument();
+  });
+
   it('英字と数字に分けられない駅番号は、そのまま表示する', () => {
     render(<StationBadge code="A-11" color="#E85298" />);
     expect(screen.getByText('A-11')).toBeInTheDocument();

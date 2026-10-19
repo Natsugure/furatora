@@ -8,13 +8,15 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const SCAN_DIRS = ['apps/web/src', 'packages/platform-diagram/src'];
 
+// mauve・olive・mist・taupe は Tailwind v4.2 で増えた名前。今の版（4.1）に無くても、上げたときに漏れないよう入れておく
 const DEFAULT_PALETTE =
-  'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+  'slate|gray|zinc|neutral|stone|mauve|olive|mist|taupe|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
 const COLOR_UTILITY =
   'bg|text|border|border-[trblxy]|ring|ring-offset|divide|outline|fill|stroke|from|via|to|placeholder|decoration|accent|caret|shadow';
 const DEFAULT_COLOR_CLASS = new RegExp(`(?<![\\w-])(?:${COLOR_UTILITY})-(?:(?:${DEFAULT_PALETTE})-\\d{2,3}|black)\\b`, 'g');
-// 文字列の中の16進の色（'#fff' / "#FFFFFF" / bg-[#123456]）。コメントの「Issue #107」は拾わない
-const HEX_COLOR = /(?<=['"`[])#(?:[0-9a-fA-F]{3}){1,2}(?:[0-9a-fA-F]{2})?\b/g;
+// 16進の色（'#fff' / '1px solid #ccc' / `${w}px solid #fff` / bg-[#123456]）。
+// 「Issue #107」のようなコメントの中の番号は、走査の前にコメントを取り除くことで拾わない（codeOnly）
+const HEX_COLOR = /(?<![\w&])#(?:[0-9a-fA-F]{3}){1,2}(?:[0-9a-fA-F]{2})?\b/g;
 
 // 意図した例外。理由を添えて、行の単位で許す
 const ALLOWED: { file: string; line: RegExp; reason: string }[] = [
@@ -30,35 +32,85 @@ const ALLOWED: { file: string; line: RegExp; reason: string }[] = [
   },
 ];
 
-function sourceFiles(dir: string): string[] {
+function listFiles(dir: string, extension: RegExp): string[] {
   return readdirSync(path.join(REPO_ROOT, dir), { recursive: true, encoding: 'utf-8' })
-    .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && !f.endsWith('.d.ts'))
+    .filter((f) => extension.test(f) && !/\.test\.tsx?$/.test(f) && !f.endsWith('.d.ts'))
     .map((f) => path.join(dir, f));
 }
 
-// 走査の対象の行（例外を除く）。ファイルを読むのは1回だけにして、各テストで使い回す
-const SCANNED_LINES = SCAN_DIRS.flatMap(sourceFiles).flatMap((file) =>
-  readFileSync(path.join(REPO_ROOT, file), 'utf-8')
-    .split('\n')
-    .map((text, i) => ({ where: `${file}:${i + 1}`, text }))
-    .filter(({ text }) => !ALLOWED.some((a) => a.file === file && a.line.test(text))),
-);
+const sourceFiles = (dir: string) => listFiles(dir, /\.tsx?$/);
+const cssFiles = (dir: string) => listFiles(dir, /\.css$/);
 
-function violations(pattern: RegExp): string[] {
-  return SCANNED_LINES.flatMap(({ where, text }) => [...text.matchAll(pattern)].map((m) => `${where} ${m[0]}`));
+// コメント（// …、/* … */、複数行の /* … */ の途中の行）を空白に置き換える。行番号は保つ。
+// URL の // を誤って消さないよう、// は直前が : でないときだけコメントとみなす
+function codeOnly(source: string): string[] {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '))
+    .split('\n')
+    .map((line) => line.replace(/(?<!:)\/\/.*$/, ''));
+}
+
+// 走査の対象の行（例外を除く）。ファイルを読むのは1回だけにして、各テストで使い回す
+function scannedLines(files: string[]) {
+  return files.flatMap((file) =>
+    codeOnly(readFileSync(path.join(REPO_ROOT, file), 'utf-8'))
+      .map((text, i) => ({ where: `${file}:${i + 1}`, text }))
+      .filter(({ text }) => !ALLOWED.some((a) => a.file === file && a.line.test(text))),
+  );
+}
+
+const SOURCE_LINES = scannedLines(SCAN_DIRS.flatMap(sourceFiles));
+// CSS は @apply の既定の色クラスだけを見る。16進の色は、globals.css と styles.css がトークンの値の正として持つため見ない
+const CSS_LINES = scannedLines(SCAN_DIRS.flatMap(cssFiles));
+
+function violations(lines: { where: string; text: string }[], pattern: RegExp): string[] {
+  return lines.flatMap(({ where, text }) => [...text.matchAll(pattern)].map((m) => `${where} ${m[0]}`));
 }
 
 describe('既定の色を使っていない', () => {
   it('Tailwind の既定の色クラスが無い', () => {
-    expect(violations(DEFAULT_COLOR_CLASS)).toEqual([]);
+    expect(violations(SOURCE_LINES, DEFAULT_COLOR_CLASS)).toEqual([]);
+  });
+
+  it('CSS の @apply にも Tailwind の既定の色クラスが無い', () => {
+    expect(violations(CSS_LINES, DEFAULT_COLOR_CLASS)).toEqual([]);
   });
 
   it('トークンを通さない16進の色が無い（路線色など DB から来る色は除く）', () => {
-    expect(violations(HEX_COLOR)).toEqual([]);
+    expect(violations(SOURCE_LINES, HEX_COLOR)).toEqual([]);
   });
 
   it('走査の対象のファイルがある（パスの誤りで空振りしない）', () => {
     expect(sourceFiles('apps/web/src').length).toBeGreaterThan(10);
     expect(sourceFiles('packages/platform-diagram/src').length).toBeGreaterThan(5);
+    expect(cssFiles('apps/web/src')).toContain('apps/web/src/app/globals.css');
+    expect(cssFiles('packages/platform-diagram/src')).toContain('packages/platform-diagram/src/styles.css');
+  });
+});
+
+// 検出の漏れを防ぐため、パターンそのものを確かめる（走査の結果が空でも、パターンが緩ければ通ってしまう）
+describe('色の検出のパターン', () => {
+  const matches = (pattern: RegExp, text: string) => [...text.matchAll(pattern)].map((m) => m[0]);
+
+  it.each([
+    "style={{ border: '1px solid #ccc' }}",
+    'border: `${w}px solid #fff`',
+    "color: '#FFFFFF'",
+    'className="bg-[#123456]"',
+  ])('16進の色を拾う: %s', (text) => {
+    expect(matches(HEX_COLOR, text)).toHaveLength(1);
+  });
+
+  it('コメントの中の番号は拾わない', () => {
+    const lines = codeOnly('// Issue #107\nconst a = 1; /* #fff */\n/*\n * #abc\n */');
+    expect(lines.flatMap((line) => matches(HEX_COLOR, line))).toEqual([]);
+  });
+
+  it('URL の // をコメントとみなさない', () => {
+    expect(codeOnly("const u = 'https://example.com'; const c = '#fff';")[0]).toContain('#fff');
+  });
+
+  it.each(['@apply text-gray-500;', 'bg-taupe-200', 'border-x-mauve-100', 'text-black'])('既定の色クラスを拾う: %s', (text) => {
+    expect(matches(DEFAULT_COLOR_CLASS, text)).toHaveLength(1);
   });
 });

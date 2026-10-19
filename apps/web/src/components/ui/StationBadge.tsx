@@ -1,3 +1,4 @@
+import { parseStationCode } from '@/features/station/domain/stationCode';
 import { railLineColor } from '@/theme/railLineColor';
 
 type Props = {
@@ -20,17 +21,16 @@ export function StationBadge({ code, color }: Props) {
     );
   }
 
-  // Parse station code (e.g., "M08" -> { prefix: "M", number: "08" })
-  const match = code.match(/^([A-Z]+)(\d+)$/);
+  const parts = parseStationCode(code);
 
   return (
     <div className={`${badgeClassName} flex-col text-ink`} style={style}>
-      {match ? (
+      {parts ? (
         <>
           <span className="text-[11px] leading-none">
-            {match[1]}
+            {parts.lineSymbol}
           </span>
-          <span className="text-[17px] leading-none">{match[2]}</span>
+          <span className="text-[17px] leading-none">{parts.number}</span>
         </>
       ) : (
         <span className="text-xs">{code}</span>

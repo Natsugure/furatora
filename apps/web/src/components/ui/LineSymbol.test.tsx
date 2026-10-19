@@ -23,13 +23,21 @@ describe('LineSymbol', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('丸を路線色で塗る', () => {
-    render(<LineSymbol lineCode="G" fallbackStationCode={null} color="#F39700" />);
-    expect(screen.getByRole('img')).toHaveStyle({ backgroundColor: '#F39700' });
+  it('駅番号が英字と数字に分けられなければ、何も描かない', () => {
+    const { container } = render(<LineSymbol lineCode={null} fallbackStationCode="A-11" color="#F39700" />);
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('路線色が無ければ、丸をニュートラルの色で塗る', () => {
+  it('輪を路線色で描き、路線色で塗らない（白い文字を載せない。REQ-10）', () => {
+    render(<LineSymbol lineCode="G" fallbackStationCode={null} color="#F39700" />);
+    const symbol = screen.getByRole('img');
+    expect(symbol).toHaveStyle({ borderColor: '#F39700' });
+    expect(symbol.style.backgroundColor).toBe('');
+    expect(symbol).toHaveClass('bg-surface', 'text-ink');
+  });
+
+  it('路線色が無ければ、輪をニュートラルの色で描く', () => {
     render(<LineSymbol lineCode="G" fallbackStationCode={null} color={null} />);
-    expect(screen.getByRole('img').style.backgroundColor).toBe('var(--color-rail-line-fallback)');
+    expect(screen.getByRole('img').style.borderColor).toBe('var(--color-rail-line-fallback)');
   });
 });
