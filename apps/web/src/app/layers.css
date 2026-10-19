@@ -1,0 +1,7 @@
+/* CSS レイヤーの順序。どのスタイルシートより先に読むこと（layout.tsx の最初の CSS の import）。
+   レイヤーの優先順位は、最初に現れた順で決まる。
+   - mantine は base（Tailwind の preflight）より上: preflight が Mantine の部品の見た目を消さないように
+   - mantine は utilities より下: Mantine のリセット（button { font: inherit } など）が
+     Tailwind のユーティリティ（font-bold / text-sm …）に勝たないように
+   Mantine は @mantine/core/styles.layer.css（@layer mantine で包んだ版）を読む */
+@layer theme, base, mantine, components, utilities;

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>池袋 2番線のホーム図</title>
+<script src="./preview.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#C63D71}a:hover{color:#A02F5B}
+</style>
+</helmet>
+<div style="width: 390px; height: 1520px; box-sizing: border-box; background: #FAF6F7; color: #2A2326; font-family: 'Noto Sans JP', sans-serif; letter-spacing: 0.02em; display: flex; flex-direction: column; overflow: hidden">
+
+  <header style="padding: 20px 20px 24px; display: flex; flex-direction: column; gap: 20px">
+    <a href="Station.dc.html" aria-label="池袋駅に戻る" style="width: 44px; height: 44px; border-radius: 999px; background: #FFFFFF; color: #4A4044; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(110,33,64,0.06)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+    <div style="display: flex; align-items: center; gap: 16px">
+      <span style="width: 56px; height: 56px; border-radius: 999px; background: #E60012; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 26px; flex-shrink: 0">2</span>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-size: 13px; font-weight: 500; color: #7A6E72">池袋 · 丸ノ内線 · 6両編成</div>
+        <h1 style="margin: 0; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.25">2番線</h1>
+        <div style="font-size: 13px; color: #4A4044">東京・新宿・荻窪・方南町方面</div>
+      </div>
+    </div>
+  </header>
+
+  <section style="flex: 1; background: #FFFFFF; border-radius: 28px 28px 0 0; padding: 28px 20px 32px; display: flex; flex-direction: column; gap: 22px; box-shadow: 0 -4px 24px rgba(110,33,64,0.05)">
+
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <h2 style="margin: 0; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 18px">ホーム図</h2>
+      <span style="font-size: 12px; color: #7A6E72">上が 1号車</span>
+    </div>
+
+    <div role="img" aria-label="2番線のホーム図。1号車の先頭付近にエスカレーターと階段、2号車と4号車付近に階段があります。" style="position: relative; width: 350px; height: 650px">
+      <span style="position: absolute; left: 24px; top: 2px; font-size: 11px; color: #7A6E72">0m</span>
+      <span style="position: absolute; left: 24px; top: 630px; font-size: 11px; color: #7A6E72">140m</span>
+
+      <sc-for list="{{cars}}" as="c" hint-placeholder-count="6">
+        <div style="position: absolute; left: 24px; width: 56px; height: 94px; background: #EFE8EB; display: flex; align-items: center; justify-content: center; {{c.style}}"><span style="width: 28px; height: 28px; border-radius: 9px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 15px">{{c.no}}</span></div>
+      </sc-for>
+      <sc-for list="{{doors}}" as="d" hint-placeholder-count="18">
+        <span style="position: absolute; {{d.style}}"></span>
+      </sc-for>
+
+      <span style="position: absolute; left: 100px; top: 14px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px; background: #FFFFFF; box-shadow: inset 0 0 0 1.5px #EBE4E7; display: flex; align-items: center; justify-content: center"><img src="../../../../../apps/web/public/icons/escalator.png" alt="" style="width: 22px; height: 22px"></span>
+      <span style="position: absolute; left: 100px; top: 50px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px; background: #FFFFFF; box-shadow: inset 0 0 0 1.5px #EBE4E7; display: flex; align-items: center; justify-content: center"><img src="../../../../../apps/web/public/icons/stairs.png" alt="" style="width: 22px; height: 22px"></span>
+      <span style="position: absolute; left: 100px; top: 171px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px; background: #FFFFFF; box-shadow: inset 0 0 0 1.5px #EBE4E7; display: flex; align-items: center; justify-content: center"><img src="../../../../../apps/web/public/icons/stairs.png" alt="" style="width: 22px; height: 22px"></span>
+      <span style="position: absolute; left: 100px; top: 368px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 10px; background: #FFFFFF; box-shadow: inset 0 0 0 1.5px #EBE4E7; display: flex; align-items: center; justify-content: center"><img src="../../../../../apps/web/public/icons/stairs.png" alt="" style="width: 22px; height: 22px"></span>
+
+      <span style="position: absolute; left: 132px; top: 29px; width: 8px; height: 2px; background: #C9BEC2"></span>
+      <span style="position: absolute; left: 132px; top: 65px; width: 8px; height: 2px; background: #C9BEC2"></span>
+      <span style="position: absolute; left: 139px; top: 29px; width: 2px; height: 38px; background: #C9BEC2"></span>
+      <span style="position: absolute; left: 140px; top: 47px; width: 8px; height: 2px; background: #C9BEC2"></span>
+
+      <span style="position: absolute; left: 132px; top: 186px; width: 8px; height: 2px; background: #C9BEC2"></span>
+      <span style="position: absolute; left: 132px; top: 383px; width: 8px; height: 2px; background: #C9BEC2"></span>
+      <span style="position: absolute; left: 139px; top: 186px; width: 2px; height: 199px; background: #C9BEC2"></span>
+      <span style="position: absolute; left: 140px; top: 299px; width: 8px; height: 2px; background: #C9BEC2"></span>
+
+      <div style="position: absolute; left: 148px; top: 0px; width: 202px; display: flex; flex-direction: column; gap: 6px">
+        <div style="padding: 10px 12px; border-radius: 14px; background: #FBF3D2; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-weight: 700; font-size: 13px; line-height: 1.5; color: #4A3F0A">サンシャイン通り・ヨドバシHDビル方面</span>
+          <span style="font-size: 11px; color: #6B5A0E">エスカレーター・階段</span>
+        </div>
+        <div style="padding: 8px 12px; border-radius: 12px; box-shadow: inset 0 0 0 1.5px #EBE4E7; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 999px; background: #E4741F"></span>西武池袋線</span>
+        </div>
+      </div>
+
+      <div style="position: absolute; left: 148px; top: 210px; width: 202px; display: flex; flex-direction: column; gap: 6px">
+        <div style="padding: 10px 12px; border-radius: 14px; background: #FBF3D2; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-weight: 700; font-size: 13px; line-height: 1.5; color: #4A3F0A">中央通路・東口（中央）方面</span>
+          <span style="font-size: 11px; color: #6B5A0E">階段</span>
+        </div>
+        <div style="padding: 8px 12px; border-radius: 12px; box-shadow: inset 0 0 0 1.5px #EBE4E7; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 999px; background: #A8904F"></span>東京メトロ有楽町線</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 999px; background: #E4741F"></span>西武池袋線</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 999px; background: #E2862A"></span>JR湘南新宿ライン</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 999px; background: #80C241"></span>JR山手線</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 999px; background: #00AC9A"></span>JR埼京線</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 16px; border-radius: 18px; background: #FAF6F7; font-size: 12px; color: #4A4044">
+      <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 999px; background: #DF5286"></span>フリースペース</span>
+      <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 999px; box-sizing: border-box; border: 2.5px solid #DF5286"></span>フリースペース（一部編成）</span>
+      <span style="display: flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 4px; background: #D9481C"></span>優先席</span>
+      <span style="display: flex; align-items: center; gap: 8px"><span style="width: 4px; height: 12px; border-radius: 2px; background: #C9BEC2; margin: 0 5px"></span>乗車位置（ドア）</span>
+      <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 4px; background: #F0DC85"></span>出口</span>
+      <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 4px; box-sizing: border-box; border: 1.5px solid #C9BEC2"></span>乗り換え</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 16px"><span style="width: 12px; height: 12px; border-radius: 999px; background: #DF5286"></span>フリースペース <span style="font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 500; color: #7A6E72">全編成</span></h2>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{free}}" as="f" hint-placeholder-count="6">
+          <div style="padding: 10px 12px; border-radius: 14px; background: #FDF3F6; display: flex; flex-direction: column; gap: 2px"><span style="font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 15px; color: #A02F5B">{{f.car}}<span style="font-size: 11px">号車</span></span><span style="font-size: 12px; color: #4A4044">{{f.door}}番ドア付近</span></div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 16px"><span style="width: 12px; height: 12px; border-radius: 4px; background: #D9481C"></span>優先席</h2>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{priority}}" as="f" hint-placeholder-count="4">
+          <div style="padding: 10px 12px; border-radius: 14px; background: #FCEEE8; display: flex; flex-direction: column; gap: 2px"><span style="font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 15px; color: #A3361A">{{f.car}}<span style="font-size: 11px">号車</span></span><span style="font-size: 12px; color: #4A4044">{{f.door}}番ドア付近</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1520}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const carTop = (i) => 24 + i * 100;
+    const doorOffset = [16, 47, 78];
+    const free = [
+      { car: 1, door: 3 }, { car: 2, door: 3 }, { car: 3, door: 3 },
+      { car: 4, door: 3 }, { car: 5, door: 3 }, { car: 6, door: 1 }
+    ];
+    const priority = [
+      { car: 1, door: 3 }, { car: 2, door: 1 }, { car: 3, door: 1 }, { car: 4, door: 1 }
+    ];
+    const cars = [1, 2, 3, 4, 5, 6].map((no, i) => {
+      let radius = 'border-radius: 10px;';
+      if (i === 0) radius = 'border-radius: 26px 26px 10px 10px;';
+      if (i === 5) radius = 'border-radius: 10px 10px 26px 26px;';
+      return { no: no, style: 'top: ' + carTop(i) + 'px; ' + radius };
+    });
+    const doors = [];
+    for (let i = 0; i < 6; i++) {
+      for (let d = 0; d < 3; d++) {
+        const y = carTop(i) + doorOffset[d];
+        const isFree = free.some((f) => f.car === i + 1 && f.door === d + 1);
+        const isPriority = priority.some((p) => p.car === i + 1 && p.door === d + 1);
+        if (isFree) {
+          doors.push({ style: 'left: 73px; top: ' + (y - 8) + 'px; width: 16px; height: 16px; border-radius: 999px; background: #DF5286; box-shadow: 0 0 0 3px #FFFFFF;' });
+        } else {
+          doors.push({ style: 'left: 78px; top: ' + (y - 6) + 'px; width: 4px; height: 12px; border-radius: 2px; background: #C9BEC2;' });
+        }
+        if (isPriority) {
+          doors.push({ style: 'left: 6px; top: ' + (y - 6) + 'px; width: 12px; height: 12px; border-radius: 4px; background: #D9481C;' });
+        }
+      }
+    }
+    return { cars: cars, doors: doors, free: free, priority: priority };
+  }
+}
+</script>
+</body>
+</html>

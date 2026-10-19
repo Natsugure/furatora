@@ -14,7 +14,7 @@ export function PlatformTabs({ tabs }: Props) {
   return (
     <div>
       {/* Tab header */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+      <div className="bg-surface rounded-card border-[1.5px] border-subtle mb-4 overflow-hidden">
         <div className="flex overflow-x-auto">
           {tabs.map((tab, i) => (
             <button
@@ -22,8 +22,8 @@ export function PlatformTabs({ tabs }: Props) {
               onClick={() => setActiveIndex(i)}
               className={`px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all flex-shrink-0 ${
                 i === activeIndex
-                  ? 'border-blue-500 text-blue-600 bg-blue-50/50'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'border-brand-600 text-brand-700 font-bold bg-brand-50'
+                  : 'border-transparent text-ink-soft hover:text-ink hover:bg-subtle'
               }`}
             >
               {tab.directionName}

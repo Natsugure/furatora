@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>アプリアイコン</title>
+<script src="./preview.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#C63D71}a:hover{color:#A02F5B}
+</style>
+</helmet>
+<div style="width: 880px; height: 620px; box-sizing: border-box; padding: 56px 64px; background: #FAF6F7; color: #2A2326; font-family: 'Noto Sans JP', sans-serif; letter-spacing: 0.02em; display: flex; flex-direction: column; gap: 32px">
+
+  <header style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 32px">アプリアイコン</h1>
+    <p style="margin: 0; font-size: 14px; color: #7A6E72">正面の電車 ／ 段差のない平らな線 ／ ふらっと。32px 以下は文字なし版を使う。</p>
+  </header>
+
+  <div style="display: flex; gap: 40px; align-items: center; padding: 36px 40px; border-radius: 28px; background: #FFFFFF; box-shadow: 0 6px 24px rgba(110,33,64,0.06)">
+    <svg width="240" height="240" viewBox="0 0 100 100" role="img" aria-label="アプリアイコン：正面の電車と平らな線とふらっと" style="flex-shrink: 0; filter: drop-shadow(0 10px 22px rgba(110,33,64,0.18))"><rect width="100" height="100" rx="22" fill="#DF5286"/><rect x="31" y="10" width="38" height="38" rx="10" fill="#FFFFFF"/><rect x="36" y="16" width="28" height="14" rx="3.5" fill="#DF5286"/><circle cx="39" cy="40" r="3" fill="#DF5286"/><circle cx="61" cy="40" r="3" fill="#DF5286"/><path d="M38 48 L35 56 M62 48 L65 56" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/><path d="M12 60 H88" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/><text x="50" y="86" text-anchor="middle" font-family="'Zen Maru Gothic', sans-serif" font-weight="700" font-size="19" letter-spacing="1" fill="#FFFFFF">ふらっと</text></svg>
+
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 28px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div style="font-size: 13px; font-weight: 700; color: #7A6E72">文字あり</div>
+        <div style="display: flex; align-items: flex-end; gap: 20px">
+          <sc-for list="{{withText}}" as="s" hint-placeholder-count="2">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><svg width="{{s.px}}" height="{{s.px}}" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#DF5286"/><rect x="31" y="10" width="38" height="38" rx="10" fill="#FFFFFF"/><rect x="36" y="16" width="28" height="14" rx="3.5" fill="#DF5286"/><circle cx="39" cy="40" r="3" fill="#DF5286"/><circle cx="61" cy="40" r="3" fill="#DF5286"/><path d="M38 48 L35 56 M62 48 L65 56" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/><path d="M12 60 H88" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/><text x="50" y="86" text-anchor="middle" font-family="'Zen Maru Gothic', sans-serif" font-weight="700" font-size="19" letter-spacing="1" fill="#FFFFFF">ふらっと</text></svg><span style="font-size: 11px; color: #7A6E72">{{s.label}}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="height: 1px; background: #F4EFF1"></div>
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div style="font-size: 13px; font-weight: 700; color: #7A6E72">文字なし（ファビコン・小さいアイコン用）</div>
+        <div style="display: flex; align-items: flex-end; gap: 20px">
+          <sc-for list="{{noText}}" as="s" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><svg width="{{s.px}}" height="{{s.px}}" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#DF5286"/><g transform="translate(50 50) scale(1.1) translate(-50 -35)"><rect x="31" y="10" width="38" height="38" rx="10" fill="#FFFFFF"/><rect x="36" y="16" width="28" height="14" rx="3.5" fill="#DF5286"/><circle cx="39" cy="40" r="3" fill="#DF5286"/><circle cx="61" cy="40" r="3" fill="#DF5286"/><path d="M38 48 L35 56 M62 48 L65 56" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/><path d="M12 60 H88" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/></g></svg><span style="font-size: 11px; color: #7A6E72">{{s.label}}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":620}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      withText: [
+        { px: 120, label: '120px' },
+        { px: 60, label: '60px' }
+      ],
+      noText: [
+        { px: 60, label: '60px' },
+        { px: 32, label: '32px' },
+        { px: 16, label: '16px' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

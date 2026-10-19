@@ -4,17 +4,24 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Search, ChevronRight, Loader2 } from 'lucide-react';
 import type { StationGroup, StationSearchApiResponse } from '@/types';
+import { railLineColor } from '@/theme/railLineColor';
+
+const cardClassName = 'bg-surface rounded-card border border-line shadow-card';
+const statusCardClassName = `${cardClassName} px-4 py-5 text-sm`;
 
 export function StationSearch() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [groups, setGroups] = useState<StationGroup[]>([]);
-  const [fetchedFor, setFetchedFor] = useState('');
-  const [hasError, setHasError] = useState(false);
+  // 最後に検索が終わったクエリと、その検索が失敗したか。
+  // エラーはクエリと組で持つ。入力のたびに消すと、確定クエリが変わらない入力（末尾の空白など）で
+  // 再検索されないままエラーだけ消え、前のクエリの結果や「見つかりませんでした」が出てしまう
+  const [fetched, setFetched] = useState<{ query: string; failed: boolean }>({ query: '', failed: false });
   const containerRef = useRef<HTMLDivElement>(null);
 
   // debouncedQuery が変わった瞬間に loading=true となるよう派生させる
-  const loading = debouncedQuery !== '' && fetchedFor !== debouncedQuery;
+  const loading = debouncedQuery !== '' && fetched.query !== debouncedQuery;
+  const hasError = !loading && fetched.failed;
   const displayedGroups = debouncedQuery ? groups : [];
   const showResults = debouncedQuery.length > 0;
 
@@ -34,13 +41,12 @@ export function StationSearch() {
         return res.json() as Promise<StationSearchApiResponse>;
       })
       .then((data) => {
-        if (!cancelled) setGroups(data.stationGroups);
+        if (cancelled) return;
+        setGroups(data.stationGroups);
+        setFetched({ query: debouncedQuery, failed: false });
       })
       .catch(() => {
-        if (!cancelled) setHasError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setFetchedFor(debouncedQuery);
+        if (!cancelled) setFetched({ query: debouncedQuery, failed: true });
       });
     return () => { cancelled = true; };
   }, [debouncedQuery]);
@@ -50,39 +56,42 @@ export function StationSearch() {
       {/* 入力欄 */}
       <div className="relative">
         <Search
-          size={18}
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+          size={22}
+          strokeWidth={2.2}
+          className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-600 pointer-events-none"
+          aria-hidden
         />
         <input
           type="search"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setHasError(false); }}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="駅名で検索（例：茅場町）"
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+          aria-label="駅名"
+          className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300"
         />
       </div>
 
       {/* 検索結果 */}
       {showResults && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 space-y-3">
           {loading && displayedGroups.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-5 flex flex-col items-center gap-2 text-sm text-gray-500">
-              <Loader2 size={20} className="animate-spin text-blue-400" />
+            <div className={`${statusCardClassName} flex flex-col items-center gap-2 text-muted`}>
+              <Loader2 size={20} className="animate-spin text-brand-400" />
               <span>検索中…</span>
             </div>
           ) : hasError ? (
-            <div className="bg-white rounded-xl border border-red-200 shadow-sm px-4 py-5 text-sm text-center text-red-500">
+            <div className={`${statusCardClassName} text-center text-ink-soft`}>
               検索中にエラーが発生しました。しばらくしてから再度お試しください。
             </div>
           ) : displayedGroups.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-5 text-sm text-center text-gray-500">
+            <div className={`${statusCardClassName} text-center text-muted`}>
               「{debouncedQuery}」に一致する駅が見つかりませんでした
             </div>
           ) : (
             <>
               {loading && (
                 <div className="flex justify-center py-1">
-                  <Loader2 size={16} className="animate-spin text-gray-400" />
+                  <Loader2 size={16} className="animate-spin text-muted" />
                 </div>
               )}
               {displayedGroups.map((group) => (
@@ -98,38 +107,36 @@ export function StationSearch() {
 
 function StationGroupCard({ group }: { group: StationGroup }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className={`${cardClassName} overflow-hidden`}>
       <div className="px-4 pt-3 pb-2">
-        <p className="font-semibold text-base text-gray-900">{group.name}</p>
+        <p className="font-display font-bold text-base text-ink">{group.name}</p>
         {group.nameEn && (
-          <p className="text-xs text-gray-500 mt-0.5">{group.nameEn}</p>
+          <p className="text-xs text-muted mt-0.5">{group.nameEn}</p>
         )}
       </div>
-      <div className="border-t border-gray-100">
+      <div className="border-t border-line">
         {group.stations.map((station) => (
           <Link
             key={station.id}
             href={`/stations/${station.slug}`}
           >
-            <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors group">
+            <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-brand-50 transition-colors group">
               <div
                 className="w-1 h-8 rounded-full flex-shrink-0"
-                style={{ backgroundColor: station.lineColor ?? '#888888' }}
+                style={{ backgroundColor: railLineColor(station.lineColor) }}
               />
               <div className="flex-1 min-w-0">
-                <p
-                  className="text-sm font-medium leading-tight"
-                  style={{ color: station.lineColor ?? '#374151' }}
-                >
+                {/* 路線色は縦線だけに使う。文字に使うと銀座線などで白地とのコントラストが足りない */}
+                <p className="text-sm font-medium leading-tight text-ink">
                   {station.lineName ?? '不明な路線'}
                 </p>
                 {station.code && (
-                  <p className="text-xs text-gray-400 mt-0.5">{station.code}</p>
+                  <p className="text-xs text-muted mt-0.5">{station.code}</p>
                 )}
               </div>
               <ChevronRight
                 size={16}
-                className="text-gray-400 flex-shrink-0 group-hover:text-blue-500 transition-colors"
+                className="text-muted flex-shrink-0 group-hover:text-brand-600 transition-colors"
               />
             </div>
           </Link>

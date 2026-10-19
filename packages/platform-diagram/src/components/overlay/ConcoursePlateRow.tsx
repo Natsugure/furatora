@@ -155,7 +155,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: P
 }
 
 /**
- * 出口プレート（黄地に黒）。
+ * 出口プレート（バター色の地に濃い文字。ADR-0018 決定3）。
  *
  * 設備の種別名を添えるのは、束ね線と出口の対応を**文章でも**担保するため。
  * 引き出し線は幅の見積り誤差ぶんずれうるが、「このエレベーターは中央改札へ」が
@@ -172,8 +172,9 @@ function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeName
       }}
     >
       {exit}
+      {/* 補足は透過させない。バター色の地に 75% で重ねると 4.16:1 で、11px の文字の基準（4.5:1）を割る */}
       {facilityTypeNames.length > 0 && (
-        <span className="mt-0.5 block text-[11px] font-normal opacity-75">
+        <span className="mt-0.5 block text-[11px] font-normal">
           {facilityTypeNames.join('・')}から
         </span>
       )}
