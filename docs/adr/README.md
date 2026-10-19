@@ -66,8 +66,8 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0014](./0014-direction-label-by-default-row.md) | 方面の表示文言を、(路線, 走行方向) ごとの既定行で解決する | Accepted   | 2026-09-27 |
 | [0015](./0015-shared-domain-packages-and-vocabulary.md) | アプリ間で共有するロジックをドメイン単位の packages に置き、共有する語彙は `@furatora/database/enums` に置く | Accepted   | 2026-10-02 |
 | [0016](./0016-facility-type-codes-constant-as-source.md) | 設備コードの一覧は定数 `FACILITY_TYPE_CODES` を正とし、DB は CHECK 制約で、seed は型で従わせる | Accepted   | 2026-10-04 |
-| [0017](./0017-soft-rose-palette-and-typography.md) | Web アプリの配色と書体を「Soft Rose」にし、トークンを Tailwind と Mantine の両方へ同じ値で渡す | Proposed   | 2026-10-18 |
-| [0018](./0018-semantic-colors-for-facilities.md) | フリースペース・優先席・出口・移動手段・状態の意味色を決め、出口を駅サインの黄からバター色に変える | Proposed   | 2026-10-18 |
+| [0017](./0017-soft-rose-palette-and-typography.md) | Web アプリの配色と書体を「Soft Rose」にし、トークンを Tailwind と Mantine の両方へ同じ値で渡す | Accepted   | 2026-10-18 |
+| [0018](./0018-semantic-colors-for-facilities.md) | フリースペース・優先席・出口・移動手段・状態の意味色を決め、出口を駅サインの黄からバター色に変える | Accepted   | 2026-10-18 |
 | [0019](./0019-app-icon-train-on-flat-line.md) | アプリアイコンを「正面の電車＋平らな線＋ふらっと」にし、小さいサイズでは文字を外す | Proposed   | 2026-10-18 |
 
 ## 関連ドキュメント

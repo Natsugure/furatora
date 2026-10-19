@@ -1,6 +1,6 @@
 # ADR-0017: Web アプリの配色と書体を「Soft Rose」にし、トークンを Tailwind と Mantine の両方へ同じ値で渡す
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-18
 - **決定者**: @Natsugure
 - **関連**: [ADR-0018](./0018-semantic-colors-for-facilities.md)（設備・状態の意味色）,
