@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { DEFAULT_LINE_COLOR } from '@furatora/platform-diagram/domain';
 import { describe, expect, it } from 'vitest';
 
 const GLOBALS_CSS = path.resolve(__dirname, './globals.css');
@@ -31,5 +32,12 @@ describe('globals.css', () => {
     const web = readFileSync(GLOBALS_CSS, 'utf-8');
     const diagram = readFileSync(DIAGRAM_CSS, 'utf-8');
     expect(resolveHex(web, name)).toBe(resolveHex(diagram, name));
+  });
+
+  // Admin のホーム図は Web のトークンを読まず、路線色が無いときの色を値で持つ。
+  // 片方だけ変えると、Web と Admin で代わりの色が無言でずれる
+  it('--color-rail-line-fallback がホーム図の DEFAULT_LINE_COLOR と同じ値', () => {
+    const web = readFileSync(GLOBALS_CSS, 'utf-8');
+    expect(resolveHex(web, 'color-rail-line-fallback')).toBe(DEFAULT_LINE_COLOR.toUpperCase());
   });
 });

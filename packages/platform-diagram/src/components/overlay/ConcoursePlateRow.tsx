@@ -172,8 +172,9 @@ function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeName
       }}
     >
       {exit}
+      {/* 補足は透過させない。バター色の地に 75% で重ねると 4.16:1 で、11px の文字の基準（4.5:1）を割る */}
       {facilityTypeNames.length > 0 && (
-        <span className="mt-0.5 block text-[11px] font-normal opacity-75">
+        <span className="mt-0.5 block text-[11px] font-normal">
           {facilityTypeNames.join('・')}から
         </span>
       )}

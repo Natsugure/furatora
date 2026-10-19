@@ -148,16 +148,25 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | `--color-bg-card` | `#ffffff` | `#FFFFFF` |
 | `--color-border-default` / `-strong` | `#e0e0e0` / `#cccccc` | `#EBE4E7` / `#C9BEC2` |
 | `--color-text-primary` / `-secondary` | `#222222` / `#666666` | `#2A2326` / `#7A6E72` |
-| `--color-train-car-bg` / `-border` | `#d6d3d1` / `#a8a29e` | `#EFE8EB` / `#C9BEC2` |
+| `--color-train-car-bg` / `-border` | `#d6d3d1` / `#a8a29e` | `#EFE8EB` / `#7A6E72` |
 | `--color-free-standard` / `-text` | `#4072b3` / `#ffffff` | `#DF5286` / `#FFFFFF` |
-| `--color-free-nonstandard` / `-text` | `#a5c0e6` / `#1a2d4e` | `#F5C5D6` / `#A02F5B` |
-| `--sign-exit-bg` / `-ink` / `-edge` | `#ffd400` / `#111111` / `#c99a00` | `#F0DC85` / `#4A3F0A` / `#F0DC85` |
-| `--sign-boarding-mark` / `--sign-leader` | `#aaaaaa` | `#C9BEC2` |
+| `--color-free-nonstandard` / `-text` | `#a5c0e6` / `#1a2d4e` | `#EE9FBA` / `#6E2140` |
+| `--sign-exit-bg` / `-ink` / `-edge` | `#ffd400` / `#111111` / `#c99a00` | `#F0DC85` / `#4A3F0A` / `#6B5A0E` |
+| `--sign-boarding-mark` / `--sign-leader` | `#aaaaaa` | `#4A4044` / `#C9BEC2` |
 | `--card-transfer-bg` / `-border` / `-heading` | `#ebf1fa` / `#4072b3` / `#264370` | `#FDF3F6` / `#F5C5D6` / `#A02F5B` |
 | `--card-prio-bg` / `-border` / `-heading` | `#fff8e1` / `#ffe082` / `#ffb300` | `#FCEEE8` / `#F4C3B1` / `#A3361A` |
 
 `--sign-transfer-*`（白地に黒い輪郭）は変えない。出口のプレートと見分けるため。
-`--sign-exit-edge` は地と同じ値にして輪郭を見えなくする。目視で白地から浮かないと分かったら、`--butter-700` に寄せた色にする（ADR-0018「影響」）。
+`--sign-exit-edge` は `--butter-700` にする。地と白地のコントラスト比は 1.37:1 しかなく、プレートと凡例の見本の外形は輪郭で出す（ADR-0018「影響」）。
+出口のプレートの補足の文字（11px）は透過させない（`opacity-75` だと 4.16:1）。
+
+乗車位置の印（通常のドア）は、`--neutral-700` を 55% で重ねる（白地 2.91:1）。不透明の `--neutral-500`（4.88:1）は 3:1 を満たすが、
+全編成のフリースペース（3.69:1）より目立ってしまう。一部編成のフリースペースは `--brand-300` にし、印とは色相と明度の両方で見分ける。
+号車の地は濃くしない（`--neutral-300` にすると一部編成の丸が 1.19:1 で沈む）。列車の輪郭は枠（`--neutral-500`）で出す。
+
+DB に路線色が無い路線の代わりの色は、Web の `--color-rail-line-fallback` とホーム図の `DEFAULT_LINE_COLOR` の両方を `--neutral-500` にする。
+`--neutral-300` では白地 1.81:1 で、対面乗換の左のバーが見えず、ホーム帯・号車の枠とも区別できない。
+2つは `apps/web/src/app/globals.test.ts` で一致を確かめる。
 `globals.css` と `styles.css` の「出口は黄地に黒」のコメントは、ADR-0018 を参照する内容に書き換える。
 
 ## 画面ごとの変更
@@ -166,7 +175,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 |---|---|---|
 | 2 | `app/layout.tsx` | ヘッダー（アイコン＋ふらとら＋説明）・フッターの色と書体。右端の `Train` アイコンは消す（意味を持たない装飾のため） |
 | 2 | `components/ui/Container.tsx` | 余白（スマホ 16px）は変えない |
-| 2 | `components/ui/StationBadge.tsx` | 路線色のリング＋白地＋Zen Maru Gothic の数字。路線色が無いときは `--color-rail-line-fallback`（= `--neutral-300`） |
+| 2 | `components/ui/StationBadge.tsx` | 路線色のリング＋白地＋Zen Maru Gothic の数字。路線色が無いときは `--color-rail-line-fallback`（= `--neutral-500`） |
 | 2 | `components/BackButton.tsx` | 白い丸（44px）に左向きの山形（戻り方は下の「戻るボタン」の段落。PR 3） |
 | 2 | `components/SearchTabs.tsx` | Mantine の `SegmentedControl`（ラジオボタンのグループ）で、角丸のセグメント（選択中は白地・ローズ文字・影）。`TransferDifficultySection`（PR 3）と同じ部品にそろえる |
 | 2 | `components/StationSearch.tsx` | 白い検索欄（角丸 18px、影、ローズの虫眼鏡） |
@@ -190,8 +199,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 路線記号（銀座線の「G」など）は、`lines.line_code`（`Line.lineCode`）を使う。null の路線だけ、先頭の駅の駅番号の英字にフォールバックする（`components/ui/LineSymbol.tsx`）。
 駅番号の英字と番号への分け方は `features/station/domain/stationCode.ts` の `parseStationCode()` にまとめ、`StationBadge` と共有する。
 
-路線色の丸に白い文字を載せない。銀座線（`#F39700`）や日比谷線など明るい路線色、路線色の無い路線の代わりの色（`neutral-300`）は、
-白とのコントラストが 3:1 にも届かない（REQ-10）。文字を載せる路線色の印（路線記号・番線・駅のバッジ）は、路線色を輪だけに使い、白地に `text-ink` で書く。
+路線色の丸に白い文字を載せない。銀座線（`#F39700`）や日比谷線など明るい路線色、白とのコントラストが 3:1 にも届かない（REQ-10）。路線色の無い路線の代わりの色（`neutral-500`）も、白い文字は載せない。文字を載せる路線色の印（路線記号・番線・駅のバッジ）は、路線色を輪だけに使い、白地に `text-ink` で書く。
 路線色で塗ってよいのは、文字を載せない線・帯・小さな丸だけにする。
 
 戻るボタン（`BackButton`）は、行き先（`href`）へのリンクにする。`navigation.canGoBack`（同じオリジンの履歴）があるときだけ、

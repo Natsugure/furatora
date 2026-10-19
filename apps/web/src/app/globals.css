@@ -72,7 +72,7 @@
   --color-border-strong:    var(--neutral-300);
   --color-border-focus:     var(--brand-300);
   /* DB に路線色が無い路線の、線・輪の代わりの色 */
-  --color-rail-line-fallback: var(--neutral-300);
+  --color-rail-line-fallback: var(--neutral-500);
 
   --color-text-primary:     var(--neutral-900);
   --color-text-secondary:   var(--neutral-500);

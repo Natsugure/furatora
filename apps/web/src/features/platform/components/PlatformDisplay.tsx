@@ -42,7 +42,7 @@ export function PlatformDisplay({ platform }: Props) {
         <div className="min-w-0 flex-1 p-5">
           {/* Platform header */}
           <div className="mb-4 flex items-center gap-3">
-            {/* 路線色で塗って白い文字を載せると、明るい路線色や代わりの色（neutral-300）では読めない（REQ-10）。
+            {/* 路線色で塗って白い文字を載せると、明るい路線色では読めない（REQ-10）。
                 路線色は輪だけに使い、番号は白地に text-ink で書く（StationBadge・LineSymbol と同じ） */}
             <div
               className="flex size-9 flex-shrink-0 items-center justify-center rounded-full border-[3px] bg-surface font-display text-base font-bold text-ink"

@@ -51,10 +51,12 @@ export function connectionLabels(concourse: Pick<ConcourseDTO, 'connections'>): 
 
 /**
  * 路線カラー未設定時の既定色。対面乗換ティントのフォールバックと揃える。
- * Web の代わりの色（globals.css の --color-rail-line-fallback = neutral-300）と同じ値。
- * Admin は Web のトークンを読まないため、CSS 変数ではなく値で持つ
+ * Web の代わりの色（globals.css の --color-rail-line-fallback = neutral-500）と同じ値で、
+ * apps/web の globals.test.ts が一致を確かめる。
+ * Admin は Web のトークンを読まないため、CSS 変数ではなく値で持つ。
+ * neutral-300 にしないのは、白地 1.81:1 で対面乗換の左のバーが見えず、ホーム帯や号車の枠とも区別できないため
  */
-export const DEFAULT_LINE_COLOR = '#c9bec2';
+export const DEFAULT_LINE_COLOR = '#7a6e72';
 
 /** 乗換プレートに並べる路線1件 */
 export type TransferLine = { name: string; color: string };
