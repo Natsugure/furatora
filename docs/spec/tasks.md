@@ -62,7 +62,7 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 - [x] **TASK-3.1** トップ（`app/page.tsx`）
   - 上部に見出しと検索、`Sheet`（新規。上端を丸めた白い本文エリア）にできることの一覧と事業者のチップ
 - [x] **TASK-3.2** 路線の駅一覧（`app/lines/[slug]/stations/page.tsx`）。最初に駅一覧のタイムラインを `StationTimeline` に部品化する（design.md「駅一覧のタイムラインの部品化」）
-  - `StationTimeline`（`<ol>`）に行の部品を閉じ込め、`StationCard` を消した。バッジの直径は `STATION_BADGE_SIZE`（TS の定数）。線の中心とバッジの中心が一致（実測 43px / 43px）
+  - `StationTimeline`（`<ol>`）に行の部品を閉じ込め、`StationCard` を消した。線はバッジの列の 50% から太さの半分を戻して置き、バッジの直径を参照しない。線の中心とバッジの中心が一致（実測 43px / 43px）
   - 路線記号の丸 `LineSymbol`（`line.lineCode`、無ければ駅番号の英字）。戻るボタンは `BackButton` に `href` を足してトップへのリンクにした
 - [x] **TASK-3.3** 駅の詳細（`app/stations/[slug]/page.tsx`）、`TransferDifficultySection` の切り替え、`transferDifficulty.ts` の状態の色。テストを書き換える
   - 路線のチップ `stationLineChips()`（ホーム＋乗換先、路線名で重複を除く）

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { StationTimeline } from './StationTimeline';
-import { STATION_BADGE_SIZE } from './ui/StationBadge';
 import type { StationWithOrder } from '@/types';
 
 function station(code: string, name: string, nameEn: string | null): StationWithOrder {
@@ -75,10 +74,20 @@ describe('StationTimeline', () => {
     expect(segment(rows[1]!, 'up')?.style.backgroundColor).toBe('var(--color-rail-line-fallback)');
   });
 
-  it('線はバッジの中心を通る', () => {
+  // 線がバッジの中心を通ることは、次の2つで確かめる（jsdom はレイアウトを計算しないため、位置を測らない）
+  it('線は列の中央から、太さの半分だけ左に置く', () => {
     const { rows, segment } = renderTimeline(STATIONS);
     const line = segment(rows[1]!, 'up')!;
-    const width = parseFloat(line.style.width);
-    expect(parseFloat(line.style.left) + width / 2).toBe(STATION_BADGE_SIZE / 2);
+    expect(line.style.left).toBe('50%');
+    expect(parseFloat(line.style.marginLeft)).toBe(-parseFloat(line.style.width) / 2);
+  });
+
+  it('線の基準の列には、線のほかにバッジだけを置く（列の幅がバッジの直径になる）', () => {
+    const { rows, segment } = renderTimeline(STATIONS);
+    const column = segment(rows[1]!, 'up')!.parentElement!;
+    expect(column).toHaveAttribute('data-timeline', 'column');
+    const others = [...column.children].filter((el) => !el.hasAttribute('data-timeline'));
+    expect(others).toHaveLength(1);
+    expect(within(others[0] as HTMLElement).getByText('G')).toBeInTheDocument();
   });
 });

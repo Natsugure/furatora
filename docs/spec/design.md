@@ -212,10 +212,15 @@ PR 3 で、この2つを一覧の部品の中に閉じ込める。
 - `components/StationTimeline.tsx` を作る。`{ stations: StationWithOrder[]; lineColor: string | null }` を受け取り、`<ol>` / `<li>` で並べる
   - `isFirst` / `isLast` はこの部品の中で決める。行を詰めて並べるのもこの部品の責任にする
   - 行の部品（今の `StationCard` の中身）はこのファイルの中に置き、export しない（単独で使えないようにする）
-- 線の位置と太さは、バッジの直径から求める（`left = 直径 / 2 − 線の太さ / 2`）。バッジの直径は1か所で定義し、`StationBadge` と線の両方がそれを参照する
-  - TS の定数（`StationBadge.tsx` から `STATION_BADGE_SIZE` を export）で持ち、バッジの幅・高さと線の `left` / `width` を style で当てる。
-    CSS 変数ではなく TS にしたのは、単体テスト（jsdom）で線の位置とバッジの直径を数値で確かめられるため
-  - `StationBadge` は駅の詳細ページの見出しでも使っているため、どちらの方法でも両方の画面で同じ直径になる
+- 線はバッジの直径を参照せず、レイアウトで中心を通す。行の中にバッジだけを置く列（`data-timeline="column"`）を作り、
+  線はその列を基準に `left: 50%` と `margin-left: −線の太さ / 2` で置く。列の幅がバッジの直径になるので、直径を変えても中心を通る
+  - 行は `items-stretch` にして、列を行の高さいっぱいに伸ばす（線を行の上端・下端まで届かせる）。行の縦の余白は列と文字の側に移す
+  - `StationBadge` の直径は Tailwind のクラス（`size-13.5`）のまま持つ。タイムラインのために数値を export しない
+  - 中心に置くのに `translateX(-50%)` ではなく `margin-left` を使うのは、単体テスト（jsdom）で数値として確かめられるため。
+    jsdom はレイアウトを計算しないので、テストは「列の 50% から太さの半分を戻す」ことと「列には線のほかにバッジだけがある」ことを確かめる。
+    列に横の余白を足すとずれるが、それは単体テストでは検出できない
+  - バッジの直径を TS の定数で共有して `left = 直径 / 2 − 線の太さ / 2` を計算する方法は採らない。
+    2つの部品が数値でつながり、バッジの大きさを style で当てる必要が出るうえ、骨組み（`loading.tsx`）の直書きの直径とずれうるため
 - `app/lines/[slug]/stations/page.tsx` は `<StationTimeline stations={stations} lineColor={line.color} />` を置くだけにする
 - `StationCard.tsx` と `StationCard.test.tsx` は消す。テストは `StationTimeline.test.tsx` に移し、駅の配列を渡して、先頭・途中・末尾の線の有無を1回の描画で確かめる
 - 線の描き方（行ごとに上半分・下半分を描き、先頭・末尾で端を切る）は変えない。一覧全体に1本の線を引く方法は、
