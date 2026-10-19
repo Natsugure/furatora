@@ -3,13 +3,13 @@ import { Info } from 'lucide-react';
 import { getStationDetail } from '@/di';
 import { PlatformDisplay } from '@/features/platform/components/PlatformDisplay';
 import { PlatformTabs } from '@/features/platform/components/PlatformTabs';
-import { stationLineChips } from '@/features/station/domain/stationLineChips';
+import { reachableLines } from '@/features/station/domain/reachableLines';
 import { BackButton } from '@/components/BackButton';
 import { StationBadge } from '@/components/ui/StationBadge';
 import { Container } from '@/components/ui/Container';
 import { Sheet } from '@/components/ui/Sheet';
 import { TransferDifficultySection } from '@/components/TransferDifficultySection';
-import { railLineColor } from '@/theme/railLineColor';
+import { StationLines } from '@/components/StationLines';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -23,8 +23,7 @@ export default async function StationDetailPage({ params }: Props) {
     notFound();
   }
 
-  const { station, headerLineColor, platforms: platformList, transferPartners, tabs } = data;
-  const lineChips = stationLineChips(platformList, transferPartners);
+  const { station, headerLineColor, stationLines, platforms: platformList, transferPartners, tabs } = data;
 
   return (
     <>
@@ -44,17 +43,8 @@ export default async function StationDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* この駅のホームの路線と、乗換先の路線（stationLineChips） */}
-        {lineChips.length > 0 && (
-          <ul aria-label="路線" className="flex flex-wrap gap-1.5 mt-4">
-            {lineChips.map((chip) => (
-              <li key={chip.name} className="h-7.5 pl-1.5 pr-3 inline-flex items-center gap-1.5 rounded-full bg-surface text-xs font-medium text-ink">
-                <span aria-hidden className="size-4 rounded-full flex-shrink-0" style={{ backgroundColor: railLineColor(chip.color) }} />
-                {chip.name}
-              </li>
-            ))}
-          </ul>
-        )}
+        {/* この駅名で乗れる路線と、別の駅名の乗換先の路線（ADR-0021） */}
+        <StationLines lines={reachableLines(station.name, stationLines, transferPartners)} />
       </Container>
 
       <Sheet className="flex flex-col gap-5">

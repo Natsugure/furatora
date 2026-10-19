@@ -1,45 +1,68 @@
-# 要件: 長命ブランチを main のみにし、develop を廃止する (Issue #183)
+# 要件: 駅から乗り換えられる路線を導くドメインの関数を作る (Issue #172)
 
 ## 概要
 
-- **対象**: ブランチ運用と、それを前提にしたリポジトリの記述・CI・GitHub の設定
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #183](https://github.com/Natsugure/furatora/issues/183) /
-  [ADR-0020](../adr/0020-main-only-long-lived-branch.md) / [ADR-0008](../adr/0008-environment-database-branch-mapping.md)
-- **ブランチ**: `chore/issue183-main-only-branching`（`main` から）
-- **信頼度**: 90%（高）
-  - アプリのコードは変えない。変更は設定と文書
-  - 不確かな点: ruleset の変更後に、PR のマージが想定どおり通るか（最初の PR のマージで確かめる）
+- **対象**: Web の駅の詳細の見出しに並ぶ路線のチップと、その出どころ
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #172](https://github.com/Natsugure/furatora/issues/172) /
+  [ADR-0021](../adr/0021-transfer-lines-from-station-connections.md)
+- **ブランチ**: `feat/issue172-reachable-lines`（`main` から）
+- **信頼度**: 88%（高）
+  - 乗換先のデータ（`transferPartners`）は既にある。増えるのは自駅の路線のクエリと純関数、表示
+  - 不確かな点: 見出しの下に「乗り換え」の段を足したときのスマホ幅での見た目（ブラウザで確かめる）
 
 ## 背景
 
-開発者が1人で、`develop` はリリース PR とコンフリクトの原因にしかなっていない。
-また、main を守るはずの ruleset が対象を持たず、実際には何も守っていなかった。詳細は ADR-0020「コンテキストと課題」。
+#166 で、駅の詳細の見出しに路線のチップを足した。駅の路線一覧が DTO に無いため、ホームの路線と乗換先の路線から暫定で作っている
+（`stationLineChips.ts`）。次の問題がある。
+
+- ホームの無い駅（春日）で、自駅の路線が出ない
+- 別の駅名の乗換先（淡路町から見た千代田線＝新御茶ノ水、都営新宿線＝小川町）が、自駅の路線と同じ見た目で並ぶ
+
+出どころは乗換接続（`stationConnections`）にする（案A）。乗換単位（`stationGroups`）は推移的でない乗換関係を表せないため使わない（ADR-0021）。
 
 ## 要件（EARS記法）
 
-- **REQ-1**: リポジトリは、`develop` を長命ブランチとして前提にした記述・設定（CI の対象、CLAUDE.md、エージェント定義）を持たないこと
-- **REQ-2**: 誰かが `main` へ直接 push したとき、GitHub はそれを拒否すること（管理者を含む）
-- **REQ-3**: CI（`verify`）が成功していない PR の場合、GitHub は `main` へのマージを止めること（管理者が明示的に迂回する場合を除く）
-- **REQ-4**: PR をマージするとき、GitHub はマージコミットだけを許し、マージ後に作業ブランチを消すこと
-- **REQ-5**: 移行が終わったとき、`develop` ブランチと Neon の `preview/develop` ブランチは存在しないこと
+- **REQ-1**: 駅の詳細を表示するとき、システムは自駅の路線（`stationLines`）を、ホームの有無にかかわらず見出しの路線に出すこと
+- **REQ-2**: 乗換先の駅名が自駅と同じとき、システムはその路線を自駅の路線と同じ段（見出しの直下）に、自駅の路線の後に出すこと
+- **REQ-3**: 乗換先の駅名が自駅と異なるとき、システムはその路線を「乗り換え」の段に、相手駅の駅名ごとにまとめて出すこと
+- **REQ-4**: システムは同じ路線名を一度だけ出すこと。見出しの直下に出た路線は「乗り換え」の段に出さないこと
+- **REQ-5**: 路線の件数が多い場合も、システムは件数を絞らず、折り返して全部出すこと
+- **REQ-6**: 別の駅名の乗換先が無い場合、システムは「乗り換え」の段を出さないこと
+- **REQ-7**: 路線を導く処理は、DB と React に依存しない純関数（`reachableLines`）として持ち、`stationLineChips.ts` を廃止すること
 
 ## 受け入れ基準
 
 | 要件 | 確かめ方 |
 |---|---|
-| REQ-1 | `rg develop` で、ADR の経緯の記述と `development`（Neon のブランチ名）以外に当たらない |
-| REQ-2・REQ-3 | `gh api repos/Natsugure/furatora/rules/branches/main` に、削除・強制 push の禁止、PR 必須、`verify` 必須が出る |
-| REQ-4 | `gh api repos/Natsugure/furatora` で `allow_merge_commit: true`、Squash・Rebase が `false`、`delete_branch_on_merge: true` |
-| REQ-5 | `git ls-remote --heads origin develop` が空。Neon のブランチ一覧に `preview/develop` が無い |
+| REQ-1 | 春日の駅の詳細に、自駅の路線のチップが出る。`reachableLines` の単体テスト |
+| REQ-2・REQ-5 | 渋谷の駅の詳細で、13路線がすべて見出しの直下に出る |
+| REQ-3 | 淡路町の駅の詳細で、見出しの直下は丸ノ内線だけ。「乗り換え」の段に「新御茶ノ水: 千代田線」「小川町: 都営新宿線」が出る |
+| REQ-4 | `reachableLines` の単体テスト（同じ駅の上下の2行、段をまたぐ重複） |
+| REQ-6 | `StationLines` の単体テスト。春日の表示 |
+| REQ-7 | `stationLineChips.ts` が無い。`reachableLines.test.ts` が通る |
 
 ## 範囲外
 
-- `~/.claude/CLAUDE.md`（開発者の個人設定）の「main・develop に直接コミットしない」。害が無いため開発者の判断に任せる
+- 御茶ノ水まわりに残る誤った乗換接続（小川町↔JR御茶ノ水の2路線、小川町↔メトロ御茶ノ水、新御茶ノ水↔メトロ御茶ノ水）の削除。開発者が Admin で行う
+- 件数の多い駅での折りたたみ・事業者でのまとまり
+- 検索結果・駅の一覧への適用（同じ入力を作るクエリを足せば `reachableLines` を使える）
+- 乗換単位の新規作成手段（#96）
 
 ## 依存関係とリスク
 
 | 依存・リスク | 影響 | 緩和 |
 |---|---|---|
-| PR #182（Issue #143）が同じ `docs/spec/` を書き換えている | 後からマージする側がコンフリクトする | #182 を先にマージし、このブランチに main を取り込んで `docs/spec/` はこちらを採る |
-| ruleset の設定ミス | main への PR のマージまで止まる | 管理者の除外を `pull_request` で残す。変更後に `rules/branches/main` で効いているルールを確かめる |
-| Vercel の Production Branch が `main` でない | マージしても本番に出ない | 開発者が Vercel の設定を確かめる |
+| 乗換接続にグループ由来の誤りが残っている | 誤った乗換先が「乗り換え」の段に出る | 開発者が Admin で削除する。見つけたら同様に直す（ADR-0021「影響」） |
+| `StationDetailDTO` に列を足す | DTO のフィクスチャを使うテストが型エラーになる | フィクスチャに `stationLines` を足す |
+| 自駅の路線を全件取るクエリに変える | 見出しのバッジの色が変わりうる | 並びを `lines.displayOrder`, `lines.name` に固定し、先頭の色をバッジに使う |
+
+## エッジケース
+
+| ケース | 期待 |
+|---|---|
+| ホームが無い駅（春日） | 自駅の路線が出る |
+| 自駅の路線も乗換先も無い駅 | 路線の段を出さない |
+| 同じ駅に同じ路線が2行（上下のホーム、#82 後の複数路線） | 1つにする |
+| 同じ路線が、同じ駅名の駅と別の駅名の駅の両方にある | 見出しの直下にだけ出す |
+| 同じ路線が、別の駅名の2つの駅にある | 最初に出た駅名の下にだけ出す |
+| 路線色が null | チップを残す（色は `railLineColor` の既定） |

@@ -27,6 +27,7 @@ function stationDetail(overrides: Partial<StationDetailDTO> = {}): StationDetail
   return {
     station: { id: 'st1', name: '渋谷', nameEn: 'Shibuya', code: 'G01', notes: null },
     headerLineColor: '#f39700',
+    stationLines: [{ lineName: '銀座線', lineColor: '#f39700' }],
     platforms: [],
     transferPartners: [],
     ...overrides,

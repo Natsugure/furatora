@@ -54,6 +54,8 @@ export type StationDetailDTO = {
     notes: string | null;
   };
   headerLineColor: string | null; // StationBadge 用
+  /** 自駅の路線（station_lines）。ホームの有無に依存しない。見出しの路線（reachableLines）に使う */
+  stationLines: { lineName: string; lineColor: string | null }[];
   platforms: PlatformDTO[];
   transferPartners: TransferPartnerDTO[];
 };

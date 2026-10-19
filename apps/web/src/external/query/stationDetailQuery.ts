@@ -105,13 +105,14 @@ export const dbStationDetailQuery: StationDetailQuery = {
       .limit(1);
     if (!stationRow) return null;
 
-    const [headerLineRows, platformList, stationConnectionRows, transferConnectionRows] = await Promise.all([
+    const [ownLineRows, platformList, stationConnectionRows, transferConnectionRows] = await Promise.all([
+      // 自駅の全路線。並びを固定し、先頭の色を見出しのバッジに使う（Issue #172）
       db
-        .select({ color: lines.color })
+        .select({ lineName: lines.name, lineColor: lines.color })
         .from(stationLines)
         .innerJoin(lines, eq(stationLines.lineId, lines.id))
         .where(eq(stationLines.stationId, stationRow.id))
-        .limit(1),
+        .orderBy(asc(lines.displayOrder), asc(lines.name)),
       db
         .select({
           id: platforms.id,
@@ -137,7 +138,8 @@ export const dbStationDetailQuery: StationDetailQuery = {
         code: stationRow.code,
         notes: stationRow.notes,
       },
-      headerLineColor: headerLineRows[0]?.color ?? null,
+      headerLineColor: ownLineRows[0]?.lineColor ?? null,
+      stationLines: ownLineRows,
     };
     const partnerLines = buildPartnerLines(stationConnectionRows);
     // 乗換の読み取りはホーム側のクエリに依存しないので、次の Promise.all に載せて往復を増やさない
