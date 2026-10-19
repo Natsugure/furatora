@@ -335,9 +335,10 @@ function FreeSpaceBadges({
             <g key={`${car.carNumber}-${mark.doorNumber}`}>
               <circle cx={mark.x} cy={cy} r={1.9} fill={color} />
               <FreeSpaceGlyph x={mark.x} y={cy} color={ink} />
+              {/* <title> の子は文字列1つにする。React のサーバー描画は子が複数あると中身を出力せず、
+                  ハイドレーションが不一致になる（Issue #143） */}
               <title>
-                {car.carNumber}号車 {mark.doorNumber}番ドア付近のフリースペース
-                {mark.isStandard ? '（全編成）' : '（一部編成）'}
+                {`${car.carNumber}号車 ${mark.doorNumber}番ドア付近のフリースペース${mark.isStandard ? '（全編成）' : '（一部編成）'}`}
               </title>
             </g>
           );
