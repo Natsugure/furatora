@@ -1,46 +1,79 @@
-# 要件: admin の API GET を整理し、残る1本を Query Service 化する (Issue #48)
+# 要件: Web アプリのデザインシステムを Soft Rose に刷新する (Issue #166)
 
 ## 概要
 
-- **対象**: admin の API GET のうち、db を直接読んでいる5本
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #48](https://github.com/Natsugure/furatora/issues/48) /
-  [ADR-0003](../adr/0003-read-write-separation.md)
-- **ブランチ**: `refactor/issue48-admin-get-query-service`
-- **信頼度**: 90%（高）
-  - 呼び出し元は grep で確定できる。新しい抽象は作らず、既存の `TrainEditPageQuery` を広げる
-  - 新規 ADR は不要（ADR-0003 の適用）
+- **対象**: Web アプリ（`apps/web`）全体と、ホーム図パッケージ（`packages/platform-diagram`）の色。
+  配色・書体・形をデザインシステム「Soft Rose」に揃え、アプリアイコンを差し替える
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #166](https://github.com/Natsugure/furatora/issues/166) /
+  [ADR-0017](../adr/0017-soft-rose-palette-and-typography.md) / [ADR-0018](../adr/0018-semantic-colors-for-facilities.md) /
+  [ADR-0019](../adr/0019-app-icon-train-on-flat-line.md)
+- **ブランチ**: `feat/issue166-design-system-soft-rose`（PR 0）。PR 1 以降はこのブランチから順に切る
+- **信頼度**: 80%（中）
+  - デザインはキャンバス上で合意済み。値は ADR に確定している
+  - 不確かな点: 直接書いた色クラス（約200か所）の置き換え漏れ、ホーム図の出口プレートの見え方（ADR-0018「影響」）、
+    Admin のホーム図への波及
+  - 中信頼度のため、PR 1（土台）を最小の実証とし、トップ画面だけで新しいトークンが期待どおり効くことを確かめてから PR 2 以降へ広げる
 
 ## 背景
 
-#90（Issue #49）でフォームを props 化し、選択肢は `external/query/*EditPageQuery.ts` から読むようになった。
-その結果、次の GET は呼び出し元が無くなっている。
-
-| エンドポイント（GET） | 呼び出し元 |
-|---|---|
-| `api/stations/[stationId]/platform-locations` | なし（レイアウト編集画面は `stationLayoutPageQuery` で読む） |
-| `api/stations/[stationId]/train-stop-patterns` | なし（同上） |
-| `api/stations/[stationId]/platforms/[platformId]` | なし（`PlatformInspector` は PUT/POST だけ使う） |
-| `api/trains` | なし（`app/trains/page.tsx` はページで直接読む） |
-| `api/trains/[trainId]` | `components/DuplicateButton.tsx`（列車の複製） |
-
-`GET /api/trains/[trainId]` は `carLength`（`decimal(5,2)`）を文字列のまま返す。
-複製はこれを `POST /api/trains` に送るが、`trainSchema` は `carLength` を数値として検証するため、
-号車の長さを入れた列車の複製は 400 で失敗する。
-
-一覧の N+1 解消は #94 に移管済みで、本 Issue の範囲外。
+見た目が無機質で、配色がアプリアイコン（`#DF5286`）と合っていない。
+色の指定がデザイントークンと Tailwind の既定の色クラスに分かれていて、トークンの値を変えるだけでは画面が揃わない。
+詳細は ADR-0017「コンテキストと課題」。
 
 ## 要件（EARS記法）
 
-- **REQ-1**: システムは、呼び出し元の無い GET（`platform-locations` / `train-stop-patterns` / `platforms/[platformId]` / `trains`）を持たないこと。同じパスの POST/PUT/DELETE は従来どおり動くこと
-- **REQ-2**: `GET /api/trains/[trainId]` を受けたとき、システムは Query Service（`TrainEditPageQuery`）を通して、編集ページと同じ形の列車 DTO を返すこと（`operatorId` / `lineIds` / `carLength: number | null`）
-- **REQ-3**: 指定した列車が無い場合、システムは `GET /api/trains/[trainId]` で 404 を返すこと
-- **REQ-4**: 号車の長さを入れた列車を複製するとき、システムは号車構成・設備・路線を引き継いだ列車を作成すること
-- **REQ-5**: システムは、`@furatora/database` を直接 import しなくなった route を ESLint の移行中の除外から外し、依存ルールを効かせること
-- **REQ-6**: 列車を読むとき、システムは号車構成を号車番号順、設備を号車番号・ドア番号順で返すこと（PR #164 のレビュー指摘）
-- **REQ-7**: `PUT /api/trains/[trainId]` が書き込みを終えたとき、システムは列車を読み直さずに成功を返すこと（PR #164 のレビュー指摘）
-- **REQ-8**: 列車の複製・保存の通信が失敗した場合、システムはエラーを表示し、ボタンを押せる状態に戻すこと（PR #164 のレビュー指摘）
+### 土台
 
-## 範囲外
+- **REQ-1**: システムは、色・角丸・影の値を CSS 変数（Web は `apps/web/src/app/globals.css`、ホーム図は `packages/platform-diagram/src/styles.css`）を正として定義すること。
+  Mantine に渡すブランド色の10段階だけは TypeScript に複製し、テストで一致を確かめること（ADR-0017 決定5）
+- **REQ-2**: システムは、REQ-1 の変数を Tailwind のユーティリティ（意味のある名前）と Mantine のテーマ（ブランド色の10段階）の両方に、同じ値で渡すこと
+- **REQ-3**: システムは、見出しと数字を Zen Maru Gothic、本文を Noto Sans JP、ホーム図のサインを BIZ UDPGothic で表示すること
+- **REQ-4**: 移行の完了後、システムは `apps/web/src` と `packages/platform-diagram/src` で Tailwind の既定の色クラス（`gray`・`blue` など）と、トークンを通さない16進の色を使わないこと。
+  ただし、路線色など DB から来る色は除く
 
-- 列車の書き込み（`trains` の POST/PUT/DELETE）の Repository 化。別 Issue に起票する
-- 一覧の N+1 解消（#94）
+### 画面
+
+- **REQ-5**: システムは、各画面を「上部の背景（`#FAF6F7`）＋上端を丸めた白い本文エリア」の構成で表示し、グラバー（ドラッグハンドル）を置かないこと
+- **REQ-6**: 利用者が駅の詳細で移動手段（ベビーカー／車いす）を切り替えたとき、システムはその移動手段のバリアフリールートだけを表示すること
+- **REQ-7**: 利用者が駅の詳細を開いたとき、システムはベビーカーを選んだ状態で表示すること
+- **REQ-8**: システムは、路線の駅一覧を、路線色の線で駅番号の丸をつないだ縦の並びで表示すること
+- **REQ-9**: システムは、乗換の状態（バリアフリールートあり／なし／確認できていない）を、色に加えて ◎ × ＊ の記号と文言で示すこと（ADR-0018 決定1）
+
+### 色と読みやすさ
+
+- **REQ-10**: システムは、本文サイズの文字と背景のコントラスト比を 4.5:1 以上にすること
+- **REQ-11**: システムは、フリースペースをローズ、優先席を朱色、出口をバター色、車いすをスレートで示すこと（ADR-0018 決定1）
+- **REQ-12**: ホーム図を Admin で表示した場合も、システムは REQ-11 と同じ色で表示すること
+
+### アイコン
+
+- **REQ-13**: システムは、アプリアイコンを ADR-0019 の図柄にし、60px 未満で出す所（ファビコン・ヘッダー）では文字のない版を使うこと
+- **REQ-14**: システムは、Web アプリの manifest で、存在するアイコンのファイルを指し、`name` と `short_name` を持つこと
+
+## 範囲外（別 Issue）
+
+- ホーム図の縦向きレイアウト（#174）
+- ホーム図に優先席の位置を描くこと（#175。#29 で図から外した判断と食い違うため、描くかどうかから決め直す）
+- 路線の駅一覧で、各駅の乗換路線を表示すること（#177。`getVisibleLineWithStations` が乗換を返さないため、クエリの追加が要る）
+- アプリ名の変更（「ふらっと乗換」。#178）
+- Admin 画面のデザイン（ホーム図の色を除く。#179）
+- ダークモード（開発者の判断で起票しない）
+
+## 依存関係とリスク
+
+| 依存・リスク | 影響 | 緩和 |
+|---|---|---|
+| ホーム図のトークンが2か所にある（Web の `globals.css` と、パッケージの `styles.css`） | 片方だけ変えると Web と Admin で色がずれる | design.md「トークンの置き場」のとおり、Web もパッケージの `styles.css` を読み込み、重複を消す |
+| `:root` の同名の変数（`--color-bg-card` など）が `globals.css` と `styles.css` の両方にある | 読み込み順で値が決まる | 上と同じ。重複を消す |
+| `TransferDifficultySection` にテストがある | 切り替えの導入でテストが変わる | PR 3 でテストを書き換える |
+| Tailwind の既定の色クラスの置き換え漏れ | 灰色・青が残る | PR 3 の最後に既定の色を無効化し、`rg` で残りを確かめる |
+
+## エッジケース
+
+| ケース | 期待 |
+|---|---|
+| 路線色が DB に無い（`null`） | 駅番号の丸・線・ホーム図の路線の印はニュートラル（`#7A6E72`）で描く |
+| 乗換先が無い駅 | 乗換のセクションを出さない（現状どおり） |
+| 移動手段を切り替えた | 選んでいる乗換先の路線は変えない |
+| 乗換先が未評価 | 移動手段に関係なく「情報なし」を表示する（現状どおり） |
+| 書体の読み込みに失敗 | フォールバック（Hiragino / Yu Gothic / system-ui）で表示が崩れない |

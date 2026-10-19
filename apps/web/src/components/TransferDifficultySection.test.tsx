@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { DirectionType } from '@furatora/transfer-difficulty/domain';
 import { TransferDifficultySection } from './TransferDifficultySection';
 import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
+import { renderWithMantine as render } from '@/test/renderWithMantine';
 
 function route(overrides: Partial<TransferRouteDTO> & { routeId: string }): TransferRouteDTO {
   return {
@@ -41,11 +42,28 @@ function partner(overrides: Partial<TransferPartnerDTO> = {}): TransferPartnerDT
 }
 
 const card = (name: string) => screen.getByRole('region', { name });
+const personaRadio = (name: string) => within(screen.getByRole('radiogroup', { name: '移動手段' })).getByRole('radio', { name });
+// MantineProvider が <style> を差し込むため、container が空かどうかでは確かめられない
+function expectNothingRendered() {
+  expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+}
+const choosePersona = (name: string) => userEvent.click(personaRadio(name));
+
+const ROUTED_PARTNERS = [
+  partner({ combos: allCombos([route({ routeId: 'stairs', label: '階段経由', facilities: ['stairs'] })]) }),
+  partner({
+    connectedStationId: 't2',
+    connectedStationName: '新御茶ノ水',
+    lineName: '東京メトロ千代田線',
+    combos: allCombos([route({ routeId: 'ev', label: 'エレベーター経由' })]),
+  }),
+];
 
 describe('TransferDifficultySection', () => {
   it('評価済みの相手駅が1つも無ければ何も表示しない', () => {
-    const { container } = render(<TransferDifficultySection stationName="淡路町" partners={[partner()]} />);
-    expect(container).toBeEmptyDOMElement();
+    render(<TransferDifficultySection stationName="淡路町" partners={[partner()]} />);
+    expectNothingRendered();
   });
 
   it('バリアフリールートが1本なら、そのルートと必要な行為を示す', () => {
@@ -99,7 +117,7 @@ describe('TransferDifficultySection', () => {
       .toBeInTheDocument();
   });
 
-  it('霞ケ関型: 階段しかないベビーカーは「なし」＋持ち上げる、車いすは「なし」＋駅員複数名の介助', () => {
+  it('霞ケ関型: 階段しかないベビーカーは「なし」＋持ち上げる、車いすは「なし」＋駅員複数名の介助', async () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -108,10 +126,12 @@ describe('TransferDifficultySection', () => {
     );
     expect(within(card('ベビーカー')).getByText('バリアフリールートなし')).toBeInTheDocument();
     expect(within(card('ベビーカー')).getByText('最も軽い方法: 持ち上げる')).toBeInTheDocument();
+    await choosePersona('車いす');
+    expect(within(card('車いす')).getByText('バリアフリールートなし')).toBeInTheDocument();
     expect(within(card('車いす')).getByText('最も軽い方法: 駅員複数名の介助')).toBeInTheDocument();
   });
 
-  it('ペルソナごとにバリアフリールートの判定が分かれる（階段昇降機）', () => {
+  it('ペルソナごとにバリアフリールートの判定が分かれる（階段昇降機）', async () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -119,6 +139,7 @@ describe('TransferDifficultySection', () => {
       />,
     );
     expect(within(card('ベビーカー')).getByText('通行可能なルートがありません')).toBeInTheDocument();
+    await choosePersona('車いす');
     expect(within(card('車いす')).getByText('バリアフリールートあり')).toBeInTheDocument();
     expect(within(card('車いす')).getByText('係員を呼ぶ')).toBeInTheDocument();
   });
@@ -244,10 +265,8 @@ describe('TransferDifficultySection', () => {
   });
 
   it('接続行はあるがルートが0本の相手駅しか無ければ何も表示しない', () => {
-    const { container } = render(
-      <TransferDifficultySection stationName="淡路町" partners={[partner({ combos: allCombos([]) })]} />,
-    );
-    expect(container).toBeEmptyDOMElement();
+    render(<TransferDifficultySection stationName="淡路町" partners={[partner({ combos: allCombos([]) })]} />);
+    expectNothingRendered();
   });
 
   it('未評価の相手駅を選ぶと「情報なし」を示す', async () => {
@@ -263,6 +282,53 @@ describe('TransferDifficultySection', () => {
     // 相手駅の駅名が自駅と違うときは、路線名に駅名を添える
     await userEvent.selectOptions(screen.getByLabelText('乗換先路線'), 'JR中央線(快速)（御茶ノ水）');
     expect(within(card('ベビーカー')).getByText('情報なし')).toBeInTheDocument();
+    await choosePersona('車いす');
     expect(within(card('車いす')).getByText('情報なし')).toBeInTheDocument();
+  });
+
+  describe('移動手段の切り替え', () => {
+    it('移動手段を「移動手段」という名前の、1つを選ぶグループで出す', () => {
+      render(<TransferDifficultySection stationName="淡路町" partners={ROUTED_PARTNERS} />);
+      expect(screen.getByRole('radiogroup', { name: '移動手段' })).toBeInTheDocument();
+    });
+
+    it('最初はベビーカーを選んだ状態で、ベビーカーの評価だけを出す（REQ-7）', () => {
+      render(<TransferDifficultySection stationName="淡路町" partners={ROUTED_PARTNERS} />);
+      expect(personaRadio('ベビーカー')).toBeChecked();
+      expect(personaRadio('車いす')).not.toBeChecked();
+      expect(card('ベビーカー')).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: '車いす' })).not.toBeInTheDocument();
+    });
+
+    it('「車いす」を選ぶと、車いすの評価だけを出す（REQ-6）', async () => {
+      render(<TransferDifficultySection stationName="淡路町" partners={ROUTED_PARTNERS} />);
+      await choosePersona('車いす');
+      expect(personaRadio('車いす')).toBeChecked();
+      expect(card('車いす')).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'ベビーカー' })).not.toBeInTheDocument();
+    });
+
+    it('矢印キーで選び直せる', async () => {
+      render(<TransferDifficultySection stationName="淡路町" partners={ROUTED_PARTNERS} />);
+      await userEvent.click(personaRadio('ベビーカー'));
+      await userEvent.keyboard('{ArrowRight}');
+      expect(personaRadio('車いす')).toBeChecked();
+    });
+
+    it('移動手段を切り替えても、選んでいる乗換先は変わらない', async () => {
+      render(<TransferDifficultySection stationName="淡路町" partners={ROUTED_PARTNERS} />);
+      await userEvent.selectOptions(screen.getByLabelText('乗換先路線'), '東京メトロ千代田線（新御茶ノ水）');
+      await choosePersona('車いす');
+      expect(screen.getByLabelText('乗換先路線')).toHaveDisplayValue('東京メトロ千代田線（新御茶ノ水）');
+      expect(within(card('車いす')).getByText('エレベーター経由')).toBeInTheDocument();
+    });
+
+    it('乗換先を選び直しても、選んでいる移動手段は変わらない', async () => {
+      render(<TransferDifficultySection stationName="淡路町" partners={ROUTED_PARTNERS} />);
+      await choosePersona('車いす');
+      await userEvent.selectOptions(screen.getByLabelText('乗換先路線'), '東京メトロ千代田線（新御茶ノ水）');
+      expect(personaRadio('車いす')).toBeChecked();
+      expect(within(card('車いす')).getByText('エレベーター経由')).toBeInTheDocument();
+    });
   });
 });

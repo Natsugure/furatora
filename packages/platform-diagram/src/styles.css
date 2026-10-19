@@ -14,45 +14,57 @@
 */
 
 :root {
-  /* カード・図の背景・枠線・文字色 */
+  /* カード・図の背景・枠線・文字色。apps/web の globals.css にも同じ名前があり、
+     web では後に読む globals.css が勝つ。両方で同じ値にしておくこと（ADR-0017）。
+     apps/web の globals.test.ts が一致を確かめる */
   --color-bg-card: #ffffff;
-  --color-border-default: #e0e0e0;
-  --color-border-strong: #cccccc;
-  --color-text-primary: #222222;
-  --color-text-secondary: #666666;
+  --color-border-default: #ebe4e7;
+  --color-border-strong: #c9bec2;
+  --color-text-primary: #2a2326;
+  --color-text-secondary: #7a6e72;
 
-  /* 号車 */
-  --color-train-car-bg: #d6d3d1;
-  --color-train-car-border: #a8a29e;
+  /* 号車。地は淡いニュートラル。地を濃くするとフリースペースの丸が沈むので、
+     輪郭は枠（neutral-500、白地 4.88:1）で出す */
+  --color-train-car-bg: #efe8eb;
+  --color-train-car-border: #7a6e72;
   --color-car-number-bg: rgba(255, 255, 255, 0.9);
 
-  /* フリースペース */
-  --color-free-standard: #4072b3;
+  /* フリースペース。ブランドのローズ（500、一部編成は 300）。ADR-0018 決定1
+     一部編成は 200 だと号車の地（1.26:1）や通常のドアの印と見分けにくいので 300 にする。
+     中の記号は 300 の上で読める 800（5.27:1） */
+  --color-free-standard: #df5286;
   --color-free-standard-text: #ffffff;
-  --color-free-nonstandard: #a5c0e6;
-  --color-free-nonstandard-text: #1a2d4e;
+  --color-free-nonstandard: #ee9fba;
+  --color-free-nonstandard-text: #6e2140;
 
   /* 駅サイン様式（出口・乗換プレート） */
-  --sign-exit-bg: #ffd400;
-  --sign-exit-ink: #111111; /* 黄地とのコントラスト比 約13:1 */
-  --sign-exit-edge: #c99a00; /* 白背景から浮かせないための輪郭 */
+  /* 出口は駅サインの黄ではなくバター色（300 の地に 900 の文字、7.62:1。ADR-0018 決定3）。
+     地と白地のコントラスト比は 1.37:1 しかないので、白地から浮かせるのは輪郭（700、白地 6.79:1）。
+     乗換のプレート（白地に黒い輪郭）とは、地の色と文言で見分ける */
+  --sign-exit-bg: #f0dc85;
+  --sign-exit-ink: #4a3f0a;
+  --sign-exit-edge: #6b5a0e;
 
   --sign-transfer-bg: #ffffff;
   --sign-transfer-edge: #111111;
-  --sign-transfer-ink: #222222;
-  --sign-transfer-note: #666666;
+  /* 乗換プレートの文字は図の見出しと同じ色にする（純黒・純グレーを混ぜない。ADR-0017 決定2） */
+  --sign-transfer-ink: var(--color-text-primary);
+  --sign-transfer-note: var(--color-text-secondary);
 
-  --sign-boarding-mark: #aaaaaa; /* 乗車位置目標（通常のドア） */
-  --sign-leader: #aaaaaa; /* 束ね線と引き出し線 */
+  /* 乗車位置目標（通常のドア）。neutral-700 を 55% で重ねて描く（白地 2.91:1）。
+     不透明の neutral-500（4.88:1）だと全編成のフリースペース（3.69:1）より目立つため、あえて淡くする。
+     透過率は DiagramSvg と凡例（PlatformDiagram）の fillOpacity が持つ */
+  --sign-boarding-mark: #4a4044;
+  --sign-leader: #c9bec2; /* 束ね線と引き出し線 */
 
-  /* フリースペース詳細・優先席カード */
-  --card-transfer-bg: #ebf1fa;
-  --card-transfer-border: #4072b3;
-  --card-transfer-heading: #264370;
+  /* フリースペース詳細（ブランドのローズ）・優先席カード（朱色。ADR-0018 決定2） */
+  --card-transfer-bg: #fdf3f6;
+  --card-transfer-border: #f5c5d6;
+  --card-transfer-heading: #a02f5b;
 
-  --card-prio-bg: #fff8e1;
-  --card-prio-border: #ffe082;
-  --card-prio-heading: #ffb300;
+  --card-prio-bg: #fceee8;
+  --card-prio-border: #f4c3b1;
+  --card-prio-heading: #a3361a;
 
   /* 号車番号・出口プレート等の書体。next/font/google の BIZ_UDPGothic を
      variable: '--font-biz-udpgothic' で各アプリの layout.tsx が読み込む前提。

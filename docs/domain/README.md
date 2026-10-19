@@ -39,3 +39,4 @@ ADR との違いは「不変か、最新か」です。ADR は決定した時点
 | [line-directions.md](./line-directions.md) | 方面（`line_directions`）。同じ意味の行が複数あること、既定行（`isDefault`）の不変条件と選び方、方面ラベルの解決規則（ホーム → 既定行 → 上り/下り） |
 | [platform-coordinate-system.md](./platform-coordinate-system.md) | ホームの座標系。原点の定義、単位、描画範囲 |
 | [train-stop-patterns.md](./train-stop-patterns.md) | 列車の停車位置パターン。号車座標、標準車両長、現在の制約 |
+| [design-system.md](./design-system.md) | デザインシステム（Soft Rose）。トークンの置き場と一致を確かめるテスト、意味色の対応、Tailwind・Mantine での使い方、書体・形、アプリアイコンのファイル |
