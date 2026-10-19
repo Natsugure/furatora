@@ -28,7 +28,7 @@ const ALLOWED: { file: string; line: RegExp; reason: string }[] = [
   {
     file: 'packages/platform-diagram/src/domain/concourse.ts',
     line: /DEFAULT_LINE_COLOR = /,
-    reason: 'DB に路線色が無い路線の代わりの色（ホーム図。PR 4 で見直す）',
+    reason: 'DB に路線色が無い路線の代わりの色（ホーム図）。Admin は Web のトークンを読まないため値で持つ。Web の --color-rail-line-fallback と同じ値',
   },
 ];
 

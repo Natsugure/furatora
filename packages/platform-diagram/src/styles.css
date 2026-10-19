@@ -23,21 +23,24 @@
   --color-text-primary: #2a2326;
   --color-text-secondary: #7a6e72;
 
-  /* 号車 */
-  --color-train-car-bg: #d6d3d1;
-  --color-train-car-border: #a8a29e;
+  /* 号車。地は淡いニュートラル、枠は --color-border-strong と同じ */
+  --color-train-car-bg: #efe8eb;
+  --color-train-car-border: #c9bec2;
   --color-car-number-bg: rgba(255, 255, 255, 0.9);
 
-  /* フリースペース */
-  --color-free-standard: #4072b3;
+  /* フリースペース。ブランドのローズ（500、一部編成は 200）。ADR-0018 決定1 */
+  --color-free-standard: #df5286;
   --color-free-standard-text: #ffffff;
-  --color-free-nonstandard: #a5c0e6;
-  --color-free-nonstandard-text: #1a2d4e;
+  --color-free-nonstandard: #f5c5d6;
+  --color-free-nonstandard-text: #a02f5b;
 
   /* 駅サイン様式（出口・乗換プレート） */
-  --sign-exit-bg: #ffd400;
-  --sign-exit-ink: #111111; /* 黄地とのコントラスト比 約13:1 */
-  --sign-exit-edge: #c99a00; /* 白背景から浮かせないための輪郭 */
+  /* 出口は駅サインの黄ではなくバター色（300 の地に 900 の文字、7.62:1。ADR-0018 決定3）。
+     輪郭は地と同じ値で見せない。地と白地のコントラスト比は 1.37:1 で、乗換のプレートとは
+     輪郭の濃さと文言で見分ける。白地から浮かないと分かったら輪郭を butter-700 寄りに濃くする（ADR-0018「影響」） */
+  --sign-exit-bg: #f0dc85;
+  --sign-exit-ink: #4a3f0a;
+  --sign-exit-edge: #f0dc85;
 
   --sign-transfer-bg: #ffffff;
   --sign-transfer-edge: #111111;
@@ -45,17 +48,17 @@
   --sign-transfer-ink: var(--color-text-primary);
   --sign-transfer-note: var(--color-text-secondary);
 
-  --sign-boarding-mark: #aaaaaa; /* 乗車位置目標（通常のドア） */
-  --sign-leader: #aaaaaa; /* 束ね線と引き出し線 */
+  --sign-boarding-mark: #c9bec2; /* 乗車位置目標（通常のドア） */
+  --sign-leader: #c9bec2; /* 束ね線と引き出し線 */
 
-  /* フリースペース詳細・優先席カード */
-  --card-transfer-bg: #ebf1fa;
-  --card-transfer-border: #4072b3;
-  --card-transfer-heading: #264370;
+  /* フリースペース詳細（ブランドのローズ）・優先席カード（朱色。ADR-0018 決定2） */
+  --card-transfer-bg: #fdf3f6;
+  --card-transfer-border: #f5c5d6;
+  --card-transfer-heading: #a02f5b;
 
-  --card-prio-bg: #fff8e1;
-  --card-prio-border: #ffe082;
-  --card-prio-heading: #ffb300;
+  --card-prio-bg: #fceee8;
+  --card-prio-border: #f4c3b1;
+  --card-prio-heading: #a3361a;
 
   /* 号車番号・出口プレート等の書体。next/font/google の BIZ_UDPGothic を
      variable: '--font-biz-udpgothic' で各アプリの layout.tsx が読み込む前提。

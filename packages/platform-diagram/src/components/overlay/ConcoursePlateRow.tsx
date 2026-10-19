@@ -155,7 +155,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: P
 }
 
 /**
- * 出口プレート（黄地に黒）。
+ * 出口プレート（バター色の地に濃い文字。ADR-0018 決定3）。
  *
  * 設備の種別名を添えるのは、束ね線と出口の対応を**文章でも**担保するため。
  * 引き出し線は幅の見積り誤差ぶんずれうるが、「このエレベーターは中央改札へ」が

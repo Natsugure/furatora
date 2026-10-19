@@ -93,10 +93,17 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
   - 結果: 成功（テスト 21 ファイル・143 件、typecheck・lint・build）。dev（390px）で、銀座線の路線記号と渋谷の番線の丸が輪になったこと、
     路線の駅一覧 → 駅の詳細 → 戻るで駅一覧に戻ること、駅の詳細を新しいコンテキストで直接開いて戻るとトップへ行くことを確かめた
 
-## PR 4: ホーム図パッケージ（依存: PR 1）
+## PR 4: ホーム図パッケージ（依存: PR 1）（`feat/issue166-pr4-diagram`）
 
-- [ ] **TASK-4.1** `packages/platform-diagram/src/styles.css` の値を変える（design.md の表）。出口のコメントを ADR-0018 参照に書き換える
-- [ ] **TASK-4.2** 検証: Web と Admin のホーム図を目視。出口のプレートが白地から浮くかを確かめ、足りなければ `--sign-exit-edge` を濃くする
+- [x] **TASK-4.1** `packages/platform-diagram/src/styles.css` の値を変える（design.md の表）。出口のコメントを ADR-0018 参照に書き換える
+  - `ConcoursePlateRow` の「出口プレート（黄地に黒）」のコメントも ADR-0018 参照に書き換えた。凡例はトークン経由なので値の変更だけで足りた
+  - TASK-3.5 で残した `DEFAULT_LINE_COLOR`（`#9ca3af`、Tailwind の gray-400）を、Web の `--color-rail-line-fallback`（neutral-300）と同じ `#c9bec2` にした。
+    Admin は Web のトークンを読まないため値で持ち、`defaultColorClasses.test.ts` の許可リストに残す
+- [x] **TASK-4.2** 検証: Web と Admin のホーム図を目視。出口のプレートが白地から浮くかを確かめ、足りなければ `--sign-exit-edge` を濃くする
+  - 結果: 成功（typecheck・lint・test・build）。Web（淡路町、390px）と Admin（淡路町のホーム編集、1280px）で、号車・フリースペースの印・出口と乗換のプレート・凡例・
+    フリースペース詳細・優先席のカードが新しい色になった
+  - 出口のプレートは、輪郭を地と同じ色にしたままでも白地から浮いて見え、乗換のプレート（黒い輪郭）とも見分けられる。`--sign-exit-edge` は変えない
+  - ホーム図のフリースペースの `<title>` のハイドレーションの不一致がコンソールに出るが、既知の #143 で今回の変更とは関係ない
 
 ## PR 5: アイコン（依存: なし。清書したデータが要る）
 
