@@ -18,7 +18,7 @@ test('サイドバーのナビゲーションリンクが表示される', async
 
 test('ページタイトルが正しい', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle(/Admin - ふらとら/);
+  await expect(page).toHaveTitle(/Admin - ふらっと乗換/);
 });
 
 test('ダッシュボードから各マスタ管理ページへ遷移できる', async ({ page }) => {

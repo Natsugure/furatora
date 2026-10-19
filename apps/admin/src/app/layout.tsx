@@ -20,7 +20,7 @@ const bizUdpGothic = BIZ_UDPGothic({
 });
 
 export const metadata: Metadata = {
-  title: 'Admin - ふらとら',
+  title: 'Admin - ふらっと乗換',
   description: 'Administration panel',
   robots: {
     index: false,

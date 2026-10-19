@@ -1,7 +1,7 @@
 {
     "id": "/",
-    "name": "ふらとら",
-    "short_name": "ふらとら",
+    "name": "ふらっと乗換",
+    "short_name": "ふらっと乗換",
     "start_url": "/",
     "scope": "/",
     "icons": [
