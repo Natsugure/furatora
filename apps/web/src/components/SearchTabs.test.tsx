@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ReactNode } from 'react';
-import { MantineProvider } from '@mantine/core';
-import { render as rtlRender, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SearchTabs } from './SearchTabs';
-import { mantineTheme } from '@/theme/mantineTheme';
+import { renderWithMantine as render } from '@/test/renderWithMantine';
 import type { OperatorWithLines } from '@/types';
 
 const operators: OperatorWithLines[] = [
@@ -16,12 +14,6 @@ const operators: OperatorWithLines[] = [
     lines: [{ id: 'ginza', slug: 'ginza', name: '銀座線', nameEn: null, lineCode: null, color: null, displayOrder: null, operatorId: 'metro' }],
   },
 ];
-
-// SegmentedControl は MantineProvider の中でしか描けない
-function Wrapper({ children }: { children: ReactNode }) {
-  return <MantineProvider theme={mantineTheme}>{children}</MantineProvider>;
-}
-const render = (ui: ReactNode) => rtlRender(ui, { wrapper: Wrapper });
 
 const stationTab = () => screen.getByRole('radio', { name: '駅名で検索' });
 const lineTab = () => screen.getByRole('radio', { name: '路線から検索' });

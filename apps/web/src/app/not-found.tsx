@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, SearchX } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
+import { pillButtonSecondary } from '@/components/ui/pillButton';
 
 export default function NotFound() {
   return (
@@ -12,7 +13,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 h-11 px-5 rounded-full bg-surface shadow-raised text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors"
+        className={pillButtonSecondary}
       >
         <ArrowLeft size={15} />
         トップページに戻る

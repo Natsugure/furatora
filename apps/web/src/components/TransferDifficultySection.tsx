@@ -22,6 +22,7 @@ type Props = {
 };
 
 const PERSONAS: Persona[] = ['stroller', 'wheelchair'];
+const PERSONA_OPTIONS = PERSONAS.map((p) => ({ value: p, label: PERSONA_LABEL[p] }));
 
 // SegmentedControl の onChange は string を返すため、Persona に絞り込む
 function isPersona(value: string): value is Persona {
@@ -38,16 +39,16 @@ const PERSONA_STYLE: Record<Persona, { cardClass: string; activeClass: string }>
 // ルートが複数あるときに、ルートの間で違う項目を目立たせる
 const HIGHLIGHT = 'bg-brand-100 text-brand-800 font-semibold';
 
-function StatusIcon({ iconPath, iconColor }: { iconPath: string; iconColor: string }) {
+// アイコンの形は mask で切り抜き、色は背景色のクラス（iconClassName）で塗る
+function StatusIcon({ iconPath, iconClassName }: { iconPath: string; iconClassName: string }) {
   return (
     <span
       aria-hidden
-      className="flex-shrink-0 mt-0.5"
+      className={`flex-shrink-0 mt-0.5 ${iconClassName}`}
       style={{
         display: 'inline-block',
         width: 20,
         height: 20,
-        backgroundColor: iconColor,
         WebkitMaskImage: `url(${iconPath})`,
         WebkitMaskSize: 'contain',
         WebkitMaskRepeat: 'no-repeat',
@@ -161,7 +162,7 @@ function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRo
   return (
     <>
       <div className="flex items-start gap-2">
-        <StatusIcon iconPath={meta.iconPath} iconColor={meta.iconColor} />
+        <StatusIcon iconPath={meta.iconPath} iconClassName={meta.iconClassName} />
         <p className={`text-[15px] font-bold leading-snug ${meta.labelClassName}`}>
           {meta.label}
           {assessment.kind === 'barrierFree' && assessment.routes.length > 1 && `（${assessment.routes.length}本）`}
@@ -241,18 +242,14 @@ export function TransferDifficultySection({ stationName, partners: allPartners }
         </div>
       )}
 
-      {/* 移動手段の切り替え。SearchTabs と同じ部品（ラジオボタンのグループ）にそろえる */}
+      {/* 移動手段の切り替え。SearchTabs と同じ部品（ラジオボタンのグループ）で、共通の見た目は mantineTheme.ts にある */}
       <SegmentedControl
         fullWidth
         aria-label="移動手段"
         value={persona}
         onChange={(value) => { if (isPersona(value)) setPersona(value); }}
-        data={PERSONAS.map((p) => ({ value: p, label: PERSONA_LABEL[p] }))}
-        classNames={{
-          root: 'p-1 rounded-full bg-subtle',
-          indicator: 'rounded-full bg-surface shadow-raised',
-          label: `flex items-center justify-center h-11.5 py-0 rounded-full text-sm font-medium text-ink-soft hover:text-ink data-[active]:font-bold ${PERSONA_STYLE[persona].activeClass}`,
-        }}
+        data={PERSONA_OPTIONS}
+        classNames={{ label: PERSONA_STYLE[persona].activeClass }}
       />
 
       <div className="flex flex-col gap-4">

@@ -1,18 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ReactNode } from 'react';
-import { MantineProvider } from '@mantine/core';
-import { render as rtlRender, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { DirectionType } from '@furatora/transfer-difficulty/domain';
 import { TransferDifficultySection } from './TransferDifficultySection';
 import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
-import { mantineTheme } from '@/theme/mantineTheme';
-
-// SegmentedControl は MantineProvider の中でしか描けない
-function Wrapper({ children }: { children: ReactNode }) {
-  return <MantineProvider theme={mantineTheme}>{children}</MantineProvider>;
-}
-const render = (ui: ReactNode) => rtlRender(ui, { wrapper: Wrapper });
+import { renderWithMantine as render } from '@/test/renderWithMantine';
 
 function route(overrides: Partial<TransferRouteDTO> & { routeId: string }): TransferRouteDTO {
   return {

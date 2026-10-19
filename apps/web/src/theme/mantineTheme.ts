@@ -1,4 +1,4 @@
-import { createTheme, type MantineColorsTuple } from '@mantine/core';
+import { createTheme, SegmentedControl, type MantineColorsTuple } from '@mantine/core';
 
 // ブランド色の10段階（index 0〜9 = globals.css の --brand-50〜--brand-900）。
 // Mantine の theme.colors は CSS 変数を受け付けないため、値を複製している（ADR-0017 決定5）。
@@ -28,4 +28,16 @@ export const mantineTheme = createTheme({
   headings: { fontFamily: 'var(--font-display)' },
   // lg = 16px（入力欄の角丸。ADR-0017 決定4）
   defaultRadius: 'lg',
+  components: {
+    // 角丸のセグメント（選択中は白地・太字・影）。SearchTabs と乗換の移動手段の切り替えで同じ見た目にする。
+    // 選択中の文字色だけは呼び出し側が classNames.label で足す（Mantine は theme と props の classNames を合成する）。
+    // Mantine の CSS は @layer mantine にあり、utilities が勝つ（layers.css）
+    SegmentedControl: SegmentedControl.extend({
+      classNames: {
+        root: 'p-1 rounded-full bg-subtle',
+        indicator: 'rounded-full bg-surface shadow-raised',
+        label: 'flex items-center justify-center h-11 py-0 rounded-full text-sm font-medium text-ink-soft hover:text-ink data-[active]:font-bold',
+      },
+    }),
+  },
 });

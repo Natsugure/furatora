@@ -28,18 +28,14 @@ export function SearchTabs({ operators }: Props) {
   return (
     <div className="flex flex-col gap-5">
       {/* 検索方法の切り替え。どちらか1つを選ぶ部品なので、ラジオボタンのグループ（SegmentedControl）にする。
-          見た目は Tailwind のクラスで当てる（Mantine の CSS は @layer mantine にあり、utilities が勝つ。layers.css） */}
+          共通の見た目は mantineTheme.ts にある */}
       <SegmentedControl
         fullWidth
         aria-label="検索方法"
         value={activeTab}
         onChange={(value) => { if (isTab(value)) setActiveTab(value); }}
         data={TABS}
-        classNames={{
-          root: 'p-1 rounded-full bg-subtle',
-          indicator: 'rounded-full bg-surface shadow-raised',
-          label: 'flex items-center justify-center h-11 py-0 rounded-full text-sm font-medium text-ink-soft hover:text-ink data-[active]:font-bold data-[active]:text-brand-600',
-        }}
+        classNames={{ label: 'data-[active]:text-brand-600' }}
       />
 
       {/* タブコンテンツ */}

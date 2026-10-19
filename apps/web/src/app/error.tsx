@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
+import { pillButtonPrimary, pillButtonSecondary } from '@/components/ui/pillButton';
 
 type Props = {
   error: Error & { digest?: string };
@@ -28,13 +29,13 @@ export default function ErrorPage({ error, reset }: Props) {
       <div className="flex items-center justify-center gap-3">
         <button
           onClick={reset}
-          className="h-11 px-5 rounded-full bg-brand-600 hover:bg-brand-700 text-sm font-bold text-white transition-colors"
+          className={pillButtonPrimary}
         >
           再試行する
         </button>
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 h-11 px-5 rounded-full bg-surface shadow-raised text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors"
+          className={pillButtonSecondary}
         >
           <ArrowLeft size={15} />
           トップページに戻る

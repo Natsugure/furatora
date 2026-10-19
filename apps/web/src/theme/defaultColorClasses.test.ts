@@ -36,15 +36,16 @@ function sourceFiles(dir: string): string[] {
     .map((f) => path.join(dir, f));
 }
 
+// 走査の対象の行（例外を除く）。ファイルを読むのは1回だけにして、各テストで使い回す
+const SCANNED_LINES = SCAN_DIRS.flatMap(sourceFiles).flatMap((file) =>
+  readFileSync(path.join(REPO_ROOT, file), 'utf-8')
+    .split('\n')
+    .map((text, i) => ({ where: `${file}:${i + 1}`, text }))
+    .filter(({ text }) => !ALLOWED.some((a) => a.file === file && a.line.test(text))),
+);
+
 function violations(pattern: RegExp): string[] {
-  return SCAN_DIRS.flatMap(sourceFiles).flatMap((file) =>
-    readFileSync(path.join(REPO_ROOT, file), 'utf-8')
-      .split('\n')
-      .flatMap((text, i) => {
-        if (ALLOWED.some((a) => a.file === file && a.line.test(text))) return [];
-        return [...text.matchAll(pattern)].map((m) => `${file}:${i + 1} ${m[0]}`);
-      }),
-  );
+  return SCANNED_LINES.flatMap(({ where, text }) => [...text.matchAll(pattern)].map((m) => `${where} ${m[0]}`));
 }
 
 describe('既定の色を使っていない', () => {

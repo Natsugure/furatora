@@ -180,7 +180,7 @@ Mantine の10段階は index 0〜9 で、CSS の `--brand-50`〜`--brand-900` �
 | 3 | `components/StationTimeline.tsx`（新規）／ `components/StationCard.tsx`（削除） | 駅一覧のタイムラインを一覧ごと部品にする（下の「駅一覧のタイムラインの部品化」） |
 | 3 | `app/stations/[slug]/page.tsx` | 駅の見出し、路線のチップ（下の「路線のチップ」）、ご利用案内 |
 | 3 | `components/TransferDifficultySection.tsx` | ベビーカー／車いすを Mantine の `SegmentedControl` で切り替える。状態の色を ADR-0018 に揃える |
-| 3 | `constants/transferDifficulty.ts` | `iconColorHex` を `iconColor` に改め、`var(--sage-500)` / `var(--amber-500)` / `var(--neutral-500)` を参照する。状態の文言の色（`labelClassName`）を足す |
+| 3 | `constants/transferDifficulty.ts` | `iconColorHex` を `iconClassName` に改め、意味色のクラス（`bg-route-ok-500` / `bg-route-none-500` / `bg-muted`）で塗る。状態の文言の色（`labelClassName`）を足す |
 | 3 | `features/platform/components/PlatformTabs.tsx` / `PlatformDisplay.tsx` | ホームのタブ・見出しの色 |
 | 3 | `app/**/loading.tsx` / `error.tsx` / `not-found.tsx` | スケルトン・エラー画面の色 |
 | 4 | `packages/platform-diagram/src/styles.css` | 上の表のとおり |

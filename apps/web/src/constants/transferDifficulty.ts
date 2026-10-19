@@ -9,23 +9,23 @@ export const TRANSFER_STATUS_META = {
   barrierFree: {
     label: 'バリアフリールートあり',
     iconPath: '/icons/double_circle.svg',
-    iconColor: 'var(--sage-500)',
+    iconClassName: 'bg-route-ok-500',
     labelClassName: 'text-route-ok-700',
   },
   // 設備未入力のルートがあるため「なし」とは言えない（ADR-0012）
   undetermined: {
     label: 'バリアフリールートを確認できていません',
     iconPath: '/icons/asterisk.svg',
-    iconColor: 'var(--neutral-500)',
+    iconClassName: 'bg-muted',
     labelClassName: 'text-ink-soft',
   },
   none: {
     label: 'バリアフリールートなし',
     iconPath: '/icons/cross.svg',
-    iconColor: 'var(--amber-500)',
+    iconClassName: 'bg-route-none-500',
     labelClassName: 'text-route-none-700',
   },
-} as const satisfies Record<StatusKind, { label: string; iconPath: string; iconColor: string; labelClassName: string }>;
+} as const satisfies Record<StatusKind, { label: string; iconPath: string; iconClassName: string; labelClassName: string }>;
 
 // ルートの4フラグのうち、利用者に伝える側の値の文言
 export const ROUTE_FLAG_LABEL = {
