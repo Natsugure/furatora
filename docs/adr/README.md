@@ -70,6 +70,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0018](./0018-semantic-colors-for-facilities.md) | フリースペース・優先席・出口・移動手段・状態の意味色を決め、出口を駅サインの黄からバター色に変える | Accepted   | 2026-10-18 |
 | [0019](./0019-app-icon-train-on-flat-line.md) | アプリアイコンを「正面の電車＋平らな線＋ふらっと」にし、小さいサイズでは文字を外す | Accepted   | 2026-10-18 |
 | [0020](./0020-main-only-long-lived-branch.md) | 長命ブランチを main のみにし、PR はマージコミットで main へ入れる | Accepted   | 2026-10-20 |
+| [0021](./0021-transfer-lines-from-station-connections.md) | 乗り換えられる路線を乗換接続から導き、乗換単位を乗換の判定に使わない | Accepted   | 2026-10-20 |
 
 ## 関連ドキュメント
 

@@ -37,6 +37,17 @@
 | `station_cd` → `stations.ekidataStationCd` | 駅 | **路線×駅**。同じ物理駅が路線ごとに別の `station_cd` を持つ |
 | `station_g_cd` → `stationGroups.ekidataStationGroupCd` | 乗換駅グループ | 物理駅（乗り換えでまとまる単位） |
 
+### 乗換単位（`stationGroups`）は乗換の判定に使わない
+
+1駅は高々1グループに属するため、グループは「同じグループの駅は互いに乗り換えられる」という推移的な関係しか表せない。
+実際の乗換関係は推移的でない。御茶ノ水のグループ（`station_g_cd = 1131203`）は淡路町・小川町・新御茶ノ水・
+JR御茶ノ水・メトロ御茶ノ水をすべて含むが、淡路町–JR御茶ノ水は乗換駅ではない。
+**乗換は乗換接続（`stationConnections`）が担う**（[ADR-0021](../adr/0021-transfer-lines-from-station-connections.md)）。
+
+乗換単位は「どの駅か」を表す単位として扱う（路線を特定しない検索・ハブページ・同じ名前の別の駅の区別。
+府中は3グループ、日本橋は東京と大阪）。現在アプリから読むのは Admin の駅作成フォームだけで、
+Web は読んでいない。手作業で追加した駅のグループを作る手段は無い（[Issue #96](https://github.com/Natsugure/furatora/issues/96)）。
+
 ### 例外・ダングリング
 
 - **`station_cd` の上位桁は `line_cd` と一致しない**（137件の例外）。所属路線は
@@ -127,6 +138,9 @@ ekidata `line_cd` は次を混在させている。設計は「案内路線（�
 
 `stationConnections` は「どの駅からどの駅へ乗り換えられるか」を持つ**接続一覧**であり、
 Web の駅詳細・Admin の駅編集・設備編集・レイアウト画面が読んでいる。
+Web の駅詳細の見出しの路線は、自駅の路線（`stationLines`）とこの表の相手駅の路線から導く
+（`apps/web/src/features/station/domain/reachableLines.ts`）。相手駅の駅名が自駅と同じ路線は自駅の路線と同じ段に、
+駅名が違う路線は「乗り換え」の段に相手駅の駅名ごとに出す（別の駅へは徒歩で移るため）。
 この表は乗換難易度を持たない。難易度は次節の新モデルが持つ。
 
 | `source` | 意味 |
