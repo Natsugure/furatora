@@ -1,44 +1,61 @@
-# 設計: ホーム図のフリースペースの `<title>` のハイドレーション不一致を直す (Issue #143)
+# 設計: 長命ブランチを main のみにし、develop を廃止する (Issue #183)
 
-## 原因
+運用と、その根拠は [ADR-0020](../adr/0020-main-only-long-lived-branch.md) による。ここには変更点だけを書く。
 
-React のサーバー描画（`react-dom-server` の `pushTitleImpl`）は、`<title>` の `children` が
-**2つ以上の要素を持つ配列なら `null` とみなし、中身を出力しない**（React 19.2.3 で確認）。
+## リポジトリ内の変更
 
-```js
-props = Array.isArray(children)
-  ? 2 > children.length ? children[0] : null
-  : children;
+| ファイル | 変更 |
+|---|---|
+| `docs/adr/0020-main-only-long-lived-branch.md` | 新規（Proposed） |
+| `docs/adr/README.md` | 一覧に 0020 を足す |
+| `.github/workflows/ci.yml` | `push.branches` を `[main]` にする |
+| `CLAUDE.md` | 「ブランチ運用」の節を足し、禁止事項から `develop` を外す |
+| `.claude/agents/frontend-engineer.md`・`test-runner-analyst.md` | ブランチの確認から `develop` を外す |
+
+ADR-0008 は Accepted のため本文を変えない。「制約」の git-flow と `preview/develop` の記述は、ADR-0020 の「関連」から置き換えを示す。
+
+## GitHub の設定（`gh api`）
+
+### リポジトリ
+
+```bash
+gh api -X PATCH repos/Natsugure/furatora \
+  -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false \
+  -F delete_branch_on_merge=true
 ```
 
-修正前の `FreeSpaceBadges` の `<title>` の子は、JSX の式と文字列が並んだ配列
-`[carNumber, '号車 ', doorNumber, '番ドア付近のフリースペース', '（全編成）' | '（一部編成）']` だった。
+### ruleset「Protect main branch」（id 13600230）
 
-- サーバー: `<title></title>`（空）を出力する
-- クライアント: 5つのテキストノードを期待する（エラーの `+ 1` は先頭の号車番号）
-- → 不一致。React がツリーをクライアントで作り直す
+```json
+{
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "bypass_actors": [{ "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "pull_request" }],
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "pull_request", "parameters": { "allowed_merge_methods": ["merge"], "required_approving_review_count": 0, "...": "既存の値を保つ" } },
+    { "type": "required_status_checks", "parameters": { "strict_required_status_checks_policy": false,
+      "required_status_checks": [{ "context": "verify" }] } }
+  ]
+}
+```
 
-同じファイルの他の `<title>`（`{banner.text}`・`{facility.typeName}`）は子が式1つなので出力され、不一致にならない。
-Issue の見立て（「サーバー側で連結される」）は細部が違い、実際は「空で出力される」。直し方は同じ。
+- `verify` は `ci.yml` のジョブ名
+- `strict`（main の最新を取り込んでいることを必須にする）は付けない。1人の開発では、取り込みのためだけの push が増えるため
 
-## 修正
+## 移行の順序
 
-`packages/platform-diagram/src/components/diagram/DiagramSvg.tsx` の `FreeSpaceBadges` で、
-`<title>` の子をテンプレート文字列1つにする。文言は修正前と同じ
-（`号車` の後に半角スペースあり、`（全編成）` の前は無し。JSX の改行は空白にならないため）。
-同じ書き方を繰り返さないよう、理由をコメントで添える。
-
-## 同じパターンの調査
-
-`packages/`・`apps/` の `.tsx` にある `<title>` は、`DiagramSvg.tsx` の4か所だけ。複数の子を持つのは `FreeSpaceBadges` だけ。
+1. PR #182（#143）を main へマージする（`docs/spec/` のコンフリクトを避けるため先に）
+2. このブランチに main を取り込み、`docs/spec/` はこちらを採る
+3. GitHub の設定を変える（この PR のマージ前。この PR 自体が新しいルールの最初の確認になる）
+4. この PR をマージする
+5. `develop` を消す。開発者が Neon の `preview/develop` を消し、Vercel の Production Branch を確かめる
 
 ## テスト
 
-自動テストは足さない。`platform-diagram` の vitest は domain の純関数だけを node 環境で確かめる方針で、
-`react-dom` も依存に無い。非公開の `FreeSpaceBadges` のために描画テストの基盤を入れるのは、この修正に対して過大。
-代わりに typecheck・lint・既存テスト・build と、dev のブラウザで修正後を確かめる。
+コードの変更が無いため、自動テストは足さない。設定は requirements.md「受け入れ基準」のコマンドで確かめる。
 
 ## ドメイン知識・決定の振り分け
 
-- `docs/domain/`: 変更なし（ドメインルールは変わらない）
-- ADR: なし（覆すときに意思決定が要る設計判断ではない）
+- ADR: ADR-0020（新規）
+- `docs/domain/`: 変更なし（システムの振る舞いではなく、開発の運用であるため。運用の要点は `CLAUDE.md` に置く）

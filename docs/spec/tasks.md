@@ -1,16 +1,15 @@
-# タスク: ホーム図のフリースペースの `<title>` のハイドレーション不一致を直す (Issue #143)
+# タスク: 長命ブランチを main のみにし、develop を廃止する (Issue #183)
 
-ブランチ: `fix/issue143-free-space-title-hydration`（develop から）
+ブランチ: `chore/issue183-main-only-branching`（`main` から）
 
-- [x] **TASK-1** 原因を確かめる: React のサーバー描画の `pushTitleImpl` が、複数の子を持つ `<title>` の中身を出力しないことを確認（design.md「原因」）
-- [x] **TASK-2** `docs/spec/` の3点を書き換える
-- [x] **TASK-3** `DiagramSvg.tsx` の `FreeSpaceBadges` の `<title>` の子をテンプレート文字列1つにし、理由のコメントを添える
-- [x] **TASK-4** 検証: `platform-diagram` の typecheck・lint・test、`pnpm run build`
-  - 結果: 成功（テスト 203 件、Web・Admin のビルド成功）
-- [x] **TASK-5** 検証: dev で駅詳細を開き、Hydration のエラーが出ないこと、ツールチップの文言が変わらないこと（REQ-1・REQ-2）
-  - 結果: 成功（`/stations/tokyometro-marunouchi-awajicho`、Chrome DevTools）
-  - 修正前: コンソールに Issue と同じ Hydration のエラー（`<title>` の `+ 1`）。サーバー出力のフリースペースの `<title>` は6つとも空
-  - 修正後: コンソールのエラー・警告なし。サーバー出力とクライアントの `<title>` 6つが同じ文言
-    （例: 「1号車 3番ドア付近のフリースペース（全編成）」）
-- [x] **TASK-6** 振り返り: `docs/domain/` の更新要否を確認する。ADR なし
-  - 結果: 変更なし。表示の実装上の不具合で、ドメインルール（ホーム図の座標系・フリースペースの意味など）は変わらない
+- [x] **TASK-1** Issue #183 を起票し、ブランチを切る
+- [x] **TASK-2** ADR-0020 を `Proposed` で書き、`docs/adr/README.md` の一覧に足す
+- [x] **TASK-3** `ci.yml`・`CLAUDE.md`・`.claude/agents/*.md` から `develop` を外し、`CLAUDE.md` にブランチ運用の節を足す
+- [x] **TASK-4** `docs/spec/` の3点を書き換える
+- [x] **TASK-5** PR #182 のマージ後、main を取り込む（`docs/spec/` はこちらを採る）
+- [ ] **TASK-6** GitHub の設定を変える（マージ方法、ブランチの自動削除、ruleset）。`rules/branches/main` で効いているルールを確かめる
+  - 開発者が変更。確認結果: マージコミットのみ・自動削除・対象 `~DEFAULT_BRANCH`・削除と強制 push の禁止・PR 必須（merge のみ）・`verify` 必須が main に効いている
+  - 残り: 管理者の除外が `bypass_mode: always` のまま（ADR-0020 決定4 は `pull_request`）
+- [ ] **TASK-7** この PR を main へマージする（新しいルールの下での最初のマージで確かめる）
+- [ ] **TASK-8** `develop` を消す。開発者: Neon の `preview/develop` を消す、Vercel の Production Branch が `main` であることを確かめる
+- [ ] **TASK-9** 振り返り: 受け入れ基準を確かめ、ADR-0020 を `Accepted` にする（開発者の承認を得てから）。`docs/domain/` は変更なし
