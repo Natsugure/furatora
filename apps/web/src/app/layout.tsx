@@ -40,7 +40,7 @@ const bizUdpGothic = BIZ_UDPGothic({
 });
 
 export const metadata: Metadata = {
-  title: 'ふらとら | バリアフリー駅・列車案内',
+  title: 'ふらっと乗換 | バリアフリー駅・列車案内',
   description: '首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを検索できます。他社線同士の乗り換えや、実際に列車に乗ったあとのフリースペース情報までわかりやすくご案内します。',
 };
 
@@ -57,10 +57,10 @@ export default function RootLayout({
           <header className="bg-canvas sticky top-0 z-50">
             <Container className="h-20 flex items-center">
               <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                <Image src={iconSvg} alt="ふらとらアイコン" width={36} height={36} unoptimized />
+                <Image src={iconSvg} alt="ふらっと乗換アイコン" width={36} height={36} unoptimized />
                 <div>
                   <p className="font-display font-bold text-xl leading-tight text-ink">
-                    ふらとら
+                    ふらっと乗換
                   </p>
                   <p className="text-xs text-muted">
                     首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを表示
@@ -79,7 +79,7 @@ export default function RootLayout({
           <footer className="bg-surface border-t border-line">
             <Container className="py-4 text-center">
               <p className="text-xs text-muted">
-                Copyright © ふらとら All Rights Reserved
+                Copyright © ふらっと乗換 All Rights Reserved
               </p>
             </Container>
           </footer>

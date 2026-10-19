@@ -6,7 +6,7 @@ import { SearchTabs } from '@/components/SearchTabs';
 import { Container } from '@/components/ui/Container';
 import { Sheet } from '@/components/ui/Sheet';
 
-// ふらとらでわかること。先頭（主な機能）だけを塗りの丸にする
+// ふらっと乗換でわかること。先頭（主な機能）だけを塗りの丸にする
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   { icon: ArrowRightLeft, title: 'バリアフリー対応の乗り換えルート', description: '他社線同士の乗り換えも案内' },
   { icon: ArrowDownUp, title: 'ホームの出口・乗り換え設備', description: 'エレベーター・階段の位置を図で表示' },
@@ -32,7 +32,7 @@ export default async function Home() {
       <Sheet className="flex flex-col gap-6">
         <section className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <h2 className="font-display font-bold text-lg text-ink">ふらとらでわかること</h2>
+            <h2 className="font-display font-bold text-lg text-ink">ふらっと乗換でわかること</h2>
             <p className="text-[13px] leading-[1.7] text-muted">
               各駅のバリアフリー設備と、車内のフリースペース・優先席の位置を図で確認できます。
             </p>
