@@ -108,21 +108,33 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
   - TASK-4.2 の判断を覆し、`--sign-exit-edge` を butter-700 にする。出口の補足の文字の `opacity-75` を外す
   - 乗車位置の印を neutral-700（55%）、一部編成のフリースペースを brand-300 / 800、号車の枠を neutral-500 にする
   - 路線色が無いときの色を Web・ホーム図とも neutral-500 にし、`globals.test.ts` に一致の検査を足す
-  - Admin の選択中のハンドルが `--sign-exit-*` を流用している件は、Issue #166 の Admin のリニューアルで直す
+  - Admin の選択中のハンドルが `--sign-exit-*` を流用している件は、Admin のリニューアル（#179）で直す
   - `docs/domain/platform-coordinate-system.md` の「出口は黄地に黒」を、バター色と輪郭の記述に直す
   - 結果: 成功（typecheck・lint・test）。Web（淡路町、390px）と Admin（淡路町のホーム編集、1280px）で、乗車位置の印・号車の枠・出口のプレートの輪郭と補足の文字・凡例が新しい色になった。
     一部編成のフリースペースと路線色の無い路線は淡路町に無く、図では確かめていない（値はトークンの検査と比較ページで確認）
 
-## PR 5: アイコン（依存: なし。清書したデータが要る）
+## PR 5: アイコン（依存: なし）（`feat/issue166-pr5-icon`。gh-stack では PR 4 の上に積む）
 
-- [ ] **TASK-5.1** 清書したアイコンのデータを受け取る（別 Issue）
-- [ ] **TASK-5.2** `icon.svg`・`apple-icon.png`・`favicon.ico`・`android-chrome-*.png` を差し替える（32px 以下は文字なしの版）
-- [ ] **TASK-5.3** `manifest.json` のパスを `/icons/…` に直し、`name` / `short_name` を入れる
+- [x] **TASK-5.1** キャンバスの案（`Icons3.dc.html`「採用：案X-1」）をそのまま使う。清書はしない（開発者の判断。ADR-0019「却下した選択肢」）
+  - 視認性を確かめ、書き出しで手当てした: 16px 用は脚と線を太くし前照灯を省く。ヘッダー（36px）は文字なし版。iOS・Android 向けは正方形・透過なし。manifest は `purpose: "any"` だけ
+- [x] **TASK-5.2** `icon.svg`・`apple-icon.png`・`favicon.ico`・`android-chrome-*.png` を差し替える（60px 未満は文字なしの版）
+  - 文字は Zen Maru Gothic Bold（ビルド済みの `next/font` の woff2）の字形を fontTools でパスにした。元データは `icon-source/app-icon.svg`
+  - ヘッダー用に `assets/app-icon-mark.svg` を足し、`layout.tsx` の import を変えた
+- [x] **TASK-5.3** `manifest.json` のパスを `/icons/…` に直し、`name` / `short_name` を入れる
+  - `name` / `short_name` は「ふらとら」、`theme_color` / `background_color` は `#FAF6F7`（ヘッダーの地）
+  - `manifest.test.ts`（4 件）を足した。修正前の manifest で 3 件が失敗することを確かめた
 - [ ] **TASK-5.4** 検証: ブラウザのタブ、iOS のホーム画面に追加したときの表示
+  - 済み: typecheck・lint・test（22 ファイル・148 件）・build。書き出した PNG を拡大して目視（512・180 で文字が読める、60 でかろうじて読める、32・16 で電車と線が見分けられる）。
+    dev で、ヘッダーに新しいアイコンが出ること、`icon.svg`・`favicon.ico`・`apple-touch-icon` の `<link>` が出ること、manifest と各アイコンが 200 で返ること
+  - 残り: iOS のホーム画面に追加したときの表示（開発者が実機で確かめる）
 
 ## フェーズ5: ドキュメント（最後の PR に含める）
 
-- [ ] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。決定時点の見本として `docs/adr/assets/0017/` を参照する。`docs/domain/README.md` の一覧に足す
+- [x] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。決定時点の見本として `docs/adr/assets/0017/` を参照する。`docs/domain/README.md` の一覧に足す
+  - アイコンのファイルと版の対応も、ここに書いた（`icon-source/` に README は置かない）
 - [ ] **TASK-6.2** ADR-0017・0018 を、開発者の承認を得て `Accepted` にする。ADR-0019 はアイコン差し替えの後に `Accepted` にする
-- [ ] **TASK-6.3** 範囲外の作業を Issue に起票する（requirements.md「範囲外」）
+  - ADR-0017・0018 は、開発者の承認を得て `Accepted` にした
+  - ADR-0019 は、iOS の実機での確認（TASK-5.4）の後に `Accepted` にする
+- [x] **TASK-6.3** 範囲外の作業を Issue に起票する（requirements.md「範囲外」）
   - ホーム図の縦向き（#174）と優先席の位置（#175）は PR 4 の後に起票した
+  - 路線の駅一覧の乗換路線（#177）、アプリ名の変更（#178）、Admin のデザイン（#179）を起票した。ダークモードは開発者の判断で起票しない

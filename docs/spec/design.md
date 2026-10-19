@@ -194,7 +194,17 @@ DB に路線色が無い路線の代わりの色は、Web の `--color-rail-line
 | 3 | `app/**/loading.tsx` / `error.tsx` / `not-found.tsx` | スケルトン・エラー画面の色 |
 | 4 | `packages/platform-diagram/src/styles.css` | 上の表のとおり |
 | 4 | `packages/platform-diagram/src/components/PlatformDiagram.tsx` | 凡例の見本の色（トークン経由なので値の変更だけで足りるかを確かめる） |
-| 5 | `app/icon.svg` / `apple-icon.png` / `favicon.ico` / `public/icons/android-chrome-*.png` / `app/manifest.json` | ADR-0019 の図柄。manifest のパスを `/icons/…` に直し、`name` / `short_name` を入れる |
+| 5 | `app/icon.svg` / `apple-icon.png` / `favicon.ico` / `public/icons/android-chrome-*.png` / `app/manifest.json` | ADR-0019 の図柄（キャンバスの案X-1。下の「アイコンの書き出し」）。manifest のパスを `/icons/…` に直し、`name` / `short_name` を入れる |
+| 5 | `assets/app-icon-mark.svg`（新規） / `app/layout.tsx` | ヘッダーは文字なし・案のままの版を読む（`app/icon.svg` はタブ用の 16px 版にするため） |
+| 5 | `icon-source/app-icon.svg`（新規） | 文字ありの版の元データ（文字はパス） |
+
+### アイコンの書き出し
+
+キャンバスの案（`Icons3.dc.html`）をそのまま使い、清書はしない。ファイルと版の対応は `docs/domain/design-system.md`「アプリアイコン」。
+
+- 文字（ふらっと）は、Zen Maru Gothic Bold の字形を fontTools でパスにした（font-size 19、字間 1、中央揃え、ベースライン y=86。案と同じ）
+- PNG はリポジトリの sharp で書き出し、`favicon.ico` は 16・32 の PNG を埋め込んで作った。スクリプトはコミットしない
+- 16px では前照灯（半径 約0.5px）が消え、脚と線（約0.7px）がかすれるため、16px 用だけ脚と線を 4 → 7 にし、前照灯を省く
 
 路線記号（銀座線の「G」など）は、`lines.line_code`（`Line.lineCode`）を使う。null の路線だけ、先頭の駅の駅番号の英字にフォールバックする（`components/ui/LineSymbol.tsx`）。
 駅番号の英字と番号への分け方は `features/station/domain/stationCode.ts` の `parseStationCode()` にまとめ、`StationBadge` と共有する。
