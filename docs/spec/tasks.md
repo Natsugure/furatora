@@ -130,6 +130,7 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 - [x] **TASK-5.5** PR #180 のレビュー対応
   - `app/icon.svg` を `icon-source/app-icon-16.svg` に移し、タブのアイコンを `favicon.ico`（16・32・48）だけにする
   - `manifest.json` に `id`・`start_url`・`scope`（いずれも `/`）を足し、`manifest.test.ts` で検査する
+  - Android は `any` のアイコンを白い円の中に置くため、`design-system.md` の「角を OS が丸める」を iOS だけに直す。maskable は足さない（開発者の判断。ADR-0019 の決定どおり）
   - 結果: 成功（typecheck・lint・test 149 件・build）。build の HTML で、`<link rel="icon">` が `favicon.ico` の 1 本だけになり、`icon.svg` が出ないことを確かめた。
     `favicon.ico` の 3 枚を拡大して目視した
 

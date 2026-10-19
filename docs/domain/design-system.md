@@ -111,6 +111,8 @@ Web は `styles.css` を `globals.css` より前に読む。同じ名前のト�
 - タブのアイコンは `favicon.ico` だけにし、`src/app/icon.svg` は置かない。Next は `app/icon.svg` を `sizes="any"` で出し、
   SVG に対応したブラウザはどの大きさでもそれを使うため、16px 用の版が 32px 以上でも出てしまう
 - `manifest.json` の `id`・`start_url`・`scope` は `/`。`id` を変えると、インストール済みのアプリとは別のアプリになる
-- iOS・Android 向けは、角を OS が丸める。透過した角は iOS で黒くなるため、地を正方形に塗る
+- iOS 向けは、角を OS が丸める。透過した角は iOS で黒くなるため、地を正方形に塗る
+- Android（Chrome でホーム画面に追加）は `purpose: "any"` のアイコンを切り抜かず、白い円の中に縮めて置く。
+  ローズの正方形が白い円の中に入った見た目になり、これを受け入れている（Android の実機では確かめていない）
 - 文字が maskable の安全領域からはみ出すため、`manifest.json` のアイコンは `purpose: "any"` だけにする
   （`src/app/manifest.test.ts`）
