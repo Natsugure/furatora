@@ -1,6 +1,6 @@
 # ADR-0019: アプリアイコンを「正面の電車＋平らな線＋ふらっと」にし、小さいサイズでは文字を外す
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-18
 - **決定者**: @Natsugure
 - **関連**: [ADR-0017](./0017-soft-rose-palette-and-typography.md)（配色）, GitHub Issue #166,

@@ -123,18 +123,18 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 - [x] **TASK-5.3** `manifest.json` のパスを `/icons/…` に直し、`name` / `short_name` を入れる
   - `name` / `short_name` は「ふらとら」、`theme_color` / `background_color` は `#FAF6F7`（ヘッダーの地）
   - `manifest.test.ts`（4 件）を足した。修正前の manifest で 3 件が失敗することを確かめた
-- [ ] **TASK-5.4** 検証: ブラウザのタブ、iOS のホーム画面に追加したときの表示
+- [x] **TASK-5.4** 検証: ブラウザのタブ、iOS のホーム画面に追加したときの表示
   - 済み: typecheck・lint・test（22 ファイル・148 件）・build。書き出した PNG を拡大して目視（512・180 で文字が読める、60 でかろうじて読める、32・16 で電車と線が見分けられる）。
     dev で、ヘッダーに新しいアイコンが出ること、`icon.svg`・`favicon.ico`・`apple-touch-icon` の `<link>` が出ること、manifest と各アイコンが 200 で返ること
-  - 残り: iOS のホーム画面に追加したときの表示（開発者が実機で確かめる）
+  - 開発者が、PR #180 の Vercel のプレビューを iOS のホーム画面に追加し、新しいアイコンが出ることを実機で確かめた
 
 ## フェーズ5: ドキュメント（最後の PR に含める）
 
 - [x] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。決定時点の見本として `docs/adr/assets/0017/` を参照する。`docs/domain/README.md` の一覧に足す
   - アイコンのファイルと版の対応も、ここに書いた（`icon-source/` に README は置かない）
-- [ ] **TASK-6.2** ADR-0017・0018 を、開発者の承認を得て `Accepted` にする。ADR-0019 はアイコン差し替えの後に `Accepted` にする
+- [x] **TASK-6.2** ADR-0017・0018 を、開発者の承認を得て `Accepted` にする。ADR-0019 はアイコン差し替えの後に `Accepted` にする
   - ADR-0017・0018 は、開発者の承認を得て `Accepted` にした
-  - ADR-0019 は、iOS の実機での確認（TASK-5.4）の後に `Accepted` にする
+  - ADR-0019 は、iOS の実機での確認（TASK-5.4）の後に `Accepted` にした
 - [x] **TASK-6.3** 範囲外の作業を Issue に起票する（requirements.md「範囲外」）
   - ホーム図の縦向き（#174）と優先席の位置（#175）は PR 4 の後に起票した
   - 路線の駅一覧の乗換路線（#177）、アプリ名の変更（#178）、Admin のデザイン（#179）を起票した。ダークモードは開発者の判断で起票しない
