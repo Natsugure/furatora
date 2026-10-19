@@ -28,13 +28,18 @@
 - `pnpm run db:migrate`: マイグレーションを実行。**Vercelのビルドが自動実行するため、手で本番に流さない**
 - `pnpm run db:studio`: Drizzle Studioを起動してDBを確認
 
+## ブランチ運用（ADR-0020）
+- 長命ブランチは `main` のみ（＝ Production。マージするとビルド時にマイグレーションが走る）
+- 作業ブランチは `main` から切り、PR で `main` へマージする。マージはマージコミットのみ
+- すべてそろうまで公開できない複数 PR の作業は、`main` から一時的なまとめ役のブランチを切り、子の PR をそこへ積む
+
 ## 禁止事項
 - console.logのコミット
 - node_modulesの直接編集
 - any型の使用（TypeScript）
 - 環境変数のハードコード
 - 合理的であると認められない状況下での、json型およびjsonb型の使用（PostgreSQL）
-- mainブランチとdevelopブランチでの直接作業
+- mainブランチでの直接作業
 - ビルドスクリプトからのDBへの書き込み（`build` はDBに触れないこと）
 - その列を読むコードが稼働したままの破壊的なマイグレーション（`DROP COLUMN` / `DROP TABLE` / `NOT NULL`化）。
   Vercelのビルド時にマイグレーションが走るため、必ず二段階に分けること

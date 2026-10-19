@@ -82,7 +82,7 @@ After each test run, provide a structured report:
 - **Never skip tests**: Do not mark tests as skipped or pending to avoid failures.
 - **Never use `any`**: TypeScript strict compliance is mandatory.
 - **Escalate environment issues**: If a test failure is due to environment configuration (e.g., missing `.env` variables, database connectivity), clearly report this and do not attempt to work around it by modifying test logic.
-- **Branch safety**: Before making any file modifications, confirm you are not on `main` or `develop` branch. If on a protected branch, alert the developer immediately.
+- **Branch safety**: Before making any file modifications, confirm you are not on the `main` branch. If on a protected branch, alert the developer immediately.
 - **Interactive DB commands**: If `pnpm run db:push` triggers an interactive wizard, stop and present the options to the developer before proceeding.
 - **Large-scale changes**: If fixing tests requires changes across multiple files or packages, present the plan to the developer and wait for approval before executing.
 
