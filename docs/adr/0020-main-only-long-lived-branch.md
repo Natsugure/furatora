@@ -1,6 +1,6 @@
 # ADR-0020: 長命ブランチを main のみにし、PR はマージコミットで main へ入れる
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-20
 - **決定者**: @Natsugure
 - **関連**: [ADR-0008](./0008-environment-database-branch-mapping.md)（「制約」のブランチ運用と、`preview/develop` をステージングとする記述を置き換える）,
