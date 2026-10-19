@@ -117,3 +117,4 @@ PR 1〜3 は、すべてそろうまで develop へのマージを待つ（途�
 - [ ] **TASK-6.1** `docs/domain/design-system.md` を新規作成する（現在のトークンの一覧、意味色の対応表、Tailwind・Mantine での使い方）。決定時点の見本として `docs/adr/assets/0017/` を参照する。`docs/domain/README.md` の一覧に足す
 - [ ] **TASK-6.2** ADR-0017・0018 を、開発者の承認を得て `Accepted` にする。ADR-0019 はアイコン差し替えの後に `Accepted` にする
 - [ ] **TASK-6.3** 範囲外の作業を Issue に起票する（requirements.md「範囲外」）
+  - ホーム図の縦向き（#174）と優先席の位置（#175）は PR 4 の後に起票した
