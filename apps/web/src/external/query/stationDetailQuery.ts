@@ -121,7 +121,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
           inboundDirectionId: platforms.inboundDirectionId,
           outboundDirectionId: platforms.outboundDirectionId,
           physicalLength: platforms.physicalLength,
-          platformSide: platforms.platformSide,
           notes: platforms.notes,
         })
         .from(platforms)
@@ -346,7 +345,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
       const line = lineMap.get(p.lineId);
       const inboundDirection = p.inboundDirectionId ? directionMap.get(p.inboundDirectionId) : undefined;
       const outboundDirection = p.outboundDirectionId ? directionMap.get(p.outboundDirectionId) : undefined;
-      const platformSide = p.platformSide === 'top' || p.platformSide === 'bottom' ? p.platformSide : null;
 
       return {
         id: p.id,
@@ -358,7 +356,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
         inboundDirectionName: inboundDirection?.displayName ?? null,
         outboundDirectionId: p.outboundDirectionId,
         outboundDirectionName: outboundDirection?.displayName ?? null,
-        platformSide,
         notes: p.notes,
         physicalLength: Number(p.physicalLength),
         stopPatterns: stopPatternsByPlatformId.get(p.id) ?? [],

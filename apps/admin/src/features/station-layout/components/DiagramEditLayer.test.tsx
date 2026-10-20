@@ -7,7 +7,7 @@ import { DiagramEditLayer } from './DiagramEditLayer';
 // 車1: 6.25/18.75/31.25/43.75、車2: 56.25/68.75/81.25/93.75）
 const bounds: Bounds = { minX: 0, maxX: 100 };
 const physicalLength = 100;
-const rows = layoutRows('bottom', { hasConcourseLeaders: false });
+const rows = layoutRows({ hasConcourseLeaders: false });
 const cars = [
   { carNumber: 1, startMeters: 0, endMeters: 50, doorCount: 4 },
   { carNumber: 2, startMeters: 50, endMeters: 100, doorCount: 4 },

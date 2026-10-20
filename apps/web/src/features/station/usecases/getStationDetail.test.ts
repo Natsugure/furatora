@@ -14,7 +14,6 @@ function platform(overrides: Partial<PlatformDTO> & { id: string }): PlatformDTO
     inboundDirectionName: null,
     outboundDirectionId: null,
     outboundDirectionName: null,
-    platformSide: null,
     notes: null,
     physicalLength: 100,
     stopPatterns: [],

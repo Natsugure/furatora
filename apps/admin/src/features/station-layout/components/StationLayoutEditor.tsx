@@ -668,7 +668,6 @@ export function StationLayoutEditor({
               inboundDirectionId: platform.inboundDirectionId,
               outboundDirectionId: platform.outboundDirectionId,
               physicalLength: platform.physicalLength,
-              platformSide: platform.platformSide,
               notes: platform.notes,
             }}
             onCancel={() => setEditingPlatform(false)}
@@ -729,7 +728,6 @@ export function StationLayoutEditor({
               pattern={displayPattern}
               physicalLength={platform.physicalLength}
               concourses={displayConcourses}
-              platformSide={platform.platformSide}
               bounds={bounds}
               plateLayout={plateLayout}
               facingLayout={facingLayout}

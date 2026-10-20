@@ -40,13 +40,15 @@ describe('platformSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('platformSideに不正な値が入る場合は失敗する', () => {
+  // ホームの側は廃止した（ADR-0022）。古い画面から送られてきても入力に含めず、書かない
+  it('platformSide が送られてきても入力から捨てる', () => {
     const result = platformSchema.safeParse({
       platformNumber: '1',
       lineId: VALID_UUID,
       physicalLength: 210,
-      platformSide: 'left',
+      platformSide: 'top',
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.data).not.toHaveProperty('platformSide');
   });
 });

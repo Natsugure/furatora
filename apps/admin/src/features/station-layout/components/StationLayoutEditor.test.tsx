@@ -72,7 +72,6 @@ const platform: LayoutPlatformDetailDTO = {
   inboundDirectionName: null,
   outboundDirectionId: null,
   outboundDirectionName: null,
-  platformSide: 'bottom',
   notes: null,
   physicalLength: 100,
   concourses: [concourse],

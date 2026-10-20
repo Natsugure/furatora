@@ -261,10 +261,9 @@ function BoardingMarks({
   reversed: boolean;
   rows: VerticalLayout;
 }) {
-  const platformIsAbove = rows.facilityY < rows.trainY;
-  // ホーム帯の、列車から見て外側の面にマークを載せる
-  const baseY = platformIsAbove ? rows.platformBarY : rows.platformBarY + PLATFORM_BAR_HEIGHT;
-  const tipY = platformIsAbove ? baseY - BOARDING_MARK_HEIGHT : baseY + BOARDING_MARK_HEIGHT;
+  // ホーム帯の下の面（列車から見て外側）にマークを載せる
+  const baseY = rows.platformBarY + PLATFORM_BAR_HEIGHT;
+  const tipY = baseY + BOARDING_MARK_HEIGHT;
 
   const triangle = (x: number) =>
     `${x - BOARDING_MARK_WIDTH / 2},${baseY} ${x + BOARDING_MARK_WIDTH / 2},${baseY} ${x},${tipY}`;
@@ -317,8 +316,7 @@ function FreeSpaceBadges({
   reversed: boolean;
   rows: VerticalLayout;
 }) {
-  const platformIsAbove = rows.facilityY < rows.trainY;
-  const cy = platformIsAbove ? rows.trainY + 2.4 : rows.trainY + TRAIN_ROW_HEIGHT - 2.4;
+  const cy = rows.trainY + TRAIN_ROW_HEIGHT - 2.4;
 
   return (
     <>
@@ -369,8 +367,8 @@ function ConcourseLeaders({ groups, rows }: { groups: ConcoursePlateGroup[]; row
   if (rows.concourseBracketY === null || rows.concourseTickStartY === null) return null;
   const bracketY = rows.concourseBracketY;
   const tickStartY = rows.concourseTickStartY;
-  // 束ね線からSVGの端まで。この先はHTMLオーバーレイのプレートが受ける
-  const edgeY = rows.facilityY < rows.trainY ? 0 : rows.viewHeight;
+  // 束ね線からSVGの下端まで。この先はHTMLオーバーレイのプレートが受ける
+  const edgeY = rows.viewHeight;
 
   return (
     <g stroke="var(--sign-leader)" strokeWidth={0.25} fill="none">

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import type { PlatformSide } from '@furatora/database/enums';
 import { PX_PER_METER, layoutRows, type Bounds, type VerticalLayout } from '../domain/geometry';
 import type { ConcoursePlateLayout, FacingTransferLayout } from '../domain/concourseLayout';
 import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
@@ -11,6 +10,7 @@ import { FacingTransferBannerRow } from './overlay/FacingTransferBannerRow';
 //
 // 図は「SVGの幾何」と「HTMLのオーバーレイ2枚」の3層でできており、
 // 3層すべてが同じキャンバス（幅 = 描画範囲 × PX_PER_METER）の上に乗る。
+// 線路に向かって立った見え方で描くので、上から 対面乗換バナー → SVG → 出口・乗換プレート の順に固定である（ADR-0022）。
 // 層をまたぐxの対応は xFraction() の割合で取るので、キャンバスが
 // コンテナ幅まで伸びても対応は崩れない。docs/adr/0006 参照。
 
@@ -18,7 +18,6 @@ type Props = {
   pattern: TrainStopPatternDTO;
   physicalLength: number;
   concourses: ConcourseDTO[];
-  platformSide: PlatformSide | null;
   bounds: Bounds;
   /** 出口・乗換プレートの配置。ホーム単位で決まるので PlatformDisplay で算出する */
   plateLayout: ConcoursePlateLayout;
@@ -39,7 +38,6 @@ export function PlatformDiagram({
   pattern,
   physicalLength,
   concourses,
-  platformSide,
   bounds,
   plateLayout,
   facingLayout,
@@ -49,54 +47,7 @@ export function PlatformDiagram({
   const { minX, maxX } = bounds;
   const width = maxX - minX;
   const cars = [...pattern.cars].sort((a, b) => a.carNumber - b.carNumber);
-  const rows = layoutRows(platformSide, { hasConcourseLeaders: plateLayout.groups.length > 0 });
-
-  // lane 0 は図に最も近い段。図の手前に積む側（top側）では、段を逆順に描かないと
-  // lane 0 が図から最も遠くなってしまう。platformSide を読み直すのではなく、
-  // layoutRows() が返した並び順から導く（side の解釈は layoutRows() に一本化する）
-  const diagramIndex = rows.stripOrder.indexOf('diagram');
-  const platesReversed = rows.stripOrder.indexOf('plates') < diagramIndex;
-  const facingReversed = rows.stripOrder.indexOf('facing') < diagramIndex;
-
-  const strip = {
-    facing: (
-      <FacingTransferBannerRow
-        key="facing"
-        banners={facingLayout.banners}
-        laneCount={facingLayout.laneCount}
-        bounds={bounds}
-        reverseLanes={facingReversed}
-      />
-    ),
-    diagram: (
-      // relative 以外のクラスを足さないこと。h-full やgridのstretchを与えると
-      // SVGの要素ボックスがviewBoxのアスペクト比から外れ、内部の絶対配置オーバーレイの
-      // y座標が実測pxとずれる（x はxFractionの割合なので影響しない）。
-      <div key="diagram" className="relative">
-        <DiagramSvg
-          cars={cars}
-          concourses={concourses}
-          physicalLength={physicalLength}
-          minX={minX}
-          width={width}
-          rows={rows}
-          plateGroups={plateLayout.groups}
-          facingBanners={facingLayout.banners}
-          iconBasePath={iconBasePath}
-        />
-        {diagramOverlay?.(rows)}
-      </div>
-    ),
-    plates: (
-      <ConcoursePlateRow
-        key="plates"
-        groups={plateLayout.groups}
-        laneCount={plateLayout.laneCount}
-        bounds={bounds}
-        reverseLanes={platesReversed}
-      />
-    ),
-  };
+  const rows = layoutRows({ hasConcourseLeaders: plateLayout.groups.length > 0 });
 
   return (
     <div
@@ -118,9 +69,33 @@ export function PlatformDiagram({
             伸びて余白を埋め、狭いときは横スクロールになる。伸縮しても各層は
             割合で位置を決めているのでxがずれない */}
         <div className="flex flex-col" style={{ minWidth: width * PX_PER_METER }}>
-          {/* 並び順は layoutRows() が platformSide から決める。
-              ここで column-reverse などを使って side を再解釈してはならない */}
-          {rows.stripOrder.map((row) => strip[row])}
+          <FacingTransferBannerRow
+            banners={facingLayout.banners}
+            laneCount={facingLayout.laneCount}
+            bounds={bounds}
+          />
+          {/* relative 以外のクラスを足さないこと。h-full やgridのstretchを与えると
+              SVGの要素ボックスがviewBoxのアスペクト比から外れ、内部の絶対配置オーバーレイの
+              y座標が実測pxとずれる（x はxFractionの割合なので影響しない）。 */}
+          <div className="relative">
+            <DiagramSvg
+              cars={cars}
+              concourses={concourses}
+              physicalLength={physicalLength}
+              minX={minX}
+              width={width}
+              rows={rows}
+              plateGroups={plateLayout.groups}
+              facingBanners={facingLayout.banners}
+              iconBasePath={iconBasePath}
+            />
+            {diagramOverlay?.(rows)}
+          </div>
+          <ConcoursePlateRow
+            groups={plateLayout.groups}
+            laneCount={plateLayout.laneCount}
+            bounds={bounds}
+          />
         </div>
       </div>
 

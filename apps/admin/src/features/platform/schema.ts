@@ -6,7 +6,6 @@ export const platformSchema = z.object({
   inboundDirectionId: z.string().uuid().nullable().optional(),
   outboundDirectionId: z.string().uuid().nullable().optional(),
   physicalLength: z.number().positive(),
-  platformSide: z.enum(['top', 'bottom']).nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 

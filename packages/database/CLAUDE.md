@@ -39,7 +39,7 @@ import type { DirectionType } from '@furatora/database/enums'  // Enum型
 - 配下はすべて Drizzle にも実行時の外部パッケージにも依存させない。型と `as const` の定数だけを置く
   - `src/enums/**` が import できるのは、同じディレクトリのファイル（`./` で始まり `..` を含まないパス）だけである。
     `eslint.config.mjs` の `no-restricted-imports` で、それ以外（外部パッケージ・`../schema` 等）をすべて禁止している
-- 構成: `stationMaster.ts`（`DirectionType` / `PlatformSide` / `StationConnectionSource`）、
+- 構成: `stationMaster.ts`（`DirectionType` / `StationConnectionSource`）、
   `facility.ts`（`FACILITY_TYPE_CODES` / `FacilityTypeCode`）、`index.ts`（再 export）
 - 設備コードの一覧の正は `FACILITY_TYPE_CODES` で、`facility_types` は CHECK 制約 `facility_types_code_known` で従う（ADR-0016）。
   種類を足す・消す・名前を変える手順（マイグレーションの順序）は `facility.ts` のコメントを見る

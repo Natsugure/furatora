@@ -15,8 +15,6 @@ type Props = {
   groups: ConcoursePlateGroup[];
   laneCount: number;
   bounds: Bounds;
-  /** 図がこのブロックの下にある（＝lane 0 を最後に描く）か */
-  reverseLanes: boolean;
 };
 
 /** アンカーのx割合をCSSのパーセントに写す */
@@ -63,11 +61,11 @@ function plateStyle(group: ConcoursePlateGroup, bounds: Bounds): CSSProperties {
   return { marginInlineStart: percentOf(group.anchorX, bounds), transform: 'translateX(-50%)' };
 }
 
-export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: Props) {
+export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
   if (groups.length === 0) return null;
 
-  // lane 0 が常に図に接するように並べる
-  const lanes = Array.from({ length: laneCount }, (_, i) => (reverseLanes ? laneCount - 1 - i : i));
+  // プレートは図の下にある（ADR-0022）。lane 0 を最初に描き、図に接するようにする
+  const lanes = Array.from({ length: laneCount }, (_, i) => i);
 
   return (
     <div className="flex flex-col" style={{ fontFamily: 'var(--font-sign)' }}>
@@ -112,7 +110,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: P
                   key={`jog-${group.concourseId}`}
                   style={{
                     position: 'absolute',
-                    ...(reverseLanes ? { bottom: 0 } : { top: 0 }),
+                    top: 0,
                     left: fractionPct(Math.min(jog.from, jog.to)),
                     // 縦線の太さぶん両端を延ばし、角に欠けを作らない
                     width: `calc(${fractionPct(Math.abs(jog.to - jog.from))} + ${LEADER_WIDTH_PX}px)`,
@@ -130,7 +128,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds, reverseLanes }: P
             .map((group) => (
               <div
                 key={group.concourseId}
-                className={`flex flex-col gap-1 ${reverseLanes ? 'pb-1.5' : 'pt-1.5'}`}
+                className="flex flex-col gap-1 pt-1.5"
                 style={{
                   gridArea: '1 / 1',
                   zIndex: 1,
