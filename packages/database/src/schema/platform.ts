@@ -15,8 +15,6 @@ export const platforms = pgTable('platforms', {
   // メートル。既存行があるため default('0') 付きで追加する（'0' = 未入力の暫定値）。
   // default を外す作業は後続Issue。docs/domain/platform-coordinate-system.md 参照
   physicalLength: decimal('physical_length', { precision: 6, scale: 2 }).notNull().default('0'),
-  // platform_side 列は DB に残っているが読み書きしない。原点を「線路に向かって左の端」に揃えたため不要になった（ADR-0022）。
-  // 次のデプロイで DROP する（CLAUDE.md の二段階。#188）
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),

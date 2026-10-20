@@ -1,0 +1,1 @@
+ALTER TABLE "platforms" DROP COLUMN "platform_side";

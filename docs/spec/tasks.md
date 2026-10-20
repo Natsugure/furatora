@@ -47,5 +47,12 @@
 
 ## 二段目（次の PR。一段目のデプロイのすぐ次）
 
-- [ ] **TASK-12** `main` から切り直したブランチで `pnpm run db:generate` し、`DROP COLUMN platform_side` だけが生成されたことを確かめる
+- [x] **TASK-12** `main` から切り直したブランチで `pnpm run db:generate` し、`DROP COLUMN platform_side` だけが生成されたことを確かめる
+  - ブランチ `feat/issue188-drop-platform-side`。生成前に Neon MCP で本番（main）に一段目が入っていることを確かめた（マイグレーション20件、`platform_side` が非 null のホーム0件）
+  - `drizzle/0020_drop_platforms_platform_side.sql` は `ALTER TABLE "platforms" DROP COLUMN "platform_side";` の1行だけ。
+    `0020_snapshot.json` と 0019 の差は `platform_side` の列だけ（他はキーの並び）。`drizzle-kit check` が通り、もう一度の `generate` は差分なし
+  - `schema/platform.ts` の「列は DB に残っている」コメントを除いた
+  - typecheck・lint・test（platform-diagram 174 / web 155 / admin 642 / transfer-difficulty 66）・build（web・admin）が成功。
+    admin が TASK-9 より1件少ないのは、一段目の 5b01f8a で `PlatformInspector` の重複したテストを除いたため
+  - [ ] （開発者）development に `pnpm run db:migrate` を流す。Neon MCP で列が消え、マイグレーションが21件になったことを確かめる
 - [ ] **TASK-13** ADR-0022 を `Accepted` にする（開発者の承認を得てから）。PR を出し、#188 を閉じる
