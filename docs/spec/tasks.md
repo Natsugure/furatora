@@ -54,5 +54,6 @@
   - `schema/platform.ts` の「列は DB に残っている」コメントを除いた
   - typecheck・lint・test（platform-diagram 174 / web 155 / admin 642 / transfer-difficulty 66）・build（web・admin）が成功。
     admin が TASK-9 より1件少ないのは、一段目の 5b01f8a で `PlatformInspector` の重複したテストを除いたため
-  - [ ] （開発者）development に `pnpm run db:migrate` を流す。Neon MCP で列が消え、マイグレーションが21件になったことを確かめる
-- [ ] **TASK-13** ADR-0022 を `Accepted` にする（開発者の承認を得てから）。PR を出し、#188 を閉じる
+  - [x] （開発者）development に `pnpm run db:migrate` を流した。Neon MCP で、列が消え、マイグレーションが21件、ホームが40件のままであることを確かめた。
+    main は変わっていない（20件、列あり）
+- [x] **TASK-13** ADR-0022 を `Accepted` にする（開発者の承認を得てから）。PR を出し、#188 を閉じる
