@@ -106,7 +106,7 @@ export const PLATFORM_BAR_HEIGHT = 0.6;
 /** 両端ラベル（0m / physicalLength m）の文字サイズ */
 export const PLATFORM_LABEL_FONT_SIZE = 1.6;
 // text の y はベースラインなので、ラベルをホーム帯の下に置くには文字の上端ぶんだけ余分に離す
-const PLATFORM_LABEL_GAP_BELOW = 2.2;
+const PLATFORM_LABEL_GAP = 2.2;
 
 // ---- コンコース束ね線 ----
 // 設備行のさらに外側（列車から遠い側）に、コンコース単位のアクセス点を束ねる線を引く。
@@ -133,7 +133,7 @@ export type VerticalLayout = {
   platformLabelY: number;
   /** コンコース束ね線（横線）のy。束ね線が無い場合は null */
   concourseBracketY: number | null;
-  /** 縦ヒゲの起点y（設備行の外側の端）。束ね線が無い場合は null */
+  /** 縦ヒゲの起点y（設備行の下端）。束ね線が無い場合は null */
   concourseTickStartY: number | null;
 };
 
@@ -143,7 +143,6 @@ export type VerticalLayout = {
  * 図は「線路に向かって立った見え方」で描く（原点は線路に向かって左の端。ADR-0022）。
  * 列車が上（奥）で、ホーム帯・設備・対面乗換ティント・コンコース束ね線はいずれもホーム上
  * （またはその先）にあるものなので、すべて列車行の下（手前）に積む。
- * SVGの外のHTMLオーバーレイも、上から 対面乗換バナー → SVG → 出口・乗換プレート の順に固定である。
  *
  * @param options.hasConcourseLeaders 束ね線を描くか。false のとき束ね線ぶんの高さは
  *   加算せず、viewHeight は束ね線導入前と完全に一致する。
@@ -159,7 +158,7 @@ export function layoutRows(options: { hasConcourseLeaders?: boolean } = {}): Ver
   const platformEdge = trainY + TRAIN_ROW_HEIGHT;
   const facilityY = platformEdge + GAP_Y;
   // 設備行の下端。束ね線の縦ヒゲはここから伸びる
-  const facilityOuterEdge = facilityY + FACILITY_ROW_HEIGHT;
+  const facilityBottom = facilityY + FACILITY_ROW_HEIGHT;
 
   return {
     viewHeight,
@@ -169,10 +168,10 @@ export function layoutRows(options: { hasConcourseLeaders?: boolean } = {}): Ver
     // 「向かい側のホームに着く」のはホーム全体に関わる事実であり、
     // 列車行と設備行の隙間だけを塗ると、文字も入らない細い帯にしかならない。
     facingBandY: platformEdge,
-    facingBandHeight: facilityOuterEdge - platformEdge,
+    facingBandHeight: facilityBottom - platformEdge,
     platformBarY: platformEdge + PLATFORM_BAR_GAP,
-    platformLabelY: platformEdge + PLATFORM_LABEL_GAP_BELOW,
-    concourseBracketY: hasLeaders ? facilityOuterEdge + CONCOURSE_TICK_HEIGHT : null,
-    concourseTickStartY: hasLeaders ? facilityOuterEdge : null,
+    platformLabelY: platformEdge + PLATFORM_LABEL_GAP,
+    concourseBracketY: hasLeaders ? facilityBottom + CONCOURSE_TICK_HEIGHT : null,
+    concourseTickStartY: hasLeaders ? facilityBottom : null,
   };
 }
