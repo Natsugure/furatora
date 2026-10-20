@@ -1,6 +1,6 @@
 # ADR-0022: ホーム座標の原点を「線路に向かって立ったときの左の端」に定め、ホームの側（platformSide）を廃止する
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-21
 - **決定者**: @Natsugure
 - **関連**: [`docs/domain/platform-coordinate-system.md`](../domain/platform-coordinate-system.md),
