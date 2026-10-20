@@ -16,7 +16,6 @@ export const dbPlatformRepository: PlatformRepository = {
         inboundDirectionId: input.inboundDirectionId ?? null,
         outboundDirectionId: input.outboundDirectionId ?? null,
         physicalLength: String(input.physicalLength),
-        platformSide: input.platformSide ?? null,
         notes: input.notes ?? null,
       })
       .returning();
@@ -32,7 +31,6 @@ export const dbPlatformRepository: PlatformRepository = {
         inboundDirectionId: input.inboundDirectionId ?? null,
         outboundDirectionId: input.outboundDirectionId ?? null,
         physicalLength: String(input.physicalLength),
-        platformSide: input.platformSide ?? null,
         notes: input.notes ?? null,
       })
       .where(and(eq(platforms.id, id), eq(platforms.stationId, stationId)))

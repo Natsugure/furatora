@@ -18,7 +18,6 @@ type PlatformData = {
   inboundDirectionId: string | null;
   outboundDirectionId: string | null;
   physicalLength: number;
-  platformSide: string | null;
   notes: string | null;
 };
 
@@ -51,7 +50,6 @@ export function PlatformInspector({ stationId, lines, initialData, onCancel, lis
   const [inboundDirectionId, setInboundDirectionId] = useState(initialData?.inboundDirectionId ?? '');
   const [outboundDirectionId, setOutboundDirectionId] = useState(initialData?.outboundDirectionId ?? '');
   const [physicalLength, setPhysicalLength] = useState(initialData?.physicalLength ?? 0);
-  const [platformSide, setPlatformSide] = useState(initialData?.platformSide ?? '');
   const [notes, setNotes] = useState(initialData?.notes ?? '');
   const [submitting, setSubmitting] = useState(false);
 
@@ -74,7 +72,6 @@ export function PlatformInspector({ stationId, lines, initialData, onCancel, lis
       inboundDirectionId: inboundDirectionId || null,
       outboundDirectionId: outboundDirectionId || null,
       physicalLength,
-      platformSide: platformSide || null,
       notes: notes || null,
     };
 
@@ -170,7 +167,7 @@ export function PlatformInspector({ stationId, lines, initialData, onCancel, lis
 
           <NumberInput
             label="ホームの物理長"
-            description="メートル単位。ホームの実体は 0 からこの値までの区間として扱われます。"
+            description="メートル単位。線路に向かって立ったときの左の端を 0m とし、右の端までをこの長さとして扱います（ADR-0022）。"
             min={0}
             step={0.1}
             decimalScale={2}
@@ -179,19 +176,6 @@ export function PlatformInspector({ stationId, lines, initialData, onCancel, lis
             onChange={(v) => setPhysicalLength(typeof v === 'number' ? v : 0)}
             required
             w={{ base: '100%', xs: 160 }}
-          />
-
-          <NativeSelect
-            label="ホーム位置"
-            description="可視化で列車図の上下どちらにホーム帯を表示するか"
-            data={[
-              { value: '', label: '未設定（デフォルト: 下）' },
-              { value: 'bottom', label: 'bottom（列車の下側）' },
-              { value: 'top', label: 'top（列車の上側）' },
-            ]}
-            value={platformSide}
-            onChange={(e) => setPlatformSide(e.target.value)}
-            w={{ base: '100%', sm: 256 }}
           />
 
           <Textarea label="備考" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />

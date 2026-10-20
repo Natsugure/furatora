@@ -104,7 +104,7 @@ describe('PlatformInspector', () => {
           initialData={{
             id: 'platform-1', platformNumber: '1', lineId: 'line-1',
             inboundDirectionId: null, outboundDirectionId: null,
-            physicalLength: 100, platformSide: null, notes: null,
+            physicalLength: 100, notes: null,
           }}
           onCancel={vi.fn()}
           listState={{}}
@@ -120,6 +120,42 @@ describe('PlatformInspector', () => {
         expect.objectContaining({ method: 'PUT' }),
       );
     });
+  });
+
+  // 原点は「線路に向かって立ったときの左の端」に揃えたので、ホームの側は選ばない（ADR-0022）
+  it('ホーム位置（列車の上下）の選択欄が無く、原点の約束を案内する', () => {
+    render(
+      <MantineProvider>
+        <PlatformInspector stationId="station-1" lines={singleLine} onCancel={vi.fn()} listState={{}} />
+      </MantineProvider>,
+    );
+    expect(screen.queryByLabelText('ホーム位置', { exact: false })).not.toBeInTheDocument();
+    expect(screen.getByText(/線路に向かって立ったときの左の端を 0m/)).toBeInTheDocument();
+  });
+
+  it('送信する内容にホームの側（platformSide）を含めない', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    render(
+      <MantineProvider>
+        <PlatformInspector
+          stationId="station-1"
+          lines={singleLine}
+          initialData={{
+            id: 'platform-1', platformNumber: '1', lineId: 'line-1',
+            inboundDirectionId: null, outboundDirectionId: null,
+            physicalLength: 100, notes: null,
+          }}
+          onCancel={vi.fn()}
+          listState={{}}
+        />
+      </MantineProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '更新' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const init = vi.mocked(fetch).mock.calls[0]![1]!;
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('platformSide');
   });
 
   it('キャンセルボタンでonCancelが呼ばれる', async () => {

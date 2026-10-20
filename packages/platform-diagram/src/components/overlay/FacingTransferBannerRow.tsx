@@ -16,18 +16,17 @@ type Props = {
   banners: FacingTransferBanner[];
   laneCount: number;
   bounds: Bounds;
-  /** 図がこのブロックの上にある（＝lane 0 を最初に描く）か */
-  reverseLanes: boolean;
 };
 
-export function FacingTransferBannerRow({ banners, laneCount, bounds, reverseLanes }: Props) {
+export function FacingTransferBannerRow({ banners, laneCount, bounds }: Props) {
   if (banners.length === 0) return null;
 
-  const lanes = Array.from({ length: laneCount }, (_, i) => (reverseLanes ? laneCount - 1 - i : i));
+  // バナーは図の上にある（ADR-0022）。lane 0 を最後に描き、図に接するようにする
+  const lanes = Array.from({ length: laneCount }, (_, i) => laneCount - 1 - i);
 
   return (
     <div
-      className={`flex flex-col gap-1 ${reverseLanes ? 'pt-1.5' : 'pb-1.5'}`}
+      className="flex flex-col gap-1 pt-1.5"
       style={{ fontFamily: 'var(--font-sign)' }}
     >
       {lanes.map((lane) => (

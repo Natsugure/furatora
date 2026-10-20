@@ -48,7 +48,6 @@ function buildPlatform(overrides: Partial<LayoutPlatformDetailDTO>): LayoutPlatf
     inboundDirectionName: null,
     outboundDirectionId: null,
     outboundDirectionName: null,
-    platformSide: null,
     notes: '階段は1か所のみ',
     physicalLength: 200,
     stopPatterns: [],

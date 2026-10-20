@@ -8,7 +8,6 @@ export type PlatformRecord = {
   inboundDirectionId: string | null;
   outboundDirectionId: string | null;
   physicalLength: string;
-  platformSide: string | null;
   notes: string | null;
 };
 

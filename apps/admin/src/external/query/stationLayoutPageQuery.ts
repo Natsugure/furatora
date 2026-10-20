@@ -242,7 +242,6 @@ export const dbStationLayoutPageQuery: StationLayoutPageQuery = {
           inboundDirectionId: platforms.inboundDirectionId,
           outboundDirectionId: platforms.outboundDirectionId,
           physicalLength: platforms.physicalLength,
-          platformSide: platforms.platformSide,
           notes: platforms.notes,
         })
         .from(platforms)
@@ -295,7 +294,6 @@ export const dbStationLayoutPageQuery: StationLayoutPageQuery = {
         inboundDirectionName: directionName(selected.inboundDirectionId),
         outboundDirectionId: selected.outboundDirectionId,
         outboundDirectionName: directionName(selected.outboundDirectionId),
-        platformSide: selected.platformSide,
         notes: selected.notes,
         physicalLength: Number(selected.physicalLength),
         stopPatterns,

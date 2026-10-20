@@ -78,7 +78,6 @@ export function PlatformDisplay({ platform }: Props) {
                     pattern={pattern}
                     physicalLength={platform.physicalLength}
                     concourses={platform.concourses}
-                    platformSide={platform.platformSide}
                     bounds={bounds}
                     plateLayout={plateLayout}
                     facingLayout={facingLayout}
