@@ -66,8 +66,10 @@ export function PlatformDisplay({ platform }: Props) {
                   {[platform.lineName, formation].filter(Boolean).join(' · ')}
                 </p>
                 {directions && <p className="text-[13px] text-muted">{directions}</p>}
-                {!canDrawDiagram && <p className="mt-1 text-xs font-bold text-ink-soft">図はまだありません</p>}
               </>
+            }
+            closedSummary={
+              !canDrawDiagram && <p className="mt-1 text-xs font-bold text-ink-soft">図はまだありません</p>
             }
             collapsible={hasContent}
           >

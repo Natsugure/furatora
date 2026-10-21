@@ -9,6 +9,9 @@ type Props = {
   badge: ReactNode;
   // 頭の2行目以降（路線・編成・方面など）。開け閉めボタンの名前には含めない
   details: ReactNode;
+  // 閉じているときだけ頭に出す一言（「図はまだありません」など）。開くと中身が理由を示すので、頭からは外す。
+  // lg 以上ではいつも開いているので出さない
+  closedSummary?: ReactNode;
   // false なら開け閉めの操作を出さず、中身も出さない（カードに出すものが頭しか無い番線）
   collapsible: boolean;
   children?: ReactNode;
@@ -20,7 +23,7 @@ type Props = {
 // 必ずスマホの形になり、PC で一瞬閉じて見える。
 // ただし CSS だけだと、PC では中身が見えているのに頭が「折りたたまれたボタン」と読み上げられ、押しても何も
 // 変わらない。支援技術向けに、lg 以上では頭をボタンにしない（ここだけ useMediaQuery を使う。見た目は変わらない）
-export function PlatformCard({ title, badge, details, collapsible, children }: Props) {
+export function PlatformCard({ title, badge, details, closedSummary, collapsible, children }: Props) {
   const [open, setOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 64em)');
   const contentId = useId();
@@ -59,6 +62,10 @@ export function PlatformCard({ title, badge, details, collapsible, children }: P
             )}
           </h3>
           {details}
+          {/* 開け閉めできない番線には中身が無いので、いつも頭に出す */}
+          {closedSummary && (!collapsible || !open) && (
+            <div className={collapsible ? 'lg:hidden' : undefined}>{closedSummary}</div>
+          )}
         </div>
         {collapsible && (
           <ChevronDown

@@ -78,4 +78,12 @@ describe('PlatformDisplay', () => {
     expect(screen.getByRole('heading', { name: '2番線' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '2番線' })).not.toBeInTheDocument();
   });
+
+  it('図を描けない番線を開くと、頭の一言は消え、中身で理由を示す', async () => {
+    render(<PlatformDisplay platform={platform({ physicalLength: 0, notes: 'ホームの注記' })} />);
+    await userEvent.click(toggle());
+
+    expect(screen.queryByText('図はまだありません')).not.toBeInTheDocument();
+    expect(screen.getByText('ホーム長が未登録のため図を表示できません')).toBeInTheDocument();
+  });
 });
