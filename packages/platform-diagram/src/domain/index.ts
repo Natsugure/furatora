@@ -4,6 +4,7 @@ export * from './types';
 export * from './geometry';
 export * from './lanes';
 export * from './consist';
+export * from './doorList';
 export * from './doorOrder';
 export * from './concourse';
 export * from './concourseLayout';
