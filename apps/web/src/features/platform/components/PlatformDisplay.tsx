@@ -10,6 +10,8 @@ import {
 } from '@furatora/platform-diagram/domain';
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { railLineColor } from '@/theme/railLineColor';
+import { formationLabel } from '../domain/formation';
+import { PlatformCard } from './PlatformCard';
 
 type Props = {
   platform: PlatformDTO;
@@ -31,6 +33,11 @@ export function PlatformDisplay({ platform }: Props) {
   // 描けるものは図のプレートが全文を持っているので、ここに重ねて出す意味はない。
   const undrawable = platform.concourses.filter((c) => !isDrawable(c) && hasDisplayableInfo(c));
 
+  const formation = formationLabel(platform.stopPatterns);
+  const canDrawDiagram = platform.physicalLength > 0 && platform.stopPatterns.length > 0;
+  // 図を描けず、位置未登録のコンコースも注記も無ければ、開いても頭と同じことしか出ない
+  const hasContent = canDrawDiagram || undrawable.length > 0 || Boolean(platform.notes);
+
   return (
     <div className="overflow-hidden rounded-card border-[1.5px] border-subtle bg-surface">
       <div className="flex items-stretch">
@@ -40,100 +47,106 @@ export function PlatformDisplay({ platform }: Props) {
             図のキャンバス（min-width = 描画範囲×PX_PER_METER）まで幅が膨らみ、
             内側の overflow-x-auto がスクロールせず親の overflow-hidden に切り落とされる */}
         <div className="min-w-0 flex-1 p-5">
-          {/* Platform header */}
-          <div className="mb-4 flex items-center gap-3">
-            {/* 路線色で塗って白い文字を載せると、明るい路線色では読めない（REQ-10）。
-                路線色は輪だけに使い、番号は白地に text-ink で書く（StationBadge・LineSymbol と同じ） */}
-            <div
-              className="flex size-9 flex-shrink-0 items-center justify-center rounded-full border-[3px] bg-surface font-display text-base font-bold text-ink"
-              style={{ borderColor: lineColor }}
-            >
-              {platform.platformNumber}
-            </div>
-            <div>
-              <h3 className="font-display text-lg font-bold leading-tight text-ink">
-                {platform.platformNumber}番線
-              </h3>
-              <p className="text-[13px] text-muted">
-                {platform.lineName}
-                {directions && ` — ${directions}`}
-              </p>
-            </div>
-          </div>
-
-          {/* Trains stopping at this platform */}
-          {platform.physicalLength === 0 ? (
-            <div className="rounded-input bg-canvas p-4 text-center text-sm text-muted">
-              ホーム長が未登録のため図を表示できません
-            </div>
-          ) : platform.stopPatterns.length > 0 ? (
-            <div>
-              <p className="mb-3 text-xs font-bold text-muted">
-                列車・ホーム設備
-              </p>
-              <div className="space-y-4">
-                {platform.stopPatterns.map((pattern) => (
-                  <PlatformDiagram
-                    key={pattern.trainId}
-                    pattern={pattern}
-                    physicalLength={platform.physicalLength}
-                    concourses={platform.concourses}
-                    bounds={bounds}
-                    plateLayout={plateLayout}
-                    facingLayout={facingLayout}
-                  />
-                ))}
+          <PlatformCard
+            title={`${platform.platformNumber}番線`}
+            badge={
+              // 路線色で塗って白い文字を載せると、明るい路線色では読めない。
+              // 路線色は輪だけに使い、番号は白地に text-ink で書く（StationBadge・LineSymbol と同じ）
+              <div
+                aria-hidden
+                className="flex size-9 flex-shrink-0 items-center justify-center rounded-full border-[3px] bg-surface font-display text-base font-bold text-ink"
+                style={{ borderColor: lineColor }}
+              >
+                {platform.platformNumber}
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted">列車情報がありません</p>
-          )}
-
-          {/* 位置が登録されていないコンコース。図に描けないぶんをここで補う */}
-          {undrawable.length > 0 && (
-            <div className="mt-4 border-t border-line pt-4">
-              <p className="mb-1 text-xs font-bold text-muted">
-                位置未登録の設備・乗換
-              </p>
-              <p className="mb-3 text-xs text-muted">
-                ホーム上の位置が登録されていないため、図には表示していません。
-              </p>
-              <div className="space-y-3">
-                {undrawable.map((concourse) => {
-                  const exits = exitsLabel(concourse);
-                  const connections = connectionLabels(concourse);
-                  const facilityNames = [
-                    ...new Set(concourse.cells.flatMap((cell) => cell.facilities.map((f) => f.typeName))),
-                  ];
-
-                  return (
-                    <div key={concourse.id}>
-                      {exits && <p className="text-sm font-medium text-ink">{exits}</p>}
-                      {connections.length > 0 && (
-                        <p className="text-sm text-ink-soft">
-                          <span className="text-muted">乗換: </span>
-                          {connections.join('・')}
-                        </p>
-                      )}
-                      {facilityNames.length > 0 && (
-                        <p className="text-sm text-ink-soft">
-                          <span className="text-muted">設備: </span>
-                          {facilityNames.join('・')}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+            }
+            details={
+              <>
+                <p className="text-[13px] text-muted">
+                  {[platform.lineName, formation].filter(Boolean).join(' · ')}
+                </p>
+                {directions && <p className="text-[13px] text-muted">{directions}</p>}
+              </>
+            }
+            closedSummary={
+              !canDrawDiagram && <p className="mt-1 text-xs font-bold text-ink-soft">図はまだありません</p>
+            }
+            collapsible={hasContent}
+          >
+            {/* Trains stopping at this platform */}
+            {canDrawDiagram ? (
+              <div>
+                <p className="mb-3 text-xs font-bold text-muted">
+                  列車・ホーム設備
+                </p>
+                <div className="space-y-4">
+                  {platform.stopPatterns.map((pattern) => (
+                    <PlatformDiagram
+                      key={pattern.trainId}
+                      pattern={pattern}
+                      physicalLength={platform.physicalLength}
+                      concourses={platform.concourses}
+                      bounds={bounds}
+                      plateLayout={plateLayout}
+                      facingLayout={facingLayout}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : platform.physicalLength === 0 ? (
+              <div className="rounded-input bg-canvas p-4 text-center text-sm text-muted">
+                ホーム長が未登録のため図を表示できません
+              </div>
+            ) : (
+              <p className="text-sm text-muted">列車情報がありません</p>
+            )}
 
-          {/* Platform notes */}
-          {platform.notes && (
-            <div className="mt-4 rounded-input bg-subtle p-3 text-sm text-ink-soft">
-              {platform.notes}
-            </div>
-          )}
+            {/* 位置が登録されていないコンコース。図に描けないぶんをここで補う */}
+            {undrawable.length > 0 && (
+              <div className="mt-4 border-t border-line pt-4">
+                <p className="mb-1 text-xs font-bold text-muted">
+                  位置未登録の設備・乗換
+                </p>
+                <p className="mb-3 text-xs text-muted">
+                  ホーム上の位置が登録されていないため、図には表示していません。
+                </p>
+                <div className="space-y-3">
+                  {undrawable.map((concourse) => {
+                    const exits = exitsLabel(concourse);
+                    const connections = connectionLabels(concourse);
+                    const facilityNames = [
+                      ...new Set(concourse.cells.flatMap((cell) => cell.facilities.map((f) => f.typeName))),
+                    ];
+
+                    return (
+                      <div key={concourse.id}>
+                        {exits && <p className="text-sm font-medium text-ink">{exits}</p>}
+                        {connections.length > 0 && (
+                          <p className="text-sm text-ink-soft">
+                            <span className="text-muted">乗換: </span>
+                            {connections.join('・')}
+                          </p>
+                        )}
+                        {facilityNames.length > 0 && (
+                          <p className="text-sm text-ink-soft">
+                            <span className="text-muted">設備: </span>
+                            {facilityNames.join('・')}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Platform notes */}
+            {platform.notes && (
+              <div className="mt-4 rounded-input bg-subtle p-3 text-sm text-ink-soft">
+                {platform.notes}
+              </div>
+            )}
+          </PlatformCard>
         </div>
       </div>
     </div>

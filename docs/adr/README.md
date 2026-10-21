@@ -72,6 +72,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0020](./0020-main-only-long-lived-branch.md) | 長命ブランチを main のみにし、PR はマージコミットで main へ入れる | Accepted   | 2026-10-20 |
 | [0021](./0021-transfer-lines-from-station-connections.md) | 乗り換えられる路線を乗換接続から導き、乗換単位を乗換の判定に使わない | Accepted   | 2026-10-20 |
 | [0022](./0022-platform-origin-left-end-facing-track.md) | ホーム座標の原点を「線路に向かって立ったときの左の端」に定め、ホームの側（platformSide）を廃止する | Accepted   | 2026-10-21 |
+| [0023](./0023-diagram-orientation-by-viewport-in-platform-card.md) | ホーム図は画面の幅で横と縦を切り替え、番線のカードに収める（回してよいが、鏡写しにしない） | Proposed   | 2026-10-21 |
 
 ## 関連ドキュメント
 
