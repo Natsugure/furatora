@@ -49,7 +49,8 @@ export function PlatformCard({ title, badge, details, collapsible, children }: P
                 aria-expanded={open}
                 aria-controls={contentId}
                 onClick={() => setOpen((v) => !v)}
-                className="text-left after:absolute after:inset-0 after:content-['']"
+                // scroll-mt は、閉じて頭へ戻したときに固定のヘッダー（高さ 80px）の下に隠れないように
+                className="scroll-mt-24 text-left after:absolute after:inset-0 after:content-['']"
               >
                 {title}
               </button>
