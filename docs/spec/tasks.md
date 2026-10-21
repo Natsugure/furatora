@@ -10,23 +10,32 @@ PR2〜4 は着手するときに、この文書のその節を詳しくする（
 - [x] **TASK-1** ブランチを切る
 - [x] **TASK-2** `docs/spec/` の3点を #174 用に書き換える。ADR-0023 を `Proposed` で書き、`docs/adr/README.md` の一覧に足す
 - [x] **TASK-3** 開発者のレビュー（spec と ADR-0023）
-- [ ] **TASK-4** サイクルA: `formationLabel`（`apps/web/src/features/platform/domain/formation.ts`）
+- [x] **TASK-4** サイクルA: `formationLabel`（`apps/web/src/features/platform/domain/formation.ts`）
   1. 列車が1つ → 「10両編成」
   2. 両数の違う列車 → 「8・10両編成」（入力の順によらず小さい順）
   3. 両数の同じ列車が複数 → 重ねない
   4. 列車が無い → null
-- [ ] **TASK-5** サイクルB: `PlatformCard`（`apps/web/src/features/platform/components/PlatformCard.tsx`、`'use client'`）
+  - Red（`./formation` が無い）を確かめてから実装した
+- [x] **TASK-5** サイクルB: `PlatformCard`（`apps/web/src/features/platform/components/PlatformCard.tsx`、`'use client'`）
   1. 既定で頭のボタンが `aria-expanded=false`
   2. 頭を押すと `aria-expanded=true`、中身の要素が `aria-controls` の id を持つ
   3. 開いているとき下の端に「閉じる」があり、押すと閉じて頭のボタンにフォーカスが移る
   4. `collapsible=false` なら頭がボタンでなく、中身も「閉じる」も無い
-  - `lg` 以上で頭が `<div>` になること（`useMediaQuery`）は、テストの `matchMedia` の代用が false を返すので単体テストでは扱わない。TASK-8 で確かめる
-- [ ] **TASK-6** サイクルC: `PlatformDisplay` を `PlatformCard` で包む（`PlatformDisplay.test.tsx` を新しく作る）
+  5. 頭の2行目以降は、開け閉めボタンの名前に含めない
+  - 空の部品を置き、1〜3・5 が「ボタンが無い」、4 が「中身が出ている」で落ちることを確かめてから実装した。
+    「閉じている間は『閉じる』を出さない」は空の部品でも通る（『閉じる』をいつも描く実装を防ぐためのもの）
+  - 頭全体を `<button>` で包むと `<h3>`・`<p>` がボタンの中に入り、HTML として正しくないので、`title`・`badge`・`details` に分けた（design.md）
+  - `lg` 以上で頭がボタンでなくなること（`useMediaQuery`）は、テストの `matchMedia` の代用が false を返すので単体テストでは扱わない。TASK-8 で確かめる
+- [x] **TASK-6** サイクルC: `PlatformDisplay` を `PlatformCard` で包む（`PlatformDisplay.test.tsx` を新しく作る）
   1. 頭（開け閉めボタンの名前）に番線・路線・編成・方面がある
   2. ホーム長0の番線は頭に「図はまだありません」があり、注記があれば開け閉めできる
   3. 列車が無く、位置未登録の設備も注記も無い番線は、開け閉めボタンが無い
   4. 図を描ける番線は、開くと列車の図（列車名）が出る
-- [ ] **TASK-7** 検証（自動）: typecheck・lint・test（web）・build（web）
+  - 7件のうち5件が、今の `PlatformDisplay` で期待した理由（ボタンが無い・「図はまだありません」が無い・路線が「 — 」で方面とつながっている）で落ちることを確かめた。
+    残る2件（中身が無ければボタンが無い／図を描ける番線では図が無いことを示さない）は今の形でも通る
+  - 番線のバッジは `aria-hidden` にした（番号が「2番線」と重なる）
+- [x] **TASK-7** 検証（自動）: typecheck・lint・test（web）・build（web）
+  - すべて成功。test は web 172（155 → 172。formation 4・PlatformCard 6・PlatformDisplay 7）
 - [ ] **TASK-8** 検証（開発者と一緒に、dev サーバー）
   - 幅 375px: 既定で閉じている／開ける／下の「閉じる」で閉じると頭に戻る／方面タブを切り替えても崩れない
   - 幅 1024px 以上: いつも開いていて、シェブロンと「閉じる」が無く、頭を Tab でたどれない（ボタンでない）

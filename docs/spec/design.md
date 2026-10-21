@@ -38,39 +38,45 @@ apps/web/src/components/TransferDifficultySection.tsx … PR4（複数ルート�
 PlatformDisplay（サーバー部品のまま）
   ├─ 頭を組み立てる（番線のバッジ・番線・路線・編成・方面・「図はまだありません」）
   ├─ 中身を組み立てる（今の図・位置未登録・注記をそのまま）
-  └─ <PlatformCard header={頭} collapsible={中身があるか}>{中身}</PlatformCard>
+  └─ <PlatformCard title badge details collapsible={中身があるか}>{中身}</PlatformCard>
 
 PlatformCard（'use client'、新規）
   └─ 開け閉めの状態だけを持つ
 ```
 
 `PlatformDisplay` は今のまま `async` でない同期の部品なので、`PlatformTabs`（クライアント部品）の中でも、
-`page.tsx`（サーバー部品）の中でも描ける。`PlatformCard` は `header` と `children` を `ReactNode` で受け取るので、
+`page.tsx`（サーバー部品）の中でも描ける。`PlatformCard` は頭の部品と `children` を `ReactNode` で受け取るので、
 中身（`PlatformDiagram`）はサーバーで描いたものがそのまま入る。
 
 ### `PlatformCard`
 
 ```ts
 type Props = {
-  header: ReactNode;       // 番線のバッジと見出し。開け閉めボタンの名前にもなる
+  title: string;           // 「2番線」。<h3> の中のボタンの名前になる
+  badge: ReactNode;        // 番線のバッジ（aria-hidden。番号は title と重なる）
+  details: ReactNode;      // 頭の2行目以降（路線・編成・方面・図が無いこと）。ボタンの名前には含めない
   collapsible: boolean;    // false なら開け閉めの操作を出さず、中身も出さない（REQ-12）
   children?: ReactNode;    // 中身
 };
 ```
+
+頭全体を `<button>` で包むと、中に `<h3>`・`<p>` が入り、HTML の入れ子として正しくない（ボタンの中は文の中の要素だけ）。
+WAI-ARIA のアコーディオンと同じく `<h3><button>2番線</button></h3>` とし、ボタンの押せる範囲を
+`after:absolute after:inset-0` で頭全体（`relative`）に広げる。
 
 - `useState(false)` で開閉を持つ。`useId()` で中身の要素に id を振り、ボタンの `aria-controls` に渡す
 - **見た目の切り替えは CSS だけで行う。** 中身の要素は `className={`${open ? 'block' : 'hidden'} lg:block`}`、
   シェブロンと下の「閉じる」は `lg:hidden`
   - サーバーで描いた結果とずれず、PC で一瞬閉じて見えることも無い（`useMediaQuery` で見た目を決めると、最初の描画が必ずスマホの形になる）
   - **`hidden` 属性は使わない。** Tailwind の preflight が `[hidden]` に `display: none !important` を当てるので、`lg:block` で上書きできない
-- 頭は `<button aria-expanded aria-controls>` にする（頭のどこを押しても開閉する）
+- 頭の `<h3>` の中を `<button aria-expanded aria-controls>` にする（押せる範囲は頭全体）
 - **支援技術向けの属性だけは `useMediaQuery`（`@mantine/hooks`）で切り替える。** CSS だけだと、PC では中身が見えているのに
   頭が「折りたたまれたボタン」と読み上げられ、押しても何も変わらない
-  - `useMediaQuery('(min-width: 64em)')`（`lg` = 1024px）が true の間は、頭を `<button>` ではなく `<div>` で描く（同じ class）
-  - 最初の描画（サーバー・ハイドレーション）は false なのでボタンで描き、マウント後に `<div>` へ替わる。見た目は変わらない
+  - `useMediaQuery('(min-width: 64em)')`（`lg` = 1024px）が true の間は、`<h3>` の中をボタンにせず文字だけにする
+  - 最初の描画（サーバー・ハイドレーション）は false なのでボタンで描き、マウント後に文字だけへ替わる。見た目は変わらない
   - テストの `matchMedia` の代用（`src/test/setup.ts`）は false を返すので、テストはスマホの振る舞いを確かめることになる
-- 中身の下の端に「閉じる」ボタン（`lg:hidden`）。押すと閉じて、頭のボタンに `focus()` し、`scrollIntoView({ block: 'nearest' })` する（REQ-7）
-  - jsdom には `scrollIntoView` が無い。呼ぶ前に存在を確かめるか、テストの setup で代用を置く（`src/test/setup.ts` は `matchMedia` の代用を置いている）
+- 中身の下の端に「閉じる」ボタン（`lg:hidden`。開いている間だけ描く）。押すと閉じて、頭のボタンに `focus()` し、`scrollIntoView({ block: 'nearest' })` する（REQ-7）
+  - jsdom には `scrollIntoView` が無いので、`scrollIntoView?.()` で呼ぶ
 
 ### カードの頭
 
