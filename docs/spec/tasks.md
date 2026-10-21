@@ -47,7 +47,7 @@ PR2〜4 は着手するときに、この文書のその節を詳しくする（
   - `docs/domain/platform-coordinate-system.md`「描画」に「駅ページでの出し方（番線のカード）」を書いた（縦の図が未実装であることを適用状況に書いた）。
     `design-system.md` はトークン・色・形の文書なので置かなかった。`docs/domain/README.md` の一覧の説明を直した
   - ADR-0023 は `Proposed` のまま（PR3 で縦の図を確かめてから `Accepted`）
-- [ ] **TASK-10** 引き渡し: PR（`main` 向け）。本文に「#174 の PR1/4」と書く
+- [x] **TASK-10** 引き渡し: PR #192（`main` 向け）
 
 ## PR2: 一覧（着手時に詳しくする）
 
