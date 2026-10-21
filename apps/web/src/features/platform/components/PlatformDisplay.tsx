@@ -63,7 +63,7 @@ export function PlatformDisplay({ platform }: Props) {
             details={
               <>
                 <p className="text-[13px] text-muted">
-                  {formation ? `${platform.lineName} · ${formation}` : platform.lineName}
+                  {[platform.lineName, formation].filter(Boolean).join(' · ')}
                 </p>
                 {directions && <p className="text-[13px] text-muted">{directions}</p>}
                 {!canDrawDiagram && <p className="mt-1 text-xs font-bold text-ink-soft">図はまだありません</p>}
@@ -72,11 +72,7 @@ export function PlatformDisplay({ platform }: Props) {
             collapsible={hasContent}
           >
             {/* Trains stopping at this platform */}
-            {platform.physicalLength === 0 ? (
-              <div className="rounded-input bg-canvas p-4 text-center text-sm text-muted">
-                ホーム長が未登録のため図を表示できません
-              </div>
-            ) : platform.stopPatterns.length > 0 ? (
+            {canDrawDiagram ? (
               <div>
                 <p className="mb-3 text-xs font-bold text-muted">
                   列車・ホーム設備
@@ -94,6 +90,10 @@ export function PlatformDisplay({ platform }: Props) {
                     />
                   ))}
                 </div>
+              </div>
+            ) : platform.physicalLength === 0 ? (
+              <div className="rounded-input bg-canvas p-4 text-center text-sm text-muted">
+                ホーム長が未登録のため図を表示できません
               </div>
             ) : (
               <p className="text-sm text-muted">列車情報がありません</p>

@@ -44,6 +44,7 @@ describe('PlatformDisplay', () => {
     expect(toggle()).toBeInTheDocument();
     expect(screen.getByText('丸ノ内線 · 6両編成')).toBeInTheDocument();
     expect(screen.getByText('池袋方面')).toBeInTheDocument();
+    expect(screen.queryByText('図はまだありません')).not.toBeInTheDocument();
   });
 
   it('図を描ける番線は、開くと列車の図が出る', async () => {
@@ -76,10 +77,5 @@ describe('PlatformDisplay', () => {
 
     expect(screen.getByRole('heading', { name: '2番線' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '2番線' })).not.toBeInTheDocument();
-  });
-
-  it('図を描ける番線では、図が無いことを示さない', () => {
-    render(<PlatformDisplay platform={platform()} />);
-    expect(screen.queryByText('図はまだありません')).not.toBeInTheDocument();
   });
 });
