@@ -153,7 +153,7 @@ export function PlatformDiagram({
       <DoorTileList
         title="フリースペース"
         coverage="全編成"
-        marker={<Dot color="var(--color-free-standard)" />}
+        marker={<Triangle color="var(--color-free-standard)" />}
         doors={freeSpace.standard}
         tileBg="var(--card-transfer-bg)"
         tileInk="var(--card-transfer-heading)"
@@ -161,7 +161,7 @@ export function PlatformDiagram({
       <DoorTileList
         title="フリースペース"
         coverage="一部編成"
-        marker={<Dot color="var(--color-free-nonstandard)" />}
+        marker={<Triangle color="var(--color-free-nonstandard)" />}
         doors={freeSpace.partial}
         tileBg="var(--card-transfer-bg)"
         tileInk="var(--card-transfer-heading)"
@@ -190,9 +190,13 @@ export function PlatformDiagram({
   );
 }
 
-// 一覧の見出しの頭の印。フリースペースは図と同じ丸
-function Dot({ color }: { color: string }) {
-  return <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />;
+// 一覧の見出しの頭の印。フリースペースは図・凡例と同じ三角
+function Triangle({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" className="flex-shrink-0">
+      <polygon points="4,11 12,11 8,5" fill={color} />
+    </svg>
+  );
 }
 
 function Square() {

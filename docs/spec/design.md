@@ -140,7 +140,7 @@ export function formationLabel(stopPatterns: Pick<TrainStopPatternDTO, 'carCount
 
 ```
 ● フリースペース 全編成          ← <section aria-labelledby> の <h6>（列車名が <h5>）
-[1号車 3番ドア付近][2号車 …][3号車 …]   ← <ul> のタイル3列
+[1号車 3番ドア付近][2号車 …][3号車 …]   ← <ul> のタイル（1枚6rem以上で、入るだけ並べる）
 ● フリースペース 一部編成
 ■ 優先席 全編成
 ■ 優先席 一部編成                 ← 空のグループは出さない
@@ -166,8 +166,10 @@ export function doorListGroups(
 
 `packages/platform-diagram/src/components/DoorTileList.tsx`（新規）。見出し・見出しの頭の印・タイルの色を受け取り、空なら何も描かない。
 
-- 見出しの頭の印: フリースペースの全編成は `--color-free-standard`、一部編成は `--color-free-nonstandard` の丸（今の図と凡例に合わせる。図の見た目は PR3 で見直す）。
+- 見出しの頭の印: フリースペースの全編成は `--color-free-standard`、一部編成は `--color-free-nonstandard` の三角（今の図と凡例に合わせる。図の見た目は PR3 で見直す）。
   優先席は `--card-prio-heading` の四角（ADR-0018 決定2。赤い路線色と形で分ける）
+- タイルの列の数は決めない（`repeat(auto-fill, minmax(6rem, 1fr))`）。見本は3列だが、番線のカードと列車のカードの内側に入るので、
+  幅375pxで3列にすると1枚が約75pxになり「3番ドア付近」が折り返す（TASK-16 で確かめた）。375px で2列、1280px で8列ぶんの幅になる
 - タイルの地と文字は今のトークン（フリースペース `--card-transfer-bg` / `--card-transfer-heading`、優先席 `--card-prio-bg` / `--card-prio-heading`。値は見本と同じ）。
   Admin は Web の Tailwind のトークンを持たないので、今と同じく `styles.css` の CSS 変数を inline style で使う。新しいトークンは足さない
 - 一覧を残す理由（読み上げ・テキスト検索、優先席は図に出さない）のコメントは残す。凡例は変えない（PR3）
