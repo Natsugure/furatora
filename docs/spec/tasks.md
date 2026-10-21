@@ -50,9 +50,27 @@ PR2〜4 は着手するときに、この文書のその節を詳しくする（
   - ADR-0023 は `Proposed` のまま（PR3 で縦の図を確かめてから `Accepted`）
 - [x] **TASK-10** 引き渡し: PR #192（`main` 向け）
 
-## PR2: 一覧（着手時に詳しくする）
+## PR2: 一覧
 
-- [ ] フリースペース・優先席を「全編成」「一部編成」の見出しで分ける（REQ-14）
+ブランチ: `feat/issue174-door-lists`（`main` から）。フリースペース・優先席を「全編成」「一部編成」の見出しで分け、見本のタイルにする（REQ-14）
+
+- [x] **TASK-11** ブランチを切り、design.md・tasks.md の PR2 節を詳しくする
+- [ ] **TASK-12** 開発者のレビュー（PR2 節）
+- [ ] **TASK-13** サイクルD: `doorListGroups`（`packages/platform-diagram/src/domain/doorList.ts`）
+  1. 全編成と一部編成に分ける
+  2. 号車→ドアの昇順に並べる（入力の順によらない）
+  3. 同じドアに両方あれば全編成だけに出す
+  4. 同じドアの重複は1つにする
+  5. ドアが無ければ両方空
+- [ ] **TASK-14** サイクルE: 一覧の描画（`DoorTileList` を新設し、`PlatformDiagram` の2枚のカードを置き換える。テストは `PlatformDisplay.test.tsx`）
+  1. フリースペースの全編成・一部編成が、それぞれの見出しの region の中に出る
+  2. 優先席も同じく分かれる
+  3. 一部編成が無ければ「一部編成」の見出しを出さない
+- [ ] **TASK-15** 検証（自動）: platform-diagram の typecheck・lint・test、web の typecheck・lint・test・build、admin の typecheck・build
+- [ ] **TASK-16** 検証（dev サーバー、Chrome DevTools）: 幅 375px・1280px で見出しとタイル3列が崩れない。Admin の駅レイアウト編集画面でも一覧が出る。
+  本番 DB に一部編成のデータがあるかを確かめる
+- [ ] **TASK-17** 振り返り: `docs/domain/platform-coordinate-system.md`「駅ページでの出し方」に一覧の分け方を書く
+- [ ] **TASK-18** 引き渡し: PR（`main` 向け）
 
 ## PR3: 新しい見た目と縦の図（着手時に詳しくする。PoC から）
 

@@ -1,7 +1,7 @@
 # 設計: ホーム図を現実の見え方に合わせ、番線のカードに収める (Issue #174)
 
 向きと出し方の決定と却下案は [ADR-0023](../adr/0023-diagram-orientation-by-viewport-in-platform-card.md) による。ここには変更点だけを書く。
-詳しく書くのは PR1 だけ。PR2〜4 は着手するときにその節を詳しくする。
+PR1・PR2 は詳しく書いた。PR3・PR4 は着手するときにその節を詳しくする。
 
 ## 全体の流れ
 
@@ -132,10 +132,51 @@ export function formationLabel(stopPatterns: Pick<TrainStopPatternDTO, 'carCount
 - `PlatformDisplay`: RTL。テストの中の `platform(overrides)` 関数でフィクスチャを作る（`getStationDetail.test.ts` と同じやり方）。
   図を描ける番線では `PlatformDiagram` が描かれる（jsdom で描けることを最初のテストで確かめる）
 
-## PR2: 一覧（着手時に詳しくする）
+## PR2: 一覧
 
-- 今は `PlatformDiagram.tsx` の中で、列車ごとにフリースペース（:149-168）と優先席（:172-190）を並べている
-- 号車のドアごとに `isStandard`（すべての編成にあるか）を持っているので、それで「全編成」「一部編成」に分ける見込み
+今は `PlatformDiagram.tsx` の中で、列車ごとにフリースペースと優先席を1つのリストで並べ、行の末尾に「(全編成)」「(一部編成)」を付けている
+（優先席は区別を出していない）。これを見出しで分け、見た目は見本（`docs/adr/assets/0017/source/Platform.dc.html` の一覧）のタイルに合わせる。
+`PlatformDiagram` は Admin も使うので、Admin の一覧も同じに変わる。
+
+```
+● フリースペース 全編成          ← <section aria-labelledby> の <h6>（列車名が <h5>）
+[1号車 3番ドア付近][2号車 …][3号車 …]   ← <ul> のタイル3列
+● フリースペース 一部編成
+■ 優先席 全編成
+■ 優先席 一部編成                 ← 空のグループは出さない
+```
+
+### `doorListGroups(cars)`
+
+`packages/platform-diagram/src/domain/doorList.ts`（新規。`domain/index.ts` から出す）。
+
+```ts
+export type DoorPosition = { carNumber: number; doorNumber: number };
+// 号車のドアを「全編成」「一部編成」に分ける。どちらも号車→ドアの昇順
+export function doorListGroups(
+  cars: { carNumber: number; doors: { nearDoor: number; isStandard: boolean }[] }[],
+): { standard: DoorPosition[]; partial: DoorPosition[] };
+```
+
+- 同じ号車・ドアに全編成と一部編成の両方があれば、全編成だけに出す（図の `freeSpaceMarks()` と同じ規則。図と一覧が食い違わないため）
+- 同じ号車・ドアの重複は1つにする
+- フリースペースと優先席のどちらにも使う（呼び出し側が `freeSpaceDoors` / `prioritySeatDoors` を `doors` に渡す）
+
+### `DoorTileList`
+
+`packages/platform-diagram/src/components/DoorTileList.tsx`（新規）。見出し・見出しの頭の印・タイルの色を受け取り、空なら何も描かない。
+
+- 見出しの頭の印: フリースペースの全編成は `--color-free-standard`、一部編成は `--color-free-nonstandard` の丸（今の図と凡例に合わせる。図の見た目は PR3 で見直す）。
+  優先席は `--card-prio-heading` の四角（ADR-0018 決定2。赤い路線色と形で分ける）
+- タイルの地と文字は今のトークン（フリースペース `--card-transfer-bg` / `--card-transfer-heading`、優先席 `--card-prio-bg` / `--card-prio-heading`。値は見本と同じ）。
+  Admin は Web の Tailwind のトークンを持たないので、今と同じく `styles.css` の CSS 変数を inline style で使う。新しいトークンは足さない
+- 一覧を残す理由（読み上げ・テキスト検索、優先席は図に出さない）のコメントは残す。凡例は変えない（PR3）
+
+### テスト戦略
+
+- `doorListGroups`: 純関数の単体テスト（platform-diagram、node 環境）
+- 一覧の描画: `PlatformDisplay.test.tsx` に足す（jsdom で `PlatformDiagram` まで描ける。platform-diagram は部品のテストの環境を持たない）。
+  `getByRole('region', { name: 'フリースペース 全編成' })` の中に号車・ドアがあることを `within` で確かめる
 
 ## PR3: 新しい見た目と縦の図（着手時に詳しくする。PoC から）
 
