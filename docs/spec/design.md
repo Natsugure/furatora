@@ -1,143 +1,149 @@
-# 設計: ホーム座標の原点を「線路に向かって立ったときの左の端」に揃え、platformSide を廃止する (Issue #188)
+# 設計: ホーム図を現実の見え方に合わせ、番線のカードに収める (Issue #174)
 
-原点の約束と却下案は [ADR-0022](../adr/0022-platform-origin-left-end-facing-track.md) による。ここには変更点だけを書く。
+向きと出し方の決定と却下案は [ADR-0023](../adr/0023-diagram-orientation-by-viewport-in-platform-card.md) による。ここには変更点だけを書く。
+詳しく書くのは PR1 だけ。PR2〜4 は着手するときにその節を詳しくする。
 
 ## 全体の流れ
 
 ```
-一段目（この PR）
-  ├─ 手書きのマイグレーション（drizzle-kit generate --custom）
-  │    platform_side = 'top' のホームの座標を L − x に置き換え、platform_side を全件 null にする
-  ├─ テーブル定義から platformSide を消す（列は DB に残る。読み書きしない）
-  ├─ 型 PlatformSide・DTO・クエリ・リポジトリ・Admin の入力欄から除く
-  └─ layoutRows() から side を除き、並びを1つに固定する
-二段目（次の PR）
-  └─ pnpm run db:generate → ALTER TABLE platforms DROP COLUMN platform_side
+apps/web/src/app/stations/[slug]/page.tsx
+ └─ <section>「ホーム」
+     ├─ PlatformTabs（方面タブ。変えない）
+     └─ PlatformDisplay（番線1つ）
+         └─ PlatformCard ……………………………… PR1 で新設（開け閉め・lg での切り替え）
+             ├─ 頭: 番線・路線・編成・方面 ……… PR1
+             └─ 中身
+                 ├─ PlatformDiagram（列車ごと）
+                 │   ├─ 図（横） ……………………… PR3 で新しい見た目（Admin も）
+                 │   ├─ 図（縦、lg 未満） ……… PR3 で新設
+                 │   └─ フリースペース・優先席 … PR2 で「全編成」「一部編成」
+                 ├─ 位置未登録の設備・乗換（変えない）
+                 └─ ホームの注記（変えない）
+
+apps/web/src/components/TransferDifficultySection.tsx … PR4（複数ルート）
 ```
 
-## マイグレーション（`packages/database/drizzle/00NN_platform_origin_left_end.sql`）
+| PR | 主に変わるところ |
+|---|---|
+| PR1 | `apps/web/src/features/platform/`（`PlatformDisplay`・新しい `PlatformCard`・`formationLabel`） |
+| PR2 | `packages/platform-diagram/src/components/PlatformDiagram.tsx` の一覧（とその元になる純関数） |
+| PR3 | `packages/platform-diagram`（図の部品・`layoutRows()`・オーバーレイ）、`apps/admin` の図の見た目 |
+| PR4 | `apps/web/src/components/TransferDifficultySection.tsx`、`features/station/domain/transferView.ts` |
 
-`pnpm --filter @furatora/database exec drizzle-kit generate --custom --name platform_origin_left_end` で空のファイルを作り、次を書く。
-前例は `0014_set_line_direction_defaults.sql`（`DO $$ ... $$` の中で順に書き換える）。
+## PR1: 出し方
 
-```sql
--- ホーム座標の原点を「線路に向かって立ったときの左の端」に揃える（Issue #188 / ADR-0022）。
--- platform_side = 'top' のホームは 180° 回した向きで入っているので、座標を x' = L − x に置き換える。
--- 対象は id ではなく platform_side で選ぶ（環境ごとに id が違いうる）。最後に platform_side を全件 null にするので、
--- 2回流しても座標は戻らない。列そのものは次の作業で落とす（読むコードが無くなってから）。
-DO $$
-DECLARE
-  v_bad text;
-BEGIN
-  -- ホーム長が未入力（0）なのに座標を持つ top のホームは、L が分からず変換できない。人が確かめてから流し直す
-  SELECT string_agg(p.id::text, ', ') INTO v_bad
-  FROM platforms p
-  WHERE p.platform_side = 'top' AND p.physical_length = 0
-    AND (
-      EXISTS (SELECT 1 FROM train_stop_patterns t WHERE t.platform_id = p.id)
-      OR EXISTS (SELECT 1 FROM platform_locations l JOIN platform_location_cells c ON c.platform_location_id = l.id
-                 WHERE l.platform_id = p.id AND c.x_position_meters IS NOT NULL)
-      OR EXISTS (SELECT 1 FROM platform_locations l JOIN facility_connections f ON f.platform_location_id = l.id
-                 WHERE l.platform_id = p.id AND f.x_range_start IS NOT NULL AND f.x_range_end IS NOT NULL)
-    );
-  IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION 'ホーム長が 0 なのに座標を持つ top のホームがあります: %', v_bad;
-  END IF;
+### 部品の分け方
 
-  -- 号車。start と end を入れ替える（start < end を保つ）
-  UPDATE train_stop_pattern_cars c
-  SET start_meters = p.physical_length - c.end_meters,
-      end_meters   = p.physical_length - c.start_meters
-  FROM train_stop_patterns t JOIN platforms p ON p.id = t.platform_id
-  WHERE c.train_stop_pattern_id = t.id AND p.platform_side = 'top' AND p.physical_length > 0;
+```
+PlatformDisplay（サーバー部品のまま）
+  ├─ 頭を組み立てる（番線のバッジ・番線・路線・編成・方面・「図はまだありません」）
+  ├─ 中身を組み立てる（今の図・位置未登録・注記をそのまま）
+  └─ <PlatformCard header={頭} collapsible={中身があるか}>{中身}</PlatformCard>
 
-  -- アクセス点。null（コンコース全体）は null のまま
-  UPDATE platform_location_cells c
-  SET x_position_meters = p.physical_length - c.x_position_meters
-  FROM platform_locations l JOIN platforms p ON p.id = l.platform_id
-  WHERE c.platform_location_id = l.id AND p.platform_side = 'top' AND p.physical_length > 0
-    AND c.x_position_meters IS NOT NULL;
-
-  -- 対面乗換帯。両方が非 null のときだけ帯として扱われる（DTO と同じ）
-  UPDATE facility_connections f
-  SET x_range_start = p.physical_length - f.x_range_end,
-      x_range_end   = p.physical_length - f.x_range_start
-  FROM platform_locations l JOIN platforms p ON p.id = l.platform_id
-  WHERE f.platform_location_id = l.id AND p.platform_side = 'top' AND p.physical_length > 0
-    AND f.x_range_start IS NOT NULL AND f.x_range_end IS NOT NULL;
-
-  UPDATE platforms SET platform_side = NULL WHERE platform_side IS NOT NULL;
-END $$;
+PlatformCard（'use client'、新規）
+  └─ 開け閉めの状態だけを持つ
 ```
 
-- `UPDATE ... SET a = f(b), b = f(a)` は、右辺が更新前の値で評価されるので入れ替えに一時列は要らない
-- `decimal(6,2)` どうしの引き算なので精度は落ちない。`L − x` が範囲（±9999.99）を超えることは無い
-- `trainStopPatternCars` の一意制約は `(trainStopPatternId, carNumber)` で、座標を変えても衝突しない
+`PlatformDisplay` は今のまま `async` でない同期の部品なので、`PlatformTabs`（クライアント部品）の中でも、
+`page.tsx`（サーバー部品）の中でも描ける。`PlatformCard` は `header` と `children` を `ReactNode` で受け取るので、
+中身（`PlatformDiagram`）はサーバーで描いたものがそのまま入る。
 
-### スナップショットとの食い違い
-
-一段目ではテーブル定義から `platformSide` を消すが、DROP は生成しない（`--custom` だけを使う）。
-一段目から二段目までのあいだ、テーブル定義と `drizzle/meta` のスナップショットが食い違う。二段目を次の作業にする（CLAUDE.md）。
-
-## 図（`packages/platform-diagram`）
-
-### `layoutRows()`（`src/domain/geometry.ts`）
+### `PlatformCard`
 
 ```ts
-// 変更前
-export function layoutRows(platformSide: PlatformSide | null, options?: { hasConcourseLeaders?: boolean }): VerticalLayout;
-// 変更後
-export function layoutRows(options?: { hasConcourseLeaders?: boolean }): VerticalLayout;
+type Props = {
+  header: ReactNode;       // 番線のバッジと見出し。開け閉めボタンの名前にもなる
+  collapsible: boolean;    // false なら開け閉めの操作を出さず、中身も出さない（REQ-12）
+  children?: ReactNode;    // 中身
+};
 ```
 
-- 値は今の `platformSide = 'bottom'`（と null）のときと同じにする。上から 列車行 → 隙間 → 設備行 → 束ね線
-- `VerticalLayout.stripOrder` を除く。並びは `facing → diagram → plates` に固定する
-- ホームの側の解釈を一手に引き受けていた理由（片方だけ反転し忘れる）は、分岐そのものが無くなるので不要になる。コメントを直す
+- `useState(false)` で開閉を持つ。`useId()` で中身の要素に id を振り、ボタンの `aria-controls` に渡す
+- **見た目の切り替えは CSS だけで行う。** 中身の要素は `className={`${open ? 'block' : 'hidden'} lg:block`}`、
+  シェブロンと下の「閉じる」は `lg:hidden`
+  - サーバーで描いた結果とずれず、PC で一瞬閉じて見えることも無い（`useMediaQuery` で見た目を決めると、最初の描画が必ずスマホの形になる）
+  - **`hidden` 属性は使わない。** Tailwind の preflight が `[hidden]` に `display: none !important` を当てるので、`lg:block` で上書きできない
+- 頭は `<button aria-expanded aria-controls>` にする（頭のどこを押しても開閉する）
+- **支援技術向けの属性だけは `useMediaQuery`（`@mantine/hooks`）で切り替える。** CSS だけだと、PC では中身が見えているのに
+  頭が「折りたたまれたボタン」と読み上げられ、押しても何も変わらない
+  - `useMediaQuery('(min-width: 64em)')`（`lg` = 1024px）が true の間は、頭を `<button>` ではなく `<div>` で描く（同じ class）
+  - 最初の描画（サーバー・ハイドレーション）は false なのでボタンで描き、マウント後に `<div>` へ替わる。見た目は変わらない
+  - テストの `matchMedia` の代用（`src/test/setup.ts`）は false を返すので、テストはスマホの振る舞いを確かめることになる
+- 中身の下の端に「閉じる」ボタン（`lg:hidden`）。押すと閉じて、頭のボタンに `focus()` し、`scrollIntoView({ block: 'nearest' })` する（REQ-7）
+  - jsdom には `scrollIntoView` が無い。呼ぶ前に存在を確かめるか、テストの setup で代用を置く（`src/test/setup.ts` は `matchMedia` の代用を置いている）
 
-### 描画コンポーネント
+### カードの頭
 
-- `PlatformDiagram`: `platformSide` の prop を除く。`stripOrder` の map をやめ、3つの帯を固定の順で描く
-- `ConcoursePlateRow` / `FacingTransferBannerRow`: `reverseLanes` の prop を除く（常に false だった側だけを残す）
-- `PlatformDTO.platformSide` を除く（`src/domain/types.ts`）
+```
+[2]  2番線                          ⌄   ← シェブロンは lg 未満だけ
+     丸ノ内線 · 6両編成
+     池袋・新宿・荻窪方面
+     （図を描けない番線のみ）図はまだありません
+```
 
-## Web（`apps/web`）
+- 番線のバッジは今の輪のもの（路線色の輪・白地に `text-ink`。明るい路線色では白い文字が読めない、という今のコメントを残す）。
+  見本の塗りつぶしは採らない
+- 路線と編成は「 · 」でつなぐ。方面は次の行（今は「 — 」で路線とつないでいる。見本の並びに合わせる）
+- 方面は今と同じく inbound / outbound を「 / 」でつなぐ
+- 図を描けない番線の判定は今と同じ（`physicalLength === 0` または `stopPatterns.length === 0`）。
+  中身の中の「ホーム長が未登録のため図を表示できません」「列車情報がありません」は残す（開いたときにも理由が分かるように）
 
-- `external/query/stationDetailQuery.ts`: `platformSide` を select せず、DTO にも入れない
-- `features/platform/components/PlatformDisplay.tsx`: `platformSide` を渡さない
-- テストのフィクスチャ（`tabs.test.ts`・`getStationDetail.test.ts`）から除く
+### `formationLabel(stopPatterns)`
 
-## Admin（`apps/admin`）
+`apps/web/src/features/platform/domain/formation.ts`（新規）。
 
-- `features/platform/schema.ts`・`ports.ts`・`external/repository/platformRepository.ts`: `platformSide` を除く
-- `external/query/stationLayoutPageQuery.ts`: select と DTO から除く
-- `features/station-layout/components/StationLayoutEditor.tsx`: `PlatformDiagram` と `PlatformInspector` へ渡さない
-- `features/station-layout/components/inspector/PlatformInspector.tsx`: 「ホーム位置」の `NativeSelect` を除く。
-  ホーム長の欄の `description` に「線路に向かって立ったときの左の端を 0m とします」を示す（ADR-0022）
+```ts
+// 番線に停まる列車の両数を、重複を除いて小さい順に「8・10両編成」とする。列車が無ければ null
+export function formationLabel(stopPatterns: Pick<TrainStopPatternDTO, 'carCount'>[]): string | null;
+```
 
-## 共有の語彙
+### 中身があるか（`collapsible`）
 
-- `packages/database/src/enums/stationMaster.ts` の `PlatformSide` を除く（ADR-0015 の語彙。使う側が無くなる）
+`PlatformDisplay` で決める。図を描ける、または位置未登録のコンコース（`undrawable`）がある、または `notes` がある。
 
-## エラーマトリックス
+### 変えないもの
+
+- `PlatformDiagram` とその中身（PR2・PR3）
+- `PlatformTabs`（方面タブ）と `page.tsx` の案内文
+- `PlatformDTO` と `stationDetailQuery.ts`（頭に要る値はすべて今の DTO にある）
+
+### エラーハンドリング
 
 | 状況 | 応答 |
 |---|---|
-| ホーム長0で座標を持つ `top` のホームがある | 移行が `RAISE EXCEPTION` で失敗し、ビルドが止まる。該当ホームを Admin で確かめ、ホーム長を入れてから流し直す |
-| 移行を2回流す | `platform_side` が null なので対象が無く、何も変わらない |
-| 一段目のデプロイ後に古いクライアントが `platformSide` を送る（Admin の古いタブ） | スキーマから外れた項目は Zod で捨てられ、リポジトリも書かない |
+| `stopPatterns` が空 | 編成を出さず、頭に「図はまだありません」 |
+| `physicalLength === 0` で列車あり | 編成を出し、頭に「図はまだありません」 |
+| 図を描けず、中身も無い | 開け閉めの操作を出さない |
+| `carCount` が 0 や欠けた値 | DTO では `number` で必ずある（`stationDetailQuery.ts` で列車の両数から入る）。そのまま出す |
 
-## テスト方針
+### テスト戦略
 
-- `geometry.test.ts`: side ごとの `describe.each` と `stripOrder` のテストを除き、side を取らない `layoutRows()` が今の `bottom` と同じ値を返すことを確かめる（Red: 引数の型が変わるので失敗する → 実装）
-- `PlatformDiagram` を使うテスト（Admin の `StationLayoutView.test.tsx`・`StationLayoutEditor.test.tsx`）: フィクスチャから除き、通ることを確かめる
-- `PlatformInspector.test.tsx`: 「ホーム位置」が無く、原点の案内があることを確かめる（Red → 実装）
-- `schema.test.ts`（Admin）: `platformSide` のケースを除く
-- マイグレーションは単体テストを持たない（前例どおり）。development ブランチで流して、前後の値を Neon MCP で比べる
+- `formationLabel`: 純関数の単体テスト
+- `PlatformCard`: RTL。`getByRole('button', { name })` と `aria-expanded`、`userEvent.click`、`toHaveFocus()`。
+  Tailwind の class は検証しない（apps/CLAUDE.md）。`lg` の切り替えは dev サーバーで目で確かめる
+- `PlatformDisplay`: RTL。テストの中の `platform(overrides)` 関数でフィクスチャを作る（`getStationDetail.test.ts` と同じやり方）。
+  図を描ける番線では `PlatformDiagram` が描かれる（jsdom で描けることを最初のテストで確かめる）
+
+## PR2: 一覧（着手時に詳しくする）
+
+- 今は `PlatformDiagram.tsx` の中で、列車ごとにフリースペース（:149-168）と優先席（:172-190）を並べている
+- 号車のドアごとに `isStandard`（すべての編成にあるか）を持っているので、それで「全編成」「一部編成」に分ける見込み
+
+## PR3: 新しい見た目と縦の図（着手時に詳しくする。PoC から）
+
+- 横の図: 見本（`docs/adr/assets/0017/source/Platform.dc.html`）の見た目を当てる。Admin の編集レイヤ（ADR-0010）は横のまま
+- 縦の図: 横の図を左へ90°回す。ADR-0022 により、回すだけで現実と同じ向きになる
+- `PlatformCard` の中身で、横の図に `hidden lg:block`、縦の図に `lg:hidden` を当てて出し分ける見込み（PR1 と同じく CSS だけ）
+- 縦のプレートの積み方と折れ線は PoC で確かめる。成功基準は着手時に決める
+
+## PR4: 乗換カード（着手時に詳しくする）
+
+- `transferView.ts` の並びから最短を選び、`TransferDifficultySection.tsx` で大きさを分ける見込み
 
 ## 恒久知識の振り分け
 
 | 内容 | 置き場 |
 |---|---|
-| 原点の約束と却下案 | ADR-0022 |
-| 原点の約束、縦方向の並び（side の分岐が無いこと）、Admin の案内 | `docs/domain/platform-coordinate-system.md`（実装後に上書き） |
-| 二段目の DROP | GitHub Issue #188（この Issue のまま、二段目の PR で閉じる） |
+| 画面の幅で横と縦を切り替える／別ページを作らない／鏡写しにしない | ADR-0023（PR1 で `Proposed`、PR3 で `Accepted`） |
+| 番線のカードの出し方（`lg` 未満で折りたたみ、既定で閉じる、`lg` 以上でいつも開く、頭に出すもの） | `docs/domain/`（PR1 のフェーズ5。置き場は書くときに決める） |
+| 縦の図の座標の取り方（回し方） | `docs/domain/platform-coordinate-system.md`「描画」（PR3） |
