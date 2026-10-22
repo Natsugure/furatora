@@ -4,6 +4,8 @@ import { standardByDoor } from './consist';
 
 export type DoorPosition = { carNumber: number; doorNumber: number };
 
+export type DoorListGroups = { standard: DoorPosition[]; partial: DoorPosition[] };
+
 /**
  * 号車のドアを「全編成」「一部編成」に分ける。どちらも号車→ドアの昇順。
  *
@@ -12,7 +14,7 @@ export type DoorPosition = { carNumber: number; doorNumber: number };
  */
 export function doorListGroups(
   cars: { carNumber: number; doors: { nearDoor: number; isStandard: boolean }[] }[],
-): { standard: DoorPosition[]; partial: DoorPosition[] } {
+): DoorListGroups {
   const standard: DoorPosition[] = [];
   const partial: DoorPosition[] = [];
 

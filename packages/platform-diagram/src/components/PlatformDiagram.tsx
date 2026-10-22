@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { PX_PER_METER, layoutRows, type Bounds, type VerticalLayout } from '../domain/geometry';
 import type { ConcoursePlateLayout, FacingTransferLayout } from '../domain/concourseLayout';
-import { doorListGroups } from '../domain/doorList';
+import { doorListGroups, type DoorListGroups } from '../domain/doorList';
 import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
 import { DoorTileList } from './DoorTileList';
 import { DiagramSvg } from './diagram/DiagramSvg';
@@ -109,21 +109,15 @@ export function PlatformDiagram({
         style={{ borderTop: '1px solid var(--color-border-default)', color: 'var(--color-text-secondary)' }}
       >
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-            <polygon points="4,11 12,11 8,5" fill="var(--color-free-standard)" />
-          </svg>
+          <Triangle color="var(--color-free-standard)" />
           <span>フリースペース</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-            <polygon points="4,11 12,11 8,5" fill="var(--color-free-nonstandard)" />
-          </svg>
+          <Triangle color="var(--color-free-nonstandard)" />
           <span>(一部編成)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-            <polygon points="4,11 12,11 8,5" fill="var(--sign-boarding-mark)" fillOpacity="0.55" />
-          </svg>
+          <Triangle color="var(--sign-boarding-mark)" opacity={0.55} />
           <span>乗車位置</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -150,19 +144,13 @@ export function PlatformDiagram({
 
       {/* フリースペースの一覧。図はドア位置を示すが、号車とドア番号の一覧は
           読み上げ・テキスト検索のために残す（車両情報ページができるまでの受け皿でもある） */}
-      <DoorTileList
+      <DoorCategoryLists
         title="フリースペース"
-        coverage="全編成"
-        marker={<Triangle color="var(--color-free-standard)" />}
-        doors={freeSpace.standard}
-        tileBg="var(--card-transfer-bg)"
-        tileInk="var(--card-transfer-heading)"
-      />
-      <DoorTileList
-        title="フリースペース"
-        coverage="一部編成"
-        marker={<Triangle color="var(--color-free-nonstandard)" />}
-        doors={freeSpace.partial}
+        groups={freeSpace}
+        markers={{
+          standard: <Triangle color="var(--color-free-standard)" />,
+          partial: <Triangle color="var(--color-free-nonstandard)" />,
+        }}
         tileBg="var(--card-transfer-bg)"
         tileInk="var(--card-transfer-heading)"
       />
@@ -170,19 +158,13 @@ export function PlatformDiagram({
       {/* 優先席は乗ってから探すもので立ち位置を左右しないため図には出さないが、
           情報は失わせない（車両情報ページの新設までここが受け皿）。
           印は四角（赤い路線色と形で分ける。ADR-0018 決定2） */}
-      <DoorTileList
+      <DoorCategoryLists
         title="優先席"
-        coverage="全編成"
-        marker={<Square />}
-        doors={prioritySeat.standard}
-        tileBg="var(--card-prio-bg)"
-        tileInk="var(--card-prio-heading)"
-      />
-      <DoorTileList
-        title="優先席"
-        coverage="一部編成"
-        marker={<Square />}
-        doors={prioritySeat.partial}
+        groups={prioritySeat}
+        markers={{
+          standard: <Square color="var(--card-prio-heading)" />,
+          partial: <Square color="var(--card-prio-heading)" />,
+        }}
         tileBg="var(--card-prio-bg)"
         tileInk="var(--card-prio-heading)"
       />
@@ -190,15 +172,38 @@ export function PlatformDiagram({
   );
 }
 
-// 一覧の見出しの頭の印。フリースペースは図・凡例と同じ三角
-function Triangle({ color }: { color: string }) {
+// 1つの設備の一覧を「全編成」「一部編成」の見出しで分けて出す。印以外（題・タイルの色）は設備で共通
+function DoorCategoryLists({
+  title,
+  groups,
+  markers,
+  tileBg,
+  tileInk,
+}: {
+  title: string;
+  groups: DoorListGroups;
+  markers: { standard: ReactNode; partial: ReactNode };
+  tileBg: string;
+  tileInk: string;
+}) {
+  const common = { title, tileBg, tileInk };
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" className="flex-shrink-0">
-      <polygon points="4,11 12,11 8,5" fill={color} />
+    <>
+      <DoorTileList {...common} coverage="全編成" marker={markers.standard} doors={groups.standard} />
+      <DoorTileList {...common} coverage="一部編成" marker={markers.partial} doors={groups.partial} />
+    </>
+  );
+}
+
+// 凡例と一覧の見出しの頭に出す三角。図のフリースペース・乗車位置の印と同じ形
+function Triangle({ color, opacity }: { color: string; opacity?: number }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
+      <polygon points="4,11 12,11 8,5" fill={color} fillOpacity={opacity} />
     </svg>
   );
 }
 
-function Square() {
-  return <span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: 'var(--card-prio-heading)' }} />;
+function Square({ color }: { color: string }) {
+  return <span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: color }} />;
 }
