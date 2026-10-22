@@ -225,6 +225,9 @@ editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）
 - **見た目の開閉の切り替えは CSS（`lg:`）だけで行う。** 最初の描画（サーバー）から PC で開いた形になる。
   `lg` 以上で頭をボタンにしないこと（支援技術に、見えている中身を「折りたたまれている」と伝えないため）だけは、
   マウント後に `useMediaQuery` で切り替える（`PlatformCard.tsx`）
+- **図の下に、フリースペースと優先席のドアの一覧を出す**（読み上げ・テキスト検索のため。優先席は図に描かないので、ここにだけ出る）。
+  それぞれ「全編成」「一部編成」の見出しで分け、空の見出しは出さない。同じドアに全編成と一部編成の両方があれば、
+  図と同じく全編成だけに出す（`domain/consist.ts` の `standardByDoor()`、`domain/doorList.ts` の `doorListGroups()`）
 
 ## 号車の向き
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { PlatformDTO, TrainStopPatternDTO } from '@furatora/platform-diagram/domain';
 import { PlatformDisplay } from './PlatformDisplay';
@@ -85,5 +85,59 @@ describe('PlatformDisplay', () => {
 
     expect(screen.queryByText('図はまだありません')).not.toBeInTheDocument();
     expect(screen.getByText('ホーム長が未登録のため図を表示できません')).toBeInTheDocument();
+  });
+  describe('図の下の一覧', () => {
+    const doors = (...list: [number, boolean][]) => list.map(([nearDoor, isStandard]) => ({ nearDoor, isStandard }));
+
+    function withDoors(car1: Partial<TrainStopPatternDTO['cars'][number]>, car2: Partial<TrainStopPatternDTO['cars'][number]>) {
+      const base = pattern({ trainId: 't1' });
+      const [c1, c2] = base.cars;
+      return platform({ stopPatterns: [{ ...base, cars: [{ ...c1!, ...car1 }, { ...c2!, ...car2 }] }] });
+    }
+
+    const items = (name: string) =>
+      within(screen.getByRole('list', { name }))
+        .getAllByRole('listitem')
+        .map((li) => li.textContent);
+
+    it('フリースペースを全編成と一部編成の見出しで分ける', async () => {
+      render(
+        <PlatformDisplay
+          platform={withDoors({ freeSpaceDoors: doors([3, true], [1, false]) }, { freeSpaceDoors: doors([3, true]) })}
+        />,
+      );
+      await userEvent.click(toggle());
+
+      expect(items('フリースペース 全編成')).toEqual(['1号車3番ドア付近', '2号車3番ドア付近']);
+      expect(items('フリースペース 一部編成')).toEqual(['1号車1番ドア付近']);
+    });
+
+    it('優先席も全編成と一部編成の見出しで分ける', async () => {
+      render(
+        <PlatformDisplay
+          platform={withDoors({ prioritySeatDoors: doors([1, true]) }, { prioritySeatDoors: doors([4, false]) })}
+        />,
+      );
+      await userEvent.click(toggle());
+
+      expect(items('優先席 全編成')).toEqual(['1号車1番ドア付近']);
+      expect(items('優先席 一部編成')).toEqual(['2号車4番ドア付近']);
+    });
+
+    it('一部編成のドアが無ければ、一部編成の見出しを出さない', async () => {
+      render(<PlatformDisplay platform={withDoors({ freeSpaceDoors: doors([3, true]) }, {})} />);
+      await userEvent.click(toggle());
+
+      expect(screen.getByRole('heading', { name: 'フリースペース 全編成' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'フリースペース 一部編成' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /優先席/ })).not.toBeInTheDocument();
+    });
+
+    it('一覧をランドマークにしない（列車の数だけ同じ名前のランドマークが並ぶため）', async () => {
+      render(<PlatformDisplay platform={withDoors({ freeSpaceDoors: doors([3, true]) }, {})} />);
+      await userEvent.click(toggle());
+
+      expect(screen.queryByRole('region', { name: 'フリースペース 全編成' })).not.toBeInTheDocument();
+    });
   });
 });

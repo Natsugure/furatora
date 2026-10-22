@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { PX_PER_METER, layoutRows, type Bounds, type VerticalLayout } from '../domain/geometry';
 import type { ConcoursePlateLayout, FacingTransferLayout } from '../domain/concourseLayout';
+import { doorListGroups, type DoorListGroups } from '../domain/doorList';
 import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
+import { DoorTileList } from './DoorTileList';
 import { DiagramSvg } from './diagram/DiagramSvg';
 import { ConcoursePlateRow } from './overlay/ConcoursePlateRow';
 import { FacingTransferBannerRow } from './overlay/FacingTransferBannerRow';
@@ -48,6 +50,8 @@ export function PlatformDiagram({
   const width = maxX - minX;
   const cars = [...pattern.cars].sort((a, b) => a.carNumber - b.carNumber);
   const rows = layoutRows({ hasConcourseLeaders: plateLayout.groups.length > 0 });
+  const freeSpace = doorListGroups(cars.map((c) => ({ carNumber: c.carNumber, doors: c.freeSpaceDoors })));
+  const prioritySeat = doorListGroups(cars.map((c) => ({ carNumber: c.carNumber, doors: c.prioritySeatDoors })));
 
   return (
     <div
@@ -105,21 +109,15 @@ export function PlatformDiagram({
         style={{ borderTop: '1px solid var(--color-border-default)', color: 'var(--color-text-secondary)' }}
       >
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-            <polygon points="4,11 12,11 8,5" fill="var(--color-free-standard)" />
-          </svg>
+          <Triangle color="var(--color-free-standard)" />
           <span>フリースペース</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-            <polygon points="4,11 12,11 8,5" fill="var(--color-free-nonstandard)" />
-          </svg>
+          <Triangle color="var(--color-free-nonstandard)" />
           <span>(一部編成)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-            <polygon points="4,11 12,11 8,5" fill="var(--sign-boarding-mark)" fillOpacity="0.55" />
-          </svg>
+          <Triangle color="var(--sign-boarding-mark)" opacity={0.55} />
           <span>乗車位置</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -144,50 +142,68 @@ export function PlatformDiagram({
         </div>
       </div>
 
-      {/* フリースペース詳細。図はドア位置を示すが、号車とドア番号の一覧は
+      {/* フリースペースの一覧。図はドア位置を示すが、号車とドア番号の一覧は
           読み上げ・テキスト検索のために残す（車両情報ページができるまでの受け皿でもある） */}
-      {cars.some((c) => c.freeSpaceDoors.length > 0) && (
-        <div
-          className="mt-3 rounded-2xl border p-3 text-xs"
-          style={{ backgroundColor: 'var(--card-transfer-bg)', borderColor: 'var(--card-transfer-border)' }}
-        >
-          <strong className="flex items-center gap-1" style={{ color: 'var(--card-transfer-heading)' }}>
-            <span className="text-sm">ℹ️</span> フリースペース詳細
-          </strong>
-          <ul className="mt-1.5 ml-5 space-y-0.5" style={{ color: 'var(--color-text-primary)' }}>
-            {cars.flatMap((c) =>
-              c.freeSpaceDoors.map((fs, idx) => (
-                <li key={`${c.carNumber}-${idx}`}>
-                  {c.carNumber}号車 {fs.nearDoor}番ドア付近
-                  {fs.isStandard ? ' (全編成)' : ' (一部編成)'}
-                </li>
-              )),
-            )}
-          </ul>
-        </div>
-      )}
+      <DoorCategoryLists
+        title="フリースペース"
+        groups={freeSpace}
+        markers={{
+          standard: <Triangle color="var(--color-free-standard)" />,
+          partial: <Triangle color="var(--color-free-nonstandard)" />,
+        }}
+        tileBg="var(--card-transfer-bg)"
+        tileInk="var(--card-transfer-heading)"
+      />
 
       {/* 優先席は乗ってから探すもので立ち位置を左右しないため図には出さないが、
-          情報は失わせない（車両情報ページの新設までここが受け皿） */}
-      {cars.some((c) => c.prioritySeatDoors.length > 0) && (
-        <div
-          className="mt-2 rounded-2xl border p-3 text-xs"
-          style={{ backgroundColor: 'var(--card-prio-bg)', borderColor: 'var(--card-prio-border)' }}
-        >
-          <strong className="flex items-center gap-1" style={{ color: 'var(--card-prio-heading)' }}>
-            <span className="text-sm">ℹ️</span> 優先席
-          </strong>
-          <ul className="mt-1.5 ml-5 space-y-0.5" style={{ color: 'var(--color-text-primary)' }}>
-            {cars.flatMap((c) =>
-              c.prioritySeatDoors.map((ps, idx) => (
-                <li key={`${c.carNumber}-${idx}`}>
-                  {c.carNumber}号車 {ps.nearDoor}番ドア付近
-                </li>
-              )),
-            )}
-          </ul>
-        </div>
-      )}
+          情報は失わせない（車両情報ページの新設までここが受け皿）。
+          印は四角（赤い路線色と形で分ける。ADR-0018 決定2） */}
+      <DoorCategoryLists
+        title="優先席"
+        groups={prioritySeat}
+        markers={{
+          standard: <Square color="var(--card-prio-heading)" />,
+          partial: <Square color="var(--card-prio-heading)" />,
+        }}
+        tileBg="var(--card-prio-bg)"
+        tileInk="var(--card-prio-heading)"
+      />
     </div>
   );
+}
+
+// 1つの設備の一覧を「全編成」「一部編成」の見出しで分けて出す。印以外（題・タイルの色）は設備で共通
+function DoorCategoryLists({
+  title,
+  groups,
+  markers,
+  tileBg,
+  tileInk,
+}: {
+  title: string;
+  groups: DoorListGroups;
+  markers: { standard: ReactNode; partial: ReactNode };
+  tileBg: string;
+  tileInk: string;
+}) {
+  const common = { title, tileBg, tileInk };
+  return (
+    <>
+      <DoorTileList {...common} coverage="全編成" marker={markers.standard} doors={groups.standard} />
+      <DoorTileList {...common} coverage="一部編成" marker={markers.partial} doors={groups.partial} />
+    </>
+  );
+}
+
+// 凡例と一覧の見出しの頭に出す三角。図のフリースペース・乗車位置の印と同じ形
+function Triangle({ color, opacity }: { color: string; opacity?: number }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
+      <polygon points="4,11 12,11 8,5" fill={color} fillOpacity={opacity} />
+    </svg>
+  );
+}
+
+function Square({ color }: { color: string }) {
+  return <span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: color }} />;
 }

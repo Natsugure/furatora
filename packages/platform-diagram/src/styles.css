@@ -57,13 +57,11 @@
   --sign-boarding-mark: #4a4044;
   --sign-leader: #c9bec2; /* 束ね線と引き出し線 */
 
-  /* フリースペース詳細（ブランドのローズ）・優先席カード（朱色。ADR-0018 決定2） */
+  /* 図の下の一覧のタイル。フリースペース（ブランドのローズ）・優先席（朱色。ADR-0018 決定2） */
   --card-transfer-bg: #fdf3f6;
-  --card-transfer-border: #f5c5d6;
   --card-transfer-heading: #a02f5b;
 
   --card-prio-bg: #fceee8;
-  --card-prio-border: #f4c3b1;
   --card-prio-heading: #a3361a;
 
   /* 号車番号・出口プレート等の書体。next/font/google の BIZ_UDPGothic を

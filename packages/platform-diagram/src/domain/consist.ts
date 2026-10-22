@@ -25,22 +25,28 @@ export function doorCenterX(
 }
 
 /**
- * フリースペースのあるドアの中心座標を、号車内で昇順に返す。
+ * ドア番号ごとに、全編成にあるか（isStandard）をまとめる。
  *
  * 同じドアに全編成ぶんと一部編成ぶんの両方が登録されうるので、
  * ドア番号で重複を除き、1つでも「全編成」があればそちらを優先する
- * （利用者にとっては「確実にある」ほうが強い情報）。
+ * （利用者にとっては「確実にある」ほうが強い情報）。図と一覧の両方がこの規則に従う。
  */
+export function standardByDoor(
+  doors: { nearDoor: number; isStandard: boolean }[],
+): Map<number, boolean> {
+  const byDoor = new Map<number, boolean>();
+  for (const door of doors) {
+    byDoor.set(door.nearDoor, (byDoor.get(door.nearDoor) ?? false) || door.isStandard);
+  }
+  return byDoor;
+}
+
+/** フリースペースのあるドアの中心座標を、号車内で昇順に返す（重複は standardByDoor() で除く） */
 export function freeSpaceMarks(
   car: Pick<StopPatternCarDTO, 'startMeters' | 'endMeters' | 'doorCount' | 'freeSpaceDoors'>,
   reversed: boolean,
 ): { doorNumber: number; x: number; isStandard: boolean }[] {
-  const byDoor = new Map<number, boolean>();
-  for (const door of car.freeSpaceDoors) {
-    byDoor.set(door.nearDoor, (byDoor.get(door.nearDoor) ?? false) || door.isStandard);
-  }
-
-  return [...byDoor.entries()]
+  return [...standardByDoor(car.freeSpaceDoors).entries()]
     .map(([doorNumber, isStandard]) => ({
       doorNumber,
       x: doorCenterX(car, doorNumber, reversed),
