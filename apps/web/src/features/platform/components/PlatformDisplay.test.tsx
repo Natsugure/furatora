@@ -96,7 +96,7 @@ describe('PlatformDisplay', () => {
     }
 
     const items = (name: string) =>
-      within(screen.getByRole('region', { name }))
+      within(screen.getByRole('list', { name }))
         .getAllByRole('listitem')
         .map((li) => li.textContent);
 
@@ -131,6 +131,13 @@ describe('PlatformDisplay', () => {
       expect(screen.getByRole('heading', { name: 'フリースペース 全編成' })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'フリースペース 一部編成' })).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /優先席/ })).not.toBeInTheDocument();
+    });
+
+    it('一覧をランドマークにしない（列車の数だけ同じ名前のランドマークが並ぶため）', async () => {
+      render(<PlatformDisplay platform={withDoors({ freeSpaceDoors: doors([3, true]) }, {})} />);
+      await userEvent.click(toggle());
+
+      expect(screen.queryByRole('region', { name: 'フリースペース 全編成' })).not.toBeInTheDocument();
     });
   });
 });

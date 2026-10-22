@@ -21,8 +21,10 @@ export function DoorTileList({ title, coverage, marker, doors, tileBg, tileInk }
   const headingId = useId();
   if (doors.length === 0) return null;
 
+  // section（region）にしない。列車の数だけ「フリースペース 全編成」の名前のランドマークが並び、
+  // どの列車のものか区別できないため。見出しで辿れ、名前は ul の aria-labelledby で付く
   return (
-    <section aria-labelledby={headingId} className="mt-4">
+    <div className="mt-4">
       <h6
         id={headingId}
         className="mb-2 flex items-center gap-2 text-base font-bold"
@@ -38,7 +40,7 @@ export function DoorTileList({ title, coverage, marker, doors, tileBg, tileInk }
       </h6>
       {/* 見本は3列だが、番線のカードと列車のカードの内側に入るので、幅375pxでは1枚が約75pxになり
           「3番ドア付近」が折り返す。列の数を決めず、1枚の幅（6rem）が保てるだけ並べる */}
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-2">
+      <ul aria-labelledby={headingId} className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-2">
         {doors.map(({ carNumber, doorNumber }) => (
           <li
             key={`${carNumber}-${doorNumber}`}
@@ -55,6 +57,6 @@ export function DoorTileList({ title, coverage, marker, doors, tileBg, tileInk }
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }
