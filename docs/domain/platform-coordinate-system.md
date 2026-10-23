@@ -182,8 +182,7 @@ editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）
 「どの階段・エレベーターがどの出口・どの乗り換えに通じるか」を図だけで読めるようにする。
 
 プレートは駅サインの様式（地の色と枠で種類を分けた札）に従う。
-**出口はバター色の地に濃い文字と濃い輪郭、乗り換えは白地に濃い灰色（neutral-500）の枠**（出口の色は [ADR-0018](../adr/0018-semantic-colors-for-facilities.md) 決定3）。
-乗り換えの枠は、黒では画面になじまず、淡い灰色では白地から浮かないので、その間を取っている（`styles.css` の `--sign-transfer-edge`）。
+**出口はバター色の地に濃い文字と濃い輪郭、乗り換えは白地に濃い灰色（neutral-500）の枠**（出口の色は [ADR-0018](../adr/0018-semantic-colors-for-facilities.md) 決定3、乗り換えの枠は [ADR-0024](../adr/0024-free-space-ring-and-transfer-plate-edge.md)）。
 出口の地は白地からほとんど浮かないため、プレートの外形は輪郭が受け持つ。
 乗り換え先は路線ごとに路線カラーのチップを添えて縦に並べる。
 
@@ -245,7 +244,7 @@ editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）
 個々のドアの座標は `domain/consist.ts` の `doorCenterX()` が返す。
 号車をドア数で等分した**スロットの中心**であり、左端ではない。
 ドアの印はこの中心に打つ。フリースペースの無いドアは乗車位置の棒、フリースペースのあるドアは
-全編成ならローズの丸、一部編成ならローズの輪（色ではなく形で分ける）。
+全編成ならローズの丸、一部編成ならローズの輪（色ではなく形で分ける。[ADR-0024](../adr/0024-free-space-ring-and-transfer-plate-edge.md)）。
 
 編成の外側の端（ホーム上で左右の端にある号車の外側）だけ大きく丸める（`domain/carShape.ts`）。
 号車の番号ではなく左右の位置で決めるのは、1号車がいつも同じ側にあるとは限らないため。
@@ -261,4 +260,5 @@ editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）
 
 - [train-stop-patterns.md](./train-stop-patterns.md) — この座標系に乗る列車の停車位置
 - [ADR-0023](../adr/0023-diagram-orientation-by-viewport-in-platform-card.md) — 画面の幅で横と縦を切り替え、番線のカードに収める理由
+- [ADR-0024](../adr/0024-free-space-ring-and-transfer-plate-edge.md) — フリースペースを丸と輪で分け、乗り換えのプレートの枠を neutral-500 にする理由
 - [ADR-0001](../adr/0001-layer-structure.md) — `geometry.ts` を `features/*/domain/` に置く理由
