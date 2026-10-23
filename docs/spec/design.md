@@ -1,7 +1,7 @@
 # 設計: ホーム図を現実の見え方に合わせ、番線のカードに収める (Issue #174)
 
 向きと出し方の決定と却下案は [ADR-0023](../adr/0023-diagram-orientation-by-viewport-in-platform-card.md) による。ここには変更点だけを書く。
-PR1・PR2 は詳しく書いた。PR3・PR4 は着手するときにその節を詳しくする。
+PR1・PR2・PR3a は詳しく書いた。PR3b・PR4 は着手するときにその節を詳しくする。
 
 ## 全体の流れ
 
@@ -14,8 +14,8 @@ apps/web/src/app/stations/[slug]/page.tsx
              ├─ 頭: 番線・路線・編成・方面 ……… PR1
              └─ 中身
                  ├─ PlatformDiagram（列車ごと）
-                 │   ├─ 図（横） ……………………… PR3 で新しい見た目（Admin も）
-                 │   ├─ 図（縦、lg 未満） ……… PR3 で新設
+                 │   ├─ 図（横） ……………………… PR3a で新しい見た目（Admin も）
+                 │   ├─ 図（縦、lg 未満） ……… PR3b で新設
                  │   └─ フリースペース・優先席 … PR2 で「全編成」「一部編成」
                  ├─ 位置未登録の設備・乗換（変えない）
                  └─ ホームの注記（変えない）
@@ -27,7 +27,8 @@ apps/web/src/components/TransferDifficultySection.tsx … PR4（複数ルート�
 |---|---|
 | PR1 | `apps/web/src/features/platform/`（`PlatformDisplay`・新しい `PlatformCard`・`formationLabel`） |
 | PR2 | `packages/platform-diagram/src/components/PlatformDiagram.tsx` の一覧（とその元になる純関数） |
-| PR3 | `packages/platform-diagram`（図の部品・`layoutRows()`・オーバーレイ）、`apps/admin` の図の見た目 |
+| PR3a | `packages/platform-diagram`（図の部品・オーバーレイ・凡例・トークン）。Admin の図の見た目も変わる |
+| PR3b | `packages/platform-diagram`（縦の図）、`apps/web` の番線のカードの中身 |
 | PR4 | `apps/web/src/components/TransferDifficultySection.tsx`、`features/station/domain/transferView.ts` |
 
 ## PR1: 出し方
@@ -180,12 +181,86 @@ export function doorListGroups(
 - 一覧の描画: `PlatformDisplay.test.tsx` に足す（jsdom で `PlatformDiagram` まで描ける。platform-diagram は部品のテストの環境を持たない）。
   `getByRole('region', { name: 'フリースペース 全編成' })` の中に号車・ドアがあることを `within` で確かめる
 
-## PR3: 新しい見た目と縦の図（着手時に詳しくする。PoC から）
+## PR3a: 横の図の新しい見た目
 
-- 横の図: 見本（`docs/adr/assets/0017/source/Platform.dc.html`）の見た目を当てる。Admin の編集レイヤ（ADR-0010）は横のまま
-- 縦の図: 横の図を左へ90°回す。ADR-0022 により、回すだけで現実と同じ向きになる
-- `PlatformCard` の中身で、横の図に `hidden lg:block`、縦の図に `lg:hidden` を当てて出し分ける見込み（PR1 と同じく CSS だけ）
-- 縦のプレートの積み方と折れ線は PoC で確かめる。成功基準は着手時に決める
+横の図に見本（`docs/adr/assets/0017/source/Platform.dc.html`）の見た目を当てる。図の部品は `packages/platform-diagram` にあるので、Admin の図も同じに変わる。
+見本は縦の図なので、横の図では見本を右へ90°回したものとして読む（号車の札・ドアの縦棒・丸の大きさは見本の px を 5px/m で割る）。
+
+### 見本と違えるところ（着手時に開発者と決めた）
+
+| 項目 | 見本 | PR3a | 理由 |
+|---|---|---|---|
+| ホームの帯 | 無い（0m・140m の文字だけ） | 細い線で残す | 座標はホームの外にも置ける（`platform-coordinate-system.md`「座標の範囲」）。端を示すものが他に無い |
+| 乗車位置の色 | `#C9BEC2` | 今の `--sign-boarding-mark` を 55% で重ねる | 見本の色は白地で 1.6:1 しかなく、#166 で決めた値を保つ |
+| 乗換のプレートの枠 | `#EBE4E7` 1.5px | `#7A6E72`（neutral-500）。今の黒（`#111`）から替える | 黒は画面になじまず、見本の色は薄すぎる。号車の枠と同じ色（白地 4.88:1） |
+| 出口のプレートの地 | 100（`#FBF3D2`）・枠なし | 今のまま 300・輪郭 700（ADR-0018 決定3） | 見本の地は ADR と違う（REQ-18）。角の丸めだけを取る |
+| 優先席の印 | 列車の外側に四角 | 描かない | 優先席は #175 の範囲。図の下の一覧に出す（PR2） |
+| 図の向きの添え書き | 「上が 1号車」 | 出さない | ADR-0023 |
+
+### 描き替えるもの（`components/diagram/DiagramSvg.tsx`）
+
+- **号車**: 先頭・末尾のノーズの多角形をやめ、すべて角丸の矩形にする。編成の外側の端だけ大きく丸める（見本の 26px・10px → 5.2m・2m。
+  ただし列車の帯は 10m なので、端の丸めは帯の半分を超えない値にする）。SVG の `rect` は4つの角を別々に丸められないので、端の号車は `path` で描く
+- **号車番号**: 白い角丸の札（今の `--color-car-number-bg`）を見本の大きさ（28px → 5.6m 四方、角 1.8m）に寄せ、文字を大きくする
+- **乗車位置**: ホームの帯の下に打つ三角をやめ、号車の中のホーム側の縁にドアの縦棒（横の図では横長の棒。見本の 4×12px → 2.4m×0.8m）を置く
+- **フリースペース**: ドアの位置で、号車のホーム側の縁に乗せる。全編成はローズの丸（`--color-free-standard`、白い縁）、一部編成はローズの輪（地は白）。
+  丸のあるドアには縦棒を描かない（見本と同じ）。人の記号（`FreeSpaceGlyph`）は消し、`<title>` の文言は変えない
+- **設備**: アイコンの後ろに白い角丸の札（枠 `--color-border-default`）を敷く。札の大きさとピッチは今の定数（`FACILITY_ICON_SIZE`・`FACILITY_ICON_PITCH`）のまま、アイコンを札の中で少し小さく描く
+- **ホームの帯**: 細くする（`PLATFORM_BAR_HEIGHT` を下げる）
+
+**図の高さの約束（`layoutRows()` の `trainY`・`facilityY`・`viewHeight`）は変えない。** Admin の編集レイヤ（`DiagramEditLayer`）が号車・設備のハンドルをこの値で置くため。
+変えたくなったら、先に `DiagramEditLayer.test.tsx` を直してから変える。
+
+### 対面乗換の札（REQ-16）
+
+今は図の上のバナーで、段を逆順に積んでいる。これを**図の下の、出口・乗換のプレートの段のさらに外側**に移す。
+
+```
+ 列車 [1][2][3][4][5][6]
+ ─ホーム─────（対面乗換の範囲は帯の色のまま）
+ 設備 ▣        ▣
+ 束ね線 └──┬──┘
+ プレート  [出口][乗換]       ← ConcoursePlateRow（lane 0 が図の側）
+ 札   [▌◯◯線（△△方面）は向かい側に到着]   ← 札の段（lane 0 が図の側）
+```
+
+- 札には引き出し線が無いので、`routeLeaders` の迂回に加えない。段の割り当て（`layoutFacingBanners()`）も今のまま、プレートとは別の段の組にする
+- 範囲は札の左端と最小幅で示す（今の `xFraction()` の割合の仕組みのまま）。ホームの帯の色（ティント）は残す
+- `FacingTransferBannerRow` は、段を正順に積み、余白を上の辺に付ける。部品の名前は `FacingTransferTagRow` にする（バナーではなくなるため）。
+  domain の型（`FacingTransferBanner`）の名前は変えない（Admin の参照と差分を増やさない）
+
+### プレート（`components/overlay/ConcoursePlateRow.tsx`）
+
+- 出口・乗換とも角を丸める（見本の 14px・12px → `rounded-xl` 相当）
+- 乗換の枠は `--sign-transfer-edge` を `#7a6e72` にし、太さは 1.5px にする
+
+### 凡例と一覧の見出しの印（`PlatformDiagram.tsx`）
+
+凡例を見本に合わせる: フリースペース（丸）・一部編成（輪）・乗車位置（棒）・出口・乗換・束ね線。
+一覧の見出しの印（PR2 で三角にした）も、凡例と同じ丸・輪にする（`Triangle` を置き換える）。
+
+### トークン（`styles.css`）
+
+- `--sign-transfer-edge`: `#111111` → `#7a6e72`
+- `--color-free-standard-text`・`--color-free-nonstandard-text`・`--color-free-nonstandard` を消す（記号と淡い塗りをやめるため）。`apps/web/src/app/globals.css` には同じ名前が無い
+- `docs/domain/design-system.md` には、これらのトークンの記述は無い
+
+### テスト戦略
+
+- 見た目（色・形・class）は単体テストで確かめない（apps/CLAUDE.md）。dev サーバーで目で確かめる
+- `PlatformDisplay.test.tsx` に足す（jsdom で `PlatformDiagram` まで描ける）
+  1. 対面乗換の札が、図（`svg`）より後に出る（`compareDocumentPosition`）
+  2. 一部編成のフリースペースの `<title>` が「◯号車 ◯番ドア付近のフリースペース（一部編成）」のまま残る
+- 端の号車の形など、純関数に切り出したものだけ `packages/platform-diagram/src/domain/*.test.ts` で単体テストする
+- Admin の `DiagramEditLayer.test.tsx` が通り続けること
+
+## PR3b: 縦の図（PR3a のマージ後に詳しくする。PoC から）
+
+- `DiagramSvg` に向き（`orientation`）を渡し、(ホームに沿う位置, 横切る位置) を x,y に写す関数を通して描く。アイコン・号車番号はいつも正立させる
+- 横の図を左へ90°回すので、**0m が下、ホーム長の端が上**になる（上を 0m にすると、列車を左に置いたとき鏡写しになる。REQ-1）
+- `PlatformCard` の中身で、横の図に `hidden lg:block`、縦の図に `lg:hidden` を当てて出し分ける（PR1 と同じく CSS だけ）
+- 縦のプレートの積み方と折れ線は PoC で確かめる。成功基準は「幅 375px で、プレートが重ならず、押し下げたプレートがどれも折れ線で設備と結ばれ、
+  クライアントで実測していない」。満たせなければ止めて相談する
 
 ## PR4: 乗換カード（着手時に詳しくする）
 
@@ -195,6 +270,7 @@ export function doorListGroups(
 
 | 内容 | 置き場 |
 |---|---|
-| 画面の幅で横と縦を切り替える／別ページを作らない／鏡写しにしない | ADR-0023（PR1 で `Proposed`、PR3 で `Accepted`） |
+| 画面の幅で横と縦を切り替える／別ページを作らない／鏡写しにしない | ADR-0023（PR1 で `Proposed`、PR3b で `Accepted`） |
 | 番線のカードの出し方（`lg` 未満で折りたたみ、既定で閉じる、`lg` 以上でいつも開く、頭に出すもの） | `docs/domain/`（PR1 のフェーズ5。置き場は書くときに決める） |
-| 縦の図の座標の取り方（回し方） | `docs/domain/platform-coordinate-system.md`「描画」（PR3） |
+| 縦の図の座標の取り方（回し方） | `docs/domain/platform-coordinate-system.md`「描画」（PR3b） |
+| 対面乗換を図の下の札にすること、図の見た目（号車・ドア・フリースペースの印） | `docs/domain/platform-coordinate-system.md`「レイヤ構成」「コンコースの表現」（PR3a） |
