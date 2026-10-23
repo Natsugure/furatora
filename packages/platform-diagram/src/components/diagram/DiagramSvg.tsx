@@ -2,12 +2,14 @@ import type { FacilityTypeCode } from '@furatora/database/enums';
 import {
   CONCOURSE_TICK_HEIGHT,
   DOOR_MARK_LENGTH,
+  DOOR_MARK_OPACITY,
   DOOR_MARK_THICKNESS,
   FACILITY_ICON_PITCH,
   FACILITY_ICON_SIZE,
   FACILITY_ROW_HEIGHT,
   FREE_SPACE_MARK_HALO,
   FREE_SPACE_MARK_RADIUS,
+  FREE_SPACE_RING_WIDTH,
   PLATFORM_BAR_HEIGHT,
   PLATFORM_LABEL_FONT_SIZE,
   TRAIN_ROW_HEIGHT,
@@ -49,8 +51,8 @@ const CAR_NUMBER_FONT_SIZE = 3;
  * 中央に置くとホーム側の縁のフリースペースの丸と重なる
  */
 const CAR_NUMBER_TAG_SHIFT = 1.5;
-/** 設備のアイコンを札の中で小さく描く割合（見本は 32px の札に 22px のアイコン） */
-const FACILITY_ICON_SCALE = 0.7;
+/** 設備のアイコンを札の中で描く大きさ（見本は 32px の札に 22px のアイコン） */
+const FACILITY_ICON_INNER_SIZE = FACILITY_ICON_SIZE * 0.7;
 const FACILITY_TILE_RADIUS = 1.6;
 
 type Props = {
@@ -79,6 +81,7 @@ export function DiagramSvg({
 }: Props) {
   const reversed = isDoorOrderReversed(cars);
   const cells = concourses.flatMap((c) => c.cells.map((cell) => ({ ...cell, concourseId: c.id })));
+  const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
 
   return (
     <svg
@@ -135,8 +138,6 @@ export function DiagramSvg({
           cell.facilities.map((facility, fIdx) => {
             const x = cell.xPositionMeters! + (fIdx - (cell.facilities.length - 1) / 2) * FACILITY_ICON_PITCH;
             const iconFile = facility.typeCode !== null ? FACILITY_ICON_FILES[facility.typeCode] : undefined;
-            const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
-            const iconSize = FACILITY_ICON_SIZE * FACILITY_ICON_SCALE;
             return iconFile ? (
               // 白い札に載せる（見本）。札の大きさは FACILITY_ICON_SIZE のままなので、描画範囲の算出は変わらない
               <g key={`${cell.concourseId}-${idx}-${fIdx}`}>
@@ -152,10 +153,10 @@ export function DiagramSvg({
                 />
                 <image
                   href={`${iconBasePath}/${iconFile}`}
-                  x={x - iconSize / 2}
-                  y={tileY + (FACILITY_ICON_SIZE - iconSize) / 2}
-                  width={iconSize}
-                  height={iconSize}
+                  x={x - FACILITY_ICON_INNER_SIZE / 2}
+                  y={tileY + (FACILITY_ICON_SIZE - FACILITY_ICON_INNER_SIZE) / 2}
+                  width={FACILITY_ICON_INNER_SIZE}
+                  height={FACILITY_ICON_INNER_SIZE}
                 >
                   <title>{facility.typeName}</title>
                 </image>
@@ -258,8 +259,6 @@ function DoorMarks({
   rows: VerticalLayout;
 }) {
   const edgeY = rows.trainY + TRAIN_ROW_HEIGHT;
-  // 輪は線の太さの半分だけ内側に描き、外径を丸と揃える
-  const ringWidth = 0.5;
 
   return (
     <>
@@ -280,7 +279,7 @@ function DoorMarks({
                     height={DOOR_MARK_THICKNESS}
                     rx={DOOR_MARK_THICKNESS / 2}
                     fill="var(--sign-boarding-mark)"
-                    fillOpacity={0.55}
+                    fillOpacity={DOOR_MARK_OPACITY}
                   />
                 );
               }
@@ -290,13 +289,14 @@ function DoorMarks({
                   {mark.isStandard ? (
                     <circle cx={x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS} fill="var(--color-free-standard)" />
                   ) : (
+                    // 輪は線の太さの半分だけ内側に描き、外径を丸と揃える。中は下の白い縁の円が埋める
                     <circle
                       cx={x}
                       cy={edgeY}
-                      r={FREE_SPACE_MARK_RADIUS - ringWidth / 2}
-                      fill="var(--color-bg-card)"
+                      r={FREE_SPACE_MARK_RADIUS - FREE_SPACE_RING_WIDTH / 2}
+                      fill="none"
                       stroke="var(--color-free-standard)"
-                      strokeWidth={ringWidth}
+                      strokeWidth={FREE_SPACE_RING_WIDTH}
                     />
                   )}
                   {/* <title> の子は文字列1つにする。React のサーバー描画は子が複数あると中身を出力せず、

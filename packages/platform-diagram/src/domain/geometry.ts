@@ -107,11 +107,18 @@ export const TRAIN_ROW_HEIGHT = 10;
 /** 乗車位置の棒の、ホームに沿う長さと太さ */
 export const DOOR_MARK_LENGTH = 2.4;
 export const DOOR_MARK_THICKNESS = 0.8;
+/** 乗車位置の棒の不透明度。図と凡例で同じ濃さにする */
+export const DOOR_MARK_OPACITY = 0.55;
 /** フリースペースの丸の半径と、その周りの白い縁の太さ */
 export const FREE_SPACE_MARK_RADIUS = 1.6;
 export const FREE_SPACE_MARK_HALO = 0.6;
+/** 一部編成のフリースペースの輪の太さ */
+export const FREE_SPACE_RING_WIDTH = 0.5;
 
-/** ホーム帯（[0, physicalLength] の実体）の、列車のホーム側の端からの距離と太さ */
+/**
+ * ホーム帯（[0, physicalLength] の実体）の、列車のホーム側の端からの距離と太さ。
+ * 距離は乗車位置の棒の下半分（DOOR_MARK_THICKNESS / 2）より大きくする
+ */
 const PLATFORM_BAR_GAP = 0.6;
 export const PLATFORM_BAR_HEIGHT = 0.3;
 /** 両端ラベル（0m / physicalLength m）の文字サイズ */

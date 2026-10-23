@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { PX_PER_METER, layoutRows, type Bounds, type VerticalLayout } from '../domain/geometry';
+import { DOOR_MARK_OPACITY, PX_PER_METER, layoutRows, type Bounds, type VerticalLayout } from '../domain/geometry';
 import type { ConcoursePlateLayout, FacingTransferLayout } from '../domain/concourseLayout';
 import { doorListGroups, type DoorListGroups } from '../domain/doorList';
 import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
@@ -213,7 +213,7 @@ function FreeSpaceMark({ partial = false }: { partial?: boolean }) {
 function DoorMark() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-      <rect x={2} y={6} width={12} height={4} rx={2} fill="var(--sign-boarding-mark)" fillOpacity={0.55} />
+      <rect x={2} y={6} width={12} height={4} rx={2} fill="var(--sign-boarding-mark)" fillOpacity={DOOR_MARK_OPACITY} />
     </svg>
   );
 }

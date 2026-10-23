@@ -1,3 +1,5 @@
+import type { CarPosition } from './doorOrder';
+
 // 号車の外形。見本（ADR-0017 の Platform.dc.html）に合わせ、号車は角を丸めた矩形にし、
 // 編成の外側の端だけを大きく丸める（先頭のノーズの多角形はやめた。Issue #174）。
 
@@ -17,9 +19,7 @@ export type CornerRadii = { left: number; right: number };
  * 外側の端は号車の番号ではなく、ホーム上の左右（startMeters）で決める。
  * 同じホームに号車の並びが逆の列車が来るので、1号車がいつも左にあるとは限らない（ADR-0022）。
  */
-export function carCornerRadii(
-  cars: { carNumber: number; startMeters: number; endMeters: number }[],
-): Map<number, CornerRadii> {
+export function carCornerRadii(cars: CarPosition[]): Map<number, CornerRadii> {
   const byX = [...cars].sort((a, b) => a.startMeters - b.startMeters);
   const leftmost = byX[0]?.carNumber;
   const rightmost = byX[byX.length - 1]?.carNumber;
