@@ -12,6 +12,7 @@ import {
   PLATFORM_LABEL_FONT_SIZE,
   TRAIN_ROW_HEIGHT,
   CONCOURSE_TICK_HEIGHT,
+  DOOR_MARK_THICKNESS,
 } from './geometry';
 import type { TrainStopPatternDTO, ConcourseDTO } from './types';
 
@@ -181,8 +182,8 @@ describe('layoutRows', () => {
       trainY: 1,
       facingBandY: 11,
       facingBandHeight: 10,
-      platformBarY: 11.3,
-      platformLabelY: 13.2,
+      platformBarY: 11.6,
+      platformLabelY: 13.4,
       concourseBracketY: null,
       concourseTickStartY: null,
     });
@@ -231,6 +232,18 @@ describe('layoutRows', () => {
 
     expect(platformBarY).toBeGreaterThanOrEqual(trainY + TRAIN_ROW_HEIGHT);
     expect(labelExtent(platformLabelY).top).toBeGreaterThanOrEqual(trainY + TRAIN_ROW_HEIGHT);
+  });
+
+  // ドアの棒は号車のホーム側の縁をまたいで置く。帯がその上に乗ると、棒が帯の目盛りに見える
+  it('ホーム帯がドアの棒に重ならない', () => {
+    const { trainY, platformBarY } = layoutRows();
+    expect(platformBarY).toBeGreaterThanOrEqual(trainY + TRAIN_ROW_HEIGHT + DOOR_MARK_THICKNESS / 2);
+  });
+
+  it('両端ラベルが設備の札に重ならない', () => {
+    const { facilityY, platformLabelY } = layoutRows();
+    const tileTop = facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
+    expect(labelExtent(platformLabelY).bottom).toBeLessThanOrEqual(tileTop);
   });
 
   // 文字の張り出しぶんまではフォント依存で厳密に保証できないため、
