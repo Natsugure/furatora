@@ -3,6 +3,7 @@
 export * from './types';
 export * from './geometry';
 export * from './lanes';
+export * from './carShape';
 export * from './consist';
 export * from './doorList';
 export * from './doorOrder';

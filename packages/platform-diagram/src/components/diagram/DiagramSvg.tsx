@@ -1,16 +1,23 @@
 import type { FacilityTypeCode } from '@furatora/database/enums';
 import {
   CONCOURSE_TICK_HEIGHT,
+  DOOR_MARK_LENGTH,
+  DOOR_MARK_OPACITY,
+  DOOR_MARK_THICKNESS,
   FACILITY_ICON_PITCH,
   FACILITY_ICON_SIZE,
   FACILITY_ROW_HEIGHT,
+  FREE_SPACE_MARK_HALO,
+  FREE_SPACE_MARK_RADIUS,
+  FREE_SPACE_RING_WIDTH,
   PLATFORM_BAR_HEIGHT,
   PLATFORM_LABEL_FONT_SIZE,
   TRAIN_ROW_HEIGHT,
   type VerticalLayout,
 } from '../../domain/geometry';
 import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/concourseLayout';
-import { doorCentersX, freeSpaceMarks } from '../../domain/consist';
+import { carCornerRadii, roundedBarPath } from '../../domain/carShape';
+import { doorMarks } from '../../domain/consist';
 import { isDoorOrderReversed } from '../../domain/doorOrder';
 import type { ConcourseDTO, StopPatternCarDTO } from '../../domain/types';
 
@@ -32,13 +39,21 @@ const FACILITY_ICON_FILES: Record<FacilityTypeCode, string> = {
   wheelchairEscalator: 'wheelchair_escalator.png',
 };
 
-const NOSE_INSET_RATIO = 0.15;
-/** 号車どうしの間に空ける隙間（片側）。境目をはっきりさせる */
-const CAR_INSET = 0.4;
-const CAR_CORNER_RADIUS = 0.6;
-/** 乗車位置目標の三角形の幅 */
-const BOARDING_MARK_WIDTH = 1.6;
-const BOARDING_MARK_HEIGHT = 1.1;
+/** 号車どうしの間に空ける隙間（片側）。境目をはっきりさせる。見本の 6px */
+const CAR_INSET = 0.6;
+/** 号車番号の札（見本の 28px 四方・角 9px・文字 15px） */
+const CAR_NUMBER_TAG_SIZE = 5;
+const CAR_NUMBER_TAG_RADIUS = 1.6;
+const CAR_NUMBER_FONT_SIZE = 3;
+/**
+ * 号車番号の札の中心を、列車の帯の中央より奥へずらす量。
+ * ドアが奇数枚の号車では真ん中のドアが号車の中央に来るので、
+ * 中央に置くとホーム側の縁のフリースペースの丸と重なる
+ */
+const CAR_NUMBER_TAG_SHIFT = 1.5;
+/** 設備のアイコンを札の中で描く大きさ（見本は 32px の札に 22px のアイコン） */
+const FACILITY_ICON_INNER_SIZE = FACILITY_ICON_SIZE * 0.7;
+const FACILITY_TILE_RADIUS = 1.6;
 
 type Props = {
   cars: StopPatternCarDTO[];
@@ -65,9 +80,8 @@ export function DiagramSvg({
   iconBasePath = '/icons',
 }: Props) {
   const reversed = isDoorOrderReversed(cars);
-  const leadingCar = cars.find((c) => c.carNumber === 1) ?? cars[0];
-  const trailingCar = cars.length > 1 ? cars[cars.length - 1] : undefined;
   const cells = concourses.flatMap((c) => c.cells.map((cell) => ({ ...cell, concourseId: c.id })));
+  const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
 
   return (
     <svg
@@ -113,9 +127,8 @@ export function DiagramSvg({
         {physicalLength}m
       </text>
 
-      <CarRow cars={cars} leadingCar={leadingCar} trailingCar={trailingCar} reversed={reversed} trainY={rows.trainY} />
-      <BoardingMarks cars={cars} reversed={reversed} rows={rows} />
-      <FreeSpaceBadges cars={cars} reversed={reversed} rows={rows} />
+      <CarRow cars={cars} trainY={rows.trainY} />
+      <DoorMarks cars={cars} reversed={reversed} rows={rows} />
 
       {/* 設備アクセス点（xPositionMeters が非nullのcellのみ。
           コンコース全体のものは座標が無いのでSVG外のリストに委ねる） */}
@@ -126,16 +139,28 @@ export function DiagramSvg({
             const x = cell.xPositionMeters! + (fIdx - (cell.facilities.length - 1) / 2) * FACILITY_ICON_PITCH;
             const iconFile = facility.typeCode !== null ? FACILITY_ICON_FILES[facility.typeCode] : undefined;
             return iconFile ? (
-              <image
-                key={`${cell.concourseId}-${idx}-${fIdx}`}
-                href={`${iconBasePath}/${iconFile}`}
-                x={x - FACILITY_ICON_SIZE / 2}
-                y={rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2}
-                width={FACILITY_ICON_SIZE}
-                height={FACILITY_ICON_SIZE}
-              >
-                <title>{facility.typeName}</title>
-              </image>
+              // 白い札に載せる（見本）。札の大きさは FACILITY_ICON_SIZE のままなので、描画範囲の算出は変わらない
+              <g key={`${cell.concourseId}-${idx}-${fIdx}`}>
+                <rect
+                  x={x - FACILITY_ICON_SIZE / 2}
+                  y={tileY}
+                  width={FACILITY_ICON_SIZE}
+                  height={FACILITY_ICON_SIZE}
+                  rx={FACILITY_TILE_RADIUS}
+                  fill="var(--color-bg-card)"
+                  stroke="var(--color-border-default)"
+                  strokeWidth={0.3}
+                />
+                <image
+                  href={`${iconBasePath}/${iconFile}`}
+                  x={x - FACILITY_ICON_INNER_SIZE / 2}
+                  y={tileY + (FACILITY_ICON_SIZE - FACILITY_ICON_INNER_SIZE) / 2}
+                  width={FACILITY_ICON_INNER_SIZE}
+                  height={FACILITY_ICON_INNER_SIZE}
+                >
+                  <title>{facility.typeName}</title>
+                </image>
+              </g>
             ) : (
               <text
                 key={`${cell.concourseId}-${idx}-${fIdx}`}
@@ -156,81 +181,50 @@ export function DiagramSvg({
   );
 }
 
-function leadingCarPolygon(startMeters: number, endMeters: number, y: number, noseOnRight: boolean): string {
-  const width = endMeters - startMeters;
-  const inset = width * NOSE_INSET_RATIO;
-  const bottom = y + TRAIN_ROW_HEIGHT;
-  const mid = y + TRAIN_ROW_HEIGHT / 2;
-
-  return noseOnRight
-    ? `${startMeters},${y} ${endMeters - inset},${y} ${endMeters},${mid} ${endMeters - inset},${bottom} ${startMeters},${bottom}`
-    : `${startMeters + inset},${y} ${endMeters},${y} ${endMeters},${bottom} ${startMeters + inset},${bottom} ${startMeters},${mid}`;
-}
-
 /**
- * 号車。1両ずつ独立した角丸矩形として描き、間に隙間を空けて境目を示す。
+ * 号車。1両ずつ独立した角丸の矩形として描き、間に隙間を空けて境目を示す。
+ * 編成の外側の端だけ大きく丸める（carCornerRadii()）。
  *
  * 編成全体を1つの外枠で囲まないのは、号車が座標上で連続している保証が
  * データに無いため（管理画面の手入力）。隙間方式なら非連続でも破綻しない。
  */
-function CarRow({
-  cars,
-  leadingCar,
-  trailingCar,
-  reversed,
-  trainY,
-}: {
-  cars: StopPatternCarDTO[];
-  leadingCar: StopPatternCarDTO | undefined;
-  trailingCar: StopPatternCarDTO | undefined;
-  reversed: boolean;
-  trainY: number;
-}) {
+function CarRow({ cars, trainY }: { cars: StopPatternCarDTO[]; trainY: number }) {
+  const radii = carCornerRadii(cars);
+  const tagCenterY = trainY + TRAIN_ROW_HEIGHT / 2 - CAR_NUMBER_TAG_SHIFT;
+
   return (
     <>
       {cars.map((car) => {
         const start = car.startMeters + CAR_INSET;
         const end = car.endMeters - CAR_INSET;
-        const isLeading = leadingCar !== undefined && car.carNumber === leadingCar.carNumber;
-        const isTrailing = trailingCar !== undefined && car.carNumber === trailingCar.carNumber;
-        // 1号車が右端にあるなら、先頭のノーズは外向き（右）に出る
-        const noseOnRight = isLeading ? reversed : !reversed;
+        const centerX = (car.startMeters + car.endMeters) / 2;
 
         return (
           <g key={car.carNumber}>
-            {isLeading || isTrailing ? (
-              <polygon
-                points={leadingCarPolygon(start, end, trainY, noseOnRight)}
-                fill="var(--color-train-car-bg)"
-                stroke="var(--color-train-car-border)"
-                strokeWidth={0.2}
-              />
-            ) : (
-              <rect
-                x={start}
-                y={trainY}
-                width={end - start}
-                height={TRAIN_ROW_HEIGHT}
-                rx={CAR_CORNER_RADIUS}
-                fill="var(--color-train-car-bg)"
-                stroke="var(--color-train-car-border)"
-                strokeWidth={0.2}
-              />
-            )}
+            <path
+              d={roundedBarPath(
+                { x: start, y: trainY, width: end - start, height: TRAIN_ROW_HEIGHT },
+                radii.get(car.carNumber)!,
+              )}
+              fill="var(--color-train-car-bg)"
+              stroke="var(--color-train-car-border)"
+              strokeWidth={0.2}
+            />
 
-            {/* 号車番号。車体が一様な色になったぶん、白バッジで浮かせる */}
+            {/* 号車番号の札。車体が一様な色なので、白い札で浮かせる */}
             <rect
-              x={(car.startMeters + car.endMeters) / 2 - 1.8}
-              y={trainY + TRAIN_ROW_HEIGHT / 2 - 1.8}
-              width={3.6}
-              height={3.6}
-              rx={0.9}
+              x={centerX - CAR_NUMBER_TAG_SIZE / 2}
+              y={tagCenterY - CAR_NUMBER_TAG_SIZE / 2}
+              width={CAR_NUMBER_TAG_SIZE}
+              height={CAR_NUMBER_TAG_SIZE}
+              rx={CAR_NUMBER_TAG_RADIUS}
               fill="var(--color-car-number-bg)"
             />
             <text
-              x={(car.startMeters + car.endMeters) / 2}
-              y={trainY + TRAIN_ROW_HEIGHT / 2 + 0.8}
-              fontSize={2.4}
+              x={centerX}
+              y={tagCenterY}
+              dominantBaseline="central"
+              fontSize={CAR_NUMBER_FONT_SIZE}
               fontWeight="bold"
               textAnchor="middle"
               fill="var(--color-text-primary)"
@@ -246,13 +240,16 @@ function CarRow({
 }
 
 /**
- * 乗車位置目標。ホーム帯の外側に、実際のドア座標に合わせて打つ。
+ * ドアの印。どのドアも号車のホーム側の縁をまたいで置く（見本）。
  *
- * フリースペースのあるドアだけ色を付けて印を強くする。
- * 号車を色で塗り分けるのをやめたのは、号車の境目を潰すうえ、
- * 凡例を読まないと何の色か分からなかったため。「ここに立て」を直接示すほうが早い。
+ * - フリースペースの無いドア: 乗車位置の棒
+ * - 全編成のフリースペース: ローズの丸（白い縁で号車の縁から浮かせる）
+ * - 一部編成のフリースペース: ローズの輪。全編成と色ではなく形で分ける（色だけで意味を伝えない。ADR-0018）
+ *
+ * 号車を色で塗り分けないのは、号車の境目を潰すうえ、凡例を読まないと何の色か分からないため。
+ * 「ここに立て」をドアの位置に直接示すほうが早い。
  */
-function BoardingMarks({
+function DoorMarks({
   cars,
   reversed,
   rows,
@@ -261,104 +258,54 @@ function BoardingMarks({
   reversed: boolean;
   rows: VerticalLayout;
 }) {
-  // ホーム帯の下の面（列車から見て外側）にマークを載せる
-  const baseY = rows.platformBarY + PLATFORM_BAR_HEIGHT;
-  const tipY = baseY + BOARDING_MARK_HEIGHT;
-
-  const triangle = (x: number) =>
-    `${x - BOARDING_MARK_WIDTH / 2},${baseY} ${x + BOARDING_MARK_WIDTH / 2},${baseY} ${x},${tipY}`;
+  const edgeY = rows.trainY + TRAIN_ROW_HEIGHT;
 
   return (
     <>
       {cars.map((car) => {
-        const free = freeSpaceMarks(car, reversed);
-        const freeByX = new Map(free.map((mark) => [mark.x, mark.isStandard]));
+        const { boardingXs, freeSpaces } = doorMarks(car, reversed);
 
         return (
           <g key={car.carNumber}>
-            {doorCentersX(car).map((x) => {
-              const isStandard = freeByX.get(x);
-              const isFree = isStandard !== undefined;
-              return (
-                <polygon
-                  key={x}
-                  points={triangle(x)}
-                  fill={
-                    !isFree
-                      ? 'var(--sign-boarding-mark)'
-                      : isStandard
-                        ? 'var(--color-free-standard)'
-                        : 'var(--color-free-nonstandard)'
-                  }
-                  fillOpacity={isFree ? 1 : 0.55}
-                />
-              );
-            })}
+            {boardingXs.map((x) => (
+              <rect
+                key={x}
+                x={x - DOOR_MARK_LENGTH / 2}
+                y={edgeY - DOOR_MARK_THICKNESS / 2}
+                width={DOOR_MARK_LENGTH}
+                height={DOOR_MARK_THICKNESS}
+                rx={DOOR_MARK_THICKNESS / 2}
+                fill="var(--sign-boarding-mark)"
+                fillOpacity={DOOR_MARK_OPACITY}
+              />
+            ))}
+            {freeSpaces.map((mark) => (
+              <g key={mark.doorNumber}>
+                <circle cx={mark.x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS + FREE_SPACE_MARK_HALO} fill="var(--color-bg-card)" />
+                {mark.isStandard ? (
+                  <circle cx={mark.x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS} fill="var(--color-free-standard)" />
+                ) : (
+                  // 輪は線の太さの半分だけ内側に描き、外径を丸と揃える。中は下の白い縁の円が埋める
+                  <circle
+                    cx={mark.x}
+                    cy={edgeY}
+                    r={FREE_SPACE_MARK_RADIUS - FREE_SPACE_RING_WIDTH / 2}
+                    fill="none"
+                    stroke="var(--color-free-standard)"
+                    strokeWidth={FREE_SPACE_RING_WIDTH}
+                  />
+                )}
+                {/* <title> の子は文字列1つにする。React のサーバー描画は子が複数あると中身を出力せず、
+                    ハイドレーションが不一致になる（Issue #143） */}
+                <title>
+                  {`${car.carNumber}号車 ${mark.doorNumber}番ドア付近のフリースペース${mark.isStandard ? '（全編成）' : '（一部編成）'}`}
+                </title>
+              </g>
+            ))}
           </g>
         );
       })}
     </>
-  );
-}
-
-/**
- * フリースペースの記号を、そのドアの真上（号車の中、ホーム側の縁）に置く。
- *
- * 設備アイコン行に置くと、エレベーターや階段のアイコンと重なって両方読めなくなる。
- * 号車の中なら、どの号車のどのドアかが一目で結びつく。
- */
-function FreeSpaceBadges({
-  cars,
-  reversed,
-  rows,
-}: {
-  cars: StopPatternCarDTO[];
-  reversed: boolean;
-  rows: VerticalLayout;
-}) {
-  const cy = rows.trainY + TRAIN_ROW_HEIGHT - 2.4;
-
-  return (
-    <>
-      {cars.flatMap((car) =>
-        freeSpaceMarks(car, reversed).map((mark) => {
-          const color = mark.isStandard
-            ? 'var(--color-free-standard)'
-            : 'var(--color-free-nonstandard)';
-          const ink = mark.isStandard
-            ? 'var(--color-free-standard-text)'
-            : 'var(--color-free-nonstandard-text)';
-
-          return (
-            <g key={`${car.carNumber}-${mark.doorNumber}`}>
-              <circle cx={mark.x} cy={cy} r={1.9} fill={color} />
-              <FreeSpaceGlyph x={mark.x} y={cy} color={ink} />
-              {/* <title> の子は文字列1つにする。React のサーバー描画は子が複数あると中身を出力せず、
-                  ハイドレーションが不一致になる（Issue #143） */}
-              <title>
-                {`${car.carNumber}号車 ${mark.doorNumber}番ドア付近のフリースペース${mark.isStandard ? '（全編成）' : '（一部編成）'}`}
-              </title>
-            </g>
-          );
-        }),
-      )}
-    </>
-  );
-}
-
-/**
- * フリースペースの記号。
- *
- * public/icons/ に専用のアイコンが無く、wheelchair.png は「段差なし」で
- * 使用済みなので流用すると意味が衝突する。ベクタで小さく描き起こす
- * （5px/m では画像を置いても潰れる）。
- */
-function FreeSpaceGlyph({ x, y, color }: { x: number; y: number; color: string }) {
-  return (
-    <g transform={`translate(${x - 1.2}, ${y - 1.2}) scale(0.1)`} fill={color} aria-hidden>
-      <circle cx={9} cy={4} r={3} />
-      <path d="M6 8 h6 a2 2 0 0 1 2 2 v6 h-3 v6 h-4 v-6 h-3 v-6 a2 2 0 0 1 2 -2 z" />
-    </g>
   );
 }
 

@@ -100,13 +100,31 @@ export const FACILITY_ROW_HEIGHT = 8;
 export const GAP_Y = 2;
 export const TRAIN_ROW_HEIGHT = 10;
 
-/** ホーム帯（[0, physicalLength] の実体）の、列車のホーム側の端からの距離と太さ */
-const PLATFORM_BAR_GAP = 0.3;
-export const PLATFORM_BAR_HEIGHT = 0.6;
+// ---- ドアの印 ----
+// どれも号車のホーム側の縁（列車行の下端）をまたいで置く。見本（ADR-0017 の Platform.dc.html）の
+// px を 5px/m で割った値。
+
+/** 乗車位置の棒の、ホームに沿う長さと太さ */
+export const DOOR_MARK_LENGTH = 2.4;
+export const DOOR_MARK_THICKNESS = 0.8;
+/** 乗車位置の棒の不透明度。図と凡例で同じ濃さにする */
+export const DOOR_MARK_OPACITY = 0.55;
+/** フリースペースの丸の半径と、その周りの白い縁の太さ */
+export const FREE_SPACE_MARK_RADIUS = 1.6;
+export const FREE_SPACE_MARK_HALO = 0.6;
+/** 一部編成のフリースペースの輪の太さ */
+export const FREE_SPACE_RING_WIDTH = 0.5;
+
+/**
+ * ホーム帯（[0, physicalLength] の実体）の、列車のホーム側の端からの距離と太さ。
+ * 距離は乗車位置の棒の下半分（DOOR_MARK_THICKNESS / 2）より大きくする
+ */
+const PLATFORM_BAR_GAP = 0.6;
+export const PLATFORM_BAR_HEIGHT = 0.3;
 /** 両端ラベル（0m / physicalLength m）の文字サイズ */
 export const PLATFORM_LABEL_FONT_SIZE = 1.6;
 // text の y はベースラインなので、ラベルをホーム帯の下に置くには文字の上端ぶんだけ余分に離す
-const PLATFORM_LABEL_GAP = 2.2;
+const PLATFORM_LABEL_GAP = 2.4;
 
 // ---- コンコース束ね線 ----
 // 設備行のさらに外側（列車から遠い側）に、コンコース単位のアクセス点を束ねる線を引く。

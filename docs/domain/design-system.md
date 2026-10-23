@@ -4,6 +4,7 @@
   Admin（`apps/admin`）は、ホーム図の色だけが従う。Admin の画面そのものと、ダークモードは対象外
 - **決定の根拠**: [ADR-0017](../adr/0017-soft-rose-palette-and-typography.md)（配色・書体・形）、
   [ADR-0018](../adr/0018-semantic-colors-for-facilities.md)（設備・状態の意味色）、
+  [ADR-0024](../adr/0024-free-space-ring-and-transfer-plate-edge.md)（フリースペースの輪・乗換のプレートの枠）、
   [ADR-0019](../adr/0019-app-icon-train-on-flat-line.md)（アプリアイコン）
 - **決定時点の見本**: [`docs/adr/assets/0017/`](../adr/assets/0017/README.md)（書き換えない。いまの値はこの文書とコードを見る）
 
@@ -46,7 +47,7 @@ Web は `styles.css` を `globals.css` より前に読む。同じ名前のト�
 
 | 意味 | Tailwind のクラス名 | 記号・形 |
 |---|---|---|
-| フリースペース | `brand-*`（一部編成は 300 の地に 800 の記号） | ホーム図の丸 |
+| フリースペース | `brand-*`（ホーム図の印は 500 だけ） | ホーム図では全編成が丸、一部編成が輪（色ではなく形で分ける。ADR-0024） |
 | 優先席 | `priority-50` / `200` / `500` / `700` | ホーム図では四角（赤い路線色と形で分ける） |
 | 出口 | `exit-100` / `300` / `700` / `900` | プレートの地は 300、文字は 900、輪郭は 700 |
 | ベビーカー | `brand-*` | |

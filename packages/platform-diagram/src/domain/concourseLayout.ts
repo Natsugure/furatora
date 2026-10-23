@@ -12,7 +12,7 @@ import { assignLanes, laneCount } from './lanes';
 import { routeLeaders, type LeaderRoute } from './leaderRoute';
 import type { ConcourseDTO } from './types';
 
-// 出口・乗換プレートと対面乗換バナーを、ホーム座標系のどこに置くかを決める。
+// 出口・乗換プレートと対面乗換の札を、ホーム座標系のどこに置くかを決める。
 //
 // プレートの中身は SVG ではなく HTML なので、**文字を切り詰めない**。
 // ここが決めるのはアンカー位置と段の割り当てだけで、実際の幅と高さは
@@ -269,7 +269,7 @@ export function transferNote(transfer: TransferEntry): string | null {
 }
 
 /**
- * 対面乗換バナーの配置を決める（純関数）。
+ * 対面乗換の札の配置を決める（純関数）。型の名前（FacingTransferBanner）は図の上のバナーだったころのまま。
  *
  * 座標範囲の両端が揃っている接続だけが対象。片方でも欠けていれば
  * ホーム上のどこを指すか決まらないので、図には出さずテキストに委ねる。

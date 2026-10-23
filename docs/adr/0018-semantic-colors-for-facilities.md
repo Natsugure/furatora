@@ -1,6 +1,6 @@
 # ADR-0018: フリースペース・優先席・出口・移動手段・状態の意味色を決め、出口を駅サインの黄からバター色に変える
 
-- **ステータス**: Accepted
+- **ステータス**: Accepted（決定1 のフリースペースの一部編成と、乗換のプレートの枠は [ADR-0024](./0024-free-space-ring-and-transfer-plate-edge.md) で置き換え）
 - **日付**: 2026-10-18
 - **決定者**: @Natsugure
 - **関連**: [ADR-0017](./0017-soft-rose-palette-and-typography.md)（配色の土台）,
