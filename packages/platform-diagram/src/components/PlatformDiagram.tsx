@@ -6,13 +6,14 @@ import type { ConcourseDTO, TrainStopPatternDTO } from '../domain/types';
 import { DoorTileList } from './DoorTileList';
 import { DiagramSvg } from './diagram/DiagramSvg';
 import { ConcoursePlateRow } from './overlay/ConcoursePlateRow';
-import { FacingTransferBannerRow } from './overlay/FacingTransferBannerRow';
+import { FacingTransferTagRow } from './overlay/FacingTransferTagRow';
 
 // 停車位置パターン1件ぶんのカード。
 //
 // 図は「SVGの幾何」と「HTMLのオーバーレイ2枚」の3層でできており、
 // 3層すべてが同じキャンバス（幅 = 描画範囲 × PX_PER_METER）の上に乗る。
-// 線路に向かって立った見え方で描くので、上から 対面乗換バナー → SVG → 出口・乗換プレート の順に固定である（ADR-0022）。
+// 線路に向かって立った見え方で描くので、上から SVG → 出口・乗換プレート → 対面乗換の札 の順に固定である（ADR-0022）。
+// 札をプレートの外側に置くのは、引き出し線を持たない札をプレートの引き出し線の迂回に関わらせないため。
 // 層をまたぐxの対応は xFraction() の割合で取るので、キャンバスが
 // コンテナ幅まで伸びても対応は崩れない。docs/adr/0006 参照。
 
@@ -23,7 +24,7 @@ type Props = {
   bounds: Bounds;
   /** 出口・乗換プレートの配置。ホーム単位で決まるので PlatformDisplay で算出する */
   plateLayout: ConcoursePlateLayout;
-  /** 対面乗換バナーの配置。同上 */
+  /** 対面乗換の札の配置。同上 */
   facingLayout: FacingTransferLayout;
   /** 設備アイコンPNGの配信元パス。DiagramSvg にそのまま渡す（既定 '/icons'） */
   iconBasePath?: string;
@@ -73,11 +74,6 @@ export function PlatformDiagram({
             伸びて余白を埋め、狭いときは横スクロールになる。伸縮しても各層は
             割合で位置を決めているのでxがずれない */}
         <div className="flex flex-col" style={{ minWidth: width * PX_PER_METER }}>
-          <FacingTransferBannerRow
-            banners={facingLayout.banners}
-            laneCount={facingLayout.laneCount}
-            bounds={bounds}
-          />
           {/* relative 以外のクラスを足さないこと。h-full やgridのstretchを与えると
               SVGの要素ボックスがviewBoxのアスペクト比から外れ、内部の絶対配置オーバーレイの
               y座標が実測pxとずれる（x はxFractionの割合なので影響しない）。 */}
@@ -100,6 +96,11 @@ export function PlatformDiagram({
             laneCount={plateLayout.laneCount}
             bounds={bounds}
           />
+          <FacingTransferTagRow
+            banners={facingLayout.banners}
+            laneCount={facingLayout.laneCount}
+            bounds={bounds}
+          />
         </div>
       </div>
 
@@ -109,28 +110,28 @@ export function PlatformDiagram({
         style={{ borderTop: '1px solid var(--color-border-default)', color: 'var(--color-text-secondary)' }}
       >
         <div className="flex items-center gap-1.5">
-          <Triangle color="var(--color-free-standard)" />
+          <FreeSpaceMark />
           <span>フリースペース</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Triangle color="var(--color-free-nonstandard)" />
-          <span>(一部編成)</span>
+          <FreeSpaceMark partial />
+          <span>フリースペース（一部編成）</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Triangle color="var(--sign-boarding-mark)" opacity={0.55} />
-          <span>乗車位置</span>
+          <DoorMark />
+          <span>乗車位置（ドア）</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span
-            className="inline-block h-4 w-4 flex-shrink-0 rounded-sm"
+            className="inline-block h-4 w-4 flex-shrink-0 rounded"
             style={{ backgroundColor: 'var(--sign-exit-bg)', border: '1px solid var(--sign-exit-edge)' }}
           />
           <span>出口</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span
-            className="inline-block h-4 w-4 flex-shrink-0 rounded-sm"
-            style={{ backgroundColor: 'var(--sign-transfer-bg)', border: '2px solid var(--sign-transfer-edge)' }}
+            className="inline-block h-4 w-4 flex-shrink-0 rounded"
+            style={{ backgroundColor: 'var(--sign-transfer-bg)', border: '1.5px solid var(--sign-transfer-edge)' }}
           />
           <span>乗換</span>
         </div>
@@ -148,8 +149,8 @@ export function PlatformDiagram({
         title="フリースペース"
         groups={freeSpace}
         markers={{
-          standard: <Triangle color="var(--color-free-standard)" />,
-          partial: <Triangle color="var(--color-free-nonstandard)" />,
+          standard: <FreeSpaceMark />,
+          partial: <FreeSpaceMark partial />,
         }}
         tileBg="var(--card-transfer-bg)"
         tileInk="var(--card-transfer-heading)"
@@ -195,11 +196,24 @@ function DoorCategoryLists({
   );
 }
 
-// 凡例と一覧の見出しの頭に出す三角。図のフリースペース・乗車位置の印と同じ形
-function Triangle({ color, opacity }: { color: string; opacity?: number }) {
+// 凡例と一覧の見出しの頭に出す印。図のフリースペースの印と同じ形（全編成は丸、一部編成は輪）
+function FreeSpaceMark({ partial = false }: { partial?: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
-      <polygon points="4,11 12,11 8,5" fill={color} fillOpacity={opacity} />
+      {partial ? (
+        <circle cx={8} cy={8} r={5.75} fill="none" stroke="var(--color-free-standard)" strokeWidth={2.5} />
+      ) : (
+        <circle cx={8} cy={8} r={7} fill="var(--color-free-standard)" />
+      )}
+    </svg>
+  );
+}
+
+// 凡例の乗車位置。図のドアの棒と同じ色と透過
+function DoorMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="flex-shrink-0">
+      <rect x={2} y={6} width={12} height={4} rx={2} fill="var(--sign-boarding-mark)" fillOpacity={0.55} />
     </svg>
   );
 }

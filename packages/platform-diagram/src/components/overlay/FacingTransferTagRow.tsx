@@ -2,10 +2,12 @@ import type { CSSProperties } from 'react';
 import type { FacingTransferBanner } from '../../domain/concourseLayout';
 import { xFraction, type Bounds } from '../../domain/geometry';
 
-// 対面乗換のバナー。「向かい側に到着する」ことは帯を塗るだけでは伝わらないので、
-// 文章として図の中に出す（東京メトロのホーム案内と同じ扱い）。
+// 対面乗換の札。「向かい側に到着する」ことは帯を塗るだけでは伝わらないので、
+// 文章として図に添える（東京メトロのホーム案内と同じ扱い）。
 //
-// バナーの左端は SVG 側のティントの左端と厳密に一致する。
+// 札は出口・乗換のプレートの段のさらに外側（図から遠い側）に置く。札には引き出し線が無いので、
+// プレートの引き出し線の迂回（routeLeaders）に関わらせないためである。
+// 札の左端と最小幅は SVG 側のティントの範囲と厳密に一致する。
 // どちらも xFraction() で同じ割合に落ちるため、引き出し線を引かなくても
 // 「この区間のことだ」が読み取れる。
 
@@ -18,16 +20,16 @@ type Props = {
   bounds: Bounds;
 };
 
-export function FacingTransferBannerRow({ banners, laneCount, bounds }: Props) {
+export function FacingTransferTagRow({ banners, laneCount, bounds }: Props) {
   if (banners.length === 0) return null;
 
-  // バナーは図の上にある（ADR-0022）。lane 0 を最後に描き、図に接するようにする。
-  // 余白は図に向いた下の辺に付ける（プレートの pt-1.5 と対になる）
-  const lanes = Array.from({ length: laneCount }, (_, i) => laneCount - 1 - i);
+  // 札は図の下にある。lane 0 を最初に描き、図（の側のプレート）に近づける。
+  // 余白は図に向いた上の辺に付ける（プレートの pt-1.5 と揃える）
+  const lanes = Array.from({ length: laneCount }, (_, i) => i);
 
   return (
     <div
-      className="flex flex-col gap-1 pb-1.5"
+      className="flex flex-col gap-1 pt-1.5"
       style={{ fontFamily: 'var(--font-sign)' }}
     >
       {lanes.map((lane) => (
@@ -54,7 +56,7 @@ export function FacingTransferBannerRow({ banners, laneCount, bounds }: Props) {
               return (
                 <p
                   key={banner.key}
-                  className="flex items-center gap-1.5 rounded-r-md py-1 pl-2 pr-2.5 text-[12px] font-bold leading-snug"
+                  className="flex items-center gap-1.5 rounded-r-xl py-1.5 pl-2.5 pr-3 text-[12px] font-bold leading-snug"
                   style={style}
                 >
                   <span

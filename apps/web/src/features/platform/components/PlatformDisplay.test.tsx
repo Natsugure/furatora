@@ -37,6 +37,10 @@ function platform(overrides: Partial<PlatformDTO> = {}): PlatformDTO {
 
 const toggle = () => screen.getByRole('button', { name: '2番線' });
 
+function partition<T>(list: T[], predicate: (item: T) => boolean): [T[], T[]] {
+  return [list.filter(predicate), list.filter((item) => !predicate(item))];
+}
+
 describe('PlatformDisplay', () => {
   it('頭に番線・路線・編成・方面を出す', () => {
     render(<PlatformDisplay platform={platform()} />);
@@ -86,6 +90,52 @@ describe('PlatformDisplay', () => {
     expect(screen.queryByText('図はまだありません')).not.toBeInTheDocument();
     expect(screen.getByText('ホーム長が未登録のため図を表示できません')).toBeInTheDocument();
   });
+
+  describe('図', () => {
+    const facingText = '有楽町線（新木場方面）は同じホームの向かい側に到着';
+
+    it('対面乗換の札を、出口・乗換のプレートと同じく図の下に出す', async () => {
+      const concourse = {
+        id: 'c1',
+        exits: null,
+        cells: [],
+        connections: [
+          {
+            lineNames: ['有楽町線'],
+            lineColors: ['#c1a470'],
+            directionName: '新木場',
+            exitLabel: null,
+            xRangeStart: 10,
+            xRangeEnd: 30,
+          },
+        ],
+      };
+      render(<PlatformDisplay platform={platform({ concourses: [concourse] })} />);
+      await userEvent.click(toggle());
+
+      // 図の中にも、帯の <title> として同じ文がある。札はそれとは別の、図の外の要素
+      const [inDiagram, tag] = partition(screen.getAllByText(facingText), (el) => el.closest('svg') !== null);
+      const diagram = inDiagram[0]!.closest('svg')!;
+      expect(tag).toHaveLength(1);
+      expect(diagram.compareDocumentPosition(tag[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('一部編成のフリースペースは、図の中で号車・ドア・一部編成であることを文で示す', async () => {
+      const base = pattern({ trainId: 't1' });
+      const [c1, c2] = base.cars;
+      render(
+        <PlatformDisplay
+          platform={platform({
+            stopPatterns: [{ ...base, cars: [{ ...c1!, freeSpaceDoors: [{ nearDoor: 1, isStandard: false }] }, c2!] }],
+          })}
+        />,
+      );
+      await userEvent.click(toggle());
+
+      expect(screen.getByText('1号車 1番ドア付近のフリースペース（一部編成）')).toBeInTheDocument();
+    });
+  });
+
   describe('図の下の一覧', () => {
     const doors = (...list: [number, boolean][]) => list.map(([nearDoor, isStandard]) => ({ nearDoor, isStandard }));
 
