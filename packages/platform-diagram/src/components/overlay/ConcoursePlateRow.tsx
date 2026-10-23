@@ -162,7 +162,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
 function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeNames: string[] }) {
   return (
     <div
-      className="rounded-md px-2.5 py-1.5 text-[13px] font-bold leading-snug"
+      className="rounded-[14px] px-3 py-2 text-[13px] font-bold leading-snug"
       style={{
         backgroundColor: 'var(--sign-exit-bg)',
         color: 'var(--sign-exit-ink)',
@@ -180,15 +180,15 @@ function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeName
   );
 }
 
-/** 乗換プレート（白地に黒枠）。路線は1件ずつ色チップ付きで縦に並べ、畳まない */
+/** 乗換プレート（白地に濃い灰色の枠）。路線は1件ずつ色チップ付きで縦に並べ、畳まない */
 function TransferPlate({ transfers }: { transfers: TransferEntry[] }) {
   return (
     <div
-      className="rounded-md px-2.5 py-1.5 text-[13px] leading-snug"
+      className="rounded-xl px-3 py-2 text-[13px] leading-snug"
       style={{
         backgroundColor: 'var(--sign-transfer-bg)',
         color: 'var(--sign-transfer-ink)',
-        border: '2px solid var(--sign-transfer-edge)',
+        border: '1.5px solid var(--sign-transfer-edge)',
       }}
     >
       <ul className="flex flex-col gap-1">

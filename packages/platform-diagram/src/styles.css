@@ -2,7 +2,7 @@
    @furatora/platform-diagram — デザイントークン
    ============================================================
    ホーム図（PlatformDiagram / DiagramSvg / ConcoursePlateRow /
-   FacingTransferBannerRow）が使うCSS変数。apps/web の globals.css に
+   FacingTransferTagRow）が使うCSS変数。apps/web の globals.css に
    あった primitive scale（--gray-* 等）には依存しない、解決済みの
    具体値として定義する（ADR-0010）。apps/web と apps/admin の両方の
    layout.tsx が1回だけ import する。
@@ -29,13 +29,9 @@
   --color-train-car-border: #7a6e72;
   --color-car-number-bg: rgba(255, 255, 255, 0.9);
 
-  /* フリースペース。ブランドのローズ（500、一部編成は 300）。ADR-0018 決定1
-     一部編成は 200 だと号車の地（1.26:1）や通常のドアの印と見分けにくいので 300 にする。
-     中の記号は 300 の上で読める 800（5.27:1） */
+  /* フリースペース。ブランドのローズ（500）。ADR-0018 決定1
+     全編成は丸、一部編成は同じ色の輪で描き、色ではなく形で分ける（Issue #174。見本どおり） */
   --color-free-standard: #df5286;
-  --color-free-standard-text: #ffffff;
-  --color-free-nonstandard: #ee9fba;
-  --color-free-nonstandard-text: #6e2140;
 
   /* 駅サイン様式（出口・乗換プレート） */
   /* 出口は駅サインの黄ではなくバター色（300 の地に 900 の文字、7.62:1。ADR-0018 決定3）。
@@ -46,7 +42,9 @@
   --sign-exit-edge: #6b5a0e;
 
   --sign-transfer-bg: #ffffff;
-  --sign-transfer-edge: #111111;
+  /* 乗換の枠は、黒ではローズ基調の画面になじまず、見本の淡い枠（neutral-100）では白地から浮かないので、
+     間を取って neutral-500（白地 4.88:1）にする（Issue #174） */
+  --sign-transfer-edge: #7a6e72;
   /* 乗換プレートの文字は図の見出しと同じ色にする（純黒・純グレーを混ぜない。ADR-0017 決定2） */
   --sign-transfer-ink: var(--color-text-primary);
   --sign-transfer-note: var(--color-text-secondary);
