@@ -65,3 +65,23 @@ export function doorCentersX(
     (_, slot) => car.startMeters + ((slot + 0.5) / car.doorCount) * width,
   );
 }
+
+/**
+ * 号車のドアの印を、乗車位置の棒とフリースペースの印に分ける（純関数）。
+ *
+ * どのドアに棒を描かないかはドア番号で決める。x の一致で決めると、浮動小数の誤差に頼ることになるため。
+ * フリースペースの印は freeSpaceMarks() を全件返す。ドア数を超えるドア番号も落とさない
+ * （管理画面はドア番号の上限を確かめていない。黙って消すと、図の下の一覧と食い違ったうえ誤りにも気づけない）。
+ */
+export function doorMarks(
+  car: Pick<StopPatternCarDTO, 'startMeters' | 'endMeters' | 'doorCount' | 'freeSpaceDoors'>,
+  reversed: boolean,
+): { boardingXs: number[]; freeSpaces: ReturnType<typeof freeSpaceMarks> } {
+  const freeSpaces = freeSpaceMarks(car, reversed);
+  const freeDoorNumbers = new Set(freeSpaces.map((mark) => mark.doorNumber));
+  const boardingXs = doorCentersX(car).filter((_, slot) => {
+    const doorNumber = reversed ? car.doorCount - slot : slot + 1;
+    return !freeDoorNumbers.has(doorNumber);
+  });
+  return { boardingXs, freeSpaces };
+}

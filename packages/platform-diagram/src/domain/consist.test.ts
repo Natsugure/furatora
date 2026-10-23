@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { doorCenterX, doorCentersX, freeSpaceMarks } from './consist';
+import { doorCenterX, doorCentersX, doorMarks, freeSpaceMarks } from './consist';
 import { isDoorOrderReversed } from './doorOrder';
 
 // 20m・4ドアの標準的な号車。スロット幅5m、中心は 2.5 / 7.5 / 12.5 / 17.5
@@ -106,5 +106,40 @@ describe('freeSpaceMarks', () => {
 
   it('フリースペースが無ければ空配列を返す', () => {
     expect(freeSpaceMarks({ ...car, freeSpaceDoors: [] }, false)).toEqual([]);
+  });
+});
+
+describe('doorMarks', () => {
+  it('フリースペースの無いドアに乗車位置の棒を、あるドアに印を置く', () => {
+    const marks = doorMarks({ ...car, freeSpaceDoors: [{ nearDoor: 2, isStandard: true }] }, false);
+
+    expect(marks.boardingXs).toEqual([2.5, 12.5, 17.5]);
+    expect(marks.freeSpaces.map((m) => [m.doorNumber, m.x])).toEqual([[2, 7.5]]);
+  });
+
+  it('反転編成ではドア番号を右から数えて棒を外す', () => {
+    const marks = doorMarks({ ...car, freeSpaceDoors: [{ nearDoor: 1, isStandard: false }] }, true);
+
+    expect(marks.boardingXs).toEqual([2.5, 7.5, 12.5]);
+    expect(marks.freeSpaces.map((m) => [m.doorNumber, m.x, m.isStandard])).toEqual([[1, 17.5, false]]);
+  });
+
+  // 管理画面はドア番号の上限を号車のドア数で確かめていない。黙って消すと、図の下の一覧と食い違ったうえ誤りにも気づけない
+  it('ドア数を超えるドア番号のフリースペースも落とさない', () => {
+    const marks = doorMarks({ ...car, freeSpaceDoors: [{ nearDoor: 5, isStandard: true }] }, false);
+
+    expect(marks.boardingXs).toEqual([2.5, 7.5, 12.5, 17.5]);
+    expect(marks.freeSpaces.map((m) => m.doorNumber)).toEqual([5]);
+  });
+
+  // 号車の幅が 3 で割り切れないと、ドアの中心は浮動小数になる。x の一致で対応を取らないことを確かめる
+  it('割り切れない幅の号車でも、フリースペースのドアに棒を重ねない', () => {
+    const marks = doorMarks(
+      { startMeters: 0.1, endMeters: 19.9, doorCount: 3, freeSpaceDoors: [{ nearDoor: 2, isStandard: true }] },
+      true,
+    );
+
+    expect(marks.boardingXs).toHaveLength(2);
+    expect(marks.freeSpaces).toHaveLength(1);
   });
 });

@@ -38,12 +38,16 @@ export function carCornerRadii(cars: CarPosition[]): Map<number, CornerRadii> {
 /**
  * 左右で丸めの違う角丸の矩形を、SVG の path で描く。
  * `<rect rx>` は4つの角を同じにしか丸められないため。丸めは幅と高さの半分を超えない。
+ *
+ * 幅が 0 以下なら空文字を返し、何も描かない（`<rect>` と同じ）。管理画面では号車を詰められるので、
+ * 号車どうしの隙間を引くと幅が負になりうる。SVG は弧の半径を絶対値で扱うため、そのまま描くと形が崩れる。
  */
 export function roundedBarPath(
   box: { x: number; y: number; width: number; height: number },
   radii: CornerRadii,
 ): string {
   const { x, y, width, height } = box;
+  if (width <= 0) return '';
   const limit = Math.min(width, height) / 2;
   const l = Math.min(radii.left, limit);
   const r = Math.min(radii.right, limit);

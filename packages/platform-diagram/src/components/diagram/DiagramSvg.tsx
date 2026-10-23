@@ -17,7 +17,7 @@ import {
 } from '../../domain/geometry';
 import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/concourseLayout';
 import { carCornerRadii, roundedBarPath } from '../../domain/carShape';
-import { doorCentersX, freeSpaceMarks } from '../../domain/consist';
+import { doorMarks } from '../../domain/consist';
 import { isDoorOrderReversed } from '../../domain/doorOrder';
 import type { ConcourseDTO, StopPatternCarDTO } from '../../domain/types';
 
@@ -263,50 +263,45 @@ function DoorMarks({
   return (
     <>
       {cars.map((car) => {
-        const free = new Map(freeSpaceMarks(car, reversed).map((mark) => [mark.x, mark]));
+        const { boardingXs, freeSpaces } = doorMarks(car, reversed);
 
         return (
           <g key={car.carNumber}>
-            {doorCentersX(car).map((x) => {
-              const mark = free.get(x);
-              if (mark === undefined) {
-                return (
-                  <rect
-                    key={x}
-                    x={x - DOOR_MARK_LENGTH / 2}
-                    y={edgeY - DOOR_MARK_THICKNESS / 2}
-                    width={DOOR_MARK_LENGTH}
-                    height={DOOR_MARK_THICKNESS}
-                    rx={DOOR_MARK_THICKNESS / 2}
-                    fill="var(--sign-boarding-mark)"
-                    fillOpacity={DOOR_MARK_OPACITY}
+            {boardingXs.map((x) => (
+              <rect
+                key={x}
+                x={x - DOOR_MARK_LENGTH / 2}
+                y={edgeY - DOOR_MARK_THICKNESS / 2}
+                width={DOOR_MARK_LENGTH}
+                height={DOOR_MARK_THICKNESS}
+                rx={DOOR_MARK_THICKNESS / 2}
+                fill="var(--sign-boarding-mark)"
+                fillOpacity={DOOR_MARK_OPACITY}
+              />
+            ))}
+            {freeSpaces.map((mark) => (
+              <g key={mark.doorNumber}>
+                <circle cx={mark.x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS + FREE_SPACE_MARK_HALO} fill="var(--color-bg-card)" />
+                {mark.isStandard ? (
+                  <circle cx={mark.x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS} fill="var(--color-free-standard)" />
+                ) : (
+                  // 輪は線の太さの半分だけ内側に描き、外径を丸と揃える。中は下の白い縁の円が埋める
+                  <circle
+                    cx={mark.x}
+                    cy={edgeY}
+                    r={FREE_SPACE_MARK_RADIUS - FREE_SPACE_RING_WIDTH / 2}
+                    fill="none"
+                    stroke="var(--color-free-standard)"
+                    strokeWidth={FREE_SPACE_RING_WIDTH}
                   />
-                );
-              }
-              return (
-                <g key={x}>
-                  <circle cx={x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS + FREE_SPACE_MARK_HALO} fill="var(--color-bg-card)" />
-                  {mark.isStandard ? (
-                    <circle cx={x} cy={edgeY} r={FREE_SPACE_MARK_RADIUS} fill="var(--color-free-standard)" />
-                  ) : (
-                    // 輪は線の太さの半分だけ内側に描き、外径を丸と揃える。中は下の白い縁の円が埋める
-                    <circle
-                      cx={x}
-                      cy={edgeY}
-                      r={FREE_SPACE_MARK_RADIUS - FREE_SPACE_RING_WIDTH / 2}
-                      fill="none"
-                      stroke="var(--color-free-standard)"
-                      strokeWidth={FREE_SPACE_RING_WIDTH}
-                    />
-                  )}
-                  {/* <title> の子は文字列1つにする。React のサーバー描画は子が複数あると中身を出力せず、
-                      ハイドレーションが不一致になる（Issue #143） */}
-                  <title>
-                    {`${car.carNumber}号車 ${mark.doorNumber}番ドア付近のフリースペース${mark.isStandard ? '（全編成）' : '（一部編成）'}`}
-                  </title>
-                </g>
-              );
-            })}
+                )}
+                {/* <title> の子は文字列1つにする。React のサーバー描画は子が複数あると中身を出力せず、
+                    ハイドレーションが不一致になる（Issue #143） */}
+                <title>
+                  {`${car.carNumber}号車 ${mark.doorNumber}番ドア付近のフリースペース${mark.isStandard ? '（全編成）' : '（一部編成）'}`}
+                </title>
+              </g>
+            ))}
           </g>
         );
       })}
