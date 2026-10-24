@@ -17,7 +17,6 @@ apps/web/src/app/stations/[slug]/page.tsx
                  │   ├─ 図（横） ……………………… PR3a で新しい見た目（Admin も）
                  │   ├─ 図（縦、lg 未満） ……… PR3b で新設
                  │   └─ フリースペース・優先席 … PR2 で「全編成」「一部編成」
-                 ├─ 位置未登録の設備・乗換（変えない）
                  └─ ホームの注記（変えない）
 
 apps/web/src/components/TransferDifficultySection.tsx … PR4（複数ルート）
@@ -38,7 +37,7 @@ apps/web/src/components/TransferDifficultySection.tsx … PR4（複数ルート�
 ```
 PlatformDisplay（サーバー部品のまま）
   ├─ 頭を組み立てる（番線のバッジ・番線・路線・編成・方面・「図はまだありません」）
-  ├─ 中身を組み立てる（今の図・位置未登録・注記をそのまま）
+  ├─ 中身を組み立てる（今の図・注記をそのまま）
   └─ <PlatformCard title badge details collapsible={中身があるか}>{中身}</PlatformCard>
 
 PlatformCard（'use client'、新規）
@@ -108,7 +107,7 @@ export function formationLabel(stopPatterns: Pick<TrainStopPatternDTO, 'carCount
 
 ### 中身があるか（`collapsible`）
 
-`PlatformDisplay` で決める。図を描ける、または位置未登録のコンコース（`undrawable`）がある、または `notes` がある。
+`PlatformDisplay` で決める。図を描ける、または `notes` がある（位置未登録のコンコースの欄は PR3b で消した。REQ-20）。
 
 ### 変えないもの
 

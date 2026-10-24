@@ -92,6 +92,40 @@ describe('PlatformDisplay', () => {
     expect(screen.queryByRole('button', { name: '2番線' })).not.toBeInTheDocument();
   });
 
+  describe('位置未登録のコンコース', () => {
+    // 座標を持つアクセス点が無い。乗換は駅の見出しの路線に、対面乗換は札に出るので、カードには文字で補わない
+    const unplacedConcourse = {
+      id: 'c9',
+      exits: '南口',
+      cells: [{ xPositionMeters: null, facilities: [{ id: 'f1', typeCode: 'elevator' as const, typeName: 'エレベーター', isWheelchairAccessible: true, isStrollerAccessible: true }] }],
+      connections: [
+        {
+          lineNames: ['銀座線'],
+          lineColors: ['#ff9500'],
+          directionName: '渋谷',
+          exitLabel: null,
+          xRangeStart: null,
+          xRangeEnd: null,
+        },
+      ],
+    };
+
+    it('出口・乗換・設備を図の下に文字で出さない', async () => {
+      render(<PlatformDisplay platform={platform({ concourses: [unplacedConcourse] })} />);
+      await userEvent.click(toggle());
+
+      expect(screen.queryByText('位置未登録の設備・乗換')).not.toBeInTheDocument();
+      expect(screen.queryByText('南口')).not.toBeInTheDocument();
+      expect(screen.queryByText(/銀座線/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/エレベーター/)).not.toBeInTheDocument();
+    });
+
+    it('図を描けず、ほかに出すものが無ければ、開け閉めできない', () => {
+      render(<PlatformDisplay platform={platform({ stopPatterns: [], concourses: [unplacedConcourse] })} />);
+      expect(screen.queryByRole('button', { name: '2番線' })).not.toBeInTheDocument();
+    });
+  });
+
   it('図を描けない番線を開くと、頭の一言は消え、中身で理由を示す', async () => {
     render(<PlatformDisplay platform={platform({ physicalLength: 0, notes: 'ホームの注記' })} />);
     await userEvent.click(toggle());
