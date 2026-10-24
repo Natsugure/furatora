@@ -160,11 +160,8 @@ function PrimaryRoute({
         {route.minutes !== null && (
           <div className="flex flex-shrink-0 flex-col items-end gap-0.5">
             <span className="text-xs text-muted">所要時間</span>
-            <span
-              className={`font-display font-bold text-[40px] leading-none ${
-                highlights.has('minutes') ? `${HIGHLIGHT} rounded-tag px-1` : accentClass
-              }`}
-            >
+            {/* 強調しない。最短の分はほかのルートと必ず違うので、強調しても何も伝えず移動手段の色を消すだけ */}
+            <span className={`font-display font-bold text-[40px] leading-none ${accentClass}`}>
               {route.minutes}
               <span className="ml-0.5 text-base">分</span>
             </span>
@@ -190,7 +187,7 @@ type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barr
 
 function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFreeAssessment; accentClass: string }) {
   const { routes, shortest, detour } = assessment;
-  // 強調は大きく出す1本も含めた全ルートで比べる
+  // 強調は大きく出す1本も含めた全ルートで比べる（大きく出す所要時間の数字だけは強調しない）
   const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
   // 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある）。
   // 同着なら1本の行為を選ばず、同着のルートの行為をすべて並べる（入力の順で選んだルートを推さない）
@@ -202,7 +199,8 @@ function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFre
   );
   // 最短が1本に決まるときだけ大きく出す
   const primary = shortest.length === 1 ? shortest[0]! : null;
-  const others = primary === null ? routes : routes.filter((assessed) => assessed !== primary);
+  // shortest は routes の先頭から取るので、1本に決まればそれは routes の先頭
+  const others = primary === null ? routes : routes.slice(1);
 
   if (primary === null) {
     return (

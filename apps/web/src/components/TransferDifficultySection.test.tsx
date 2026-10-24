@@ -206,6 +206,18 @@ describe('TransferDifficultySection', () => {
     expect(within(stroller).queryByRole('list')).not.toBeInTheDocument();
   });
 
+  it('バリアフリールートが1本で所要時分が不明なら、大きく出すが「所要時間」の欄を出さない', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[partner({ combos: allCombos([route({ routeId: 'ev', label: 'エレベーター経由' })]) })]}
+      />,
+    );
+    const stroller = card('ベビーカー');
+    expect(within(stroller).getByText('エレベーター経由')).toBeInTheDocument();
+    expect(within(stroller).queryByText('所要時間')).not.toBeInTheDocument();
+  });
+
   it('迂回度は基準ルートと BF ルートの所要時分が揃うときだけ、必要な行為と並べて出す', () => {
     render(
       <TransferDifficultySection
