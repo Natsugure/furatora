@@ -159,7 +159,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
  * 引き出し線は幅の見積り誤差ぶんずれうるが、「このエレベーターは中央改札へ」が
  * 文字で読めれば対応関係は失われない。
  */
-function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeNames: string[] }) {
+export function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeNames: string[] }) {
   return (
     <div
       className="rounded-[14px] px-3 py-2 text-[13px] font-bold leading-snug"
@@ -181,7 +181,7 @@ function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeName
 }
 
 /** 乗換プレート（白地に濃い灰色の枠）。路線は1件ずつ色チップ付きで縦に並べ、畳まない */
-function TransferPlate({ transfers }: { transfers: TransferEntry[] }) {
+export function TransferPlate({ transfers }: { transfers: TransferEntry[] }) {
   return (
     <div
       className="rounded-xl px-3 py-2 text-[13px] leading-snug"

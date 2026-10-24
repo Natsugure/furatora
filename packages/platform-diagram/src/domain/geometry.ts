@@ -49,6 +49,31 @@ export function xFraction(x: number, bounds: Bounds): number {
   return (x - bounds.minX) / width;
 }
 
+// ---- 縦の図（lg 未満） ----
+// 縦の図は横の図を左へ90°回したもの（列車が左、設備・プレートが右、0m が下。ADR-0023）。
+// 横の図の座標のまま描き、この写像で回す。回すだけなので鏡写しにならない（ADR-0022・0023）。
+
+/**
+ * 横の図の座標 (x, y) を縦の図の座標へ写す、SVG の matrix(a b c d e f)。
+ * (x, y) → (y, maxX − x)。描画範囲の上の端（maxX）が y=0 に来る
+ */
+export function verticalMatrix(bounds: Bounds): [number, number, number, number, number, number] {
+  return [0, -1, 1, 0, 0, bounds.maxX];
+}
+
+export function toVertical(point: { x: number; y: number }, bounds: Bounds): { x: number; y: number } {
+  const [a, b, c, d, e, f] = verticalMatrix(bounds);
+  return { x: a * point.x + c * point.y + e, y: b * point.x + d * point.y + f };
+}
+
+/**
+ * 縦の図での、ホーム上の位置 x の y（px、描画範囲の上の端から）。
+ * 縦の図は伸び縮みさせないので、HTML のプレートの列もこの px で SVG と揃う（割合で取る必要が無い）
+ */
+export function verticalY(x: number, bounds: Bounds): number {
+  return toVertical({ x, y: 0 }, bounds).y * PX_PER_METER;
+}
+
 /**
  * ホーム物理長・全停車位置パターン・全設備・全対面乗換帯の座標から
  * SVG viewBox の描画範囲を算出する（純関数・DB非依存）。

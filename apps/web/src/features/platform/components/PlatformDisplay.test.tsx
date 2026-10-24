@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { PlatformDTO, TrainStopPatternDTO } from '@furatora/platform-diagram/domain';
+import { computeBounds, layoutConcoursePlates, layoutFacingBanners } from '@furatora/platform-diagram/domain';
+import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { PlatformDisplay } from './PlatformDisplay';
 
 function pattern(overrides: Partial<TrainStopPatternDTO> & { trainId: string }): TrainStopPatternDTO {
@@ -36,6 +38,13 @@ function platform(overrides: Partial<PlatformDTO> = {}): PlatformDTO {
 }
 
 const toggle = () => screen.getByRole('button', { name: '2番線' });
+
+// jsdom は CSS（lg:hidden など）を効かせないので、縦と横の図が両方とも DOM にある。向きで絞って調べる
+function canvas(orientation: 'horizontal' | 'vertical'): HTMLElement {
+  const el = document.querySelector<HTMLElement>(`[data-orientation="${orientation}"]`);
+  if (el === null) throw new Error(`${orientation} の図が無い`);
+  return el;
+}
 
 function partition<T>(list: T[], predicate: (item: T) => boolean): [T[], T[]] {
   return [list.filter(predicate), list.filter((item) => !predicate(item))];
@@ -93,28 +102,37 @@ describe('PlatformDisplay', () => {
 
   describe('図', () => {
     const facingText = '有楽町線（新木場方面）は同じホームの向かい側に到着';
+    const facingConcourse = {
+      id: 'c1',
+      exits: null,
+      cells: [],
+      connections: [
+        {
+          lineNames: ['有楽町線'],
+          lineColors: ['#c1a470'],
+          directionName: '新木場',
+          exitLabel: null,
+          xRangeStart: 10,
+          xRangeEnd: 30,
+        },
+      ],
+    };
+    const exitConcourse = {
+      id: 'c2',
+      exits: '中央口',
+      cells: [{ xPositionMeters: 60, facilities: [] }],
+      connections: [],
+    };
 
     it('対面乗換の札を、出口・乗換のプレートと同じく図の下に出す', async () => {
-      const concourse = {
-        id: 'c1',
-        exits: null,
-        cells: [],
-        connections: [
-          {
-            lineNames: ['有楽町線'],
-            lineColors: ['#c1a470'],
-            directionName: '新木場',
-            exitLabel: null,
-            xRangeStart: 10,
-            xRangeEnd: 30,
-          },
-        ],
-      };
-      render(<PlatformDisplay platform={platform({ concourses: [concourse] })} />);
+      render(<PlatformDisplay platform={platform({ concourses: [facingConcourse] })} />);
       await userEvent.click(toggle());
 
       // 図の中にも、帯の <title> として同じ文がある。札はそれとは別の、図の外の要素
-      const [inDiagram, tag] = partition(screen.getAllByText(facingText), (el) => el.closest('svg') !== null);
+      const [inDiagram, tag] = partition(
+        within(canvas('horizontal')).getAllByText(facingText),
+        (el) => el.closest('svg') !== null,
+      );
       const diagram = inDiagram[0]!.closest('svg')!;
       expect(tag).toHaveLength(1);
       expect(diagram.compareDocumentPosition(tag[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -132,7 +150,46 @@ describe('PlatformDisplay', () => {
       );
       await userEvent.click(toggle());
 
-      expect(screen.getByText('1号車 1番ドア付近のフリースペース（一部編成）')).toBeInTheDocument();
+      expect(within(canvas('horizontal')).getByText('1号車 1番ドア付近のフリースペース（一部編成）')).toBeInTheDocument();
+    });
+
+    it('縦の図と横の図の両方を描く（どちらを見せるかは CSS で画面の幅により切り替える）', async () => {
+      render(<PlatformDisplay platform={platform()} />);
+      await userEvent.click(toggle());
+
+      expect(canvas('vertical').querySelector('svg')).not.toBeNull();
+      expect(canvas('horizontal').querySelector('svg')).not.toBeNull();
+    });
+
+    it('縦の図にも、出口・乗換のプレートと対面乗換の札を図の外に出す', async () => {
+      render(<PlatformDisplay platform={platform({ concourses: [facingConcourse, exitConcourse] })} />);
+      await userEvent.click(toggle());
+
+      const vertical = within(canvas('vertical'));
+      expect(vertical.getByText('中央口')).toBeInTheDocument();
+      const [, tag] = partition(vertical.getAllByText(facingText), (el) => el.closest('svg') !== null);
+      expect(tag).toHaveLength(1);
+    });
+  });
+
+  // Admin は PlatformDiagram を responsive 無しで使う（編集は PC で行うので横のまま）
+  describe('PlatformDiagram（responsive を渡さない）', () => {
+    it('横の図だけを描く', () => {
+      const p = platform();
+      const bounds = computeBounds(p.physicalLength, p.stopPatterns, p.concourses);
+      render(
+        <PlatformDiagram
+          pattern={p.stopPatterns[0]!}
+          physicalLength={p.physicalLength}
+          concourses={p.concourses}
+          bounds={bounds}
+          plateLayout={layoutConcoursePlates(p.concourses, bounds)}
+          facingLayout={layoutFacingBanners(p.concourses, bounds)}
+        />,
+      );
+
+      expect(document.querySelector('[data-orientation="vertical"]')).toBeNull();
+      expect(canvas('horizontal').querySelector('svg')).not.toBeNull();
     });
   });
 

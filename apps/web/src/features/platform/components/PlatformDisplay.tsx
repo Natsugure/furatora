@@ -89,6 +89,7 @@ export function PlatformDisplay({ platform }: Props) {
                       bounds={bounds}
                       plateLayout={plateLayout}
                       facingLayout={facingLayout}
+                      responsive
                     />
                   ))}
                 </div>

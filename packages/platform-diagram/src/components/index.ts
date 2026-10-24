@@ -6,3 +6,4 @@ export { PlatformDiagram } from './PlatformDiagram';
 export { DiagramSvg } from './diagram/DiagramSvg';
 export { ConcoursePlateRow } from './overlay/ConcoursePlateRow';
 export { FacingTransferTagRow } from './overlay/FacingTransferTagRow';
+export { VerticalPlateColumn } from './overlay/VerticalPlateColumn';

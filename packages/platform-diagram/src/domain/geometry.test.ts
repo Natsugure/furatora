@@ -3,7 +3,11 @@ import {
   computeBounds,
   facilityIconHalfExtent,
   layoutRows,
+  toVertical,
+  verticalMatrix,
+  verticalY,
   xFraction,
+  PX_PER_METER,
   FACILITY_ICON_SIZE,
   FACILITY_ROW_HEIGHT,
   GAP_Y,
@@ -311,5 +315,34 @@ describe('xFraction', () => {
 
   it('幅が0に縮退した場合は0を返す', () => {
     expect(xFraction(5, { minX: 5, maxX: 5 })).toBe(0);
+  });
+});
+
+describe('縦の図の写像（verticalMatrix / toVertical）', () => {
+  const bounds = { minX: -5, maxX: 145 };
+  const rows = layoutRows();
+
+  it('0m が下、ホーム長の端が上に来る', () => {
+    expect(toVertical({ x: 0, y: 0 }, bounds).y).toBeGreaterThan(toVertical({ x: 140, y: 0 }, bounds).y);
+  });
+
+  it('描画範囲の上の端が y=0、下の端が y=描画範囲の長さ', () => {
+    expect(toVertical({ x: 145, y: 0 }, bounds).y).toBe(0);
+    expect(toVertical({ x: -5, y: 0 }, bounds).y).toBe(150);
+  });
+
+  it('列車が左、設備が右に来る', () => {
+    expect(toVertical({ x: 70, y: rows.trainY }, bounds).x).toBeLessThan(
+      toVertical({ x: 70, y: rows.facilityY }, bounds).x,
+    );
+  });
+
+  it('回すだけで、鏡写しにしない（行列式が +1）', () => {
+    const [a, b, c, d] = verticalMatrix(bounds);
+    expect(a * d - b * c).toBe(1);
+  });
+
+  it('プレートの列の y（px）は、写した y に PX_PER_METER を掛けたもの', () => {
+    expect(verticalY(20, bounds)).toBe(toVertical({ x: 20, y: 0 }, bounds).y * PX_PER_METER);
   });
 });

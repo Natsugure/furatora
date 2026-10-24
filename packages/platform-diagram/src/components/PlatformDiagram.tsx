@@ -7,6 +7,7 @@ import { DoorTileList } from './DoorTileList';
 import { DiagramSvg } from './diagram/DiagramSvg';
 import { ConcoursePlateRow } from './overlay/ConcoursePlateRow';
 import { FacingTransferTagRow } from './overlay/FacingTransferTagRow';
+import { VerticalPlateColumn } from './overlay/VerticalPlateColumn';
 
 // 停車位置パターン1件ぶんのカード。
 //
@@ -35,6 +36,11 @@ type Props = {
    * web は未指定のまま（挙動不変）。
    */
   diagramOverlay?: (rows: VerticalLayout) => ReactNode;
+  /**
+   * true なら lg 未満で縦の図、lg 以上で横の図を出す（CSS だけで切り替える。ADR-0023）。
+   * Admin は渡さず横のまま（編集は PC で行う）
+   */
+  responsive?: boolean;
 };
 
 export function PlatformDiagram({
@@ -46,6 +52,7 @@ export function PlatformDiagram({
   facingLayout,
   iconBasePath,
   diagramOverlay,
+  responsive = false,
 }: Props) {
   const { minX, maxX } = bounds;
   const width = maxX - minX;
@@ -56,7 +63,8 @@ export function PlatformDiagram({
 
   return (
     <div
-      className="rounded-3xl border-2 p-6"
+      // 縦の図ではプレートの列が狭いので、外側の番線のカードと重なる余白を詰める
+      className={`rounded-3xl border-2 ${responsive ? 'p-3 lg:p-6' : 'p-6'}`}
       style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border-default)' }}
     >
       {/* 列車名 */}
@@ -69,7 +77,28 @@ export function PlatformDiagram({
         </p>
       </div>
 
-      <div className="mb-2 overflow-x-auto">
+      {/* 縦の図（lg 未満）。横の図を左へ90°回したもので、プレートと対面乗換の札は右の1列に積む */}
+      {responsive && (
+        <div data-orientation="vertical" className="mb-2 overflow-x-auto lg:hidden">
+          <div className="flex items-start">
+            <DiagramSvg
+              cars={cars}
+              concourses={concourses}
+              physicalLength={physicalLength}
+              minX={minX}
+              width={width}
+              rows={rows}
+              plateGroups={plateLayout.groups}
+              facingBanners={facingLayout.banners}
+              iconBasePath={iconBasePath}
+              orientation="vertical"
+            />
+            <VerticalPlateColumn groups={plateLayout.groups} facingBanners={facingLayout.banners} bounds={bounds} />
+          </div>
+        </div>
+      )}
+
+      <div data-orientation="horizontal" className={`mb-2 overflow-x-auto ${responsive ? 'hidden lg:block' : ''}`}>
         {/* キャンバス。min-width（width ではない）にすることで、コンテナが広いときは
             伸びて余白を埋め、狭いときは横スクロールになる。伸縮しても各層は
             割合で位置を決めているのでxがずれない */}
