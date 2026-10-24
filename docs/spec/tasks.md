@@ -120,17 +120,24 @@ PR2〜4（PR3 は 3a・3b）は着手するときに、この文書のその節�
 ブランチ: `feat/issue174-vertical-diagram`（`main` から）。信頼度 70%（中）なので PoC から（design.md）
 
 - [x] **TASK-28** ブランチを切り、requirements.md・design.md・tasks.md の PR3b 節を詳しくする
-- [ ] **TASK-29** 開発者のレビュー（PR3b 節）
-- [ ] **TASK-30** PoC: 縦の図を回して描き、プレートを入れ子の grid で積み、折れ線で結ぶ。札を案A・案B の両方で描く
-  - dev サーバー（幅 375px。池袋・赤坂見附・中野坂上）で成功基準を確かめ、スクリーンショットで開発者が札の案を決める
-  - 満たせなければ止めて相談する
-- [ ] **TASK-31** サイクルG: 縦のプレートの並び（純関数。`domain/verticalPlateLayout.ts`）
-- [ ] **TASK-32** サイクルH: 回す写像（純関数。`geometry.ts`）
-- [ ] **TASK-33** サイクルI: 描画（`PlatformDisplay.test.tsx`。web で縦と横の両方、縦にも出口・乗換の文、Admin 相当は横だけ）
-- [ ] **TASK-34** 検証（自動）: platform-diagram・web・admin の typecheck・lint・test・build
-- [ ] **TASK-35** 検証（dev サーバー）: 375px で縦、1024px・1280px で横、1023px ↔ 1024px で両方が同時に出ない。Admin が横のまま（開発者）
-- [ ] **TASK-36** 振り返り: `docs/domain/platform-coordinate-system.md`「描画」に縦の図を書き、「駅ページでの出し方」の適用状況の注記を外す。
-  ADR-0023 を `Accepted` にする（`docs/adr/README.md` も）。札の置き方を ADR にするか判定する
+- [x] **TASK-29** 開発者のレビュー（PR3b 節）
+- [x] **TASK-30** PoC: 縦の図を回して描き、プレートを入れ子の grid で積み、折れ線で結ぶ。札を案A・案B の両方で描く
+  - 幅 375px で成功基準を満たした: 池袋1番線の一番下のプレートが本来の位置から約160px 押し下げられ、折れ線で結ばれた。どの番線もプレートは重ならない。実測は無い
+  - 札は赤坂見附2番線のスクリーンショットで見比べ、開発者が案A（プレートと同じ列）に決めた。案B は図が約770px と長く、札がティントから離れる
+  - 列が約120px と狭く細かく折り返したので、縦の図のときだけ列車のカードの余白を `p-3` にした（列 146px）
+- [x] **TASK-31** サイクルG: `layoutVerticalColumn()`（`domain/verticalPlateLayout.ts`）。4件。Red（`./verticalPlateLayout` が無い）を確かめてから実装した
+- [x] **TASK-32** サイクルH: `verticalMatrix()`・`toVertical()`・`verticalY()`（`geometry.ts`）。5件。Red（関数が無い）を確かめてから実装し、`verticalY()` を geometry へ移した
+- [x] **TASK-33** サイクルI: 描画（`PlatformDisplay.test.tsx`）。3件を足し、図が2つになって重複で落ちた既存の2件は横の図の中に絞った。
+  5件が「`data-orientation` の図が無い」で落ちることを確かめてから、キャンバスに `data-orientation` を付けた
+- [x] **TASK-34** 検証（自動）: すべて成功。test は platform-diagram 201（192 → 201）、web 185（182 → 185）、admin 642（変わらず）
+- [x] **TASK-35** 検証（dev サーバー、Chrome DevTools。データは本番 DB）
+  - [x] 幅 375px（池袋・赤坂見附）: 縦の図。プレートが重ならず、押し下げたプレートが折れ線で結ばれる。ページの横はみ出しは無い
+  - [x] 幅 375px（中野坂上）: 方面タブを3つ切り替えても崩れない
+  - [x] 幅 1023px で縦だけ、1024px・1280px で横だけ（横の図の見た目は変わらない）
+  - [ ] Admin の駅レイアウト編集が横のまま変わらない（GitHub のログインが要るため、開発者が確かめる）
+  - 設備の札が、近いアクセス点どうしで重なる（赤坂見附の 0m 付近）。横の図でも同じで、この PR の変更によるものではない
+- [x] **TASK-36** 振り返り: `docs/domain/platform-coordinate-system.md` に「縦の図」を書き、「駅ページでの出し方」の適用状況の注記を外した。
+  ADR-0023 を `Accepted` にした（`docs/adr/README.md` も）。札の置き方は ADR にしない（ADR-0023 の決定の中の見せ方で、覆しても他の決定に響かない）。理由と却下案は domain に書いた
 - [ ] **TASK-37** 引き渡し: PR（`main` 向け）
 
 ## PR4: 乗換カード（着手時に詳しくする）
