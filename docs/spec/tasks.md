@@ -148,22 +148,29 @@ PR2〜4（PR3 は 3a・3b）は着手するときに、この文書のその節�
 ブランチ: `feat/issue174-transfer-routes`（`main` から）。選んだ移動手段のバリアフリールートのうち最短を大きく、ほかは区切りの下に小さく（REQ-19）
 
 - [x] **TASK-38** ブランチを切り、requirements.md（REQ-19 の前提にバリアフリールートを足す）・design.md・tasks.md の PR4 節を詳しくする
-- [ ] **TASK-39** 開発者のレビュー（PR4 節）
-- [ ] **TASK-40** サイクルJ: `splitPrimaryRoute()`（`apps/web/src/features/station/domain/transferView.ts`）
+- [x] **TASK-39** 開発者のレビュー（PR4 節）
+- [x] **TASK-40** サイクルJ: `splitPrimaryRoute()`（`apps/web/src/features/station/domain/transferView.ts`）
   1. 1本なら、所要時分が不明でも primary
   2. [3, 8] → primary 3、others [8]
   3. [3, 不明] → primary 3
   4. [5, 5, 8] → primary null、others 全部
   5. [不明, 不明] → primary null
-- [ ] **TASK-41** サイクルK: 描画（`TransferDifficultySection.test.tsx`）
+  - 5件が「`splitPrimaryRoute` が関数でない」で落ちることを確かめてから実装した
+- [x] **TASK-41** サイクルK: 描画（`TransferDifficultySection.test.tsx`）
   1. 最短が決まると、最短は「ほかのルート」の一覧に無く、残りがその一覧に所要時分の順で入る
   2. 同着なら「ほかのルート」の見出しが無く、全部が1つの一覧に入る
   3. 1本のとき「ほかのルート」が無い（既存の「1本なら…」のテストが通り続ける）
-- [ ] **TASK-42** 検証（自動）: web の typecheck・lint・test・build
-- [ ] **TASK-43** 検証（dev サーバー、Chrome DevTools。データは本番 DB）
-  - [ ] 幅 375px・1280px（後楽園）: ベビーカー・車いすで、最短が大きく、ほかが区切りの下に出る。方面の見出しで分かれても崩れない
-  - [ ] 幅 375px（池袋）: バリアフリールートが1本で、大きい形
-  - 同着・全部不明は本番 DB に無いので、TASK-40・41 で確かめる
-- [ ] **TASK-44** 振り返り: `docs/domain/station-master-model.md`「Web の表示の規則」の「バリアフリールートあり」を上書きする。ADR は作らない（見せ方の判断で、他の決定を覆さない）
-  - #174 の恒久知識の取り残しを確かめる（design.md「恒久知識の振り分け」の各行が ADR・domain にあるか）
+  - 1・3 が「『ほかのルート』の一覧が無い」「1本でも一覧がある」で落ちることを確かめてから実装した。2 は今の形でも通る（先頭をいつも大きくする実装を防ぐためのもの）
+  - 所要時間は見本どおり数字と「分」を別の大きさで描くので、既存の `getByText('4分')` を、所要時間の欄の文字全体で確かめる形に直した
+- [x] **TASK-42** 検証（自動）: web の typecheck・lint・test・build
+  - すべて成功。test は web 194（187 → 194。splitPrimaryRoute 5・描画 2）
+- [x] **TASK-43** 検証（dev サーバー、Chrome DevTools）
+  - 本番 DB には、どちらの移動手段でもバリアフリールートが2本以上ある接続が無かった（後楽園の複数ルートは、片方がエスカレーターを通りバリアフリールートに入らない）。
+    着手時に「後楽園が複数」としたのは、ルートの本数で数えていたため
+  - [x] 幅 375px（後楽園 → 南北線）: 1本・所要時分不明で、大きい形に所要時間の欄が無い
+  - [x] 幅 375px・1280px（後楽園 → 三田線・大江戸線）: ページに渡すデータに仮のルートを足して（コミットしない一時的な変更。確かめたあと戻した）、
+    最短が大きく、ほかが「ほかのルート」の下に小さく出る、違う項目が強調される、同着なら同じ大きさの一覧になることを確かめた。ページの横のはみ出しは無い
+- [x] **TASK-44** 振り返り: `docs/domain/station-master-model.md`「Web の表示の規則」の「バリアフリールートあり」を上書きする。ADR は作らない（見せ方の判断で、他の決定を覆さない）
+  - #174 の恒久知識の取り残しを確かめた: 向きと出し方は ADR-0023（Accepted）、回し方・番線のカード・図の見た目・対面乗換の札・位置未登録のコンコースを出さないこと（REQ-20）は
+    `platform-coordinate-system.md`、乗換カードは `station-master-model.md` にある。spec にだけ残る恒久知識は無い
 - [ ] **TASK-45** 引き渡し: PR（`main` 向け。`Closes #174`）
