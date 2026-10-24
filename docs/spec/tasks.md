@@ -173,4 +173,4 @@ PR2〜4（PR3 は 3a・3b）は着手するときに、この文書のその節�
 - [x] **TASK-44** 振り返り: `docs/domain/station-master-model.md`「Web の表示の規則」の「バリアフリールートあり」を上書きする。ADR は作らない（見せ方の判断で、他の決定を覆さない）
   - #174 の恒久知識の取り残しを確かめた: 向きと出し方は ADR-0023（Accepted）、回し方・番線のカード・図の見た目・対面乗換の札・位置未登録のコンコースを出さないこと（REQ-20）は
     `platform-coordinate-system.md`、乗換カードは `station-master-model.md` にある。spec にだけ残る恒久知識は無い
-- [ ] **TASK-45** 引き渡し: PR（`main` 向け。`Closes #174`）
+- [x] **TASK-45** 引き渡し: PR #197（`main` 向け。`Closes #174`）
