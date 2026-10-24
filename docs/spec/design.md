@@ -324,31 +324,33 @@ N_i を `relative` にし、`top: anchorY_i; bottom: 0` の絶対配置の線を
 ## PR4: 乗換カード（複数ルート）
 
 並べ替えは今のまま `assessRoutes`（`packages/transfer-difficulty`）が行う。選んだ移動手段のバリアフリールートだけに絞り、所要時分の昇順（不明は末尾）。
-ここで足すのは、その並びから大きく出す1本を選ぶ判定と、見せ方だけ。並べ替えの規則（必要な行為で並べない）には触れない。
+ここで足すのは、最短が1本に決まるかの判定（`assessRoutes` の結果に `shortest` を足す）と、見せ方だけ。並べ替えの規則（必要な行為で並べない）には触れない。
 
 本番 DB には、どちらの移動手段でもバリアフリールートが2本以上ある接続が無い（TASK-43）。複数ルートの見た目は、仮のルートを足して確かめた。
 
-### `splitPrimaryRoute(routes)`
+### `assessRoutes` の `shortest`
 
-`apps/web/src/features/station/domain/transferView.ts` に足す。
+`packages/transfer-difficulty/src/domain/assessment.ts` の barrierFree の結果に足す。
 
 ```ts
-// assessRoutes の並び（最短が先頭）から、大きく出す1本と残りを分ける。最短が1本に決まらなければ primary は null で、others が全部
-export function splitPrimaryRoute<T extends AssessedRoute<TransferRouteDTO>>(
-  routes: readonly T[],
-): { primary: T | null; others: T[] };
+| { kind: 'barrierFree'; routes: AssessedRoute<R>[]; shortest: AssessedRoute<R>[]; detour: number | null }
 ```
 
-| 並び（分） | primary | others |
-|---|---|---|
-| [不明]（1本） | 先頭 | [] |
-| [3, 8] | 3 | [8] |
-| [3, 不明] | 3 | [不明] |
-| [5, 5, 8] | null | 全部 |
-| [不明, 不明] | null | 全部 |
+`shortest` は、並べ替えた routes の先頭と所要時分が同じルート（不明どうしも同じとみなす）。1本以上あり、並びは routes のまま。
 
-- 決まるのは、1本だけのとき、または先頭の所要時分があり、2本目が不明か先頭より長いとき
+| routes（分） | shortest |
+|---|---|
+| [不明]（1本） | [不明] |
+| [3, 8] | [3] |
+| [3, 不明] | [3] |
+| [5, 5, 8] | [5, 5] |
+| [不明, 不明] | [不明, 不明] |
+
+- 1本なら最短が決まり、大きく出す。2本以上なら決まらない
 - 決まらないときに先頭を大きくしないのは、入力の順で選んだルートを推すことになるため（domain「『おすすめ』に相当する印を付けない」）
+- 判定をパッケージに置くのは、並べ替えた直後に判定すれば並びの前提がパッケージの外に出ないため。また迂回度の文の行為も同じ `shortest` から取るため
+  （domain「解釈はパッケージの純粋関数に置き、アプリ側で書き直さない」）
+- `detour` も `shortest` の所要時分から計算する（同着なら値は同じ）
 
 ### 見せ方（`TransferDifficultySection.tsx` の `BarrierFreeDetail`）
 
@@ -367,7 +369,8 @@ export function splitPrimaryRoute<T extends AssessedRoute<TransferRouteDTO>>(
 - primary があれば、見本（`docs/adr/assets/0017/source/Station.dc.html` の乗換カード）の形で出す。所要時分が不明なら「所要時間」の欄を出さない（1本だけのときに起きる）
 - others があれば、区切り線の下に「ほかのルート」の見出しと、今の `RouteItem` の一覧
 - primary が null なら、今の一覧（同じ大きさ）と、一覧の下の迂回度の文のまま
-- 状態の行の「（N本）」は残す。迂回度の文言は変えない
+- 状態の行の「（N本）」は残す。迂回度の文言は変えない。ただし最短が同着なら、括弧の中に同着のルートの行為を重複を除いて「／」でつないで出す
+  （例: 「（そのまま通れる／係員を呼ぶ）」）。1本の行為を選ぶと、入力の順で選んだルートを推すことになる
 - 違う項目の強調（`differingFields`）は全ルートで比べ、大きい形・小さい形の両方に当てる。大きい形の分の数字も強調の対象にする
 - 色・文字の大きさは今のトークン（`text-ink`・`text-muted`、`font-display`）。新しいトークンは足さない
 
@@ -381,11 +384,12 @@ export function splitPrimaryRoute<T extends AssessedRoute<TransferRouteDTO>>(
 
 ### テスト戦略
 
-- `splitPrimaryRoute`: 純関数の単体テスト（上の表の5件）
+- `assessRoutes` の `shortest`: パッケージの単体テスト（上の表の5件）
 - 描画（`TransferDifficultySection.test.tsx`）:
   1. 最短が決まると、最短は「ほかのルート」の一覧に無く、残りがその一覧に所要時分の順で入る（今の「昇順で並べ、本数を示す」を置き換える）
   2. 同着なら「ほかのルート」の見出しが無く、全部が1つの一覧に入る
   3. 1本のとき、ルート名・分・チップが出て、「ほかのルート」が無い（既存のテストが通り続ける）
+  4. 同着で行為が違うと、迂回度の文に両方の行為が並ぶ
 - 大きさ・色は単体テストで確かめない（apps/CLAUDE.md）。dev サーバーで目で確かめる
 
 ## 恒久知識の振り分け
