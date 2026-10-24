@@ -2,7 +2,13 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/concourseLayout';
 import type { Bounds } from '../../domain/geometry';
 import { LEADER_WIDTH_PX } from '../../domain/leaderRoute';
-import { layoutVerticalColumn } from '../../domain/verticalPlateLayout';
+import {
+  CONNECT_OFFSET_PX,
+  GUTTER_PX,
+  columnLeaderXs,
+  columnSpacerHeight,
+  layoutVerticalColumn,
+} from '../../domain/verticalPlateLayout';
 import { PlateStack } from './ConcoursePlateRow';
 import { FacingTransferTag } from './FacingTransferTagRow';
 
@@ -18,10 +24,6 @@ import { FacingTransferTag } from './FacingTransferTagRow';
 // 押し下げられた長さを測らずに結べる（ADR-0006 の範囲。実測しない）。
 // 対面乗換の札には引き出し線を付けない（範囲は SVG のティントが示し、札はその上の端に並ぶ）。
 
-/** 本来の位置からプレートの中へ線をつなぐ点までの距離（プレートの上端から）。押し下げられなければ線は真横になる */
-const CONNECT_OFFSET_PX = 14;
-/** SVG とプレートの間の、折れ線の縦の部分が走る列の幅 */
-const GUTTER_PX = 20;
 const PLATE_GAP_PX = 6;
 
 type Props = {
@@ -34,17 +36,17 @@ export function VerticalPlateColumn({ groups, facingBanners, bounds }: Props) {
   const items = layoutVerticalColumn(groups, facingBanners, bounds);
   if (items.length === 0) return null;
 
-  // 下のプレートほど縦の線を SVG に近い側へ寄せる。押し下げが連なっても、線どうしが交わらない
-  const leaderXs = items.map((_, i) => GUTTER_PX - ((i + 1) * GUTTER_PX) / (items.length + 1));
+  const leaderXs = columnLeaderXs(items);
 
   const stack = items.reduce<ReactNode>((inner, item, i) => {
-    const spacer = Math.max(0, item.anchorY - CONNECT_OFFSET_PX);
+    const spacer = columnSpacerHeight(item);
+    const leaderX = leaderXs[i];
     return (
       <>
         <div className="relative grid grid-cols-[minmax(0,1fr)]">
           <div style={{ gridArea: '1 / 1', height: spacer }} />
           {inner !== null && <div style={{ gridArea: '1 / 1', paddingBottom: PLATE_GAP_PX }}>{inner}</div>}
-          {item.kind === 'plate' && <Leader anchorY={item.anchorY} x={leaderXs[i]!} />}
+          {leaderX != null && <Leader anchorY={item.anchorY} x={leaderX} />}
         </div>
         <div style={{ paddingInlineStart: GUTTER_PX }}>
           {item.kind === 'plate' ? (

@@ -15,6 +15,7 @@ import {
   PX_PER_METER,
   TRAIN_ROW_HEIGHT,
   verticalMatrix,
+  type Bounds,
   type VerticalLayout,
 } from '../../domain/geometry';
 import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/concourseLayout';
@@ -61,8 +62,8 @@ type Props = {
   cars: StopPatternCarDTO[];
   concourses: ConcourseDTO[];
   physicalLength: number;
-  minX: number;
-  width: number;
+  /** 描画範囲。縦の図の写像も、HTML の列（verticalY()）と同じこの値から作る */
+  bounds: Bounds;
   rows: VerticalLayout;
   plateGroups: ConcoursePlateGroup[];
   facingBanners: FacingTransferBanner[];
@@ -96,14 +97,15 @@ export function DiagramSvg({
   cars,
   concourses,
   physicalLength,
-  minX,
-  width,
+  bounds,
   rows,
   plateGroups,
   facingBanners,
   iconBasePath = '/icons',
   orientation = 'horizontal',
 }: Props) {
+  const { minX, maxX } = bounds;
+  const width = maxX - minX;
   const reversed = isDoorOrderReversed(cars);
   const cells = concourses.flatMap((c) => c.cells.map((cell) => ({ ...cell, concourseId: c.id })));
   const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
@@ -226,7 +228,7 @@ export function DiagramSvg({
         height={width * PX_PER_METER}
         style={{ display: 'block', flexShrink: 0 }}
       >
-        <g transform={`matrix(${verticalMatrix({ minX, maxX: minX + width }).join(' ')})`}>{content}</g>
+        <g transform={`matrix(${verticalMatrix(bounds).join(' ')})`}>{content}</g>
       </svg>
     );
   }
