@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assessRoutes, type DirectionType, type Persona } from '@furatora/transfer-difficulty/domain';
-import { differingFields, groupCombos, splitPrimaryRoute } from './transferView';
+import { differingFields, groupCombos } from './transferView';
 import type { TransferComboDTO, TransferPartnerDTO, TransferRouteDTO } from './types';
 
 function route(overrides: Partial<TransferRouteDTO> & { routeId: string }): TransferRouteDTO {
@@ -162,48 +162,5 @@ describe('differingFields', () => {
     const a = route({ routeId: 'a', facilities: ['elevator'] });
     const b = route({ routeId: 'b', facilities: ['sameFloor'] });
     expect(differingFields(barrierFreeRoutes('wheelchair', [a, b]))).toEqual(new Set());
-  });
-});
-
-describe('splitPrimaryRoute', () => {
-  // assessRoutes の並び（所要時分の昇順、不明は末尾）を渡す
-  const sorted = (...minutes: (number | null)[]) => {
-    const result = assessRoutes(
-      'stroller',
-      minutes.map((m, i) => route({ routeId: `r${i}`, minutes: m })),
-    );
-    if (result.kind !== 'barrierFree') throw new Error(result.kind);
-    return result.routes;
-  };
-  const minutesOf = (routes: { route: TransferRouteDTO }[]) => routes.map((r) => r.route.minutes);
-
-  it('1本なら、所要時分が不明でも大きく出す', () => {
-    const { primary, others } = splitPrimaryRoute(sorted(null));
-    expect(primary?.route.minutes).toBeNull();
-    expect(others).toEqual([]);
-  });
-
-  it('最短が1本に決まれば、それを大きく出し、残りを順に並べる', () => {
-    const { primary, others } = splitPrimaryRoute(sorted(8, 3));
-    expect(primary?.route.minutes).toBe(3);
-    expect(minutesOf(others)).toEqual([8]);
-  });
-
-  it('2本目の所要時分が不明でも、先頭の所要時分があれば最短に決まる', () => {
-    const { primary, others } = splitPrimaryRoute(sorted(null, 3));
-    expect(primary?.route.minutes).toBe(3);
-    expect(minutesOf(others)).toEqual([null]);
-  });
-
-  it('先頭の2本が同着なら最短に決めず、全部を同じ大きさで並べる', () => {
-    const { primary, others } = splitPrimaryRoute(sorted(5, 8, 5));
-    expect(primary).toBeNull();
-    expect(minutesOf(others)).toEqual([5, 5, 8]);
-  });
-
-  it('所要時分がどれも不明なら最短に決めない', () => {
-    const { primary, others } = splitPrimaryRoute(sorted(null, null));
-    expect(primary).toBeNull();
-    expect(others).toHaveLength(2);
   });
 });

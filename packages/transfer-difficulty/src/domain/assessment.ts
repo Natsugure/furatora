@@ -23,9 +23,11 @@ export type Assessment<R extends RouteFacts> =
   | { kind: 'unevaluated' }
   // バリアフリールートが1本以上。所要時分の昇順・未入力は末尾。
   // 設備未入力のルートがあっても利用者には出さない（補完は管理者の作業。Admin で一覧する: #135）。
-  // detour（迂回度）= routes の先頭（最短）の所要時分 − 基準ルートの所要時分。どちらかが無ければ null。
+  // shortest = routes の先頭と所要時分が同じルート（不明どうしも同じとみなす）。1本以上あり、並びは routes のまま。
+  // 2本以上なら最短が1本に決まらないので、表示で1本を推さないこと（入力の順で選んだルートを推すことになる）。
+  // detour（迂回度）= 最短の所要時分 − 基準ルートの所要時分。どちらかが無ければ null。
   // 差には距離の差と移動速度の差が混ざるので、表示では必要な行為と並べること
-  | { kind: 'barrierFree'; routes: AssessedRoute<R>[]; detour: number | null }
+  | { kind: 'barrierFree'; routes: AssessedRoute<R>[]; shortest: AssessedRoute<R>[]; detour: number | null }
   // バリアフリールートは0本だが、設備未入力のルートがあるので「無い」とは言えない。
   // lightest は設備が入力済みのルートだけから選ぶ（未入力のルートの方が軽い可能性がある）
   | { kind: 'undetermined'; lightest: Requirement | null }
@@ -56,15 +58,17 @@ export function assessRoutes<R extends RouteFacts>(persona: Persona, routes: rea
 
   if (barrierFree.length > 0) {
     const sorted = byMinutes(barrierFree);
-    return { kind: 'barrierFree', routes: sorted, detour: detourOf(sorted[0]!.route, routes) };
+    const shortestMinutes = sorted[0]!.route.minutes;
+    const shortest = sorted.filter(({ route }) => route.minutes === shortestMinutes);
+    return { kind: 'barrierFree', routes: sorted, shortest, detour: detourOf(shortestMinutes, routes) };
   }
   const lightest = lightestRequirement(persona, assessed.map(({ requirement }) => requirement));
   if (hasNotEntered) return { kind: 'undetermined', lightest };
   return { kind: 'none', lightest };
 }
 
-function detourOf(shortest: RouteFacts, routes: readonly RouteFacts[]): number | null {
+function detourOf(shortestMinutes: number | null, routes: readonly RouteFacts[]): number | null {
   const baseline = routes.find((route) => route.isBaseline);
-  if (!baseline || baseline.minutes === null || shortest.minutes === null) return null;
-  return shortest.minutes - baseline.minutes;
+  if (!baseline || baseline.minutes === null || shortestMinutes === null) return null;
+  return shortestMinutes - baseline.minutes;
 }

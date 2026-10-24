@@ -150,3 +150,36 @@ describe('assessRoutes の detour: BF ルートの最短 − 基準ルート', (
     ])).toBeNull();
   });
 });
+
+describe('assessRoutes の shortest: 所要時分が最短の BF ルート（同着ならすべて）', () => {
+  const shortestIds = (routes: (RouteFacts & { id: string })[]) => {
+    const result = assessRoutes('stroller', routes);
+    if (result.kind !== 'barrierFree') throw new Error(result.kind);
+    return result.shortest.map((r) => r.route.id);
+  };
+
+  it('最短が1本に決まれば、その1本', () => {
+    expect(shortestIds([route('slow', ['elevator'], { minutes: 8 }), route('fast', ['elevator'], { minutes: 3 })]))
+      .toEqual(['fast']);
+  });
+
+  it('2本目の所要時分が不明でも、先頭の所要時分があれば1本に決まる', () => {
+    expect(shortestIds([route('unknown', ['elevator']), route('fast', ['elevator'], { minutes: 3 })])).toEqual(['fast']);
+  });
+
+  it('BF ルートが1本なら、所要時分が不明でもその1本', () => {
+    expect(shortestIds([route('unknown', ['elevator'])])).toEqual(['unknown']);
+  });
+
+  it('同着なら、同着のルートをすべて入力の順で返す', () => {
+    expect(shortestIds([
+      route('b', ['elevator'], { minutes: 5 }),
+      route('slow', ['elevator'], { minutes: 8 }),
+      route('a', ['sameFloor'], { minutes: 5 }),
+    ])).toEqual(['b', 'a']);
+  });
+
+  it('所要時分がどれも不明なら、すべてを返す（最短に決まらない）', () => {
+    expect(shortestIds([route('x', ['elevator']), route('y', ['elevator'])])).toEqual(['x', 'y']);
+  });
+});

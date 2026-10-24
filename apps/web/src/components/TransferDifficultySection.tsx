@@ -12,7 +12,7 @@ import {
   type Persona,
 } from '@furatora/transfer-difficulty/domain';
 import type { TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
-import { differingFields, groupCombos, splitPrimaryRoute, type RouteField } from '@/features/station/domain/transferView';
+import { differingFields, groupCombos, type RouteField } from '@/features/station/domain/transferView';
 import { ROUTE_FLAG_LABEL, TRANSFER_STATUS_META } from '@/constants/transferDifficulty';
 
 type Props = {
@@ -156,7 +156,7 @@ function PrimaryRoute({
           <span className="text-xs text-muted">経路</span>
           <p className="font-display font-bold text-lg leading-snug text-ink">{route.label}</p>
         </div>
-        {/* 所要時分が不明なのは、ルートが1本だけのとき（splitPrimaryRoute） */}
+        {/* 所要時分が不明なのは、ルートが1本だけのとき（assessRoutes の shortest） */}
         {route.minutes !== null && (
           <div className="flex flex-shrink-0 flex-col items-end gap-0.5">
             <span className="text-xs text-muted">所要時間</span>
@@ -189,18 +189,20 @@ function detourText(minutes: number): string {
 type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barrierFree' }>;
 
 function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFreeAssessment; accentClass: string }) {
-  const { routes, detour } = assessment;
+  const { routes, shortest, detour } = assessment;
   // 強調は大きく出す1本も含めた全ルートで比べる
   const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
-  // routes は1本以上あり、先頭が最短
-  const shortest = routes[0]!;
-  // 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある）
+  // 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある）。
+  // 同着なら1本の行為を選ばず、同着のルートの行為をすべて並べる（入力の順で選んだルートを推さない）
+  const shortestRequirements = [...new Set(shortest.map(({ requirement }) => REQUIREMENT_LABEL[requirement]))];
   const detourNote = detour !== null && (
     <p className="text-xs text-ink-soft">
-      最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortest.requirement]}）
+      最短のバリアフリールート: {detourText(detour)}（{shortestRequirements.join('／')}）
     </p>
   );
-  const { primary, others } = splitPrimaryRoute(routes);
+  // 最短が1本に決まるときだけ大きく出す
+  const primary = shortest.length === 1 ? shortest[0]! : null;
+  const others = primary === null ? routes : routes.filter((assessed) => assessed !== primary);
 
   if (primary === null) {
     return (

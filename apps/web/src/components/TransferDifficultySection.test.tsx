@@ -224,6 +224,27 @@ describe('TransferDifficultySection', () => {
       .toBeInTheDocument();
   });
 
+  it('最短が同着なら、迂回度の文に同着のルートの必要な行為をすべて並べる', async () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[
+          partner({
+            combos: allCombos([
+              route({ routeId: 'general', facilities: ['stairs'], minutes: 3, isBaseline: true }),
+              route({ routeId: 'ev', facilities: ['elevator'], minutes: 5 }),
+              route({ routeId: 'lift', facilities: ['stairLift'], minutes: 5 }),
+            ]),
+          }),
+        ]}
+      />,
+    );
+    await choosePersona('車いす');
+    expect(
+      within(card('車いす')).getByText('最短のバリアフリールート: 一般的なルートより 2分長い（そのまま通れる／係員を呼ぶ）'),
+    ).toBeInTheDocument();
+  });
+
   it('公式案内に載っていないルートと、その他のフラグを示す', () => {
     render(
       <TransferDifficultySection
