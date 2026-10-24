@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { SegmentedControl } from '@mantine/core';
 import { ChevronDown } from 'lucide-react';
 import {
@@ -12,7 +12,7 @@ import {
   type Persona,
 } from '@furatora/transfer-difficulty/domain';
 import type { TransferPartnerDTO, TransferRouteDTO } from '@/features/station/domain/types';
-import { differingFields, groupCombos, type RouteField } from '@/features/station/domain/transferView';
+import { differingFields, groupCombos, splitPrimaryRoute, type RouteField } from '@/features/station/domain/transferView';
 import { ROUTE_FLAG_LABEL, TRANSFER_STATUS_META } from '@/constants/transferDifficulty';
 
 type Props = {
@@ -31,9 +31,14 @@ function isPersona(value: string): value is Persona {
 
 // 移動手段ごとの面と強調の色。ベビーカーはブランドのローズ、車いすはスレート（ADR-0018）。
 // Tailwind はクラス名を静的に拾うので、クラス名は組み立てずに文字列リテラルで持つ
-const PERSONA_STYLE: Record<Persona, { cardClass: string; activeClass: string }> = {
-  stroller: { cardClass: 'bg-brand-50', activeClass: 'data-[active]:text-brand-600' },
-  wheelchair: { cardClass: 'bg-wheelchair-50', activeClass: 'data-[active]:text-wheelchair-700' },
+// accentClass は最短のルートの所要時間の数字（見本の accentText）
+const PERSONA_STYLE: Record<Persona, { cardClass: string; activeClass: string; accentClass: string }> = {
+  stroller: { cardClass: 'bg-brand-50', activeClass: 'data-[active]:text-brand-600', accentClass: 'text-brand-700' },
+  wheelchair: {
+    cardClass: 'bg-wheelchair-50',
+    activeClass: 'data-[active]:text-wheelchair-700',
+    accentClass: 'text-wheelchair-700',
+  },
 };
 
 // ルートが複数あるときに、ルートの間で違う項目を目立たせる
@@ -72,8 +77,8 @@ function Chip({ children, highlighted }: { children: React.ReactNode; highlighte
   );
 }
 
-// バリアフリールートの1本。設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）
-function RouteItem({
+// 設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）
+function RouteChips({
   assessed: { route, requirement },
   highlights,
 }: {
@@ -87,8 +92,34 @@ function RouteItem({
     ['isOfficiallyGuided', !route.isOfficiallyGuided, ROUTE_FLAG_LABEL.notOfficiallyGuided],
   ];
   return (
+    <div className="flex flex-wrap gap-1">
+      <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
+      {flags.map(
+        ([field, shown, label]) =>
+          shown && (
+            <Chip key={field} highlighted={highlights.has(field)}>
+              {label}
+            </Chip>
+          ),
+      )}
+    </div>
+  );
+}
+
+// 一覧の中のバリアフリールートの1本。compact は最短の下の「ほかのルート」で、文字を一段小さくする
+function RouteItem({
+  assessed,
+  highlights,
+  compact,
+}: {
+  assessed: AssessedRoute<TransferRouteDTO>;
+  highlights: Set<RouteField>;
+  compact: boolean;
+}) {
+  const { route } = assessed;
+  return (
     <li className="py-2 first:pt-0 last:pb-0">
-      <p className="font-display font-bold text-[15px] leading-snug text-ink">
+      <p className={`font-display font-bold leading-snug text-ink ${compact ? 'text-sm' : 'text-[15px]'}`}>
         {route.label}
         {route.minutes !== null && (
           <span className={`ml-1.5 font-normal ${highlights.has('minutes') ? HIGHLIGHT : 'text-muted'}`}>
@@ -96,19 +127,57 @@ function RouteItem({
           </span>
         )}
       </p>
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
-        {flags.map(
-          ([field, shown, label]) =>
-            shown && (
-              <Chip key={field} highlighted={highlights.has(field)}>
-                {label}
-              </Chip>
-            ),
-        )}
+      <div className="mt-1.5">
+        <RouteChips assessed={assessed} highlights={highlights} />
       </div>
       {route.notes && <p className="mt-1 text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
     </li>
+  );
+}
+
+// 最短のバリアフリールート。見本（ADR-0017 の乗換カード）の形で、経路名と所要時間を大きく出す
+function PrimaryRoute({
+  assessed,
+  highlights,
+  accentClass,
+  children,
+}: {
+  assessed: AssessedRoute<TransferRouteDTO>;
+  highlights: Set<RouteField>;
+  accentClass: string;
+  /** チップの後に添える文（迂回度） */
+  children?: React.ReactNode;
+}) {
+  const { route } = assessed;
+  return (
+    <div className="mt-4 flex flex-col gap-4">
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs text-muted">経路</span>
+          <p className="font-display font-bold text-lg leading-snug text-ink">{route.label}</p>
+        </div>
+        {/* 所要時分が不明なのは、ルートが1本だけのとき（splitPrimaryRoute） */}
+        {route.minutes !== null && (
+          <div className="flex flex-shrink-0 flex-col items-end gap-0.5">
+            <span className="text-xs text-muted">所要時間</span>
+            <span
+              className={`font-display font-bold text-[40px] leading-none ${
+                highlights.has('minutes') ? `${HIGHLIGHT} rounded-tag px-1` : accentClass
+              }`}
+            >
+              {route.minutes}
+              <span className="ml-0.5 text-base">分</span>
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="h-px bg-ink/10" />
+      <div className="flex flex-col gap-2">
+        <RouteChips assessed={assessed} highlights={highlights} />
+        {route.notes && <p className="text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -119,25 +188,62 @@ function detourText(minutes: number): string {
 
 type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barrierFree' }>;
 
-function BarrierFreeDetail({ assessment }: { assessment: BarrierFreeAssessment }) {
+function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFreeAssessment; accentClass: string }) {
   const { routes, detour } = assessment;
+  // 強調は大きく出す1本も含めた全ルートで比べる
   const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
   // routes は1本以上あり、先頭が最短
   const shortest = routes[0]!;
+  // 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある）
+  const detourNote = detour !== null && (
+    <p className="text-xs text-ink-soft">
+      最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortest.requirement]}）
+    </p>
+  );
+  const { primary, others } = splitPrimaryRoute(routes);
+
+  if (primary === null) {
+    return (
+      <>
+        <ul className="mt-3 divide-y divide-ink/10">
+          {others.map((assessed) => (
+            <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} compact={false} />
+          ))}
+        </ul>
+        {detourNote && <div className="mt-3">{detourNote}</div>}
+      </>
+    );
+  }
+
   return (
     <>
-      <ul className="mt-3 divide-y divide-ink/10">
+      <PrimaryRoute assessed={primary} highlights={highlights} accentClass={accentClass}>
+        {detourNote}
+      </PrimaryRoute>
+      {others.length > 0 && <OtherRoutes routes={others} highlights={highlights} />}
+    </>
+  );
+}
+
+function OtherRoutes({
+  routes,
+  highlights,
+}: {
+  routes: AssessedRoute<TransferRouteDTO>[];
+  highlights: Set<RouteField>;
+}) {
+  const headingId = useId();
+  return (
+    <div className="mt-4 border-t border-ink/10 pt-3">
+      <h4 id={headingId} className="mb-2 text-xs font-bold text-muted">
+        ほかのルート
+      </h4>
+      <ul aria-labelledby={headingId} className="divide-y divide-ink/10">
         {routes.map((assessed) => (
-          <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} />
+          <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} compact />
         ))}
       </ul>
-      {/* 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある） */}
-      {detour !== null && (
-        <p className="mt-3 text-xs text-ink-soft">
-          最短のバリアフリールート: {detourText(detour)}（{REQUIREMENT_LABEL[shortest.requirement]}）
-        </p>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -169,7 +275,7 @@ function PersonaBody({ persona, routes }: { persona: Persona; routes: TransferRo
         </p>
       </div>
       {assessment.kind === 'barrierFree' ? (
-        <BarrierFreeDetail assessment={assessment} />
+        <BarrierFreeDetail assessment={assessment} accentClass={PERSONA_STYLE[persona].accentClass} />
       ) : (
         text && <p className="mt-1.5 text-xs text-ink-soft">{text}</p>
       )}

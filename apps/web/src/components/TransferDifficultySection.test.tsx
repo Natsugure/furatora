@@ -76,7 +76,8 @@ describe('TransferDifficultySection', () => {
     const stroller = card('ベビーカー');
     expect(within(stroller).getByText('バリアフリールートあり')).toBeInTheDocument();
     expect(within(stroller).getByText('エレベーター経由')).toBeInTheDocument();
-    expect(within(stroller).getByText('4分')).toBeInTheDocument();
+    // 所要時間は数字と「分」を別の大きさで描くので、欄の文字の全体で確かめる
+    expect(within(stroller).getByText('所要時間').parentElement).toHaveTextContent('所要時間4分');
     expect(within(stroller).getByText('そのまま通れる')).toBeInTheDocument();
     expect(screen.getByText('共通の備考')).toBeInTheDocument();
     // 全組み合わせが同じなら方面の見出しを出さない
@@ -144,7 +145,7 @@ describe('TransferDifficultySection', () => {
     expect(within(card('車いす')).getByText('係員を呼ぶ')).toBeInTheDocument();
   });
 
-  it('複数のバリアフリールートは所要時分の昇順で並べ、本数を示す', () => {
+  it('複数のバリアフリールートは最短を大きく出し、ほかは「ほかのルート」に所要時分の昇順で並べ、本数を示す', () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -161,10 +162,48 @@ describe('TransferDifficultySection', () => {
     );
     const stroller = card('ベビーカー');
     expect(within(stroller).getByText('バリアフリールートあり（3本）')).toBeInTheDocument();
+    // 最短は大きく出し、「ほかのルート」の一覧には入れない
+    expect(within(stroller).getByText('近道')).toBeInTheDocument();
+    const others = within(stroller).getByRole('list', { name: 'ほかのルート' });
+    const items = within(others).getAllByRole('listitem').map((li) => li.textContent);
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatch(/^遠回り/);
+    expect(items[1]).toMatch(/^時間不明/);
+  });
+
+  it('最短が同着なら1本を大きくせず、全部を1つの一覧に同じ大きさで並べる', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[
+          partner({
+            combos: allCombos([
+              route({ routeId: 'a', label: '北口経由', minutes: 5 }),
+              route({ routeId: 'b', label: '南口経由', minutes: 5 }),
+            ]),
+          }),
+        ]}
+      />,
+    );
+    const stroller = card('ベビーカー');
+    expect(within(stroller).queryByRole('heading', { name: 'ほかのルート' })).not.toBeInTheDocument();
     const items = within(stroller).getAllByRole('listitem').map((li) => li.textContent);
-    expect(items[0]).toMatch(/^近道/);
-    expect(items[1]).toMatch(/^遠回り/);
-    expect(items[2]).toMatch(/^時間不明/);
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatch(/^北口経由/);
+    expect(items[1]).toMatch(/^南口経由/);
+  });
+
+  it('バリアフリールートが1本なら「ほかのルート」を出さない', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[partner({ combos: allCombos([route({ routeId: 'ev', label: 'エレベーター経由', minutes: 4 })]) })]}
+      />,
+    );
+    const stroller = card('ベビーカー');
+    expect(within(stroller).getByText('エレベーター経由')).toBeInTheDocument();
+    expect(within(stroller).queryByRole('heading', { name: 'ほかのルート' })).not.toBeInTheDocument();
+    expect(within(stroller).queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('迂回度は基準ルートと BF ルートの所要時分が揃うときだけ、必要な行為と並べて出す', () => {
