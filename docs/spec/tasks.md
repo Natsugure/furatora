@@ -115,11 +115,23 @@ PR2〜4（PR3 は 3a・3b）は着手するときに、この文書のその節�
   - 白い縁の円がホーム帯・対面乗換のティントにかかる件は、赤坂見附 2番線で縁を号車の側だけにした案と見比べ、今のままにした
 - [x] **TASK-27** 引き渡し: PR（`main` 向け）
 
-## PR3b: 縦の図（着手時に詳しくする。PoC から）
+## PR3b: 縦の図
 
-- [ ] 縦の図（REQ-3）。縦のプレートの積み方と折れ線（REQ-17）
-- [ ] `docs/domain/platform-coordinate-system.md` の「描画」に縦の図を書き、適用状況の注記を外す
-- [ ] ADR-0023 を `Accepted` にする
+ブランチ: `feat/issue174-vertical-diagram`（`main` から）。信頼度 70%（中）なので PoC から（design.md）
+
+- [x] **TASK-28** ブランチを切り、requirements.md・design.md・tasks.md の PR3b 節を詳しくする
+- [ ] **TASK-29** 開発者のレビュー（PR3b 節）
+- [ ] **TASK-30** PoC: 縦の図を回して描き、プレートを入れ子の grid で積み、折れ線で結ぶ。札を案A・案B の両方で描く
+  - dev サーバー（幅 375px。池袋・赤坂見附・中野坂上）で成功基準を確かめ、スクリーンショットで開発者が札の案を決める
+  - 満たせなければ止めて相談する
+- [ ] **TASK-31** サイクルG: 縦のプレートの並び（純関数。`domain/verticalPlateLayout.ts`）
+- [ ] **TASK-32** サイクルH: 回す写像（純関数。`geometry.ts`）
+- [ ] **TASK-33** サイクルI: 描画（`PlatformDisplay.test.tsx`。web で縦と横の両方、縦にも出口・乗換の文、Admin 相当は横だけ）
+- [ ] **TASK-34** 検証（自動）: platform-diagram・web・admin の typecheck・lint・test・build
+- [ ] **TASK-35** 検証（dev サーバー）: 375px で縦、1024px・1280px で横、1023px ↔ 1024px で両方が同時に出ない。Admin が横のまま（開発者）
+- [ ] **TASK-36** 振り返り: `docs/domain/platform-coordinate-system.md`「描画」に縦の図を書き、「駅ページでの出し方」の適用状況の注記を外す。
+  ADR-0023 を `Accepted` にする（`docs/adr/README.md` も）。札の置き方を ADR にするか判定する
+- [ ] **TASK-37** 引き渡し: PR（`main` 向け）
 
 ## PR4: 乗換カード（着手時に詳しくする）
 
