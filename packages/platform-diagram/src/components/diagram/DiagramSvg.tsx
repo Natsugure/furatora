@@ -75,11 +75,21 @@ type Props = {
   orientation?: Orientation;
 };
 
-export type Orientation = 'horizontal' | 'vertical';
+type Orientation = 'horizontal' | 'vertical';
+
+/** ホームの両端の文字（0m とホーム長） */
+type EndLabel = {
+  key: 'start' | 'end';
+  text: string;
+  x: number;
+  y: number;
+  textAnchor: 'start' | 'middle' | 'end';
+  dominantBaseline?: 'hanging';
+};
 
 /** 縦の図で、文字・アイコンを (cx, cy) を中心に正立へ戻す transform。横の図では何もしない */
-function upright(orientation: Orientation, cx: number, cy: number): string | undefined {
-  return orientation === 'vertical' ? `rotate(90 ${cx} ${cy})` : undefined;
+function upright(vertical: boolean, cx: number, cy: number): string | undefined {
+  return vertical ? `rotate(90 ${cx} ${cy})` : undefined;
 }
 
 export function DiagramSvg({
@@ -99,6 +109,16 @@ export function DiagramSvg({
   const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
 
   const vertical = orientation === 'vertical';
+  // 縦では両端の文字をホームの帯の延長上（0m は下の端の外、ホーム長は上の端の外）に正立で置く
+  const endLabels: EndLabel[] = vertical
+    ? [
+        { key: 'start', text: '0m', x: -0.6, y: rows.platformBarY, textAnchor: 'middle', dominantBaseline: 'hanging' },
+        { key: 'end', text: `${physicalLength}m`, x: physicalLength + 0.6, y: rows.platformBarY, textAnchor: 'middle' },
+      ]
+    : [
+        { key: 'start', text: '0m', x: 0, y: rows.platformLabelY, textAnchor: 'start' },
+        { key: 'end', text: `${physicalLength}m`, x: physicalLength, y: rows.platformLabelY, textAnchor: 'end' },
+      ];
 
   const content = (
     <>
@@ -125,49 +145,21 @@ export function DiagramSvg({
         height={PLATFORM_BAR_HEIGHT}
         fill="var(--color-border-strong)"
       />
-      {vertical ? (
-        // 縦では両端の文字をホームの帯の延長上（0m は下の端の外、ホーム長は上の端の外）に正立で置く
-        <>
-          <text
-            x={-0.6}
-            y={rows.platformBarY}
-            transform={upright(orientation, -0.6, rows.platformBarY)}
-            fontSize={PLATFORM_LABEL_FONT_SIZE}
-            fill="var(--color-text-secondary)"
-            textAnchor="middle"
-            dominantBaseline="hanging"
-          >
-            0m
-          </text>
-          <text
-            x={physicalLength + 0.6}
-            y={rows.platformBarY}
-            transform={upright(orientation, physicalLength + 0.6, rows.platformBarY)}
-            fontSize={PLATFORM_LABEL_FONT_SIZE}
-            fill="var(--color-text-secondary)"
-            textAnchor="middle"
-          >
-            {physicalLength}m
-          </text>
-        </>
-      ) : (
-        <>
-          <text x={0} y={rows.platformLabelY} fontSize={PLATFORM_LABEL_FONT_SIZE} fill="var(--color-text-secondary)">
-            0m
-          </text>
-          <text
-            x={physicalLength}
-            y={rows.platformLabelY}
-            fontSize={PLATFORM_LABEL_FONT_SIZE}
-            fill="var(--color-text-secondary)"
-            textAnchor="end"
-          >
-            {physicalLength}m
-          </text>
-        </>
-      )}
+      {endLabels.map(({ key, text, x, y, ...attrs }) => (
+        <text
+          key={key}
+          x={x}
+          y={y}
+          transform={upright(vertical, x, y)}
+          fontSize={PLATFORM_LABEL_FONT_SIZE}
+          fill="var(--color-text-secondary)"
+          {...attrs}
+        >
+          {text}
+        </text>
+      ))}
 
-      <CarRow cars={cars} trainY={rows.trainY} orientation={orientation} />
+      <CarRow cars={cars} trainY={rows.trainY} vertical={vertical} />
       <DoorMarks cars={cars} reversed={reversed} rows={rows} />
 
       {/* 設備アクセス点（xPositionMeters が非nullのcellのみ。
@@ -182,7 +174,7 @@ export function DiagramSvg({
               // 白い札に載せる（見本）。札の大きさは FACILITY_ICON_SIZE のままなので、描画範囲の算出は変わらない
               <g
                 key={`${cell.concourseId}-${idx}-${fIdx}`}
-                transform={upright(orientation, x, tileY + FACILITY_ICON_SIZE / 2)}
+                transform={upright(vertical, x, tileY + FACILITY_ICON_SIZE / 2)}
               >
                 <rect
                   x={x - FACILITY_ICON_SIZE / 2}
@@ -211,7 +203,7 @@ export function DiagramSvg({
                 y={rows.facilityY + FACILITY_ROW_HEIGHT / 2 + 1}
                 fontSize={FACILITY_ICON_SIZE}
                 textAnchor="middle"
-                transform={upright(orientation, x, rows.facilityY + FACILITY_ROW_HEIGHT / 2)}
+                transform={upright(vertical, x, rows.facilityY + FACILITY_ROW_HEIGHT / 2)}
               >
                 📍
                 <title>{facility.typeName}</title>
@@ -262,11 +254,11 @@ export function DiagramSvg({
 function CarRow({
   cars,
   trainY,
-  orientation,
+  vertical,
 }: {
   cars: StopPatternCarDTO[];
   trainY: number;
-  orientation: Orientation;
+  vertical: boolean;
 }) {
   const radii = carCornerRadii(cars);
   const tagCenterY = trainY + TRAIN_ROW_HEIGHT / 2 - CAR_NUMBER_TAG_SHIFT;
@@ -291,7 +283,7 @@ function CarRow({
             />
 
             {/* 号車番号の札。車体が一様な色なので、白い札で浮かせる */}
-            <g transform={upright(orientation, centerX, tagCenterY)}>
+            <g transform={upright(vertical, centerX, tagCenterY)}>
               <rect
                 x={centerX - CAR_NUMBER_TAG_SIZE / 2}
                 y={tagCenterY - CAR_NUMBER_TAG_SIZE / 2}

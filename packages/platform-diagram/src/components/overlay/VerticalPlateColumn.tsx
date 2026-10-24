@@ -3,7 +3,8 @@ import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/con
 import type { Bounds } from '../../domain/geometry';
 import { LEADER_WIDTH_PX } from '../../domain/leaderRoute';
 import { layoutVerticalColumn } from '../../domain/verticalPlateLayout';
-import { ExitPlate, TransferPlate } from './ConcoursePlateRow';
+import { PlateStack } from './ConcoursePlateRow';
+import { FacingTransferTag } from './FacingTransferTagRow';
 
 // 縦の図の、出口・乗換のプレートと対面乗換の札の列。並びと本来の位置は layoutVerticalColumn() が決める。
 //
@@ -36,24 +37,25 @@ export function VerticalPlateColumn({ groups, facingBanners, bounds }: Props) {
   // 下のプレートほど縦の線を SVG に近い側へ寄せる。押し下げが連なっても、線どうしが交わらない
   const leaderXs = items.map((_, i) => GUTTER_PX - ((i + 1) * GUTTER_PX) / (items.length + 1));
 
-  let stack: ReactNode = null;
-  items.forEach((item, i) => {
+  const stack = items.reduce<ReactNode>((inner, item, i) => {
     const spacer = Math.max(0, item.anchorY - CONNECT_OFFSET_PX);
-    stack = (
+    return (
       <>
         <div className="relative grid grid-cols-[minmax(0,1fr)]">
           <div style={{ gridArea: '1 / 1', height: spacer }} />
-          {stack !== null && (
-            <div style={{ gridArea: '1 / 1', paddingBottom: PLATE_GAP_PX }}>{stack}</div>
-          )}
+          {inner !== null && <div style={{ gridArea: '1 / 1', paddingBottom: PLATE_GAP_PX }}>{inner}</div>}
           {item.kind === 'plate' && <Leader anchorY={item.anchorY} x={leaderXs[i]!} />}
         </div>
         <div style={{ paddingInlineStart: GUTTER_PX }}>
-          {item.kind === 'plate' ? <PlateBody group={item.group} /> : <FacingTag banner={item.banner} />}
+          {item.kind === 'plate' ? (
+            <PlateStack group={item.group} className="w-max max-w-full" />
+          ) : (
+            <FacingTransferTag banner={item.banner} style={{ width: 'max-content', maxWidth: '100%' }} />
+          )}
         </div>
       </>
     );
-  });
+  }, null);
 
   return (
     <div className="min-w-0 flex-1" style={{ fontFamily: 'var(--font-sign)' }}>
@@ -83,29 +85,5 @@ function Leader({ anchorY, x }: { anchorY: number; x: number }) {
         }}
       />
     </div>
-  );
-}
-
-function PlateBody({ group }: { group: ConcoursePlateGroup }) {
-  return (
-    <div className="flex w-max max-w-full flex-col gap-1">
-      {group.exit !== null && <ExitPlate exit={group.exit} facilityTypeNames={group.facilityTypeNames} />}
-      {group.transfers.length > 0 && <TransferPlate transfers={group.transfers} />}
-    </div>
-  );
-}
-
-/** 対面乗換の札。横の図の札（FacingTransferTagRow）と同じ見た目。色だけに頼らず左の縁のバーで路線を示す */
-function FacingTag({ banner }: { banner: FacingTransferBanner }) {
-  return (
-    <p
-      className="w-max max-w-full rounded-r-xl py-1.5 pl-2.5 pr-3 text-[12px] font-bold leading-snug"
-      style={{
-        backgroundColor: `color-mix(in srgb, ${banner.color} 10%, white)`,
-        borderInlineStart: `4px solid ${banner.color}`,
-      }}
-    >
-      {banner.text}
-    </p>
   );
 }

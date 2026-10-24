@@ -126,9 +126,10 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
           {groups
             .filter((group) => group.lane === lane)
             .map((group) => (
-              <div
+              <PlateStack
                 key={group.concourseId}
-                className="flex flex-col gap-1 pt-1.5"
+                group={group}
+                className="pt-1.5"
                 style={{
                   gridArea: '1 / 1',
                   zIndex: 1,
@@ -139,15 +140,28 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
                   maxWidth: 'min(220px, 100%)',
                   ...plateStyle(group, bounds),
                 }}
-              >
-                {group.exit !== null && (
-                  <ExitPlate exit={group.exit} facilityTypeNames={group.facilityTypeNames} />
-                )}
-                {group.transfers.length > 0 && <TransferPlate transfers={group.transfers} />}
-              </div>
+              />
             ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** 出口のプレートと乗換のプレートを縦に積んだもの。横の段と縦の列の両方で使う。位置は呼び出し側が決める */
+export function PlateStack({
+  group,
+  className = '',
+  style,
+}: {
+  group: ConcoursePlateGroup;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`} style={style}>
+      {group.exit !== null && <ExitPlate exit={group.exit} facilityTypeNames={group.facilityTypeNames} />}
+      {group.transfers.length > 0 && <TransferPlate transfers={group.transfers} />}
     </div>
   );
 }
@@ -159,7 +173,7 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
  * 引き出し線は幅の見積り誤差ぶんずれうるが、「このエレベーターは中央改札へ」が
  * 文字で読めれば対応関係は失われない。
  */
-export function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeNames: string[] }) {
+function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityTypeNames: string[] }) {
   return (
     <div
       className="rounded-[14px] px-3 py-2 text-[13px] font-bold leading-snug"
@@ -181,7 +195,7 @@ export function ExitPlate({ exit, facilityTypeNames }: { exit: string; facilityT
 }
 
 /** 乗換プレート（白地に濃い灰色の枠）。路線は1件ずつ色チップ付きで縦に並べ、畳まない */
-export function TransferPlate({ transfers }: { transfers: TransferEntry[] }) {
+function TransferPlate({ transfers }: { transfers: TransferEntry[] }) {
   return (
     <div
       className="rounded-xl px-3 py-2 text-[13px] leading-snug"

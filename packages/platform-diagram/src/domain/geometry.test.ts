@@ -342,7 +342,7 @@ describe('縦の図の写像（verticalMatrix / toVertical）', () => {
     expect(a * d - b * c).toBe(1);
   });
 
-  it('プレートの列の y（px）は、写した y に PX_PER_METER を掛けたもの', () => {
-    expect(verticalY(20, bounds)).toBe(toVertical({ x: 20, y: 0 }, bounds).y * PX_PER_METER);
+  it('プレートの列の y（px）は、描画範囲の上の端からの距離に PX_PER_METER を掛けたもの', () => {
+    expect(verticalY(20, bounds)).toBe((145 - 20) * PX_PER_METER);
   });
 });

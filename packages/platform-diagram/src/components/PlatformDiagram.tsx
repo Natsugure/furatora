@@ -60,6 +60,18 @@ export function PlatformDiagram({
   const rows = layoutRows({ hasConcourseLeaders: plateLayout.groups.length > 0 });
   const freeSpace = doorListGroups(cars.map((c) => ({ carNumber: c.carNumber, doors: c.freeSpaceDoors })));
   const prioritySeat = doorListGroups(cars.map((c) => ({ carNumber: c.carNumber, doors: c.prioritySeatDoors })));
+  // 縦と横の図は向きのほかは同じものを描く
+  const svgProps = {
+    cars,
+    concourses,
+    physicalLength,
+    minX,
+    width,
+    rows,
+    plateGroups: plateLayout.groups,
+    facingBanners: facingLayout.banners,
+    iconBasePath,
+  };
 
   return (
     <div
@@ -81,18 +93,7 @@ export function PlatformDiagram({
       {responsive && (
         <div data-orientation="vertical" className="mb-2 overflow-x-auto lg:hidden">
           <div className="flex items-start">
-            <DiagramSvg
-              cars={cars}
-              concourses={concourses}
-              physicalLength={physicalLength}
-              minX={minX}
-              width={width}
-              rows={rows}
-              plateGroups={plateLayout.groups}
-              facingBanners={facingLayout.banners}
-              iconBasePath={iconBasePath}
-              orientation="vertical"
-            />
+            <DiagramSvg {...svgProps} orientation="vertical" />
             <VerticalPlateColumn groups={plateLayout.groups} facingBanners={facingLayout.banners} bounds={bounds} />
           </div>
         </div>
@@ -107,17 +108,7 @@ export function PlatformDiagram({
               SVGの要素ボックスがviewBoxのアスペクト比から外れ、内部の絶対配置オーバーレイの
               y座標が実測pxとずれる（x はxFractionの割合なので影響しない）。 */}
           <div className="relative">
-            <DiagramSvg
-              cars={cars}
-              concourses={concourses}
-              physicalLength={physicalLength}
-              minX={minX}
-              width={width}
-              rows={rows}
-              plateGroups={plateLayout.groups}
-              facingBanners={facingLayout.banners}
-              iconBasePath={iconBasePath}
-            />
+            <DiagramSvg {...svgProps} />
             {diagramOverlay?.(rows)}
           </div>
           <ConcoursePlateRow
