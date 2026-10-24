@@ -102,9 +102,10 @@ export function differingFields(routes: readonly AssessedRoute<TransferRouteDTO>
  * 最短が1本に決まらない（先頭の所要時分が不明、または先頭の2本が同着）ときは primary を null にし、全部を others に入れる。
  * 決まらないのに先頭を大きくすると、入力の順で選んだルートを推すことになる（docs/domain/station-master-model.md「Web の表示の規則」）
  */
-export function splitPrimaryRoute<T extends AssessedRoute<TransferRouteDTO>>(
-  routes: readonly T[],
-): { primary: T | null; others: T[] } {
+export function splitPrimaryRoute(routes: readonly AssessedRoute<TransferRouteDTO>[]): {
+  primary: AssessedRoute<TransferRouteDTO> | null;
+  others: AssessedRoute<TransferRouteDTO>[];
+} {
   const [first, second, ...rest] = routes;
   if (first === undefined) return { primary: null, others: [] };
   if (second === undefined) return { primary: first, others: [] };

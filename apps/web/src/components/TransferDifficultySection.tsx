@@ -140,13 +140,13 @@ function PrimaryRoute({
   assessed,
   highlights,
   accentClass,
-  children,
+  detourNote,
 }: {
   assessed: AssessedRoute<TransferRouteDTO>;
   highlights: Set<RouteField>;
   accentClass: string;
-  /** チップの後に添える文（迂回度） */
-  children?: React.ReactNode;
+  /** チップの後に添える迂回度の文 */
+  detourNote: React.ReactNode;
 }) {
   const { route } = assessed;
   return (
@@ -175,7 +175,7 @@ function PrimaryRoute({
       <div className="flex flex-col gap-2">
         <RouteChips assessed={assessed} highlights={highlights} />
         {route.notes && <p className="text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
-        {children}
+        {detourNote}
       </div>
     </div>
   );
@@ -205,11 +205,7 @@ function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFre
   if (primary === null) {
     return (
       <>
-        <ul className="mt-3 divide-y divide-ink/10">
-          {others.map((assessed) => (
-            <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} compact={false} />
-          ))}
-        </ul>
+        <RouteList routes={others} highlights={highlights} compact={false} className="mt-3" />
         {detourNote && <div className="mt-3">{detourNote}</div>}
       </>
     );
@@ -217,11 +213,31 @@ function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFre
 
   return (
     <>
-      <PrimaryRoute assessed={primary} highlights={highlights} accentClass={accentClass}>
-        {detourNote}
-      </PrimaryRoute>
+      <PrimaryRoute assessed={primary} highlights={highlights} accentClass={accentClass} detourNote={detourNote} />
       {others.length > 0 && <OtherRoutes routes={others} highlights={highlights} />}
     </>
+  );
+}
+
+function RouteList({
+  routes,
+  highlights,
+  compact,
+  className = '',
+  labelledBy,
+}: {
+  routes: AssessedRoute<TransferRouteDTO>[];
+  highlights: Set<RouteField>;
+  compact: boolean;
+  className?: string;
+  labelledBy?: string;
+}) {
+  return (
+    <ul aria-labelledby={labelledBy} className={`divide-y divide-ink/10 ${className}`}>
+      {routes.map((assessed) => (
+        <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} compact={compact} />
+      ))}
+    </ul>
   );
 }
 
@@ -238,11 +254,7 @@ function OtherRoutes({
       <h4 id={headingId} className="mb-2 text-xs font-bold text-muted">
         ほかのルート
       </h4>
-      <ul aria-labelledby={headingId} className="divide-y divide-ink/10">
-        {routes.map((assessed) => (
-          <RouteItem key={assessed.route.routeId} assessed={assessed} highlights={highlights} compact />
-        ))}
-      </ul>
+      <RouteList routes={routes} highlights={highlights} compact labelledBy={headingId} />
     </div>
   );
 }
