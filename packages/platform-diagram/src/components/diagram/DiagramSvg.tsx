@@ -12,7 +12,10 @@ import {
   FREE_SPACE_RING_WIDTH,
   PLATFORM_BAR_HEIGHT,
   PLATFORM_LABEL_FONT_SIZE,
+  PX_PER_METER,
   TRAIN_ROW_HEIGHT,
+  verticalMatrix,
+  type Bounds,
   type VerticalLayout,
 } from '../../domain/geometry';
 import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/concourseLayout';
@@ -59,38 +62,68 @@ type Props = {
   cars: StopPatternCarDTO[];
   concourses: ConcourseDTO[];
   physicalLength: number;
-  minX: number;
-  width: number;
+  /** 描画範囲。縦の図の写像も、HTML の列（verticalY()）と同じこの値から作る */
+  bounds: Bounds;
   rows: VerticalLayout;
   plateGroups: ConcoursePlateGroup[];
   facingBanners: FacingTransferBanner[];
   /** 設備アイコンPNGの配信元パス。各アプリの public/icons/ を指す（既定 '/icons'） */
   iconBasePath?: string;
+  /**
+   * 縦の図は横の図を左へ90°回したもの（0m が下、列車が左。ADR-0023）。
+   * 中身はいつも横の座標で描き、外側の <g> で回す。文字・アイコンだけ正立に戻す
+   */
+  orientation?: Orientation;
 };
+
+type Orientation = 'horizontal' | 'vertical';
+
+/** ホームの両端の文字（0m とホーム長） */
+type EndLabel = {
+  key: 'start' | 'end';
+  text: string;
+  x: number;
+  y: number;
+  textAnchor: 'start' | 'middle' | 'end';
+  dominantBaseline?: 'hanging';
+};
+
+/** 縦の図で、文字・アイコンを (cx, cy) を中心に正立へ戻す transform。横の図では何もしない */
+function upright(vertical: boolean, cx: number, cy: number): string | undefined {
+  return vertical ? `rotate(90 ${cx} ${cy})` : undefined;
+}
 
 export function DiagramSvg({
   cars,
   concourses,
   physicalLength,
-  minX,
-  width,
+  bounds,
   rows,
   plateGroups,
   facingBanners,
   iconBasePath = '/icons',
+  orientation = 'horizontal',
 }: Props) {
+  const { minX, maxX } = bounds;
+  const width = maxX - minX;
   const reversed = isDoorOrderReversed(cars);
   const cells = concourses.flatMap((c) => c.cells.map((cell) => ({ ...cell, concourseId: c.id })));
   const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
 
-  return (
-    <svg
-      viewBox={`${minX} 0 ${width} ${rows.viewHeight}`}
-      preserveAspectRatio="xMidYMid meet"
-      /* height を指定してはならない。指定すると meet がレターボックスを生み、
-         HTMLオーバーレイとのx対応が無言で壊れる（docs/domain/platform-coordinate-system.md） */
-      style={{ width: '100%', display: 'block' }}
-    >
+  const vertical = orientation === 'vertical';
+  // 縦では両端の文字をホームの帯の延長上（0m は下の端の外、ホーム長は上の端の外）に正立で置く
+  const endLabels: EndLabel[] = vertical
+    ? [
+        { key: 'start', text: '0m', x: -0.6, y: rows.platformBarY, textAnchor: 'middle', dominantBaseline: 'hanging' },
+        { key: 'end', text: `${physicalLength}m`, x: physicalLength + 0.6, y: rows.platformBarY, textAnchor: 'middle' },
+      ]
+    : [
+        { key: 'start', text: '0m', x: 0, y: rows.platformLabelY, textAnchor: 'start' },
+        { key: 'end', text: `${physicalLength}m`, x: physicalLength, y: rows.platformLabelY, textAnchor: 'end' },
+      ];
+
+  const content = (
+    <>
       {/* 対面乗換ティント。ホーム側の帯全体を覆う */}
       {facingBanners.map((banner) => (
         <rect
@@ -114,20 +147,21 @@ export function DiagramSvg({
         height={PLATFORM_BAR_HEIGHT}
         fill="var(--color-border-strong)"
       />
-      <text x={0} y={rows.platformLabelY} fontSize={PLATFORM_LABEL_FONT_SIZE} fill="var(--color-text-secondary)">
-        0m
-      </text>
-      <text
-        x={physicalLength}
-        y={rows.platformLabelY}
-        fontSize={PLATFORM_LABEL_FONT_SIZE}
-        fill="var(--color-text-secondary)"
-        textAnchor="end"
-      >
-        {physicalLength}m
-      </text>
+      {endLabels.map(({ key, text, x, y, ...attrs }) => (
+        <text
+          key={key}
+          x={x}
+          y={y}
+          transform={upright(vertical, x, y)}
+          fontSize={PLATFORM_LABEL_FONT_SIZE}
+          fill="var(--color-text-secondary)"
+          {...attrs}
+        >
+          {text}
+        </text>
+      ))}
 
-      <CarRow cars={cars} trainY={rows.trainY} />
+      <CarRow cars={cars} trainY={rows.trainY} vertical={vertical} />
       <DoorMarks cars={cars} reversed={reversed} rows={rows} />
 
       {/* 設備アクセス点（xPositionMeters が非nullのcellのみ。
@@ -140,7 +174,10 @@ export function DiagramSvg({
             const iconFile = facility.typeCode !== null ? FACILITY_ICON_FILES[facility.typeCode] : undefined;
             return iconFile ? (
               // 白い札に載せる（見本）。札の大きさは FACILITY_ICON_SIZE のままなので、描画範囲の算出は変わらない
-              <g key={`${cell.concourseId}-${idx}-${fIdx}`}>
+              <g
+                key={`${cell.concourseId}-${idx}-${fIdx}`}
+                transform={upright(vertical, x, tileY + FACILITY_ICON_SIZE / 2)}
+              >
                 <rect
                   x={x - FACILITY_ICON_SIZE / 2}
                   y={tileY}
@@ -168,6 +205,7 @@ export function DiagramSvg({
                 y={rows.facilityY + FACILITY_ROW_HEIGHT / 2 + 1}
                 fontSize={FACILITY_ICON_SIZE}
                 textAnchor="middle"
+                transform={upright(vertical, x, rows.facilityY + FACILITY_ROW_HEIGHT / 2)}
               >
                 📍
                 <title>{facility.typeName}</title>
@@ -177,6 +215,33 @@ export function DiagramSvg({
         )}
 
       <ConcourseLeaders groups={plateGroups} rows={rows} />
+    </>
+  );
+
+  if (vertical) {
+    // 左へ90°回す（verticalMatrix()。行列式が +1 の回転なので鏡写しにならない）。
+    // 縦は伸び縮みさせないので、幅と高さを px で両方決める（アスペクト比が viewBox と一致し、レターボックスは出ない）
+    return (
+      <svg
+        viewBox={`0 0 ${rows.viewHeight} ${width}`}
+        width={rows.viewHeight * PX_PER_METER}
+        height={width * PX_PER_METER}
+        style={{ display: 'block', flexShrink: 0 }}
+      >
+        <g transform={`matrix(${verticalMatrix(bounds).join(' ')})`}>{content}</g>
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox={`${minX} 0 ${width} ${rows.viewHeight}`}
+      preserveAspectRatio="xMidYMid meet"
+      /* height を指定してはならない。指定すると meet がレターボックスを生み、
+         HTMLオーバーレイとのx対応が無言で壊れる（docs/domain/platform-coordinate-system.md） */
+      style={{ width: '100%', display: 'block' }}
+    >
+      {content}
     </svg>
   );
 }
@@ -188,7 +253,15 @@ export function DiagramSvg({
  * 編成全体を1つの外枠で囲まないのは、号車が座標上で連続している保証が
  * データに無いため（管理画面の手入力）。隙間方式なら非連続でも破綻しない。
  */
-function CarRow({ cars, trainY }: { cars: StopPatternCarDTO[]; trainY: number }) {
+function CarRow({
+  cars,
+  trainY,
+  vertical,
+}: {
+  cars: StopPatternCarDTO[];
+  trainY: number;
+  vertical: boolean;
+}) {
   const radii = carCornerRadii(cars);
   const tagCenterY = trainY + TRAIN_ROW_HEIGHT / 2 - CAR_NUMBER_TAG_SHIFT;
 
@@ -212,26 +285,28 @@ function CarRow({ cars, trainY }: { cars: StopPatternCarDTO[]; trainY: number })
             />
 
             {/* 号車番号の札。車体が一様な色なので、白い札で浮かせる */}
-            <rect
-              x={centerX - CAR_NUMBER_TAG_SIZE / 2}
-              y={tagCenterY - CAR_NUMBER_TAG_SIZE / 2}
-              width={CAR_NUMBER_TAG_SIZE}
-              height={CAR_NUMBER_TAG_SIZE}
-              rx={CAR_NUMBER_TAG_RADIUS}
-              fill="var(--color-car-number-bg)"
-            />
-            <text
-              x={centerX}
-              y={tagCenterY}
-              dominantBaseline="central"
-              fontSize={CAR_NUMBER_FONT_SIZE}
-              fontWeight="bold"
-              textAnchor="middle"
-              fill="var(--color-text-primary)"
-              style={{ fontFamily: 'var(--font-sign)', fontVariantNumeric: 'tabular-nums' }}
-            >
-              {car.carNumber}
-            </text>
+            <g transform={upright(vertical, centerX, tagCenterY)}>
+              <rect
+                x={centerX - CAR_NUMBER_TAG_SIZE / 2}
+                y={tagCenterY - CAR_NUMBER_TAG_SIZE / 2}
+                width={CAR_NUMBER_TAG_SIZE}
+                height={CAR_NUMBER_TAG_SIZE}
+                rx={CAR_NUMBER_TAG_RADIUS}
+                fill="var(--color-car-number-bg)"
+              />
+              <text
+                x={centerX}
+                y={tagCenterY}
+                dominantBaseline="central"
+                fontSize={CAR_NUMBER_FONT_SIZE}
+                fontWeight="bold"
+                textAnchor="middle"
+                fill="var(--color-text-primary)"
+                style={{ fontFamily: 'var(--font-sign)', fontVariantNumeric: 'tabular-nums' }}
+              >
+                {car.carNumber}
+              </text>
+            </g>
           </g>
         );
       })}

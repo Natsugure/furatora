@@ -1,6 +1,6 @@
 # ADR-0023: ホーム図は画面の幅で横と縦を切り替え、番線のカードに収める（回してよいが、鏡写しにしない）
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-10-21
 - **決定者**: @Natsugure
 - **関連**: [ADR-0017](./0017-soft-rose-palette-and-typography.md)（見本）, [ADR-0022](./0022-platform-origin-left-end-facing-track.md)（原点の約束）,

@@ -2,10 +2,6 @@ import {
   computeBounds,
   layoutConcoursePlates,
   layoutFacingBanners,
-  connectionLabels,
-  exitsLabel,
-  hasDisplayableInfo,
-  isDrawable,
   type PlatformDTO,
 } from '@furatora/platform-diagram/domain';
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
@@ -29,14 +25,10 @@ export function PlatformDisplay({ platform }: Props) {
   const plateLayout = layoutConcoursePlates(platform.concourses, bounds);
   const facingLayout = layoutFacingBanners(platform.concourses, bounds);
 
-  // 図に描けないコンコース（座標を持つアクセス点が無い）だけをテキストで補う。
-  // 描けるものは図のプレートが全文を持っているので、ここに重ねて出す意味はない。
-  const undrawable = platform.concourses.filter((c) => !isDrawable(c) && hasDisplayableInfo(c));
-
   const formation = formationLabel(platform.stopPatterns);
   const canDrawDiagram = platform.physicalLength > 0 && platform.stopPatterns.length > 0;
-  // 図を描けず、位置未登録のコンコースも注記も無ければ、開いても頭と同じことしか出ない
-  const hasContent = canDrawDiagram || undrawable.length > 0 || Boolean(platform.notes);
+  // 図を描けず注記も無ければ、開いても頭と同じことしか出ない
+  const hasContent = canDrawDiagram || Boolean(platform.notes);
 
   return (
     <div className="overflow-hidden rounded-card border-[1.5px] border-subtle bg-surface">
@@ -89,6 +81,7 @@ export function PlatformDisplay({ platform }: Props) {
                       bounds={bounds}
                       plateLayout={plateLayout}
                       facingLayout={facingLayout}
+                      responsive
                     />
                   ))}
                 </div>
@@ -99,45 +92,6 @@ export function PlatformDisplay({ platform }: Props) {
               </div>
             ) : (
               <p className="text-sm text-muted">列車情報がありません</p>
-            )}
-
-            {/* 位置が登録されていないコンコース。図に描けないぶんをここで補う */}
-            {undrawable.length > 0 && (
-              <div className="mt-4 border-t border-line pt-4">
-                <p className="mb-1 text-xs font-bold text-muted">
-                  位置未登録の設備・乗換
-                </p>
-                <p className="mb-3 text-xs text-muted">
-                  ホーム上の位置が登録されていないため、図には表示していません。
-                </p>
-                <div className="space-y-3">
-                  {undrawable.map((concourse) => {
-                    const exits = exitsLabel(concourse);
-                    const connections = connectionLabels(concourse);
-                    const facilityNames = [
-                      ...new Set(concourse.cells.flatMap((cell) => cell.facilities.map((f) => f.typeName))),
-                    ];
-
-                    return (
-                      <div key={concourse.id}>
-                        {exits && <p className="text-sm font-medium text-ink">{exits}</p>}
-                        {connections.length > 0 && (
-                          <p className="text-sm text-ink-soft">
-                            <span className="text-muted">乗換: </span>
-                            {connections.join('・')}
-                          </p>
-                        )}
-                        {facilityNames.length > 0 && (
-                          <p className="text-sm text-ink-soft">
-                            <span className="text-muted">設備: </span>
-                            {facilityNames.join('・')}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             )}
 
             {/* Platform notes */}

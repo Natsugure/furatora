@@ -126,9 +126,10 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
           {groups
             .filter((group) => group.lane === lane)
             .map((group) => (
-              <div
+              <PlateStack
                 key={group.concourseId}
-                className="flex flex-col gap-1 pt-1.5"
+                group={group}
+                className="pt-1.5"
                 style={{
                   gridArea: '1 / 1',
                   zIndex: 1,
@@ -139,15 +140,28 @@ export function ConcoursePlateRow({ groups, laneCount, bounds }: Props) {
                   maxWidth: 'min(220px, 100%)',
                   ...plateStyle(group, bounds),
                 }}
-              >
-                {group.exit !== null && (
-                  <ExitPlate exit={group.exit} facilityTypeNames={group.facilityTypeNames} />
-                )}
-                {group.transfers.length > 0 && <TransferPlate transfers={group.transfers} />}
-              </div>
+              />
             ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** 出口のプレートと乗換のプレートを縦に積んだもの。横の段と縦の列の両方で使う。位置は呼び出し側が決める */
+export function PlateStack({
+  group,
+  className = '',
+  style,
+}: {
+  group: ConcoursePlateGroup;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`} style={style}>
+      {group.exit !== null && <ExitPlate exit={group.exit} facilityTypeNames={group.facilityTypeNames} />}
+      {group.transfers.length > 0 && <TransferPlate transfers={group.transfers} />}
     </div>
   );
 }

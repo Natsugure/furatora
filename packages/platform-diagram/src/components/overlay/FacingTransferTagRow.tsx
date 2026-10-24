@@ -39,37 +39,45 @@ export function FacingTransferTagRow({ banners, laneCount, bounds }: Props) {
             .map((banner) => {
               const startPct = xFraction(banner.startX, bounds) * 100;
               const endPct = xFraction(banner.endX, bounds) * 100;
-              const style: LineColorStyle = {
-                gridArea: '1 / 1',
-                justifySelf: 'start',
-                marginInlineStart: `${startPct}%`,
-                minWidth: `${endPct - startPct}%`,
-                width: 'max-content',
-                maxWidth: '100%',
-                '--line-color': banner.color,
-                // 色を主たる手掛かりにしない: color-mix が効かない環境でも
-                // 左のバーだけで路線が識別できるようにする
-                backgroundColor: 'color-mix(in srgb, var(--line-color) 10%, white)',
-                borderInlineStart: '4px solid var(--line-color)',
-              };
-
               return (
-                <p
+                <FacingTransferTag
                   key={banner.key}
-                  className="flex items-center gap-1.5 rounded-r-xl py-1.5 pl-2.5 pr-3 text-[12px] font-bold leading-snug"
-                  style={style}
-                >
-                  <span
-                    aria-hidden
-                    className="size-2.5 flex-shrink-0 rounded-full"
-                    style={{ backgroundColor: 'var(--line-color)' }}
-                  />
-                  {banner.text}
-                </p>
+                  banner={banner}
+                  style={{
+                    gridArea: '1 / 1',
+                    justifySelf: 'start',
+                    marginInlineStart: `${startPct}%`,
+                    minWidth: `${endPct - startPct}%`,
+                    width: 'max-content',
+                    maxWidth: '100%',
+                  }}
+                />
               );
             })}
         </div>
       ))}
     </div>
+  );
+}
+
+/** 札1枚の見た目。横の段と縦の列の両方で使う。位置は呼び出し側が style で決める */
+export function FacingTransferTag({ banner, style }: { banner: FacingTransferBanner; style?: CSSProperties }) {
+  const tagStyle: LineColorStyle = {
+    ...style,
+    '--line-color': banner.color,
+    // 色を主たる手掛かりにしない: color-mix が効かない環境でも
+    // 左のバーだけで路線が識別できるようにする
+    backgroundColor: 'color-mix(in srgb, var(--line-color) 10%, white)',
+    borderInlineStart: '4px solid var(--line-color)',
+  };
+
+  return (
+    <p
+      className="flex items-center gap-1.5 rounded-r-xl py-1.5 pl-2.5 pr-3 text-[12px] font-bold leading-snug"
+      style={tagStyle}
+    >
+      <span aria-hidden className="size-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: 'var(--line-color)' }} />
+      {banner.text}
+    </p>
   );
 }
