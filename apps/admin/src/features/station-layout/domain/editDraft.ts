@@ -365,6 +365,7 @@ export function shiftConsistByEdge(
 
   const car = cars[index]!;
   const delta = x - (edge.side === 'start' ? car.startMeters : car.endMeters);
+  if (delta === 0) return draft;
   // 丸めないと浮動小数の誤差で隣接号車の共有フィールドがずれ、境界の共有が崩れる
   return {
     cars: cars.map((c) => ({

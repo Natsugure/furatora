@@ -69,7 +69,7 @@ export function DiagramEditLayer({
   // では、外端・境界のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
   const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
 
-  const edgeCandidates = useCallback(() => snapCandidates([], physicalLength), [physicalLength]);
+  const edgeCandidates = () => [0, physicalLength];
 
   const cellY = rows.facilityY + FACILITY_ROW_HEIGHT / 2;
   const carY = rows.trainY + TRAIN_ROW_HEIGHT / 2;
