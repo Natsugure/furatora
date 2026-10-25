@@ -73,4 +73,23 @@ describe('buildDirectionTabs', () => {
     const tabs = buildDirectionTabs([p]);
     expect(tabs[0]!.directionName).toBe('方面');
   });
+
+  it('方面IDがあるホーム番号順にソートされる (1, 2, 10の順で並ぶ)', () => {
+    const p1 = platform({ id: 'p1', platformNumber: '1', inboundDirectionId: 'dir1', inboundDirectionName: '渋谷方面' });
+    const p2 = platform({ id: 'p2', platformNumber: '10', inboundDirectionId: 'dir1', inboundDirectionName: '渋谷方面' });
+    const p3 = platform({ id: 'p3', platformNumber: '2', inboundDirectionId: 'dir1', inboundDirectionName: '渋谷方面' });
+    const tabs = buildDirectionTabs([p1, p2, p3]);
+    expect(tabs[0]!.platforms).toEqual([p1, p3, p2]);
+  });
+
+  it('方面IDがないホームが複数ある場合、全方面タブに数値順で並ぶ', () => {
+    const p1 = platform({ id: 'p1', platformNumber: '1', inboundDirectionId: 'dir1', inboundDirectionName: '渋谷方面' });
+    const p2 = platform({ id: 'p2', platformNumber: '10' });
+    const p3 = platform({ id: 'p3', platformNumber: '2' });
+    const tabs = buildDirectionTabs([p1, p2, p3]);
+    expect(tabs).toEqual([
+      { directionId: 'dir1', directionName: '渋谷方面', platforms: [p1] },
+      { directionId: null, directionName: '全方面', platforms: [p3, p2] },
+    ]);
+  })
 });

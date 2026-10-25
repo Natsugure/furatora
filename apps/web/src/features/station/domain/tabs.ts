@@ -6,10 +6,14 @@ import type { DirectionTabDTO, PlatformDTO } from '@furatora/platform-diagram/do
  * どちらの方面IDも持たないホームは「全方面」タブへまとめる。
  */
 export function buildDirectionTabs(platforms: PlatformDTO[]): DirectionTabDTO[] {
+  const sorted = [...platforms].sort((a, b) =>
+    a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true })
+  );
+
   const directionToPlatforms = new Map<string, PlatformDTO[]>();
   const directionNames = new Map<string, string>();
 
-  for (const platform of platforms) {
+  for (const platform of sorted) {
     const directions: [string | null, string | null][] = [
       [platform.inboundDirectionId, platform.inboundDirectionName],
       [platform.outboundDirectionId, platform.outboundDirectionName],
@@ -27,7 +31,7 @@ export function buildDirectionTabs(platforms: PlatformDTO[]): DirectionTabDTO[] 
     }
   }
 
-  const noDirectionPlatforms = platforms.filter(
+  const noDirectionPlatforms = sorted.filter(
     (p) => p.inboundDirectionId === null && p.outboundDirectionId === null,
   );
 
