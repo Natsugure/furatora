@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 
 // 路線の新規作成フォームの入力。既存の PUT 用 `lib/validations.ts` の
 // `lineUpdateSchema` はコピーせず、feature ローカルの規約（z.infer で Input 型を export）に従う。
@@ -10,7 +11,7 @@ import { z } from 'zod';
 // `ekidataLineCd` も手動追加行は持ち得ないため設定しない（ADR-0007 決定3）。
 export const lineCreateSchema = z.object({
   name: z.string().min(1),
-  operatorId: z.string().uuid(),
+  operatorId: uuidSchema,
   nameKana: z.string().nullable().optional(),
   nameEn: z.string().nullable().optional(),
   odptRailwayId: z.string().nullable().optional(),

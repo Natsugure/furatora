@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 
 // 駅の新規作成フォームの入力。既存の PUT 用 `lib/validations.ts` の
 // `stationUpdateSchema` はコピーせず、feature ローカルの規約（z.infer で Input 型を export）に従う。
@@ -13,8 +14,8 @@ import { z } from 'zod';
 // （docs/domain/station-master-model.md「粒度は暫定である」）、新規駅も路線の指定を伴う。
 export const stationCreateSchema = z.object({
   name: z.string().min(1),
-  operatorId: z.string().uuid(),
-  lineId: z.string().uuid(),
+  operatorId: uuidSchema,
+  lineId: uuidSchema,
   nameKana: z.string().nullable().optional(),
   nameEn: z.string().nullable().optional(),
   code: z.string().nullable().optional(),
@@ -22,7 +23,7 @@ export const stationCreateSchema = z.object({
   lon: z.string().nullable().optional(),
   odptStationId: z.string().nullable().optional(),
   prefCode: z.number().int().nullable().optional(),
-  stationGroupId: z.string().uuid().nullable().optional(),
+  stationGroupId: uuidSchema.nullable().optional(),
   stationOrder: z.number().int().nullable().optional(),
   notes: z.string().nullable().optional(),
 });

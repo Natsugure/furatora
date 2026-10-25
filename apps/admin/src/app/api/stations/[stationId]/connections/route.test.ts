@@ -48,6 +48,28 @@ describe('POST /api/stations/[stationId]/connections', () => {
     expect(createPair).not.toHaveBeenCalled();
   });
 
+  it('パスとボディの両方が大文字の同じ駅なら、自己接続として400を返す（#160）', async () => {
+    const upper = STATION_ID.toUpperCase();
+    const response = await POST(
+      request({ connectedStationId: upper }),
+      { params: Promise.resolve({ stationId: upper }) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(createPair).not.toHaveBeenCalled();
+  });
+
+  it('ボディの connectedStationId を小文字にして Repository に渡す（#160）', async () => {
+    createPair.mockResolvedValue(undefined);
+
+    await POST(request({ connectedStationId: OTHER_ID.toUpperCase() }), { params: mockParams });
+
+    expect(createPair).toHaveBeenCalledWith(
+      STATION_ID,
+      expect.objectContaining({ connectedStationId: OTHER_ID }),
+    );
+  });
+
   it('connectedStationId が UUID でない場合は400を返す', async () => {
     const response = await POST(request({ connectedStationId: 'x' }), { params: mockParams });
 

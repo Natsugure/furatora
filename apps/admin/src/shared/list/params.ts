@@ -7,7 +7,7 @@
 // SQL の列参照や asc()/desc() をこの型に持ち込まない。それらへの変換は
 // external/query/*.ts の中だけで行う（ADR-0003 が選択肢1を却下した理由への対処）。
 
-import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 
 export type SortOrder = 'asc' | 'desc';
 
@@ -37,8 +37,6 @@ export function singleParam(value: string | string[] | undefined): string | unde
   return Array.isArray(value) ? value[0] : value;
 }
 
-const uuidSchema = z.string().uuid();
-
 /**
  * スコープ用の UUID パラメータ（operatorId / lineId 等）を取り出す。
  * 不正な形式（例: `?operatorId=not-a-uuid`）は undefined にフォールバックする。
@@ -50,7 +48,7 @@ const uuidSchema = z.string().uuid();
 export function parseUuidParam(value: string | string[] | undefined): string | undefined {
   const v = singleParam(value);
   const result = v ? uuidSchema.safeParse(v) : undefined;
-  return result?.success ? result.data.toLowerCase() : undefined;
+  return result?.success ? result.data : undefined;
 }
 
 /**

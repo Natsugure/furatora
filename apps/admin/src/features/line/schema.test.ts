@@ -55,3 +55,13 @@ describe('lineCreateSchema', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('lineCreateSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = lineCreateSchema.parse({ name: '銀座線', operatorId: UPPER });
+    expect(result.operatorId).toBe(LOWER);
+  });
+});

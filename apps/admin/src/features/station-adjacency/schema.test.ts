@@ -15,6 +15,16 @@ describe('stationAdjacencyCreateSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('大文字・小文字だけが違う同じ駅どうしは失敗する（#160）', () => {
+    const result = stationAdjacencyCreateSchema.safeParse({ stationAId: A, stationBId: A.toUpperCase() });
+    expect(result.success).toBe(false);
+  });
+
+  it('端点を小文字にして返す（#160。昇順正規化を DB の uuid の順序と一致させるため）', () => {
+    const result = stationAdjacencyCreateSchema.parse({ stationAId: A.toUpperCase(), stationBId: B.toUpperCase() });
+    expect(result).toEqual({ stationAId: A, stationBId: B });
+  });
+
   it('UUID でない端点は失敗する', () => {
     const result = stationAdjacencyCreateSchema.safeParse({ stationAId: A, stationBId: 'x' });
     expect(result.success).toBe(false);

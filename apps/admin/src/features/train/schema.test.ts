@@ -65,3 +65,13 @@ describe('trainSchema', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('trainSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = trainSchema.parse({ name: 'E235系', operatorId: UPPER, lineIds: [UPPER], carCount: 11 });
+    expect(result).toMatchObject({ operatorId: LOWER, lineIds: [LOWER] });
+  });
+});

@@ -52,3 +52,19 @@ describe('platformSchema', () => {
     expect(result.data).not.toHaveProperty('platformSide');
   });
 });
+
+describe('platformSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = platformSchema.parse({
+      platformNumber: '1',
+      lineId: UPPER,
+      inboundDirectionId: UPPER,
+      outboundDirectionId: UPPER,
+      physicalLength: 210,
+    });
+    expect(result).toMatchObject({ lineId: LOWER, inboundDirectionId: LOWER, outboundDirectionId: LOWER });
+  });
+});

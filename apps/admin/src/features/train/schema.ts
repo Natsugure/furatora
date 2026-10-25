@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 
 const trainEquipmentSchema = z.object({
   carNumber: z.number().int().min(1),
@@ -15,8 +16,8 @@ const carStructureItemSchema = z.object({
 
 export const trainSchema = z.object({
   name: z.string().min(1),
-  operatorId: z.string().uuid(),
-  lineIds: z.array(z.string().uuid()),
+  operatorId: uuidSchema,
+  lineIds: z.array(uuidSchema),
   carCount: z.number().int().min(1),
   carStructure: z.array(carStructureItemSchema).nullable().optional(),
   freeSpaces: z.array(trainEquipmentSchema).nullable().optional(),

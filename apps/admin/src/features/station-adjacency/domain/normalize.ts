@@ -5,7 +5,9 @@
 // 書き込み側がこの正規化を必ず通すことで、辺が逆向きに与えられても重複行にならない
 // （docs/domain/station-master-model.md「隣接」）。
 //
-// UUID の文字列は辞書順で全順序が定まる。等値（自己隣接）はそのまま返す
+// UUID の文字列は辞書順で全順序が定まる。ただし DB の uuid の順序と一致するのは小文字どうしの
+// 比較だけなので、端点は schema（shared/schema/uuid.ts）で小文字にそろえてから渡すこと（#160）。
+// 等値（自己隣接）はそのまま返す
 // （排除は schema の .refine() の責務）。
 export function normalizeAdjacencyEndpoints(
   x: string,

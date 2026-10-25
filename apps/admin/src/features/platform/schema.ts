@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 
 export const platformSchema = z.object({
   platformNumber: z.string().min(1),
-  lineId: z.string().uuid(),
-  inboundDirectionId: z.string().uuid().nullable().optional(),
-  outboundDirectionId: z.string().uuid().nullable().optional(),
+  lineId: uuidSchema,
+  inboundDirectionId: uuidSchema.nullable().optional(),
+  outboundDirectionId: uuidSchema.nullable().optional(),
   physicalLength: z.number().positive(),
   notes: z.string().nullable().optional(),
 });

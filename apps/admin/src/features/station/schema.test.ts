@@ -64,3 +64,13 @@ describe('stationCreateSchema', () => {
     expect(result.success && 'slug' in result.data).toBe(false);
   });
 });
+
+describe('stationCreateSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = stationCreateSchema.parse({ name: '銀座', operatorId: UPPER, lineId: UPPER, stationGroupId: UPPER });
+    expect(result).toMatchObject({ operatorId: LOWER, lineId: LOWER, stationGroupId: LOWER });
+  });
+});

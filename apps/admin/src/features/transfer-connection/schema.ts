@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 import { FACILITY_TYPE_CODES } from '@furatora/transfer-difficulty/domain';
 import { COMBO_KEYS } from './domain/types';
 
@@ -7,7 +8,7 @@ import { COMBO_KEYS } from './domain/types';
 export const pairSaveInputSchema = z.object({
   routes: z.array(
     z.object({
-      routeId: z.string().uuid().nullable(),
+      routeId: uuidSchema.nullable(),
       label: z.string(),
       isBaseline: z.boolean(),
       minutes: z.number().nullable(),

@@ -30,3 +30,9 @@
   - `docs/domain/` は変えない。パスパラメータの扱いはドメインルールではなく Admin の実装の約束で、`parseUuidParams` の JSDoc に書いた
   - ADR の追加・ステータス変更は無い
 - [x] **TASK-9** PR を作る（#108・#160 を閉じる）: #198
+- [x] **TASK-10** レビューの指摘への対応: リクエストボディの UUID も小文字にそろえる
+  - パスだけを小文字にしたため、`POST /api/stations/{大文字}/connections` に同じ駅を大文字で送ると自己接続の判定をすり抜けた（`station_connections` に CHECK は無い）
+  - 隣接の端点も、大文字・小文字が混ざると `normalizeAdjacencyEndpoints` の順序が DB の uuid の順序と食い違い、`.refine` の自己隣接の判定もすり抜けた（PR 前から）
+  - `shared/schema/uuid.ts` の `uuidSchema`（検証して小文字にする）を作り、`features/*/schema.ts` と `lib/validations.ts` のボディの UUID、`parseUuidParam` で使う
+  - Red を確かめたテスト: `uuidSchema` 2 件、乗換接続の route 2 件、隣接の schema 2 件、残りの schema 9 件。ユニット 672 件・型チェック・lint が通った
+  - 見送った指摘（RFC に沿わない UUID の既存行は本番に 0 件、`connections/new` の searchParams は PR 前からの挙動、e2e の待ち方は不安定の根拠が弱い）と、技術的負債として起票した指摘（ガードの重複、`parseUuidParams` の置き場所、route のテスト不足）は PR のコメントに書く
