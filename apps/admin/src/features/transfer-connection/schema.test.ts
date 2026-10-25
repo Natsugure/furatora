@@ -58,3 +58,13 @@ describe('pairSaveInputSchema', () => {
     expect(pairSaveInputSchema.safeParse({ connectionNotes: {} }).success).toBe(false);
   });
 });
+
+describe('pairSaveInputSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = pairSaveInputSchema.parse({ routes: [route({ routeId: UPPER })], connectionNotes: {} });
+    expect(result.routes[0]?.routeId).toBe(LOWER);
+  });
+});

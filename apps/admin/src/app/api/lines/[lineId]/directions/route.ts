@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { directionSchema } from '@/lib/validations';
 import { lineDirectionRepository } from '@/di';
 import { DirectionDefaultConflictError } from '@/features/line/ports';
+import { parseUuidParams } from '@/shared/list/params';
 
 // 方面の新規作成
 export async function POST(
@@ -9,7 +10,9 @@ export async function POST(
   { params }: { params: Promise<{ lineId: string }> }
 ) {
   try {
-    const { lineId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { lineId } = ids;
     // 空ボディ・不正 JSON は 400
     let body: unknown;
     try {

@@ -78,3 +78,18 @@ describe('platformLocationSchema', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('platformLocationSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = platformLocationSchema.parse({
+      platformId: UPPER,
+      cells: [{ facilities: [{ typeCode: 'elevator' }] }],
+      connections: [{ stationId: UPPER, connectedPlatformId: UPPER, directionId: UPPER }],
+    });
+    expect(result.platformId).toBe(LOWER);
+    expect(result.connections?.[0]).toMatchObject({ stationId: LOWER, connectedPlatformId: LOWER, directionId: LOWER });
+  });
+});

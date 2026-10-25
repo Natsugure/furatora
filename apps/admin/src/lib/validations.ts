@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 import { DIRECTIONS } from '@/features/transfer-connection/domain/types';
 
 export const operatorSchema = z.object({
@@ -16,7 +17,7 @@ export const stationUpdateSchema = z.object({
   code: z.string().nullable().optional(),
   lat: z.string().nullable().optional(),
   lon: z.string().nullable().optional(),
-  operatorId: z.string().uuid(),
+  operatorId: uuidSchema,
   notes: z.string().nullable().optional(),
 });
 
@@ -29,7 +30,7 @@ export const lineUpdateSchema = z.object({
   lineCode: z.string().nullable().optional(),
   color: z.string().nullable().optional(),
   displayOrder: z.number().int().nullable().optional(),
-  operatorId: z.string().uuid(),
+  operatorId: uuidSchema,
 });
 
 export const directionSchema = z.object({

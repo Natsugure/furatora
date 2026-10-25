@@ -122,3 +122,34 @@ describe('PUT /api/trains/[trainId]', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 });
+
+describe('パスパラメータの検証（#108・#160）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('GET: UUID の形でない trainId は404を返し、Query を呼ばない', async () => {
+    const res = await GET(request(), { params: Promise.resolve({ trainId: 'not-a-uuid' }) });
+
+    expect(res.status).toBe(404);
+    expect(getTrain).not.toHaveBeenCalled();
+  });
+
+  it('GET: 大文字の trainId は小文字にして Query に渡す', async () => {
+    getTrain.mockResolvedValue(null);
+
+    await GET(request(), { params: Promise.resolve({ trainId: TRAIN_ID.toUpperCase() }) });
+
+    expect(getTrain).toHaveBeenCalledWith(TRAIN_ID);
+  });
+
+  it('PUT: UUID の形でない trainId は404を返し、DB を呼ばない', async () => {
+    const res = await PUT(
+      new Request('http://localhost/api/trains/not-a-uuid', { method: 'PUT', body: '{}' }),
+      { params: Promise.resolve({ trainId: 'not-a-uuid' }) },
+    );
+
+    expect(res.status).toBe(404);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+});

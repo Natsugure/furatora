@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { stationAdjacencyCreateSchema } from '@/features/station-adjacency/schema';
 import { AdjacencyEndpointNotOnLineError } from '@/features/station-adjacency/ports';
 import { stationAdjacencyRepository } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 // 路線内の隣接の追加（Issue #88）。端点の昇順正規化と lineId 所属の検証は
 // Repository が担う。冪等なので同じ辺を再送しても 201。
@@ -10,7 +11,9 @@ export async function POST(
   { params }: { params: Promise<{ lineId: string }> },
 ) {
   try {
-    const { lineId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { lineId } = ids;
 
     let body: unknown;
     try {

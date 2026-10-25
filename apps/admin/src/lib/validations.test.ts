@@ -153,3 +153,16 @@ describe('directionSchema', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('stationUpdateSchema・lineUpdateSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('stationUpdateSchema は大文字の operatorId を小文字にして返す', () => {
+    expect(stationUpdateSchema.parse({ name: '銀座', operatorId: UPPER }).operatorId).toBe(LOWER);
+  });
+
+  it('lineUpdateSchema は大文字の operatorId を小文字にして返す', () => {
+    expect(lineUpdateSchema.parse({ name: '銀座線', operatorId: UPPER }).operatorId).toBe(LOWER);
+  });
+});

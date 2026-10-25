@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { stationPublishingRepository } from '@/di';
 import { stationPublicationSchema } from '@/features/station-publishing/schema';
 import { LineSlugMissingError, SlugTakenError } from '@/features/station-publishing/ports';
+import { parseUuidParams } from '@/shared/list/params';
 
 /**
  * 駅の公開・非公開を切り替える専用エンドポイント。
@@ -19,7 +20,9 @@ export async function PATCH(
   { params }: { params: Promise<{ stationId: string }> }
 ) {
   try {
-    const { stationId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId } = ids;
 
     // 空ボディ・不正 JSON は 400 系のクライアントエラー。
     // request.json() の例外を下の catch に落とすと 500 になってしまう

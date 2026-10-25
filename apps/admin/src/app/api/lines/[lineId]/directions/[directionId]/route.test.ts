@@ -78,3 +78,19 @@ describe('PUT /api/lines/[lineId]/directions/[directionId]', () => {
     expect(response.status).toBe(409);
   });
 });
+
+describe('パスパラメータの検証（#108）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('PUT: directionId が UUID の形でなければ404を返し、Repository を呼ばない', async () => {
+    const response = await PUT(
+      request(JSON.stringify(validBody)),
+      { params: Promise.resolve({ lineId: LINE_ID, directionId: 'not-a-uuid' }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(update).not.toHaveBeenCalled();
+  });
+});

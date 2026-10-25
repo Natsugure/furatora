@@ -109,3 +109,17 @@ describe('trainStopPatternSchema', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('trainStopPatternSchema の UUID（#160）', () => {
+  const UPPER = '550e8400-e29b-41d4-a716-4466554400AB';
+  const LOWER = '550e8400-e29b-41d4-a716-4466554400ab';
+
+  it('大文字の UUID を小文字にして返す', () => {
+    const result = trainStopPatternSchema.parse({
+      platformId: UPPER,
+      trainId: UPPER,
+      cars: [{ carNumber: 1, startMeters: 0, endMeters: 20 }],
+    });
+    expect(result).toMatchObject({ platformId: LOWER, trainId: LOWER });
+  });
+});

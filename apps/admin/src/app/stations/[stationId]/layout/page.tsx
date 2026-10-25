@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { BackLink } from '@/components/LinkElements';
-import { parseUuidParam } from '@/shared/list/params';
+import { parseUuidParam, parseUuidParams } from '@/shared/list/params';
 import { StationLayoutView } from '@/features/station-layout/components/StationLayoutView';
 import { resolveStationListBack } from '@/features/station/listState';
 import { stationLayoutPageQuery } from '@/di';
@@ -18,9 +18,9 @@ export default async function StationLayoutPage({
   params: Promise<{ stationId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { stationId } = await params;
-  // パスの stationId は UUID でなければ 404。検証せずに渡すと Postgres の uuid 型エラーで 500 になる
-  if (!parseUuidParam(stationId)) notFound();
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { stationId } = ids;
 
   const raw = await searchParams;
   // 不正値は500にせず先頭にフォールバックさせる

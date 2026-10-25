@@ -2,13 +2,16 @@ import { notFound } from 'next/navigation';
 import { Title } from '@mantine/core';
 import { TrainForm } from '@/features/train/components/TrainForm';
 import { trainEditPageQuery } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 export default async function EditTrainPage({
   params,
 }: {
   params: Promise<{ trainId: string }>;
 }) {
-  const { trainId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { trainId } = ids;
   const context = await trainEditPageQuery.getEditContext(trainId);
 
   if (!context?.train) notFound();

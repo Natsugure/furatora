@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
 
 const trainStopPatternCarSchema = z
@@ -17,8 +18,8 @@ const BOUNDARY_TOLERANCE_METERS = 0.01;
 
 export const trainStopPatternSchema = z
   .object({
-    platformId: z.string().uuid(),
-    trainId: z.string().uuid(),
+    platformId: uuidSchema,
+    trainId: uuidSchema,
     cars: z.array(trainStopPatternCarSchema).min(1),
   })
   // 隣接号車は境界を共有する（docs/domain/train-stop-patterns.md「隣接号車は境界を

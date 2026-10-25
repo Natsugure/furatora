@@ -5,13 +5,16 @@ import { eq, and } from 'drizzle-orm';
 import { directionSchema } from '@/lib/validations';
 import { lineDirectionRepository } from '@/di';
 import { DirectionDefaultConflictError } from '@/features/line/ports';
+import { parseUuidParams } from '@/shared/list/params';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ lineId: string; directionId: string }> }
 ) {
   try {
-    const { lineId, directionId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { lineId, directionId } = ids;
     const [direction] = await db
       .select()
       .from(lineDirections)
@@ -31,7 +34,9 @@ export async function PUT(
   { params }: { params: Promise<{ lineId: string; directionId: string }> }
 ) {
   try {
-    const { lineId, directionId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { lineId, directionId } = ids;
     let body: unknown;
     try {
       body = await request.json();
@@ -62,7 +67,9 @@ export async function DELETE(
   { params }: { params: Promise<{ lineId: string; directionId: string }> }
 ) {
   try {
-    const { lineId, directionId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { lineId, directionId } = ids;
     const [deleted] = await db
       .delete(lineDirections)
       .where(and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId)))

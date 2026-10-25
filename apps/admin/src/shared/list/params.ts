@@ -7,7 +7,7 @@
 // SQL の列参照や asc()/desc() をこの型に持ち込まない。それらへの変換は
 // external/query/*.ts の中だけで行う（ADR-0003 が選択肢1を却下した理由への対処）。
 
-import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 
 export type SortOrder = 'asc' | 'desc';
 
@@ -37,18 +37,34 @@ export function singleParam(value: string | string[] | undefined): string | unde
   return Array.isArray(value) ? value[0] : value;
 }
 
-const uuidSchema = z.string().uuid();
-
 /**
  * スコープ用の UUID パラメータ（operatorId / lineId 等）を取り出す。
  * 不正な形式（例: `?operatorId=not-a-uuid`）は undefined にフォールバックする。
  * ここで弾かないと、Drizzle が生成する `WHERE id = $1` にそのまま渡り
  * Postgres の `invalid input syntax for type uuid` で 500 になる。
+ * 小文字にして返す。DB は uuid を小文字で返すので、DB の id をキーにした Map を
+ * 大文字の URL の値で引くと外れる（#160）。
  */
 export function parseUuidParam(value: string | string[] | undefined): string | undefined {
   const v = singleParam(value);
   const result = v ? uuidSchema.safeParse(v) : undefined;
   return result?.success ? result.data : undefined;
+}
+
+/**
+ * 動的ルートのパスパラメータ（`await params` の結果）を丸ごと検証する（#108）。
+ * すべて UUID の形なら、同じキーで小文字にした値を返す。1 つでも不正なら null。
+ * Page は null なら `notFound()`、Route Handler は 404 を返し、以降は戻り値だけを使うこと
+ * （元の値を下に渡すと、大文字の id が Query の Map を外す。#160）。
+ */
+export function parseUuidParams<T extends Record<string, string>>(params: T): T | null {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    const id = parseUuidParam(value);
+    if (!id) return null;
+    result[key] = id;
+  }
+  return result as T;
 }
 
 /**

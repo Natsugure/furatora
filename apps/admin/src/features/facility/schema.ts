@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uuidSchema } from '@/shared/schema/uuid';
 import { FACILITY_TYPE_CODES } from '@furatora/database/enums';
 
 const facilitySchema = z.object({
@@ -21,9 +22,9 @@ const cellSchema = z.object({
 
 const connectionSchema = z
   .object({
-    stationId: z.string().uuid(),
-    connectedPlatformId: z.string().uuid().nullable().optional(),
-    directionId: z.string().uuid().nullable().optional(),
+    stationId: uuidSchema,
+    connectedPlatformId: uuidSchema.nullable().optional(),
+    directionId: uuidSchema.nullable().optional(),
     exitLabel: z.string().nullable().optional(),
     // 対面乗り換え帯（自ホーム座標系）。connectedPlatformId 指定時のみ意味を持つ
     xRangeStart: z.number().nullable().optional(),
@@ -35,7 +36,7 @@ const connectionSchema = z
   );
 
 export const platformLocationSchema = z.object({
-  platformId: z.string().uuid(),
+  platformId: uuidSchema,
   exits: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   cells: z.array(cellSchema).min(1),

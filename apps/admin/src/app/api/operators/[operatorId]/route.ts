@@ -3,12 +3,15 @@ import { db } from '@furatora/database/client';
 import { operators } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { operatorSchema } from '@/lib/validations';
+import { parseUuidParams } from '@/shared/list/params';
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ operatorId: string }> }
 ) {
-  const { operatorId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const { operatorId } = ids;
   try {
     const body = await request.json();
     const parsed = operatorSchema.safeParse(body);
@@ -38,7 +41,9 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ operatorId: string }> }
 ) {
-  const { operatorId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const { operatorId } = ids;
   try {
     const [deleted] = await db
       .delete(operators)

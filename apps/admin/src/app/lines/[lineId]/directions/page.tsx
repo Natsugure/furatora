@@ -6,13 +6,16 @@ import { FALLBACK_DIRECTION_LABELS } from '@furatora/transfer-difficulty/domain'
 import { Badge, Card, Group, Stack, Text, Title } from '@mantine/core';
 import { DeleteButton } from '@/components/DeleteButton';
 import { LinkAnchor, LinkButton } from '@/components/LinkElements';
+import { parseUuidParams } from '@/shared/list/params';
 
 export default async function LineDirectionsPage({
   params,
 }: {
   params: Promise<{ lineId: string }>;
 }) {
-  const { lineId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { lineId } = ids;
   const [line] = await db.select().from(lines).where(eq(lines.id, lineId));
 
   if (!line) notFound();
