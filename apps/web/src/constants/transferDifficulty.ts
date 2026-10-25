@@ -31,7 +31,8 @@ export const TRANSFER_STATUS_META = {
 export const ROUTE_FLAG_LABEL = {
   isOutdoor: '屋外を通る',
   requiresExitGate: '改札外を通る',
-  requiresStaff: '係員の対応が必要',
+  // 設備から導けない理由で係員への申し出が要る（例: 改札外のエレベーター）。設備の操作は必要な行為の call_staff が表す
+  requiresStaff: '係員への申し出が必要',
   // false のときに出す。isOfficiallyGuided は「駅の構内図・公式の案内に載っているルートか」
-  notOfficiallyGuided: '駅の構内図・公式案内に載っていないルート',
+  notOfficiallyGuided: '公式案内に無いルート',
 } as const;

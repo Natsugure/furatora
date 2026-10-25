@@ -1,48 +1,29 @@
-# 設計: ホーム図の編集で、編成の先頭・末尾を動かすと編成全体を平行移動する (Issue #201)
+# 設計: 乗換の評価カードのタグと補足の文言を見直す (Issue #189)
 
 - **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
-## 方針
+## 文言
 
-`editDraft.ts` の `moveCarEdge` を、平行移動の `shiftConsistByEdge` に置き換える。呼び出し元（`StationLayoutEditor` のハンドラ）は関数を差し替える。
-コンポーネントの props `onMoveCarEdge` / ハンドラ `handleMoveCarEdge` は、号車の端を動かす（号車の長さを変える）と読めるため、ドメイン関数に揃えて `onShiftConsist` / `handleShiftConsist` に改名する。シグネチャ `(edge, x)` は変えない。
+| 対象 | 変更前 | 変更後 | 出る場所 |
+|---|---|---|---|
+| `call_staff` | 係員を呼ぶ | 係員が設備を操作 | Web タグ・Admin |
+| `lift` | 持ち上げる | 持ち上げて運ぶ | Web 補足・Admin |
+| `assisted_by_staff` | 駅員複数名の介助 | 係員複数名が車いすを担ぐ | Web 補足・Admin |
+| `requiresStaff`（Web） | 係員の対応が必要 | 係員への申し出が必要 | Web タグ |
+| `requiresStaff`（Admin の入力） | 係員対応が必要 | 係員への申し出が必要（設備の操作を除く） | Admin |
+| `notOfficiallyGuided` | 駅の構内図・公式案内に載っていないルート | 公式案内に無いルート | Web タグ |
+| 迂回度 | 最短のバリアフリールート: 一般的なルートより N分長い（行為） | 最短のバリアフリールート: 通常のルートより N分長い | Web 補足 |
+| 最も軽い方法 | 最も軽い方法: … | 最も負担の少ない方法: … | Web 補足 |
 
-## インターフェース
+`as_is`（そのまま通れる）・`fold_and_carry`・`impossible` と、`isOutdoor`・`requiresExitGate` は変えない。
 
-```ts
-/**
- * 編成の外端（edge）が x に来るよう、全号車を同じ差分だけ動かす。号車の長さと境界の共有は保たれる。
- * edge が外端でなければ無変更で返す。
- */
-export function shiftConsistByEdge(
-  draft: PatternDraft,
-  edge: { carNumber: number; side: 'start' | 'end' },
-  x: number,
-): PatternDraft;
-```
+## 実装
 
-- 外端かどうかの判定は、いまの `moveCarEdge` と同じく `freeEdgeSides(isDoorOrderReversed(cars))` で行う
-- 差分を足した各値は `roundToDecimal2`（`@furatora/platform-diagram/domain`）で丸める
-- `opts.minCarMeters` は要らなくなる（号車の長さを変えないため）。`MIN_CAR_METERS` は `moveCarBoundary` だけが使う
+- `RouteChips`: `as_is` なら必要な行為のタグを出さない。タグが0個なら `null` を返す。外側の余白は `className` で受ける（空の段に余白を残さないため）。
+  段に `role="group"`・`aria-label="通行条件"` を付け、テストから意味で引けるようにする
+- `BarrierFreeDetail`: `shortestRequirements` をやめ、`detourText` だけを出す
+- 強調（`differingFields`）は変えない
 
-## スナップの候補
+## テスト
 
-`DiagramEditLayer.tsx` の外端の 2 つのハンドルの `candidates` を ホーム端の `[0, physicalLength]` だけにする（`snapCandidates` は通さず直接書く）。
-編成自身の境界・ドアはドラッグ中に一緒に動くので、候補にすると「自分のドアに外端を合わせる」という意味の無い吸着になる。
-内側の境界のハンドル・アクセス点のハンドルの候補は変えない。
-
-## データフロー
-
-ハンドル・数値入力 → `onShiftConsist(edge, x)` → `handleShiftConsist` → `shiftConsistByEdge` → 未保存の draft → 図・インスペクタ。保存の経路は変わらない。
-
-## テスト戦略
-
-- `editDraft.test.ts`: `moveCarEdge` の describe を `shiftConsistByEdge` に書き換える（非反転・反転で先頭・末尾、外端でない edge は無変更、小数の丸め）
-- `DiagramEditLayer.test.tsx`: 先頭のハンドルを自分のドアの中心の近くへ動かすと、ドアにではなくグリッドにスナップする
-- `StationLayoutEditor.test.tsx`: インスペクタの先頭の数値入力を変えると、全号車の表示が動く（結合の確認。既存のテストに同じ形のものがあれば、それに足す）
-- e2e: 既存の反転編成のドラッグのテストは、development に表参道（半蔵門線）のホームが無く、この PR の前から落ちている（#198 で確かめた）。この PR では直さない
-
-## 恒久知識の振り分け
-
-- 「外端のハンドル・数値入力は編成全体を平行移動する」は図上編集の現在の振る舞い。`docs/domain/platform-coordinate-system.md`（図上編集の節）と `train-stop-patterns.md`（`moveCarEdge` の記述）を上書きする
-- ADR にはしない（ADR-0010 は編集レイヤーの置き場所の決定で、ハンドルの動きまでは決めていない）
+`TransferDifficultySection.test.tsx` の文言の期待を書き換え、REQ-1・REQ-2 を足す。強調はクラスでしか確かめられないので、テストにしない（規約で、クラスでは検証しない）。

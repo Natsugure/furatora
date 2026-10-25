@@ -1,26 +1,15 @@
-# タスク: ホーム図の編集で、編成の先頭・末尾を動かすと編成全体を平行移動する (Issue #201)
+# タスク: 乗換の評価カードのタグと補足の文言を見直す (Issue #189)
 
-どのサイクルも TDD（テストを1つ書く → 期待した理由で失敗することを確かめる → 最小の実装 → 通る → Refactor）。
+どのサイクルも TDD（テストを書く → 失敗を確かめる → 実装 → 通る）。
 
-ブランチ: `fix/issue201-consist-shift`（`main` から）
+ブランチ: `feat/issue189-transfer-labels`（`main` から）
 
-- [x] **TASK-1** Issue #201 を起票し、ブランチを切る
-- [x] **TASK-2** `docs/spec/` の3点を #201 用に書き換える
-- [x] **TASK-3** サイクルA: `shiftConsistByEdge`（`editDraft.ts`）と呼び出し元の差し替え
-  - `moveCarEdge` の 7 件を平行移動の期待に書き換え、関数が無い Red から実装した。`StationLayoutEditor` のハンドラが呼ぶ関数を差し替えた
-  - simplify のレビューを受け、props `onMoveCarEdge` / ハンドラ `handleMoveCarEdge` を `onShiftConsist` / `handleShiftConsist` に改名した（号車の長さを変えると読めるため）
-- [x] **TASK-4** サイクルB: 外端のハンドルのスナップの候補（`DiagramEditLayer.tsx`）
-  - 「自分のドア（6.25m）ではなくグリッド（6.5m）に合わせる」の Red を確かめてから、候補をホーム端だけにした。「ホーム端にはスナップする」は今の候補でも通る（候補を減らしすぎないためのもの）
-- [x] **TASK-5** サイクルC: インスペクタの数値入力からの結合の確認（`StationLayoutEditor.test.tsx`）
-  - 修正前の実装に戻すと落ち、修正後に通ることを確かめた
-- [x] **TASK-6** 検証: admin の test・型チェック・lint・build、dev サーバーで先頭・末尾をドラッグして確かめる（保存しない）
-  - ユニット 695 件・型チェック・lint・`next build` が通った
-  - Playwright（e2e のログイン状態、GET 以外の API は遮断。届いた数は 0）で大手町・丸ノ内線を開いた
-    - 1番線（非反転）: 1号車の先頭を右へ → 6両とも +5m、各 18m のまま
-    - 2番線（反転）: 1号車の先頭（end）を左へ → 6両とも -5m、続けて 6号車の末尾（start）を左へ → さらに -5m。各 18m のまま
-  - 未保存の変更があるまま別の番線のタブを押すと、切り替わらずに同じ番線に留まった。この PR の前からの振る舞い（変えていない）
-- [x] **TASK-7** 振り返り: `docs/domain/` の `moveCarEdge` の記述を上書きする
-  - `platform-coordinate-system.md`: 関数名を直し、「号車のハンドルは2種類ある」を足した
-  - `train-stop-patterns.md`: 関数名と、平行移動でも境界の共有が保たれる理由を直した
-  - ADR の追加・ステータス変更は無い（ADR-0010 は編集レイヤーの置き場所の決定）
-- [x] **TASK-8** PR を作る（#201 を閉じる）: #202
+- [x] **TASK-1** `docs/spec/` の3点を #189 用に書き換える
+- [x] **TASK-2** Web のテストを新しい仕様に書き換え、8 件が落ちることを確かめた
+- [x] **TASK-3** `REQUIREMENT_LABEL`・`ROUTE_FLAG_LABEL`・`RouteChips`・迂回度・最も負担の少ない方法を実装し、Web 26 件が通った
+- [x] **TASK-4** Admin のテストの期待と `RouteCard` の入力ラベル、パッケージのテスト名・コメントを揃えた
+- [ ] **TASK-5** 検証: 3 パッケージの test・型チェック・lint・build、dev サーバーで目視
+  - test（transfer-difficulty 71・admin の transfer-connection 125・web 195）・lint・`pnpm run build` が通った
+  - 目視は未実施（DevTools の Chrome が起動しておらず、dev サーバーへの curl は許可されなかった）
+- [x] **TASK-6** 振り返り: `docs/domain/station-master-model.md` に `requiresStaff` の定義・タグの規則を書き、迂回度の規則を上書きした。ADR の追加・変更は無い
+- [x] **TASK-7** データ: 本番の `requiresStaff` が `call_staff` と重複している2本（`stairLift`・`wheelchairEscalator` を含むルート）のフラグを Admin で外す（開発者）

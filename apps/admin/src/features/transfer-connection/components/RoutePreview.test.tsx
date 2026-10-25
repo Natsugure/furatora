@@ -18,17 +18,17 @@ describe('RoutePreview', () => {
     expect(screen.getAllByText('バリアフリールート')).toHaveLength(2);
   });
 
-  it('階段昇降機を含むルートは、ベビーカーは通れず（バリアフリーではない）、車いすは係員を呼ぶ（バリアフリー）', () => {
+  it('階段昇降機を含むルートは、ベビーカーは通れず（バリアフリーではない）、車いすは係員が設備を操作（バリアフリー）', () => {
     renderPreview(['elevator', 'stairLift']);
     expect(screen.getByText('ベビーカー: 通れない')).toBeInTheDocument();
-    expect(screen.getByText('車いす: 係員を呼ぶ')).toBeInTheDocument();
+    expect(screen.getByText('車いす: 係員が設備を操作')).toBeInTheDocument();
     expect(screen.getAllByText('バリアフリールート')).toHaveLength(1);
   });
 
   it('階段を含むルートは、バリアフリールートではない', () => {
     renderPreview(['stairs']);
-    expect(screen.getByText('ベビーカー: 持ち上げる')).toBeInTheDocument();
-    expect(screen.getByText('車いす: 駅員複数名の介助')).toBeInTheDocument();
+    expect(screen.getByText('ベビーカー: 持ち上げて運ぶ')).toBeInTheDocument();
+    expect(screen.getByText('車いす: 係員複数名が車いすを担ぐ')).toBeInTheDocument();
     expect(screen.queryByText('バリアフリールート')).not.toBeInTheDocument();
   });
 

@@ -42,7 +42,7 @@ type Props = {
 const FLAGS = [
   { field: 'isOutdoor', label: '屋外を通る' },
   { field: 'requiresExitGate', label: '改札外を経由する' },
-  { field: 'requiresStaff', label: '係員対応が必要' },
+  { field: 'requiresStaff', label: '係員への申し出が必要（設備の操作を除く）' },
   { field: 'isOfficiallyGuided', label: '事業者が公式に案内している' },
 ] as const;
 

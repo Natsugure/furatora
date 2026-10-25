@@ -12,10 +12,10 @@ export type Persona = 'stroller' | 'wheelchair';
 
 export type Requirement =
   | 'as_is' // そのまま通れる
-  | 'call_staff' // 係員を呼ぶ
+  | 'call_staff' // 係員が設備を操作（車いす対応エスカレーター・階段昇降機）
   | 'fold_and_carry' // 畳んで抱える
-  | 'lift' // 持ち上げる
-  | 'assisted_by_staff' // 駅員複数名の介助
+  | 'lift' // 持ち上げて運ぶ（ベビーカーで階段）
+  | 'assisted_by_staff' // 係員複数名が車いすを担ぐ（車いすで階段）
   | 'impossible'; // 通れない
 
 export const PERSONA_LABEL: Record<Persona, string> = {
@@ -25,14 +25,14 @@ export const PERSONA_LABEL: Record<Persona, string> = {
 
 export const REQUIREMENT_LABEL: Record<Requirement, string> = {
   as_is: 'そのまま通れる',
-  call_staff: '係員を呼ぶ',
+  call_staff: '係員が設備を操作',
   fold_and_carry: '畳んで抱える',
-  lift: '持ち上げる',
-  assisted_by_staff: '駅員複数名の介助',
+  lift: '持ち上げて運ぶ',
+  assisted_by_staff: '係員複数名が車いすを担ぐ',
   impossible: '通れない',
 };
 
-// 「重さ」の順序はペルソナごとに違う（畳んで抱える と 係員を呼ぶ は別軸）。
+// 「重さ」の順序はペルソナごとに違う（fold_and_carry と call_staff は別軸）。
 // この順序はこのファイルの中だけに存在する（requirementFor / lightestRequirement）。export して表示側の並べ替えに使わないこと
 const WEIGHT: Record<Persona, readonly Requirement[]> = {
   stroller: ['as_is', 'fold_and_carry', 'lift', 'impossible'],
@@ -65,14 +65,14 @@ export function requirementFor(
   return heaviest;
 }
 
-// バリアフリールート = 必要な行為が「そのまま通れる」または「係員を呼ぶ」。
+// バリアフリールート = 必要な行為が as_is または call_staff。
 // null（設備未入力）はバリアフリールートに数えない（ADR-0012）
 export function isBarrierFree(requirement: Requirement | null): boolean {
   return requirement === 'as_is' || requirement === 'call_staff';
 }
 
 // 通行可能な行為（「通れない」と null＝設備未入力を除く）のうち、そのペルソナにとって最も軽いものを返す。無ければ null。
-// バリアフリールートが無いときに「最も軽い方法」として示す（docs/domain「乗換難易度」の表示の規則）
+// バリアフリールートが無いときに「最も負担の少ない方法」として示す（docs/domain「乗換難易度」の表示の規則）
 export function lightestRequirement(
   persona: Persona,
   requirements: readonly (Requirement | null)[],

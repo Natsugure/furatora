@@ -26,7 +26,7 @@ export type Assessment<R extends RouteFacts> =
   // shortest = routes の先頭と所要時分が同じルート（不明どうしも同じとみなす）。1本以上あり、並びは routes のまま。
   // 2本以上なら最短が1本に決まらないので、表示で1本を推さないこと（入力の順で選んだルートを推すことになる）。
   // detour（迂回度）= 最短の所要時分 − 基準ルートの所要時分。どちらかが無ければ null。
-  // 差には距離の差と移動速度の差が混ざるので、表示では必要な行為と並べること
+  // 差には距離の差と移動速度の差が混ざる
   | { kind: 'barrierFree'; routes: AssessedRoute<R>[]; shortest: AssessedRoute<R>[]; detour: number | null }
   // バリアフリールートは0本だが、設備未入力のルートがあるので「無い」とは言えない。
   // lightest は設備が入力済みのルートだけから選ぶ（未入力のルートの方が軽い可能性がある）
@@ -34,7 +34,7 @@ export type Assessment<R extends RouteFacts> =
   // 全ルートの設備が入力済みで、バリアフリールートが0本
   | { kind: 'none'; lightest: Requirement | null };
 
-// 【所要時分以外で並べ替えないこと】「畳んで抱える」と「係員を呼ぶ」のどちらが軽いかは利用者によって逆転する。
+// 【所要時分以外で並べ替えないこと】「畳んで抱える」と「係員が設備を操作」のどちらが軽いかは利用者によって逆転する。
 // Array.prototype.sort は安定なので、所要時分が同じルートは入力の順序を保つ
 function byMinutes<R extends RouteFacts>(routes: readonly AssessedRoute<R>[]): AssessedRoute<R>[] {
   return [...routes].sort(({ route: x }, { route: y }) => {
