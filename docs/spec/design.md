@@ -1,71 +1,68 @@
-# 設計: Admin のパスパラメータを UUID か確かめ、小文字にそろえる (Issue #108・#160)
+# 設計: フリースペース・優先席のドア番号を、その号車のドア数の範囲内に限る (Issue #194)
 
 - **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
 ## 方針
 
-入口（Page・Route Handler の先頭）で、パスパラメータを丸ごと検証して小文字にそろえる。**その後は、検証の戻り値だけを使う。**
-下の層（Query・Repository・ドメイン関数）は、受け取る ID が小文字の UUID であることを前提にしてよい。
+範囲の判定を純関数 1 つにまとめ、サーバー（`trainSchema` の `superRefine`）とフォーム（行ごとのエラー）の両方から呼ぶ。
+判定を 2 か所に書かないことで、フォームが通したのに API が拒む（またはその逆）食い違いを作らない。
 
 ## インターフェース
 
-`apps/admin/src/shared/list/params.ts` に置く（`parseUuidParam` と同じ `uuidSchema` を使うため）。
+`apps/admin/src/features/train/domain/equipmentDoors.ts`（Next.js・Drizzle 非依存）:
 
 ```ts
-/** UUID の形なら小文字にして返す。不正・未指定は undefined（既存。小文字化を足す） */
-export function parseUuidParam(value: string | string[] | undefined): string | undefined;
+export type EquipmentDoorIssue = {
+  /** equipments の添字 */
+  index: number;
+  field: 'carNumber' | 'nearDoor';
+  message: string;
+};
 
-/**
- * パスパラメータ（`await params` の結果）を丸ごと検証する。
- * すべて UUID の形なら、同じキーで小文字にした値を返す。1 つでも不正なら null。
- */
-export function parseUuidParams<T extends Record<string, string>>(params: T): T | null;
+/** 設備（フリースペース・優先席）の号車とドア番号が、車両構成の範囲内にあるかを確かめる */
+export function equipmentDoorIssues(
+  carStructure: readonly { carNumber: number; doorCount: number }[] | null | undefined,
+  equipments: readonly { carNumber: number; nearDoor: number }[],
+): EquipmentDoorIssue[];
 ```
 
-- `shared/` は Next.js を import しない（ADR-0001、`params.ts` の冒頭コメント）。`notFound()` や `NextResponse` は呼び出し側で使う
-- パラメータごとに `parseUuidParam` を並べる形をやめ、オブジェクトを丸ごと渡す形にしたのは、2 つ目のパラメータの検証漏れを防ぐため（駅対のルートは 2 つ並べて書いていた）
+- 号車が車両構成に無ければ `field: 'carNumber'`、`message: '{n}号車は車両構成にありません'`
+- ドア番号が `1..doorCount` の外なら `field: 'nearDoor'`、`message: '{n}号車のドアは1〜{doorCount}番です'`
+- 1 つの行に出す issue は 1 つ（号車が無ければドア番号は確かめない）
 
-## 呼び出し側の形
+## schema
 
-Page:
+`trainSchema` に `.superRefine()` を足し、`freeSpaces`・`prioritySeats` それぞれについて `equipmentDoorIssues` を呼び、
+`path: [key, index, field]` で `ctx.addIssue({ code: 'custom', ... })` する（手本は `features/stop-pattern/schema.ts`）。
 
-```ts
-const ids = parseUuidParams(await params);
-if (!ids) notFound();
-const { stationId } = ids;
-```
+`nearDoor` に `.min(1)` は付けない。範囲（下限を含む）は `equipmentDoorIssues` だけが決める。zod 4 は、中の項目に issue があっても外側の `superRefine` を走らせる
+（2026-10-25 に zod 4.3 で確かめた）ため、`.min(1)` を付けると `nearDoor=0` で同じ行に issue が 2 つ出る。
 
-Route Handler:
+## フォーム
 
-```ts
-const ids = parseUuidParams(await params);
-if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-const { operatorId } = ids;
-```
-
-- `await params` が `try` の外にあるルートは、検証も `try` の外に置く（`await params` が投げることはない）。中にあるルートは中に置く。どちらでも 404 は `catch` に落ちない
-- `layout/page.tsx` と駅対の乗換の Page・Route Handler も、この形に置き換える
-
-## #160 が直る理由
-
-駅対の乗換の Page が `transferPairEditPageQuery.getContext()` に小文字の id を渡すようになるので、`stationName.get(stationId)` が DB の返す小文字のキーと一致する。
-Query 側の Map は変えない。Query のテストに大文字の id のケースは足さない（入口で小文字にするので、その経路が無くなる）。代わりに、ヘルパーが小文字にすることをユニットテストで、画面の駅名を e2e で確かめる。
+- 描画のたびに `equipmentDoorIssues(carStructures, freeSpaces)`（優先席も同じ）を計算し、行ごとに `carNumber`・`nearDoor` の入力の `error` に文を渡す。いまの「空欄なら赤枠」（`error={... === ''}`）は残し、文があればそちらを優先する
+- ドア番号の `NumberInput` に `max={その号車の doorCount}` を渡す（号車が無ければ渡さない）。`clampBehavior="none"` にして、範囲外の値を上限に丸めない
+  - Mantine の既定（`blur`）では、9 を入れて「更新」を押すと、フォーカスが外れた時点で 3 に丸まってエラーが消え、3 が保存される。3 番ドアは実在する別のドアなので、黙って書き換えずにエラーで止める
+- フリースペースと優先席で同じ JSX を 2 回書いていたので、行の部品 `EquipmentRows`（`TrainForm.tsx` 内）にまとめた
+- 送信時、issue が 1 つでもあれば送信せず、いまの空欄チェックと同じ `notifications.show`（「入力に誤りがあります。」）を出す
+- 入力途中の値（空欄の文字列）は、いまの空欄チェックに任せ、`equipmentDoorIssues` には数値の行だけを渡す（添字は元の行のまま）
 
 ## エラーハンドリング
 
-| 状況 | Page | Route Handler |
+| 状況 | API | フォーム |
 |---|---|---|
-| パスパラメータが UUID の形でない | `notFound()` | 404 `{ error: 'Not found' }`。DB は呼ばない |
-| 形は正しいが存在しない | これまでどおり（`notFound()`） | これまでどおり（404） |
-| 乗換接続の追加画面のクエリ文字列が不正 | 未指定として画面を開く | — |
+| ドア番号が範囲外 | 400、`path: [key, i, 'nearDoor']` | その行のドア番号の下に文。送信しない |
+| 号車が車両構成に無い | 400、`path: [key, i, 'carNumber']` | その行の号車の下に文。送信しない |
+| 空欄 | （フォームが送らない） | いまのまま（赤枠と通知） |
 
 ## テスト戦略
 
-- `params.test.ts`: `parseUuidParam` の小文字化、`parseUuidParams` の全部正しい・片方不正・大文字・空オブジェクト
-- Route Handler: テストファイルがあるルート（`operators/[operatorId]`、`trains/[trainId]`、`lines/[lineId]/directions/[directionId]`、`lines/[lineId]/directions`、`lines/[lineId]/adjacencies`、`stations/[stationId]/connections`、`stations/[stationId]/publication`）に、不正な UUID で 404 を返し DB を呼ばないケースを足す。テストファイルが無いルートは、ヘルパーのテストと、全ルートで同じ形に書くこと（レビューで目で揃いを確かめる）に頼る
-- e2e（`station-layout.spec.ts` の既存の 404 のケースにならう）: 代表的な Page（`/stations/not-a-uuid/edit`、`/lines/not-a-uuid/edit`、`/trains/not-a-uuid/edit`）が 404 になる。駅対の乗換の画面を大文字の駅 ID で開き、駅名が出る
+- `equipmentDoors.test.ts`: 範囲内・上限・0・上限+1・号車が無い・`carStructure` が null・空・添字
+- `schema.test.ts`: 範囲外で失敗し、issue の `path` が行を指す。範囲内なら通る
+- `TrainForm.test.tsx`: 範囲外の行にエラーの文が出る、そのまま更新を押しても `fetch` を呼ばない、ドア番号の入力に上限がある
 
 ## 恒久知識の振り分け
 
-- 「パスパラメータは入口で検証し、小文字にそろえて下に渡す」は Admin の実装の約束で、ドメインルールではない。`docs/domain/` には置かず、`parseUuidParams` のコメントに書く
-- ADR にはしない（却下した案と比べて選んだ設計上の決定ではなく、既存の修正の形を全ルートに広げるだけ）
+- 「設備のドア番号は、その号車の `1..doorCount` に入る」は、次の Issue 以降も有効なドメインの不変条件。`docs/domain/train-stop-patterns.md` に「列車の設備」として書く
+  （列車の車両構成とドアの数え方を扱う文書がこれしか無く、新しいファイルを作るほどの量ではない）
+- ADR にはしない（比べて選んだ設計上の決定ではない）
