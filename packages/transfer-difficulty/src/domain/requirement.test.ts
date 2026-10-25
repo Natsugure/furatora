@@ -33,7 +33,7 @@ describe('requirementFor: 設備1種ごとの導出表', () => {
 });
 
 describe('requirementFor: 最も重い行為を選ぶ', () => {
-  it('ベビーカー: エレベーターと階段なら持ち上げる', () => {
+  it('ベビーカー: エレベーターと階段なら持ち上げて運ぶ', () => {
     expect(requirementFor('stroller', ['elevator', 'stairs'])).toBe('lift');
   });
 
@@ -45,11 +45,11 @@ describe('requirementFor: 最も重い行為を選ぶ', () => {
     expect(requirementFor('stroller', ['elevator', 'wheelchairEscalator'])).toBe('fold_and_carry');
   });
 
-  it('車いす: 階段昇降機と車いす対応エスカレーターは係員を呼ぶ', () => {
+  it('車いす: 階段昇降機と車いす対応エスカレーターは係員が設備を操作', () => {
     expect(requirementFor('wheelchair', ['stairLift', 'wheelchairEscalator'])).toBe('call_staff');
   });
 
-  it('車いす: 階段があれば駅員複数名の介助（係員を呼ぶより重い）', () => {
+  it('車いす: 階段があれば係員複数名が車いすを担ぐ（call_staff より重い）', () => {
     expect(requirementFor('wheelchair', ['stairLift', 'stairs'])).toBe('assisted_by_staff');
   });
 
@@ -63,7 +63,7 @@ describe('requirementFor: 最も重い行為を選ぶ', () => {
     );
   });
 
-  it('#123 の淡路町↔新御茶ノ水の階段昇降機経由（elevator, ramp, stairLift）: ベビーカーは通れず、車いすは係員を呼ぶ', () => {
+  it('#123 の淡路町↔新御茶ノ水の階段昇降機経由（elevator, ramp, stairLift）: ベビーカーは通れず、車いすは係員が設備を操作', () => {
     const facilities: FacilityTypeCode[] = ['elevator', 'ramp', 'stairLift'];
     expect(requirementFor('stroller', facilities)).toBe('impossible');
     expect(requirementFor('wheelchair', facilities)).toBe('call_staff');
@@ -83,7 +83,7 @@ describe('isBarrierFree', () => {
     expect(isBarrierFree('call_staff')).toBe(true);
   });
 
-  it('畳んで抱える・持ち上げる・駅員複数名の介助・通れないはバリアフリールートではない', () => {
+  it('畳んで抱える・持ち上げて運ぶ・係員複数名が車いすを担ぐ・通れないはバリアフリールートではない', () => {
     expect(isBarrierFree('fold_and_carry')).toBe(false);
     expect(isBarrierFree('lift')).toBe(false);
     expect(isBarrierFree('assisted_by_staff')).toBe(false);

@@ -19,11 +19,11 @@ const route = (
 });
 
 describe('lightestRequirement: 通行可能な行為のうち最も軽いもの', () => {
-  it('ベビーカー: 畳んで抱える と 持ち上げる なら 畳んで抱える', () => {
+  it('ベビーカー: 畳んで抱える と 持ち上げて運ぶ なら 畳んで抱える', () => {
     expect(lightestRequirement('stroller', ['lift', 'fold_and_carry'])).toBe('fold_and_carry');
   });
 
-  it('車いす: 駅員複数名の介助 と 係員を呼ぶ なら 係員を呼ぶ', () => {
+  it('車いす: assisted_by_staff と call_staff なら call_staff', () => {
     expect(lightestRequirement('wheelchair', ['assisted_by_staff', 'call_staff'])).toBe('call_staff');
   });
 
@@ -52,7 +52,7 @@ describe('assessRoutes: 状態の分類', () => {
     expect(result.routes.map((r) => r.route.id)).toEqual(['ev']);
   });
 
-  it('係員を呼ぶ ルートは車いすのバリアフリールートに数える', () => {
+  it('call_staff のルートは車いすのバリアフリールートに数える', () => {
     const result = assessRoutes('wheelchair', [route('lift', ['stairLift'])]);
     expect(result.kind).toBe('barrierFree');
   });
@@ -72,7 +72,7 @@ describe('assessRoutes: 状態の分類', () => {
     expect(result).toEqual({ kind: 'undetermined', lightest: 'lift' });
   });
 
-  it('霞ケ関型: 階段を持ち上げれば通れるが BF は無い → none＋持ち上げる', () => {
+  it('霞ケ関型: 階段を持ち上げれば通れるが BF は無い → none＋持ち上げて運ぶ', () => {
     expect(assessRoutes('stroller', [route('stairs', ['elevator', 'stairs'])]))
       .toEqual({ kind: 'none', lightest: 'lift' });
   });

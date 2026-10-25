@@ -77,13 +77,17 @@ function Chip({ children, highlighted }: { children: React.ReactNode; highlighte
   );
 }
 
-// 設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）
+// 設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）。
+// タグは通常ではない通行条件だけにする。as_is は通常の通り方なので出さない（ベビーカーのバリアフリールートは常に as_is で、出しても何も伝えない）。
+// 条件が1つも無ければ段ごと出さない
 function RouteChips({
   assessed: { route, requirement },
   highlights,
+  className = '',
 }: {
   assessed: AssessedRoute<TransferRouteDTO>;
   highlights: Set<RouteField>;
+  className?: string;
 }) {
   const flags: [RouteField, boolean, string][] = [
     ['isOutdoor', route.isOutdoor, ROUTE_FLAG_LABEL.isOutdoor],
@@ -91,9 +95,12 @@ function RouteChips({
     ['requiresStaff', route.requiresStaff, ROUTE_FLAG_LABEL.requiresStaff],
     ['isOfficiallyGuided', !route.isOfficiallyGuided, ROUTE_FLAG_LABEL.notOfficiallyGuided],
   ];
+  if (requirement === 'as_is' && !flags.some(([, shown]) => shown)) return null;
   return (
-    <div className="flex flex-wrap gap-1">
-      <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
+    <div role="group" aria-label="通行条件" className={`flex flex-wrap gap-1 ${className}`}>
+      {requirement !== 'as_is' && (
+        <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
+      )}
       {flags.map(
         ([field, shown, label]) =>
           shown && (
@@ -127,9 +134,7 @@ function RouteItem({
           </span>
         )}
       </p>
-      <div className="mt-1.5">
-        <RouteChips assessed={assessed} highlights={highlights} />
-      </div>
+      <RouteChips assessed={assessed} highlights={highlights} className="mt-1.5" />
       {route.notes && <p className="mt-1 text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
     </li>
   );
@@ -179,8 +184,8 @@ function PrimaryRoute({
 }
 
 function detourText(minutes: number): string {
-  if (minutes === 0) return '一般的なルートと同じ所要時間';
-  return minutes > 0 ? `一般的なルートより ${minutes}分長い` : `一般的なルートより ${-minutes}分短い`;
+  if (minutes === 0) return '通常のルートと同じ所要時間';
+  return minutes > 0 ? `通常のルートより ${minutes}分長い` : `通常のルートより ${-minutes}分短い`;
 }
 
 type BarrierFreeAssessment = Extract<Assessment<TransferRouteDTO>, { kind: 'barrierFree' }>;
@@ -189,13 +194,9 @@ function BarrierFreeDetail({ assessment, accentClass }: { assessment: BarrierFre
   const { routes, shortest, detour } = assessment;
   // 強調は大きく出す1本も含めた全ルートで比べる（大きく出す所要時間の数字だけは強調しない）
   const highlights = routes.length > 1 ? differingFields(routes) : new Set<RouteField>();
-  // 迂回度は差に距離と移動速度の差が混ざるため、必要な行為と並べて出す（迂回度0でも行為が要る接続がある）。
-  // 同着なら1本の行為を選ばず、同着のルートの行為をすべて並べる（入力の順で選んだルートを推さない）
-  const shortestRequirements = [...new Set(shortest.map(({ requirement }) => REQUIREMENT_LABEL[requirement]))];
+  // 迂回度の文は時間の差だけを出す。必要な行為は同じルートのタグで分かる
   const detourNote = detour !== null && (
-    <p className="text-xs text-ink-soft">
-      最短のバリアフリールート: {detourText(detour)}（{shortestRequirements.join('／')}）
-    </p>
+    <p className="text-xs text-ink-soft">最短のバリアフリールート: {detourText(detour)}</p>
   );
   // 最短が1本に決まるときだけ大きく出す
   const primary = shortest.length === 1 ? shortest[0]! : null;
@@ -264,7 +265,7 @@ function OtherRoutes({
 function lightestText(assessment: Extract<Assessment<TransferRouteDTO>, { kind: 'undetermined' | 'none' }>) {
   const { kind, lightest } = assessment;
   if (lightest !== null) {
-    return `${kind === 'undetermined' ? '確認できているルートでは、' : ''}最も軽い方法: ${REQUIREMENT_LABEL[lightest]}`;
+    return `${kind === 'undetermined' ? '確認できているルートでは、' : ''}最も負担の少ない方法: ${REQUIREMENT_LABEL[lightest]}`;
   }
   return kind === 'none' ? '通行可能なルートがありません' : null;
 }

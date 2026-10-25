@@ -34,7 +34,7 @@ export type Assessment<R extends RouteFacts> =
   // 全ルートの設備が入力済みで、バリアフリールートが0本
   | { kind: 'none'; lightest: Requirement | null };
 
-// 【所要時分以外で並べ替えないこと】「畳んで抱える」と「係員を呼ぶ」のどちらが軽いかは利用者によって逆転する。
+// 【所要時分以外で並べ替えないこと】「畳んで抱える」と「係員が設備を操作」のどちらが軽いかは利用者によって逆転する。
 // Array.prototype.sort は安定なので、所要時分が同じルートは入力の順序を保つ
 function byMinutes<R extends RouteFacts>(routes: readonly AssessedRoute<R>[]): AssessedRoute<R>[] {
   return [...routes].sort(({ route: x }, { route: y }) => {

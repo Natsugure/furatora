@@ -66,7 +66,7 @@ describe('TransferDifficultySection', () => {
     expectNothingRendered();
   });
 
-  it('バリアフリールートが1本なら、そのルートと必要な行為を示す', () => {
+  it('バリアフリールートが1本なら、そのルートを示す', () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -78,13 +78,12 @@ describe('TransferDifficultySection', () => {
     expect(within(stroller).getByText('エレベーター経由')).toBeInTheDocument();
     // 所要時間は数字と「分」を別の大きさで描くので、欄の文字の全体で確かめる
     expect(within(stroller).getByText('所要時間').parentElement).toHaveTextContent('所要時間4分');
-    expect(within(stroller).getByText('そのまま通れる')).toBeInTheDocument();
     expect(screen.getByText('共通の備考')).toBeInTheDocument();
     // 全組み合わせが同じなら方面の見出しを出さない
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
   });
 
-  it('設備0件のルートを「そのまま通れる」と表示せず、確認できていないと示す（ADR-0012）', () => {
+  it('設備0件のルートを通れると表示せず、確認できていないと示す（ADR-0012）', () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -96,7 +95,6 @@ describe('TransferDifficultySection', () => {
     // 未入力のルートの存在・名前は利用者に出さない（#135）
     expect(screen.queryByText(/一般経路/)).not.toBeInTheDocument();
     expect(screen.queryByText(/未入力/)).not.toBeInTheDocument();
-    expect(screen.queryByText('そのまま通れる')).not.toBeInTheDocument();
     expect(screen.queryByText('バリアフリールートなし')).not.toBeInTheDocument();
   });
 
@@ -114,11 +112,11 @@ describe('TransferDifficultySection', () => {
         ]}
       />,
     );
-    expect(within(card('ベビーカー')).getByText('確認できているルートでは、最も軽い方法: 持ち上げる'))
+    expect(within(card('ベビーカー')).getByText('確認できているルートでは、最も負担の少ない方法: 持ち上げて運ぶ'))
       .toBeInTheDocument();
   });
 
-  it('霞ケ関型: 階段しかないベビーカーは「なし」＋持ち上げる、車いすは「なし」＋駅員複数名の介助', async () => {
+  it('霞ケ関型: 階段しかないベビーカーは「なし」＋持ち上げて運ぶ、車いすは「なし」＋係員複数名が車いすを担ぐ', async () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -126,10 +124,34 @@ describe('TransferDifficultySection', () => {
       />,
     );
     expect(within(card('ベビーカー')).getByText('バリアフリールートなし')).toBeInTheDocument();
-    expect(within(card('ベビーカー')).getByText('最も軽い方法: 持ち上げる')).toBeInTheDocument();
+    expect(within(card('ベビーカー')).getByText('最も負担の少ない方法: 持ち上げて運ぶ')).toBeInTheDocument();
     await choosePersona('車いす');
     expect(within(card('車いす')).getByText('バリアフリールートなし')).toBeInTheDocument();
-    expect(within(card('車いす')).getByText('最も軽い方法: 駅員複数名の介助')).toBeInTheDocument();
+    expect(within(card('車いす')).getByText('最も負担の少ない方法: 係員複数名が車いすを担ぐ')).toBeInTheDocument();
+  });
+
+  it('そのまま通れるルートは必要な行為をタグにせず、フラグも無ければタグの段を出さない', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[partner({ combos: allCombos([route({ routeId: 'ev', label: 'エレベーター経由', minutes: 4 })]) })]}
+      />,
+    );
+    const stroller = card('ベビーカー');
+    expect(within(stroller).queryByText('そのまま通れる')).not.toBeInTheDocument();
+    expect(within(stroller).queryByRole('group', { name: '通行条件' })).not.toBeInTheDocument();
+  });
+
+  it('そのまま通れるルートでも、フラグはタグにする', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[partner({ combos: allCombos([route({ routeId: 'ev', isOutdoor: true })]) })]}
+      />,
+    );
+    const chips = within(card('ベビーカー')).getByRole('group', { name: '通行条件' });
+    expect(chips).toHaveTextContent('屋外を通る');
+    expect(chips).not.toHaveTextContent('そのまま通れる');
   });
 
   it('ペルソナごとにバリアフリールートの判定が分かれる（階段昇降機）', async () => {
@@ -142,7 +164,7 @@ describe('TransferDifficultySection', () => {
     expect(within(card('ベビーカー')).getByText('通行可能なルートがありません')).toBeInTheDocument();
     await choosePersona('車いす');
     expect(within(card('車いす')).getByText('バリアフリールートあり')).toBeInTheDocument();
-    expect(within(card('車いす')).getByText('係員を呼ぶ')).toBeInTheDocument();
+    expect(within(card('車いす')).getByText('係員が設備を操作')).toBeInTheDocument();
   });
 
   it('複数のバリアフリールートは最短を大きく出し、ほかは「ほかのルート」に所要時分の昇順で並べ、本数を示す', () => {
@@ -218,7 +240,7 @@ describe('TransferDifficultySection', () => {
     expect(within(stroller).queryByText('所要時間')).not.toBeInTheDocument();
   });
 
-  it('迂回度は基準ルートと BF ルートの所要時分が揃うときだけ、必要な行為と並べて出す', () => {
+  it('迂回度は基準ルートと BF ルートの所要時分が揃うときだけ出す', () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -232,11 +254,11 @@ describe('TransferDifficultySection', () => {
         ]}
       />,
     );
-    expect(within(card('ベビーカー')).getByText('最短のバリアフリールート: 一般的なルートより 2分長い（そのまま通れる）'))
+    expect(within(card('ベビーカー')).getByText('最短のバリアフリールート: 通常のルートより 2分長い'))
       .toBeInTheDocument();
   });
 
-  it('最短が同着なら、迂回度の文に同着のルートの必要な行為をすべて並べる', async () => {
+  it('最短が同着でも、迂回度の文は時間の差だけを出す（行為はタグで分かる）', async () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -253,11 +275,11 @@ describe('TransferDifficultySection', () => {
     );
     await choosePersona('車いす');
     expect(
-      within(card('車いす')).getByText('最短のバリアフリールート: 一般的なルートより 2分長い（そのまま通れる／係員を呼ぶ）'),
+      within(card('車いす')).getByText('最短のバリアフリールート: 通常のルートより 2分長い'),
     ).toBeInTheDocument();
   });
 
-  it('公式案内に載っていないルートと、その他のフラグを示す', () => {
+  it('公式案内に無いルートと、その他のフラグを示す', () => {
     render(
       <TransferDifficultySection
         stationName="淡路町"
@@ -271,10 +293,10 @@ describe('TransferDifficultySection', () => {
       />,
     );
     const stroller = card('ベビーカー');
-    expect(within(stroller).getByText('駅の構内図・公式案内に載っていないルート')).toBeInTheDocument();
+    expect(within(stroller).getByText('公式案内に無いルート')).toBeInTheDocument();
     expect(within(stroller).getByText('屋外を通る')).toBeInTheDocument();
     expect(within(stroller).getByText('改札外を通る')).toBeInTheDocument();
-    expect(within(stroller).getByText('係員の対応が必要')).toBeInTheDocument();
+    expect(within(stroller).getByText('係員への申し出が必要')).toBeInTheDocument();
   });
 
   it('方面でルートが分かれる接続は、方面の見出しごとに表示する', () => {
