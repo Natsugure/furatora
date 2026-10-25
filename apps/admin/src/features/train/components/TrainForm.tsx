@@ -297,7 +297,10 @@ function EquipmentRows({ items, issues, carCount, carStructures, onUpdate, onRem
     <Stack gap="xs">
       {items.map((item, i) => (
         <Group key={i} gap="sm" align="flex-start" wrap="wrap">
-          <NumberInput label="号車" min={1} max={carCount} value={item.carNumber}
+          {/* 号車もドア番号と同じく、範囲外を丸めずにエラーを出す */}
+          <NumberInput label="号車" min={1} max={carCount}
+            clampBehavior="none"
+            value={item.carNumber}
             onChange={(v) => onUpdate(i, 'carNumber', v)}
             w={80} size="xs"
             error={messageOf(i, 'carNumber') ?? (typeof item.carNumber === 'string' && item.carNumber === '')}

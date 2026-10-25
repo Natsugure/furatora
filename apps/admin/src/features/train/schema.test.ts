@@ -128,3 +128,47 @@ describe('trainSchema の設備のドア番号（#194）', () => {
     ]);
   });
 });
+
+describe('trainSchema の車両構成（#194）', () => {
+  const base = { name: 'E235系', operatorId: VALID_UUID, lineIds: [VALID_UUID], carCount: 2 };
+
+  it('両数を超える号車があれば失敗し、その号車を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      carStructure: [{ carNumber: 1, doorCount: 4 }, { carNumber: 5, doorCount: 9 }],
+      freeSpaces: [{ carNumber: 5, nearDoor: 9, isStandard: true }],
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toContainEqual(
+      expect.objectContaining({ path: ['carStructure', 1, 'carNumber'] }),
+    );
+  });
+
+  it('号車が 0 なら失敗する', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      carStructure: [{ carNumber: 0, doorCount: 4 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('ドア数が 0 なら失敗し、その号車の doorCount を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      carStructure: [{ carNumber: 1, doorCount: 0 }, { carNumber: 2, doorCount: 4 }],
+    });
+    expect(result.error?.issues).toContainEqual(
+      expect.objectContaining({ path: ['carStructure', 0, 'doorCount'] }),
+    );
+  });
+
+  it('同じ号車が 2 回あれば失敗し、2 回目を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      carStructure: [{ carNumber: 1, doorCount: 4 }, { carNumber: 1, doorCount: 3 }],
+    });
+    expect(result.error?.issues).toContainEqual(
+      expect.objectContaining({ path: ['carStructure', 1, 'carNumber'], message: '1号車が重複しています' }),
+    );
+  });
+});

@@ -126,5 +126,20 @@ describe('TrainForm', () => {
       expect(screen.getByText('1号車のドアは1〜3番です')).toBeInTheDocument();
       expect(fetch).not.toHaveBeenCalled();
     });
+
+    it('範囲外の号車は、フォーカスが外れても両数に丸めず、エラーのまま送信しない', async () => {
+      // 丸めると、押した覚えのない別の号車（最後の号車）の設備が黙って保存される
+      const user = userEvent.setup();
+      setup({ freeSpaces: [{ carNumber: 1, nearDoor: 1, isStandard: true }] });
+
+      const input = screen.getByLabelText('号車');
+      await user.clear(input);
+      await user.type(input, '12');
+      await user.click(screen.getByRole('button', { name: '更新' }));
+
+      expect(input).toHaveValue('12');
+      expect(screen.getByText('12号車は車両構成にありません')).toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });
