@@ -1,5 +1,6 @@
 import { db } from '@furatora/database/client';
 import { stations, stationLines, lines } from '@furatora/database/schema';
+import { toKatakana } from '@/features/station/domain/kana';
 import { ilike, eq, and, or } from 'drizzle-orm';
 import type { StationGroup } from '@/types';
 import { publishedStation } from './visibility';
@@ -30,7 +31,7 @@ export async function searchVisibleStations(query: string): Promise<StationGroup
       publishedStation(),
       or(
         ilike(stations.name, `%${query}%`),
-        ilike(stations.nameKana, `%${query}%`),
+        ilike(stations.nameKana, `%${toKatakana(query)}%`),
       ),
     ))
     .limit(60);
