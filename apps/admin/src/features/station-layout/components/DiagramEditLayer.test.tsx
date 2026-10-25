@@ -160,6 +160,21 @@ describe('号車境界・外端のドラッグ', () => {
     expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 90);
   });
 
+  it('外端は、動かしている編成自身のドアにはスナップせず、グリッドに合わせる（#201）', () => {
+    // 外端のドラッグは編成全体を動かすので、編成のドアも一緒に動く。自分のドアは吸着の目標にならない
+    const { onMoveCarEdge } = renderLayer();
+    const handle = screen.getByRole('slider', { name: '1号車の先頭（0m）' });
+    drag(handle, 0, 31.75); // 31.75px→6.35m。1号車のドア中心6.25mから0.1m
+    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, 6.5);
+  });
+
+  it('外端は、ホーム端にはスナップする', () => {
+    const { onMoveCarEdge } = renderLayer();
+    const handle = screen.getByRole('slider', { name: '2号車の末尾（100m）' });
+    drag(handle, 500, 499); // 499px→99.8m。ホーム端100mから0.2m
+    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 100);
+  });
+
   describe('反転編成（carNumber昇順でxが減少する編成）', () => {
     it('境界ハンドルは共有フィールド（1号車のstart=2号車のend）の座標に立ち、onMoveCarBoundaryが呼ばれる', () => {
       const { onMoveCarBoundary } = renderLayer({ cars: reversedCars });

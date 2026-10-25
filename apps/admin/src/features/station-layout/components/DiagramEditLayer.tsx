@@ -69,6 +69,8 @@ export function DiagramEditLayer({
   // では、外端・境界のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
   const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
 
+  const edgeCandidates = useCallback(() => snapCandidates([], physicalLength), [physicalLength]);
+
   const cellY = rows.facilityY + FACILITY_ROW_HEIGHT / 2;
   const carY = rows.trainY + TRAIN_ROW_HEIGHT / 2;
 
@@ -91,11 +93,13 @@ export function DiagramEditLayer({
         />
       ))}
 
+      {/* 外端は編成全体を動かす（editDraft.ts の shiftConsistByEdge）。編成自身の境界・ドアは一緒に動くので、
+          スナップの候補はホーム端だけにする */}
       {sortedCars.map((car, i) => {
         const isFirst = i === 0;
         const isLast = i === sortedCars.length - 1;
         // 非反転: 先頭車のstartが外端、境界はend。反転: これが入れ替わる
-        // （moveCarBoundary/moveCarEdge の境界共有規則の裏返し。editDraft.ts参照）
+        // （moveCarBoundary/shiftConsistByEdge の境界共有規則の裏返し。editDraft.ts参照）
         const leadEdgeX = reversed ? car.endMeters : car.startMeters;
         const leadEdgeSide: 'start' | 'end' = reversed ? 'end' : 'start';
         const boundaryX = reversed ? car.startMeters : car.endMeters;
@@ -113,7 +117,7 @@ export function DiagramEditLayer({
                 y={carY}
                 label={`${car.carNumber}号車の先頭（${leadEdgeX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [leadEdgeX] })}
+                candidates={edgeCandidates}
                 onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
               />
             )}
@@ -141,7 +145,7 @@ export function DiagramEditLayer({
                 y={carY}
                 label={`${car.carNumber}号車の末尾（${trailEdgeX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [trailEdgeX] })}
+                candidates={edgeCandidates}
                 onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
               />
             )}

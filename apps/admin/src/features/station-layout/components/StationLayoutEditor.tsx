@@ -26,7 +26,7 @@ import type {
 import {
   createConcourseDraft, createEmptyConcourseDraft, duplicateConcourseDraft,
   createPatternDraft, createPatternDraftFromPreview,
-  moveCell, moveCarBoundary, moveCarEdge,
+  moveCell, moveCarBoundary, shiftConsistByEdge,
   isConcourseDirty, isPatternDirty, dirtyIds, toPlatformLocationPayload, toStopPatternPayload,
   draftToDisplayConcourse, concourseDraftValidationError,
   MIN_CAR_METERS, type ConcourseDraft, type PatternDraft, type ConcourseDisplayLookups,
@@ -253,14 +253,14 @@ export function StationLayoutEditor({
   function handleMoveCarEdge(edge: { carNumber: number; side: 'start' | 'end' }, x: number) {
     if (newPattern) {
       setNewPattern((prev) => (prev
-        ? { ...prev, draft: moveCarEdge(prev.draft, edge, x, { minCarMeters: MIN_CAR_METERS }) }
+        ? { ...prev, draft: shiftConsistByEdge(prev.draft, edge, x) }
         : prev));
       return;
     }
     if (!selectedPatternBaseline) return;
     updatePatternDraft(
       selectedPatternBaseline.patternId,
-      (draft) => moveCarEdge(draft, edge, x, { minCarMeters: MIN_CAR_METERS }),
+      (draft) => shiftConsistByEdge(draft, edge, x),
     );
   }
 
