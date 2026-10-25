@@ -14,7 +14,6 @@ export async function PUT(
   { params }: { params: Promise<{ stationId: string; connectedStationId: string }> },
 ) {
   try {
-    // 不正な id を 500 にしない（#108）。UUID でなければ駅対は存在しない
     const ids = parseUuidParams(await params);
     if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { stationId, connectedStationId } = ids;

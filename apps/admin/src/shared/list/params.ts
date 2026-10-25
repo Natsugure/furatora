@@ -60,9 +60,13 @@ export function parseUuidParam(value: string | string[] | undefined): string | u
  * （元の値を下に渡すと、大文字の id が Query の Map を外す。#160）。
  */
 export function parseUuidParams<T extends Record<string, string>>(params: T): T | null {
-  const entries = Object.entries(params).map(([key, value]) => [key, parseUuidParam(value)] as const);
-  if (entries.some(([, value]) => value === undefined)) return null;
-  return Object.fromEntries(entries) as T;
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    const id = parseUuidParam(value);
+    if (!id) return null;
+    result[key] = id;
+  }
+  return result as T;
 }
 
 /**
