@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server';
 import { trainStopPatternSchema } from '@/features/stop-pattern/schema';
 import { DuplicateStopPatternError } from '@/features/stop-pattern/ports';
 import { stopPatternRepository } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ stationId: string; patternId: string }> }
 ) {
   try {
-    const { stationId, patternId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId, patternId } = ids;
     const body = await request.json();
     const parsed = trainStopPatternSchema.safeParse(body);
     if (!parsed.success) {
@@ -34,7 +37,9 @@ export async function DELETE(
   { params }: { params: Promise<{ stationId: string; patternId: string }> }
 ) {
   try {
-    const { stationId, patternId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId, patternId } = ids;
     const deleted = await stopPatternRepository.delete(patternId, stationId);
     if (!deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });

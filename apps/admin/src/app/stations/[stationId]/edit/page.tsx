@@ -4,6 +4,7 @@ import { BackLink } from '@/components/LinkElements';
 import { StationEditForm } from '@/components/StationEditForm';
 import { resolveStationListBack } from '@/features/station/listState';
 import { stationEditPageQuery } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 type Props = {
   params: Promise<{ stationId: string }>;
@@ -11,7 +12,9 @@ type Props = {
 };
 
 export default async function StationEditPage({ params, searchParams }: Props) {
-  const { stationId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { stationId } = ids;
   const [context, { backHref }] = await Promise.all([
     stationEditPageQuery.getEditContext(stationId),
     searchParams.then(resolveStationListBack),

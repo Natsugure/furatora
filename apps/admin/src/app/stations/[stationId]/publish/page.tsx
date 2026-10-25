@@ -5,6 +5,7 @@ import { resolveStationListBack } from '@/features/station/listState';
 import { stationPublishingPageQuery } from '@/di';
 import { buildSlugCandidate, hasKanaEkiSuffixMismatch } from '@/features/station-publishing/domain/slugCandidate';
 import { StationPublishingForm } from '@/features/station-publishing/components/StationPublishingForm';
+import { parseUuidParams } from '@/shared/list/params';
 
 type Props = {
   params: Promise<{ stationId: string }>;
@@ -12,7 +13,9 @@ type Props = {
 };
 
 export default async function StationPublishPage({ params, searchParams }: Props) {
-  const { stationId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { stationId } = ids;
   const [context, linesMissingSlug, { backHref }] = await Promise.all([
     stationPublishingPageQuery.getContext(stationId),
     stationPublishingPageQuery.listLinesMissingSlug(),

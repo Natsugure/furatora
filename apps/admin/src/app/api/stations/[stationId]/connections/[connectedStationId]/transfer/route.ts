@@ -3,7 +3,7 @@ import { transferConnectionRepository } from '@/di';
 import { pairSaveInputSchema } from '@/features/transfer-connection/schema';
 import { validateSaveInput } from '@/features/transfer-connection/domain/validate';
 import { RouteLabelTakenError, RouteOutOfScopeError } from '@/features/transfer-connection/ports';
-import { parseUuidParam } from '@/shared/list/params';
+import { parseUuidParams } from '@/shared/list/params';
 
 /**
  * 駅対（自駅 S・相手駅 T）の乗換難易度を、最終状態でまとめて保存する。
@@ -14,11 +14,10 @@ export async function PUT(
   { params }: { params: Promise<{ stationId: string; connectedStationId: string }> },
 ) {
   try {
-    const { stationId, connectedStationId } = await params;
     // 不正な id を 500 にしない（#108）。UUID でなければ駅対は存在しない
-    if (!parseUuidParam(stationId) || !parseUuidParam(connectedStationId)) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId, connectedStationId } = ids;
 
     let body: unknown;
     try {

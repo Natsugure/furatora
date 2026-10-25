@@ -2,13 +2,16 @@ import { notFound } from 'next/navigation';
 import { Title, Text } from '@mantine/core';
 import { LineForm } from '@/components/LineForm';
 import { lineEditPageQuery } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 export default async function LineEditPage({
   params,
 }: {
   params: Promise<{ lineId: string }>;
 }) {
-  const { lineId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { lineId } = ids;
   const context = await lineEditPageQuery.getEditContext(lineId);
 
   if (!context) {

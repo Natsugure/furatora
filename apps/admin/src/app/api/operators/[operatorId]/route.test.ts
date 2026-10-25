@@ -161,3 +161,36 @@ describe('DELETE /api/operators/[operatorId]', () => {
     expect(data).toEqual({ error: 'Internal server error' });
   });
 });
+
+describe('パスパラメータの検証（#108）', () => {
+  const invalidParams = { params: Promise.resolve({ operatorId: 'not-a-uuid' }) };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('PUT: UUID の形でない operatorId は404を返し、DB を呼ばない', async () => {
+    const { db } = await import('@furatora/database/client');
+    const request = new Request('http://localhost/api/operators/not-a-uuid', {
+      method: 'PUT',
+      body: JSON.stringify({ name: 'JR東日本' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PUT(request, invalidParams);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Not found' });
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('DELETE: UUID の形でない operatorId は404を返し、DB を呼ばない', async () => {
+    const { db } = await import('@furatora/database/client');
+    const request = new Request('http://localhost/api/operators/not-a-uuid', { method: 'DELETE' });
+
+    const response = await DELETE(request, invalidParams);
+
+    expect(response.status).toBe(404);
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+});

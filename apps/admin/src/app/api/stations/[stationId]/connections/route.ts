@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { stationConnectionCreateSchema } from '@/features/station-connection/schema';
 import { stationConnectionRepository } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 // 乗換接続の追加（Issue #88）。駅スコープの POST。
 // createPair が有向2行を冪等に挿入するため、同じ組を再送しても 201（行は増えない）。
@@ -9,7 +10,9 @@ export async function POST(
   { params }: { params: Promise<{ stationId: string }> },
 ) {
   try {
-    const { stationId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId } = ids;
 
     let body: unknown;
     try {

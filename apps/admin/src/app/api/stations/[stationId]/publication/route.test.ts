@@ -137,3 +137,19 @@ describe('PATCH /api/stations/[stationId]/publication', () => {
     expect(data).toEqual({ error: 'Internal server error' });
   });
 });
+
+describe('パスパラメータの検証（#108）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('PATCH: UUID の形でない stationId は404を返し、Repository を呼ばない', async () => {
+    const response = await PATCH(
+      request({ action: 'unpublish' }),
+      { params: Promise.resolve({ stationId: 'not-a-uuid' }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(unpublish).not.toHaveBeenCalled();
+  });
+});

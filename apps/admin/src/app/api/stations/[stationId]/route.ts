@@ -3,13 +3,16 @@ import { db } from '@furatora/database/client';
 import { stations } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import { stationUpdateSchema } from '@/lib/validations';
+import { parseUuidParams } from '@/shared/list/params';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ stationId: string }> }
 ) {
   try {
-    const { stationId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId } = ids;
     const [station] = await db.select().from(stations).where(eq(stations.id, stationId));
     if (!station) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -25,7 +28,9 @@ export async function PUT(
   { params }: { params: Promise<{ stationId: string }> }
 ) {
   try {
-    const { stationId } = await params;
+    const ids = parseUuidParams(await params);
+    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { stationId } = ids;
     const body = await request.json();
     const parsed = stationUpdateSchema.safeParse(body);
     if (!parsed.success) {

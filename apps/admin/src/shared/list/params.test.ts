@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseListParams, escapeLikePattern, parseUuidParam } from './params';
+import { parseListParams, escapeLikePattern, parseUuidParam, parseUuidParams } from './params';
 
 const SPEC = { sortKeys: ['line', 'name'] as const, defaultSort: 'line' as const, perPage: 50 };
 
@@ -60,6 +60,31 @@ describe('parseUuidParam', () => {
 
   it('配列で来た値は先頭のみ検証する', () => {
     expect(parseUuidParam(['550e8400-e29b-41d4-a716-446655440000', 'x'])).toBe('550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('大文字を含むUUIDは小文字にして返す（#160）', () => {
+    expect(parseUuidParam('550E8400-E29B-41D4-A716-446655440000')).toBe('550e8400-e29b-41d4-a716-446655440000');
+  });
+});
+
+describe('parseUuidParams', () => {
+  const A = '550e8400-e29b-41d4-a716-446655440000';
+  const B = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+  it('すべてUUIDなら同じキーで返す', () => {
+    expect(parseUuidParams({ stationId: A, connectedStationId: B })).toEqual({ stationId: A, connectedStationId: B });
+  });
+
+  it('大文字を含む値は小文字にして返す（#160）', () => {
+    expect(parseUuidParams({ stationId: A.toUpperCase() })).toEqual({ stationId: A });
+  });
+
+  it('1つでもUUIDの形でなければ null（#108）', () => {
+    expect(parseUuidParams({ stationId: A, connectedStationId: 'not-a-uuid' })).toBeNull();
+  });
+
+  it('空文字は null', () => {
+    expect(parseUuidParams({ stationId: '' })).toBeNull();
   });
 });
 

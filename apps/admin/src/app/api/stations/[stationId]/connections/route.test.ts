@@ -63,3 +63,19 @@ describe('POST /api/stations/[stationId]/connections', () => {
     expect(response.status).toBe(500);
   });
 });
+
+describe('パスパラメータの検証（#108）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('POST: UUID の形でない stationId は404を返し、Repository を呼ばない', async () => {
+    const response = await POST(
+      request({ connectedStationId: OTHER_ID }),
+      { params: Promise.resolve({ stationId: 'not-a-uuid' }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(createPair).not.toHaveBeenCalled();
+  });
+});

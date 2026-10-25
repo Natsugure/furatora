@@ -4,13 +4,16 @@ import { DeleteButton } from '@/components/DeleteButton';
 import { LinkAnchor } from '@/components/LinkElements';
 import { StationAdjacencyCreateForm } from '@/features/station-adjacency/components/StationAdjacencyCreateForm';
 import { stationAdjacencyPageQuery } from '@/di';
+import { parseUuidParams } from '@/shared/list/params';
 
 export default async function LineAdjacenciesPage({
   params,
 }: {
   params: Promise<{ lineId: string }>;
 }) {
-  const { lineId } = await params;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { lineId } = ids;
   const context = await stationAdjacencyPageQuery.getPageContext(lineId);
   if (!context) notFound();
 

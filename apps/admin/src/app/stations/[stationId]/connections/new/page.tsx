@@ -3,16 +3,22 @@ import { Title } from '@mantine/core';
 import { LinkAnchor } from '@/components/LinkElements';
 import { StationConnectionCreateForm } from '@/features/station-connection/components/StationConnectionCreateForm';
 import { stationConnectionCreatePageQuery } from '@/di';
+import { parseUuidParam, parseUuidParams } from '@/shared/list/params';
 
 export default async function NewStationConnectionPage({
   params,
   searchParams,
 }: {
   params: Promise<{ stationId: string }>;
-  searchParams: Promise<{ operatorId?: string; lineId?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { stationId } = await params;
-  const { operatorId, lineId } = await searchParams;
+  const ids = parseUuidParams(await params);
+  if (!ids) notFound();
+  const { stationId } = ids;
+  const raw = await searchParams;
+  // 不正値は500にせず未選択として開く（#108）
+  const operatorId = parseUuidParam(raw.operatorId);
+  const lineId = parseUuidParam(raw.lineId);
 
   const context = await stationConnectionCreatePageQuery.getCreateContext(stationId, {
     operatorId,

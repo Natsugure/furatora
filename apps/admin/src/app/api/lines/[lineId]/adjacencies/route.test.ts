@@ -65,3 +65,19 @@ describe('POST /api/lines/[lineId]/adjacencies', () => {
     expect(response.status).toBe(500);
   });
 });
+
+describe('パスパラメータの検証（#108）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('POST: UUID の形でない lineId は404を返し、Repository を呼ばない', async () => {
+    const response = await POST(
+      request({ stationAId: A, stationBId: B }),
+      { params: Promise.resolve({ lineId: 'not-a-uuid' }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(create).not.toHaveBeenCalled();
+  });
+});
