@@ -5,4 +5,4 @@
 
 import { z } from 'zod';
 
-export const uuidSchema = z.string().uuid().transform((v) => v.toLowerCase());
+export const uuidSchema = z.uuid().transform((v) => v.toLowerCase());
