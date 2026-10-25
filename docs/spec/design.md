@@ -27,7 +27,7 @@ export function shiftConsistByEdge(
 
 ## スナップの候補
 
-`DiagramEditLayer.tsx` の外端の 2 つのハンドルの `candidates` を `snapCandidates([], physicalLength)`（ホーム端の 0 と `physicalLength` だけ）にする。
+`DiagramEditLayer.tsx` の外端の 2 つのハンドルの `candidates` を ホーム端の `[0, physicalLength]` だけにする（`snapCandidates` は通さず直接書く）。
 編成自身の境界・ドアはドラッグ中に一緒に動くので、候補にすると「自分のドアに外端を合わせる」という意味の無い吸着になる。
 内側の境界のハンドル・アクセス点のハンドルの候補は変えない。
 
