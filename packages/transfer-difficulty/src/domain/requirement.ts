@@ -23,7 +23,6 @@ export const PERSONA_LABEL: Record<Persona, string> = {
   wheelchair: '車いす',
 };
 
-// Web は as_is をタグにしない（通常の通り方で、条件ではないため）。as_is の文言は Admin のプレビューにだけ出る
 export const REQUIREMENT_LABEL: Record<Requirement, string> = {
   as_is: 'そのまま通れる',
   call_staff: '係員が設備を操作',

@@ -95,20 +95,16 @@ function RouteChips({
     ['requiresStaff', route.requiresStaff, ROUTE_FLAG_LABEL.requiresStaff],
     ['isOfficiallyGuided', !route.isOfficiallyGuided, ROUTE_FLAG_LABEL.notOfficiallyGuided],
   ];
-  if (requirement === 'as_is' && !flags.some(([, shown]) => shown)) return null;
+  const chips: [RouteField, string][] = flags.filter(([, shown]) => shown).map(([field, , label]) => [field, label]);
+  if (requirement !== 'as_is') chips.unshift(['requirement', REQUIREMENT_LABEL[requirement]]);
+  if (chips.length === 0) return null;
   return (
     <div role="group" aria-label="通行条件" className={`flex flex-wrap gap-1 ${className}`}>
-      {requirement !== 'as_is' && (
-        <Chip highlighted={highlights.has('requirement')}>{REQUIREMENT_LABEL[requirement]}</Chip>
-      )}
-      {flags.map(
-        ([field, shown, label]) =>
-          shown && (
-            <Chip key={field} highlighted={highlights.has(field)}>
-              {label}
-            </Chip>
-          ),
-      )}
+      {chips.map(([field, label]) => (
+        <Chip key={field} highlighted={highlights.has(field)}>
+          {label}
+        </Chip>
+      ))}
     </div>
   );
 }
