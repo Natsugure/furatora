@@ -52,6 +52,22 @@ Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft
 未指定（null）の場合に標準値を用いる。号車ごとに長さの異なる編成を
 表現するためのカラムであり、通常は未指定でよい。
 
+## 列車の設備（フリースペース・優先席）
+
+`trainEquipments` は、設備のある位置を「号車（`carNumber`）」と「その号車の何番目のドアの付近か（`nearDoor`）」で持つ。
+ドアの数は `trainCarStructures.doorCount` で、号車ごとに決まる。
+
+**設備の `carNumber` は `trainCarStructures` にある号車で、`nearDoor` はその号車の `1..doorCount` に入る。**
+範囲外の値があると、ホームの図はドアを号車の外（隣の号車に入ることもある）に描き、図の下の一覧には範囲外の番号がそのまま出て、両者が食い違う。
+
+- DB のカラム制約にはまだ現れていない（2つの表をまたぐ条件のため）
+- Admin が入力側で守る。判定は `apps/admin/src/features/train/domain/equipmentDoors.ts` の `equipmentDoorIssues()` 1つで、
+  API（`trainSchema` の `superRefine`）とフォーム（行ごとのエラー）が同じ関数を呼ぶ。フォームは範囲外の号車・ドア番号を上限に丸めない
+  （丸めると、入力していない別の号車・ドアが保存されてしまう）
+- この判定は車両構成を正として読むため、API は車両構成そのものも確かめる。号車は `1..carCount` に 1 回ずつ、`doorCount` は 1 以上
+  （号車の重複は DB の一意制約 `unique_train_car_structure` でも止まる）
+- 表示側（`packages/platform-diagram`）は範囲外の設備を落とさずに描く。データの誤りが図の上で見えるようにするため
+
 ## 号車位置の算出
 
 `features/stop-pattern/domain/carSegments.ts` の `buildCarSegments()`（純関数）が行う。

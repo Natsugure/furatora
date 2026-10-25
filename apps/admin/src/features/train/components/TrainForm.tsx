@@ -9,6 +9,7 @@ import {
 import { Trash2 } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import type { OperatorOption, TrainLineOption } from '@/features/train/ports';
+import { doorCountOf, equipmentDoorIssues, type EquipmentDoorIssue } from '@/features/train/domain/equipmentDoors';
 
 // @furatora/database/schema には carLength を含まないため、admin側でローカルに定義する
 type CarStructureItem = { carNumber: number; doorCount: number; carLength: number | null };
@@ -71,21 +72,23 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
     setPrioritySeats((prev) => prev.map((ps, i) => (i === index ? { ...ps, [field]: value } : ps)));
   }
 
+  const freeSpaceIssues = doorIssuesOf(carStructures, freeSpaces);
+  const prioritySeatIssues = doorIssuesOf(carStructures, prioritySeats);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     // NumberInputからの空文字列をチェック
-    const hasInvalidFreeSpace = freeSpaces.some(
-      fs => typeof fs.carNumber !== 'number' || typeof fs.nearDoor !== 'number'
+    const hasBlank = [...freeSpaces, ...prioritySeats].some(
+      (item) => typeof item.carNumber !== 'number' || typeof item.nearDoor !== 'number'
     );
-    const hasInvalidPrioritySeat = prioritySeats.some(
-      ps => typeof ps.carNumber !== 'number' || typeof ps.nearDoor !== 'number'
-    );
+    // 範囲外のドア番号は API も拒む（trainSchema）。行のエラーを出したまま送らない
+    const hasDoorIssue = freeSpaceIssues.length > 0 || prioritySeatIssues.length > 0;
 
-    if (hasInvalidFreeSpace || hasInvalidPrioritySeat) {
+    if (hasBlank || hasDoorIssue) {
       notifications.show({
         title: '更新エラー',
-        message: '入力項目が不足しています。',
+        message: hasBlank ? '入力項目が不足しています。' : '入力に誤りがあります。',
         color: 'red',
         autoClose: 3000,
       });
@@ -228,29 +231,14 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
             <Text size="sm" fw={500}>フリースペース</Text>
             <Button type="button" variant="subtle" size="compact-sm" onClick={addFreeSpace}>+ 追加</Button>
           </Group>
-          <Stack gap="xs">
-            {freeSpaces.map((fs, i) => (
-              <Group key={i} gap="sm" align="center" wrap="wrap">
-                <NumberInput label="号車" min={1} max={carCount} value={fs.carNumber}
-                  onChange={(v) => updateFreeSpace(i, 'carNumber', v)}
-                  w={80} size="xs"
-                  error={typeof fs.carNumber === 'string' && fs.carNumber === ''}
-                />
-                <NumberInput label="ドア番号" min={1} value={fs.nearDoor}
-                  onChange={(v) => updateFreeSpace(i, 'nearDoor', v)}
-                  w={80} size="xs"
-                  error={typeof fs.nearDoor === 'string' && fs.nearDoor === ''}
-                />
-                <Checkbox label="全編成装備" checked={fs.isStandard}
-                  onChange={(e) => updateFreeSpace(i, 'isStandard', e.currentTarget.checked)}
-                  size="sm" mt="lg"
-                />
-                <ActionIcon variant="filled" color="red" size="sm" onClick={() => removeFreeSpace(i)} mt="lg">
-                  <Trash2 style={{ width: '70%', height: '70%' }}/>
-                </ActionIcon>
-              </Group>
-            ))}
-          </Stack>
+          <EquipmentRows
+            items={freeSpaces}
+            issues={freeSpaceIssues}
+            carCount={carCount}
+            carStructures={carStructures}
+            onUpdate={updateFreeSpace}
+            onRemove={removeFreeSpace}
+          />
         </div>
 
         <div>
@@ -258,29 +246,14 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
             <Text size="sm" fw={500}>優先席</Text>
             <Button type="button" variant="subtle" size="compact-sm" onClick={addPrioritySeat}>+ 追加</Button>
           </Group>
-          <Stack gap="xs">
-            {prioritySeats.map((ps, i) => (
-              <Group key={i} gap="sm" align="center" wrap="wrap">
-                <NumberInput label="号車" min={1} max={carCount} value={ps.carNumber}
-                  onChange={(v) => updatePrioritySeat(i, 'carNumber', v)}
-                  w={80} size="xs"
-                  error={typeof ps.carNumber === 'string' && ps.carNumber === ''}
-                />
-                <NumberInput label="ドア番号" min={1} value={ps.nearDoor}
-                  onChange={(v) => updatePrioritySeat(i, 'nearDoor', v)}
-                  w={80} size="xs"
-                  error={typeof ps.nearDoor === 'string' && ps.nearDoor === ''}
-                />
-                <Checkbox label="全編成装備" checked={ps.isStandard}
-                  onChange={(e) => updatePrioritySeat(i, 'isStandard', e.currentTarget.checked)}
-                  size="sm" mt="lg"
-                />
-                <ActionIcon variant="filled" color="red" size="sm" onClick={() => removePrioritySeat(i)} mt="lg">
-                  <Trash2 style={{ width: '70%', height: '70%' }}/>
-                </ActionIcon>
-              </Group>
-            ))}
-          </Stack>
+          <EquipmentRows
+            items={prioritySeats}
+            issues={prioritySeatIssues}
+            carCount={carCount}
+            carStructures={carStructures}
+            onUpdate={updatePrioritySeat}
+            onRemove={removePrioritySeat}
+          />
         </div>
 
         <Group gap="sm">
@@ -293,5 +266,64 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
         </Group>
       </Stack>
     </form>
+  );
+}
+
+/**
+ * 範囲外の号車・ドア番号を行ごとに返す（#194）。入力途中の空欄（文字列）の行の issue は
+ * 空欄チェックに任せて落とす
+ */
+function doorIssuesOf(carStructures: CarStructureItem[], items: EquipmentItem[]): EquipmentDoorIssue[] {
+  return equipmentDoorIssues(carStructures, items).filter(({ index }) =>
+    typeof items[index]?.carNumber === 'number' && typeof items[index]?.nearDoor === 'number',
+  );
+}
+
+type EquipmentRowsProps = {
+  items: EquipmentItem[];
+  issues: EquipmentDoorIssue[];
+  carCount: number;
+  carStructures: CarStructureItem[];
+  onUpdate: (index: number, field: keyof EquipmentItem, value: number | string | boolean) => void;
+  onRemove: (index: number) => void;
+};
+
+/** フリースペース・優先席の行。空欄は赤枠、範囲外は文で示す */
+function EquipmentRows({ items, issues, carCount, carStructures, onUpdate, onRemove }: EquipmentRowsProps) {
+  const messageOf = (index: number, field: EquipmentDoorIssue['field']) =>
+    issues.find((issue) => issue.index === index && issue.field === field)?.message;
+
+  return (
+    <Stack gap="xs">
+      {items.map((item, i) => (
+        <Group key={i} gap="sm" align="flex-start" wrap="wrap">
+          {/* 号車もドア番号と同じく、範囲外を丸めずにエラーを出す */}
+          <NumberInput label="号車" min={1} max={carCount}
+            clampBehavior="none"
+            value={item.carNumber}
+            onChange={(v) => onUpdate(i, 'carNumber', v)}
+            w={80} size="xs"
+            error={messageOf(i, 'carNumber') ?? (typeof item.carNumber === 'string' && item.carNumber === '')}
+          />
+          {/* 範囲外を上限に丸めると、押した覚えのない別のドアが黙って保存される。
+              丸めずにエラーを出し、送信を止める（max は矢印キー・増減ボタンの上限） */}
+          <NumberInput label="ドア番号" min={1}
+            max={doorCountOf(carStructures, item.carNumber)}
+            clampBehavior="none"
+            value={item.nearDoor}
+            onChange={(v) => onUpdate(i, 'nearDoor', v)}
+            w={80} size="xs"
+            error={messageOf(i, 'nearDoor') ?? (typeof item.nearDoor === 'string' && item.nearDoor === '')}
+          />
+          <Checkbox label="全編成装備" checked={item.isStandard}
+            onChange={(e) => onUpdate(i, 'isStandard', e.currentTarget.checked)}
+            size="sm" mt="lg"
+          />
+          <ActionIcon variant="filled" color="red" size="sm" onClick={() => onRemove(i)} mt="lg">
+            <Trash2 style={{ width: '70%', height: '70%' }}/>
+          </ActionIcon>
+        </Group>
+      ))}
+    </Stack>
   );
 }
