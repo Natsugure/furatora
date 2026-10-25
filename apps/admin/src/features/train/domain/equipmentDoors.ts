@@ -10,15 +10,21 @@ export type EquipmentDoorIssue = {
   message: string;
 };
 
+type CarStructure = readonly { carNumber: number; doorCount: number }[] | null | undefined;
+
+/** 号車のドア数。車両構成に無い号車なら undefined */
+export function doorCountOf(carStructure: CarStructure, carNumber: number): number | undefined {
+  return carStructure?.find((car) => car.carNumber === carNumber)?.doorCount;
+}
+
 /** 設備の号車とドア番号が、車両構成の範囲内にあるかを確かめる。1 行に出す issue は 1 つまで */
 export function equipmentDoorIssues(
-  carStructure: readonly { carNumber: number; doorCount: number }[] | null | undefined,
+  carStructure: CarStructure,
   equipments: readonly { carNumber: number; nearDoor: number }[],
 ): EquipmentDoorIssue[] {
-  const doorCountOf = new Map((carStructure ?? []).map((car) => [car.carNumber, car.doorCount]));
   const issues: EquipmentDoorIssue[] = [];
   equipments.forEach((equipment, index) => {
-    const doorCount = doorCountOf.get(equipment.carNumber);
+    const doorCount = doorCountOf(carStructure, equipment.carNumber);
     if (doorCount === undefined) {
       issues.push({ index, field: 'carNumber', message: `${equipment.carNumber}号車は車両構成にありません` });
     } else if (equipment.nearDoor < 1 || equipment.nearDoor > doorCount) {

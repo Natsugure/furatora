@@ -9,7 +9,7 @@ import {
 import { Trash2 } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import type { OperatorOption, TrainLineOption } from '@/features/train/ports';
-import { equipmentDoorIssues, type EquipmentDoorIssue } from '@/features/train/domain/equipmentDoors';
+import { doorCountOf, equipmentDoorIssues, type EquipmentDoorIssue } from '@/features/train/domain/equipmentDoors';
 
 // @furatora/database/schema には carLength を含まないため、admin側でローカルに定義する
 type CarStructureItem = { carNumber: number; doorCount: number; carLength: number | null };
@@ -79,28 +79,16 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
     e.preventDefault();
 
     // NumberInputからの空文字列をチェック
-    const hasInvalidFreeSpace = freeSpaces.some(
-      fs => typeof fs.carNumber !== 'number' || typeof fs.nearDoor !== 'number'
+    const hasBlank = [...freeSpaces, ...prioritySeats].some(
+      (item) => typeof item.carNumber !== 'number' || typeof item.nearDoor !== 'number'
     );
-    const hasInvalidPrioritySeat = prioritySeats.some(
-      ps => typeof ps.carNumber !== 'number' || typeof ps.nearDoor !== 'number'
-    );
-
-    if (hasInvalidFreeSpace || hasInvalidPrioritySeat) {
-      notifications.show({
-        title: '更新エラー',
-        message: '入力項目が不足しています。',
-        color: 'red',
-        autoClose: 3000,
-      });
-      return;
-    }
-
     // 範囲外のドア番号は API も拒む（trainSchema）。行のエラーを出したまま送らない
-    if (freeSpaceIssues.length > 0 || prioritySeatIssues.length > 0) {
+    const hasDoorIssue = freeSpaceIssues.length > 0 || prioritySeatIssues.length > 0;
+
+    if (hasBlank || hasDoorIssue) {
       notifications.show({
         title: '更新エラー',
-        message: '入力に誤りがあります。',
+        message: hasBlank ? '入力項目が不足しています。' : '入力に誤りがあります。',
         color: 'red',
         autoClose: 3000,
       });
@@ -282,14 +270,13 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
 }
 
 /**
- * 範囲外の号車・ドア番号を行ごとに返す（#194）。入力途中の空欄（文字列）の行は
- * 空欄チェックに任せて渡さず、添字は元の行のまま保つ
+ * 範囲外の号車・ドア番号を行ごとに返す（#194）。入力途中の空欄（文字列）の行の issue は
+ * 空欄チェックに任せて落とす
  */
 function doorIssuesOf(carStructures: CarStructureItem[], items: EquipmentItem[]): EquipmentDoorIssue[] {
-  const filled = items.flatMap((item, index) =>
-    typeof item.carNumber === 'number' && typeof item.nearDoor === 'number' ? [{ ...item, index }] : [],
+  return equipmentDoorIssues(carStructures, items).filter(({ index }) =>
+    typeof items[index]?.carNumber === 'number' && typeof items[index]?.nearDoor === 'number',
   );
-  return equipmentDoorIssues(carStructures, filled).map((issue) => ({ ...issue, index: filled[issue.index]!.index }));
 }
 
 type EquipmentRowsProps = {
@@ -318,7 +305,7 @@ function EquipmentRows({ items, issues, carCount, carStructures, onUpdate, onRem
           {/* 範囲外を上限に丸めると、押した覚えのない別のドアが黙って保存される。
               丸めずにエラーを出し、送信を止める（max は矢印キー・増減ボタンの上限） */}
           <NumberInput label="ドア番号" min={1}
-            max={carStructures.find((c) => c.carNumber === item.carNumber)?.doorCount}
+            max={doorCountOf(carStructures, item.carNumber)}
             clampBehavior="none"
             value={item.nearDoor}
             onChange={(v) => onUpdate(i, 'nearDoor', v)}
