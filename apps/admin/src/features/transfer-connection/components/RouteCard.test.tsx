@@ -85,7 +85,7 @@ describe('RouteCard', () => {
   it('設備を選ぶとプレビューに導出結果が出る', () => {
     setup(draft({ facilities: ['stairLift'] }));
     expect(screen.getByText('ベビーカー: 通れない')).toBeInTheDocument();
-    expect(screen.getByText('車いす: 係員を呼ぶ')).toBeInTheDocument();
+    expect(screen.getByText('車いす: 係員が設備を操作')).toBeInTheDocument();
   });
 
   it('設備0件では「設備が未入力」と出て、必要な行為は出ない', () => {
