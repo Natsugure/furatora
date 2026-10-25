@@ -194,10 +194,18 @@ Admin 側は、保存が確定した値（baseline）が変わったとき（マ
 図上ドラッグ（本節）と、インスペクタの数値入力
 （`components/inspector/ConcourseInspector.tsx`/`StopPatternInspector.tsx`）の
 どちらからも編集できる。両方とも `apps/admin/src/features/station-layout/domain/
-editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`moveCarEdge`）を呼ぶため、
+editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`shiftConsistByEdge`）を呼ぶため、
 どちらの経路で編集しても未保存state・不変条件（号車境界の隙間・重なり防止、
 向き非依存の判定）は1箇所に閉じたまま保たれる。数値入力専用の別ロジックを
 作らないこと。
+
+**号車のハンドルは2種類ある**:
+
+- **内側の境界**（隣り合う号車の境界）: 境界だけを動かし、両側の号車の長さが変わる（`moveCarBoundary`）
+- **外端**（1号車の先頭・最終号車の末尾）: 号車の長さを変えずに、**編成全体を平行移動する**（`shiftConsistByEdge`）。
+  停車位置を合わせる作業で動かしたいのは編成の位置だから。端の号車の長さだけを変える操作は無い
+  （長さは境界のハンドルで変える）。外端のスナップの候補はホーム端（0 と `physicalLength`）だけで、
+  編成自身の境界・ドアは候補にしない（ドラッグ中に一緒に動くため）
 
 ### コンコースの表現
 
