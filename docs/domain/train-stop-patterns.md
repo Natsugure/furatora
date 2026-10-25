@@ -62,8 +62,10 @@ Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft
 
 - DB のカラム制約にはまだ現れていない（2つの表をまたぐ条件のため）
 - Admin が入力側で守る。判定は `apps/admin/src/features/train/domain/equipmentDoors.ts` の `equipmentDoorIssues()` 1つで、
-  API（`trainSchema` の `superRefine`）とフォーム（行ごとのエラー）が同じ関数を呼ぶ。フォームは範囲外の値を上限に丸めない
-  （丸めると、入力していない別のドアが保存されてしまう）
+  API（`trainSchema` の `superRefine`）とフォーム（行ごとのエラー）が同じ関数を呼ぶ。フォームは範囲外の号車・ドア番号を上限に丸めない
+  （丸めると、入力していない別の号車・ドアが保存されてしまう）
+- この判定は車両構成を正として読むため、API は車両構成そのものも確かめる。号車は `1..carCount` に 1 回ずつ、`doorCount` は 1 以上
+  （号車の重複は DB の一意制約 `unique_train_car_structure` でも止まる）
 - 表示側（`packages/platform-diagram`）は範囲外の設備を落とさずに描く。データの誤りが図の上で見えるようにするため
 
 ## 号車位置の算出
