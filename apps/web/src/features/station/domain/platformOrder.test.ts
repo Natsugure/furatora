@@ -28,6 +28,13 @@ describe('sortPlatformsByNumber', () => {
     expect(sortPlatformsByNumber([p10, p2, p1])).toEqual([p1, p2, p10]);
   });
 
+  it('同じ番号のホームは id の順に並べる (入力の順に左右されない)', () => {
+    const a = platform({ id: 'a', platformNumber: '1', lineName: '丸ノ内線' });
+    const b = platform({ id: 'b', platformNumber: '1', lineName: '銀座線' });
+    expect(sortPlatformsByNumber([b, a])).toEqual([a, b]);
+    expect(sortPlatformsByNumber([a, b])).toEqual([a, b]);
+  });
+
   it('入力の配列を変更しない', () => {
     const p1 = platform({ id: 'p1', platformNumber: '1' });
     const p2 = platform({ id: 'p2', platformNumber: '2' });
