@@ -325,6 +325,19 @@ describe('StationLayoutEditor', () => {
       expect(within(screen.getByTestId('unsaved-panel')).getByText('テスト列車 の停車位置')).toBeInTheDocument();
     });
 
+    it('先頭の数値入力を変えると、号車の長さを変えずに編成全体が動く（#201）', async () => {
+      renderEditor();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '展開する' }));
+      const leadInput = screen.getByLabelText('1号車の先頭');
+      await user.clear(leadInput);
+      await user.type(leadInput, '-5');
+      await user.tab();
+
+      expect(screen.getByText('1号車（-5m 〜 45m）')).toBeInTheDocument();
+      expect(screen.getByText('2号車（45m 〜 95m）')).toBeInTheDocument();
+    });
+
     it('「自動計算してプレビュー」で作成した新規パターンのインスペクタはデフォルトで展開されている', async () => {
       const newTrain: TrainOptionDTO = {
         id: 'train-2',

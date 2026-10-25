@@ -96,7 +96,7 @@ type EditProps = {
   trainLabel: string;
   cars: PatternCar[];
   onMoveCarBoundary: (boundaryIndex: number, x: number) => void;
-  onMoveCarEdge: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
+  onShiftConsist: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
   onSave: () => void;
   /** 既存パターンのみ渡す */
   onDelete?: () => void;
@@ -109,12 +109,12 @@ type EditProps = {
 
 /**
  * 号車境界を境界ベースの数値入力で調整するインスペクタ。図上ドラッグ
- * （DiagramEditLayer）と同じ onMoveCarBoundary/onMoveCarEdge を呼ぶため、
+ * （DiagramEditLayer）と同じ onMoveCarBoundary/onShiftConsist を呼ぶため、
  * 隣接号車の連動・向き判定（isDoorOrderReversed）を含む隙間・重なり防止の
  * 不変条件は editDraft.ts の実装1箇所に閉じたまま、入力経路だけが増える。
  */
 export function StopPatternInspector({
-  trainLabel, cars, onMoveCarBoundary, onMoveCarEdge, onSave, onDelete, onDiscard, saving, deleting, isNew,
+  trainLabel, cars, onMoveCarBoundary, onShiftConsist, onSave, onDelete, onDiscard, saving, deleting, isNew,
 }: EditProps) {
   const sorted = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
   const reversed = useMemo(() => isDoorOrderReversed(sorted), [sorted]);
@@ -152,7 +152,7 @@ export function StopPatternInspector({
                     step={0.1}
                     decimalScale={2}
                     value={leadEdgeX}
-                    onChange={(v) => typeof v === 'number' && onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, v)}
+                    onChange={(v) => typeof v === 'number' && onShiftConsist({ carNumber: car.carNumber, side: leadEdgeSide }, v)}
                     suffix=" m"
                     size="sm"
                   />
@@ -176,7 +176,7 @@ export function StopPatternInspector({
                     step={0.1}
                     decimalScale={2}
                     value={trailEdgeX}
-                    onChange={(v) => typeof v === 'number' && onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, v)}
+                    onChange={(v) => typeof v === 'number' && onShiftConsist({ carNumber: car.carNumber, side: trailEdgeSide }, v)}
                     suffix=" m"
                     size="sm"
                   />

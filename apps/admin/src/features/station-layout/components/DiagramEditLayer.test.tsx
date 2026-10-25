@@ -35,7 +35,7 @@ function renderLayer(overrides: Partial<React.ComponentProps<typeof DiagramEditL
   const onSelectCell = vi.fn();
   const onMoveCell = vi.fn();
   const onMoveCarBoundary = vi.fn();
-  const onMoveCarEdge = vi.fn();
+  const onShiftConsist = vi.fn();
 
   render(
     <DiagramEditLayer
@@ -48,12 +48,12 @@ function renderLayer(overrides: Partial<React.ComponentProps<typeof DiagramEditL
       onSelectCell={onSelectCell}
       onMoveCell={onMoveCell}
       onMoveCarBoundary={onMoveCarBoundary}
-      onMoveCarEdge={onMoveCarEdge}
+      onShiftConsist={onShiftConsist}
       {...overrides}
     />,
   );
 
-  return { onSelectCell, onMoveCell, onMoveCarBoundary, onMoveCarEdge };
+  return { onSelectCell, onMoveCell, onMoveCarBoundary, onShiftConsist };
 }
 
 function drag(handle: HTMLElement, fromClientX: number, toClientX: number, extra: Partial<PointerEvent> = {}) {
@@ -146,18 +146,33 @@ describe('号車境界・外端のドラッグ', () => {
     expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 70);
   });
 
-  it('1号車の先頭（編成の左端）をドラッグするとonMoveCarEdgeが呼ばれる', () => {
-    const { onMoveCarEdge } = renderLayer();
+  it('1号車の先頭（編成の左端）をドラッグするとonShiftConsistが呼ばれる', () => {
+    const { onShiftConsist } = renderLayer();
     const handle = screen.getByRole('slider', { name: '1号車の先頭（0m）' });
     drag(handle, 0, 50); // 50px→10m
-    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, 10);
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, 10);
   });
 
-  it('最終号車の末尾（編成の右端）をドラッグするとonMoveCarEdgeが呼ばれる', () => {
-    const { onMoveCarEdge } = renderLayer();
+  it('最終号車の末尾（編成の右端）をドラッグするとonShiftConsistが呼ばれる', () => {
+    const { onShiftConsist } = renderLayer();
     const handle = screen.getByRole('slider', { name: '2号車の末尾（100m）' });
     drag(handle, 500, 450); // 450px→90m
-    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 90);
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 90);
+  });
+
+  it('外端は、動かしている編成自身のドアにはスナップせず、グリッドに合わせる（#201）', () => {
+    // 外端のドラッグは編成全体を動かすので、編成のドアも一緒に動く。自分のドアは吸着の目標にならない
+    const { onShiftConsist } = renderLayer();
+    const handle = screen.getByRole('slider', { name: '1号車の先頭（0m）' });
+    drag(handle, 0, 31.75); // 31.75px→6.35m。1号車のドア中心6.25mから0.1m
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, 6.5);
+  });
+
+  it('外端は、ホーム端にはスナップする', () => {
+    const { onShiftConsist } = renderLayer();
+    const handle = screen.getByRole('slider', { name: '2号車の末尾（100m）' });
+    drag(handle, 500, 499); // 499px→99.8m。ホーム端100mから0.2m
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 100);
   });
 
   describe('反転編成（carNumber昇順でxが減少する編成）', () => {
@@ -169,18 +184,18 @@ describe('号車境界・外端のドラッグ', () => {
       expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 70);
     });
 
-    it('1号車の先頭ハンドルは外側の自由端（endフィールド、100m）に立ち、onMoveCarEdgeのsideもendになる', () => {
-      const { onMoveCarEdge } = renderLayer({ cars: reversedCars });
+    it('1号車の先頭ハンドルは外側の自由端（endフィールド、100m）に立ち、onShiftConsistのsideもendになる', () => {
+      const { onShiftConsist } = renderLayer({ cars: reversedCars });
       const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
       drag(handle, 500, 450); // 450px→90m
-      expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 90);
+      expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 90);
     });
 
-    it('最終号車の末尾ハンドルは外側の自由端（startフィールド、0m）に立ち、onMoveCarEdgeのsideもstartになる', () => {
-      const { onMoveCarEdge } = renderLayer({ cars: reversedCars });
+    it('最終号車の末尾ハンドルは外側の自由端（startフィールド、0m）に立ち、onShiftConsistのsideもstartになる', () => {
+      const { onShiftConsist } = renderLayer({ cars: reversedCars });
       const handle = screen.getByRole('slider', { name: '2号車の末尾（0m）' });
       drag(handle, 0, 50); // 50px→10m
-      expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, 10);
+      expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, 10);
     });
   });
 });

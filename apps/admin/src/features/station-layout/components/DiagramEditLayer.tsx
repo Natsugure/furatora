@@ -33,7 +33,7 @@ type Props = {
   onSelectCell: (cellId: string) => void;
   onMoveCell: (cellId: string, x: number) => void;
   onMoveCarBoundary: (boundaryIndex: number, x: number) => void;
-  onMoveCarEdge: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
+  onShiftConsist: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
 };
 
 /** キャンバス（このレイヤーのルート要素）の実測サイズ。min-widthで伸縮するため必ず実測する */
@@ -60,7 +60,7 @@ function useCanvasRect(rootRef: RefObject<HTMLDivElement | null>) {
 
 export function DiagramEditLayer({
   rows, bounds, physicalLength, cars, cellHandles, selectedCellId,
-  onSelectCell, onMoveCell, onMoveCarBoundary, onMoveCarEdge,
+  onSelectCell, onMoveCell, onMoveCarBoundary, onShiftConsist,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const rect = useCanvasRect(rootRef);
@@ -68,6 +68,8 @@ export function DiagramEditLayer({
   // 号車番号昇順でxが減少する反転編成（docs/domain/platform-coordinate-system.md「号車の向き」）
   // では、外端・境界のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
   const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
+
+  const edgeCandidates = () => [0, physicalLength];
 
   const cellY = rows.facilityY + FACILITY_ROW_HEIGHT / 2;
   const carY = rows.trainY + TRAIN_ROW_HEIGHT / 2;
@@ -91,11 +93,13 @@ export function DiagramEditLayer({
         />
       ))}
 
+      {/* 外端は編成全体を動かす（editDraft.ts の shiftConsistByEdge）。編成自身の境界・ドアは一緒に動くので、
+          スナップの候補はホーム端だけにする */}
       {sortedCars.map((car, i) => {
         const isFirst = i === 0;
         const isLast = i === sortedCars.length - 1;
         // 非反転: 先頭車のstartが外端、境界はend。反転: これが入れ替わる
-        // （moveCarBoundary/moveCarEdge の境界共有規則の裏返し。editDraft.ts参照）
+        // （moveCarBoundary/shiftConsistByEdge の境界共有規則の裏返し。editDraft.ts参照）
         const leadEdgeX = reversed ? car.endMeters : car.startMeters;
         const leadEdgeSide: 'start' | 'end' = reversed ? 'end' : 'start';
         const boundaryX = reversed ? car.startMeters : car.endMeters;
@@ -113,8 +117,8 @@ export function DiagramEditLayer({
                 y={carY}
                 label={`${car.carNumber}号車の先頭（${leadEdgeX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [leadEdgeX] })}
-                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
+                candidates={edgeCandidates}
+                onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
               />
             )}
             {!isLast && (
@@ -141,8 +145,8 @@ export function DiagramEditLayer({
                 y={carY}
                 label={`${car.carNumber}号車の末尾（${trailEdgeX}m）`}
                 selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [trailEdgeX] })}
-                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
+                candidates={edgeCandidates}
+                onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
               />
             )}
           </div>

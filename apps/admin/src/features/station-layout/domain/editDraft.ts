@@ -1,4 +1,4 @@
-import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
+import { isDoorOrderReversed, roundToDecimal2 } from '@furatora/platform-diagram/domain';
 import type { FacilityTypeCode } from '@furatora/database/enums';
 import type { PlatformLocationInput } from '@/features/facility/schema';
 import type { TrainStopPatternInput } from '@/features/stop-pattern/schema';
@@ -14,10 +14,11 @@ import type {
 //   非反転（carNumber昇順でxが増加）: cars[i].endMeters === cars[i+1].startMeters
 //   反転（carNumber昇順でxが減少）  : cars[i].startMeters === cars[i+1].endMeters
 // 向きの判定は isDoorOrderReversed()（packages/platform-diagram）を唯一の判定源とする。
-// この不変条件は moveCarBoundary 以外の経路で startMeters/endMeters を書き換えてはならない
+// この不変条件を保つため、startMeters/endMeters は moveCarBoundary（境界を動かす）と
+// shiftConsistByEdge（全号車を同じ差分で動かす）以外の経路で書き換えてはならない
 // （docs/domain/train-stop-patterns.md）。
 
-/** 号車を潰さない最小幅（m）。moveCarBoundary/moveCarEdge の唯一のクランプ元 */
+/** 号車を潰さない最小幅（m）。moveCarBoundary の唯一のクランプ元 */
 export const MIN_CAR_METERS = 0.5;
 
 /** 新規アクセス点に設備を追加したときの既定値 */
@@ -287,7 +288,7 @@ export function removeConnection(draft: ConcourseDraft, stationId: string): Conc
  * 両側の号車がこれより短くならないようクランプする。
  *
  * boundaryIndex が範囲外（両端の外側の境界）のときは無変更で返す。両端は
- * moveCarEdge を使うこと。テキスト入力（境界ベースの数値入力）からも同じ関数を呼ぶ
+ * shiftConsistByEdge を使うこと。テキスト入力（境界ベースの数値入力）からも同じ関数を呼ぶ
  * ことで、ドラッグと数値入力の両経路で隙間・重なりを構造的に作れなくする。
  */
 export function moveCarBoundary(
@@ -333,7 +334,7 @@ export function moveCarBoundary(
 /**
  * 編成の向きに応じた自由端の側を返す。非反転編成では1号車の start・最終号車の end、
  * 反転編成ではこれが入れ替わる（moveCarBoundary の境界共有規則の裏返し）。
- * moveCarEdge とインスペクタのラベル表示（StopPatternInspector）の両方が
+ * shiftConsistByEdge とインスペクタのラベル表示（StopPatternInspector）の両方が
  * この判定を共有することで、向きの判定を1箇所に閉じる。
  */
 export function freeEdgeSides(reversed: boolean): { first: 'start' | 'end'; last: 'start' | 'end' } {
@@ -341,15 +342,15 @@ export function freeEdgeSides(reversed: boolean): { first: 'start' | 'end'; last
 }
 
 /**
- * 編成の外端（他のどの号車とも境界を共有しない、編成全体としての自由端）を動かす。
- * 内側の境界は moveCarBoundary を使うこと（edge が内側の号車・逆側のフィールドを
- * 指す場合は無変更で返す）。
+ * 編成の外端（他のどの号車とも境界を共有しない、編成全体としての自由端）が x に来るよう、
+ * 全号車を同じ差分だけ動かす（#201）。号車の長さと境界の共有は変わらない。
+ * 動かしたいのは停車位置で、号車の長さは境界（moveCarBoundary）で変える。
+ * edge が内側の号車・逆側のフィールドを指す場合は無変更で返す。
  */
-export function moveCarEdge(
+export function shiftConsistByEdge(
   draft: PatternDraft,
   edge: { carNumber: number; side: 'start' | 'end' },
   x: number,
-  opts: { minCarMeters: number },
 ): PatternDraft {
   const cars = [...draft.cars].sort((a, b) => a.carNumber - b.carNumber);
   const index = cars.findIndex((c) => c.carNumber === edge.carNumber);
@@ -363,11 +364,16 @@ export function moveCarEdge(
   if (!isLeadEdge && !isTrailEdge) return draft;
 
   const car = cars[index]!;
-  const nextCar = edge.side === 'start'
-    ? { ...car, startMeters: Math.min(x, car.endMeters - opts.minCarMeters) }
-    : { ...car, endMeters: Math.max(x, car.startMeters + opts.minCarMeters) };
-
-  return { cars: cars.map((c, i) => (i === index ? nextCar : c)) };
+  const delta = x - (edge.side === 'start' ? car.startMeters : car.endMeters);
+  if (delta === 0) return draft;
+  // 丸めないと浮動小数の誤差で隣接号車の共有フィールドがずれ、境界の共有が崩れる
+  return {
+    cars: cars.map((c) => ({
+      ...c,
+      startMeters: roundToDecimal2(c.startMeters + delta),
+      endMeters: roundToDecimal2(c.endMeters + delta),
+    })),
+  };
 }
 
 /**

@@ -5,7 +5,7 @@ import {
   setConcourseField, moveCell, addCell, removeCell,
   addCellFacility, removeCellFacility, updateCellFacility,
   setConnection, removeConnection,
-  moveCarBoundary, moveCarEdge,
+  moveCarBoundary, shiftConsistByEdge,
   isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
   draftToDisplayConcourse,
   MIN_CAR_METERS,
@@ -300,7 +300,7 @@ describe('moveCarBoundary', () => {
     expect(car1.endMeters).toBe(MIN_CAR_METERS);
   });
 
-  it('範囲外のboundaryIndexは無変更で返す（両端は moveCarEdge を使う）', () => {
+  it('範囲外のboundaryIndexは無変更で返す（両端は shiftConsistByEdge を使う）', () => {
     const draft = createPatternDraft(pattern);
     expect(moveCarBoundary(draft, -1, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
     expect(moveCarBoundary(draft, 2, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
@@ -359,56 +359,46 @@ describe('moveCarBoundary', () => {
   });
 });
 
-describe('moveCarEdge', () => {
-  it('1号車のstart（編成の左端）を単独で動かせる', () => {
-    const draft = createPatternDraft(pattern);
-    const next = moveCarEdge(draft, { carNumber: 1, side: 'start' }, -5, { minCarMeters: MIN_CAR_METERS });
-    const car1 = next.cars.find((c) => c.carNumber === 1)!;
-    expect(car1.startMeters).toBe(-5);
-    expect(car1.endMeters).toBe(20); // end は動かない
+describe('shiftConsistByEdge', () => {
+  const spans = (draft: { cars: { carNumber: number; startMeters: number; endMeters: number }[] }) =>
+    [...draft.cars].sort((a, b) => a.carNumber - b.carNumber).map((c) => [c.startMeters, c.endMeters]);
+
+  it('1号車のstart（編成の左端）を動かすと、全号車が同じだけ動く', () => {
+    const next = shiftConsistByEdge(createPatternDraft(pattern), { carNumber: 1, side: 'start' }, -5);
+    expect(spans(next)).toEqual([[-5, 15], [15, 35], [35, 55]]);
   });
 
-  it('最終号車のend（編成の右端）を単独で動かせる', () => {
-    const draft = createPatternDraft(pattern);
-    const next = moveCarEdge(draft, { carNumber: 3, side: 'end' }, 65, { minCarMeters: MIN_CAR_METERS });
-    const car3 = next.cars.find((c) => c.carNumber === 3)!;
-    expect(car3.endMeters).toBe(65);
-    expect(car3.startMeters).toBe(40);
+  it('最終号車のend（編成の右端）を動かすと、全号車が同じだけ動く', () => {
+    const next = shiftConsistByEdge(createPatternDraft(pattern), { carNumber: 3, side: 'end' }, 65);
+    expect(spans(next)).toEqual([[5, 25], [25, 45], [45, 65]]);
   });
 
   it('内側の号車の境界を指定すると無変更で返す', () => {
     const draft = createPatternDraft(pattern);
-    expect(moveCarEdge(draft, { carNumber: 2, side: 'start' }, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
-    expect(moveCarEdge(draft, { carNumber: 1, side: 'end' }, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
+    expect(shiftConsistByEdge(draft, { carNumber: 2, side: 'start' }, 10)).toEqual(draft);
+    expect(shiftConsistByEdge(draft, { carNumber: 1, side: 'end' }, 10)).toEqual(draft);
   });
 
-  it('号車を潰す位置へはクランプされる', () => {
-    const draft = createPatternDraft(pattern);
-    const next = moveCarEdge(draft, { carNumber: 1, side: 'start' }, 19.9, { minCarMeters: MIN_CAR_METERS });
-    expect(next.cars.find((c) => c.carNumber === 1)!.startMeters).toBe(20 - MIN_CAR_METERS);
+  it('小数の差分でも浮動小数の誤差を残さず、境界の共有が保たれる', () => {
+    const next = shiftConsistByEdge(createPatternDraft(pattern), { carNumber: 1, side: 'start' }, 0.1);
+    expect(spans(next)).toEqual([[0.1, 20.1], [20.1, 40.1], [40.1, 60.1]]);
   });
 
   describe('反転編成（carNumber昇順でxが減少する編成）', () => {
-    it('1号車のend（編成の右端）を単独で動かせる（非反転と自由端が逆）', () => {
-      const draft = createPatternDraft(reversedPattern);
-      const next = moveCarEdge(draft, { carNumber: 1, side: 'end' }, 65, { minCarMeters: MIN_CAR_METERS });
-      const car1 = next.cars.find((c) => c.carNumber === 1)!;
-      expect(car1.endMeters).toBe(65);
-      expect(car1.startMeters).toBe(40); // start は動かない（内側境界のため）
+    it('1号車のend（編成の右端）を動かすと、全号車が同じだけ動く（非反転と自由端が逆）', () => {
+      const next = shiftConsistByEdge(createPatternDraft(reversedPattern), { carNumber: 1, side: 'end' }, 65);
+      expect(spans(next)).toEqual([[45, 65], [25, 45], [5, 25]]);
     });
 
-    it('最終号車のstart（編成の左端）を単独で動かせる', () => {
-      const draft = createPatternDraft(reversedPattern);
-      const next = moveCarEdge(draft, { carNumber: 3, side: 'start' }, -5, { minCarMeters: MIN_CAR_METERS });
-      const car3 = next.cars.find((c) => c.carNumber === 3)!;
-      expect(car3.startMeters).toBe(-5);
-      expect(car3.endMeters).toBe(20);
+    it('最終号車のstart（編成の左端）を動かすと、全号車が同じだけ動く', () => {
+      const next = shiftConsistByEdge(createPatternDraft(reversedPattern), { carNumber: 3, side: 'start' }, -5);
+      expect(spans(next)).toEqual([[35, 55], [15, 35], [-5, 15]]);
     });
 
     it('非反転側の自由端（1号車のstart・最終号車のend）を指定すると無変更で返す（反転時は内側境界のため）', () => {
       const draft = createPatternDraft(reversedPattern);
-      expect(moveCarEdge(draft, { carNumber: 1, side: 'start' }, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
-      expect(moveCarEdge(draft, { carNumber: 3, side: 'end' }, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
+      expect(shiftConsistByEdge(draft, { carNumber: 1, side: 'start' }, 10)).toEqual(draft);
+      expect(shiftConsistByEdge(draft, { carNumber: 3, side: 'end' }, 10)).toEqual(draft);
     });
   });
 });

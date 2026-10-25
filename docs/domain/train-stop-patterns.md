@@ -35,9 +35,9 @@ trainStopPatterns
 これは `startMeters < endMeters` と違い、DB のカラム制約にはまだ現れていない
 （`trainStopPatternCars` の一意な保証は各行の `startMeters < endMeters` のみ）。
 Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft.ts`
-の `moveCarBoundary`/`moveCarEdge`）が、`isDoorOrderReversed()` で向きを判定した上で
-境界を動かすときに隣接号車の共有フィールドを常に同値で書き換えることで、この
-不変条件をクライアント側で構造的に守っている。
+の `moveCarBoundary`/`shiftConsistByEdge`）が、`isDoorOrderReversed()` で向きを判定した上で
+境界を動かすときに隣接号車の共有フィールドを常に同値で書き換え、編成全体を動かすときは
+全号車に同じ差分を足して小数2桁に丸めることで、この不変条件をクライアント側で構造的に守っている。
 
 **サーバー側スキーマ（`trainStopPatternSchema`）にも `superRefine` で同じ条件を
 強制している**（既存データ（本番含む）に不連続な編成が無いことを確認してから
