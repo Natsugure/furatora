@@ -69,7 +69,9 @@ export function DiagramEditLayer({
   // では、外端・境界のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
   const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
 
-  const edgeCandidates = () => [0, physicalLength];
+  // 外端は自分の側のホーム端にだけ吸着させる。反対側の端に吸着すると、編成全体がホームの外へ引き寄せられる
+  const leftEdgeCandidates = useCallback(() => [0], []);
+  const rightEdgeCandidates = useCallback(() => [physicalLength], [physicalLength]);
 
   const cellY = rows.facilityY + FACILITY_ROW_HEIGHT / 2;
   const carY = rows.trainY + TRAIN_ROW_HEIGHT / 2;
@@ -94,7 +96,8 @@ export function DiagramEditLayer({
       ))}
 
       {/* 外端は編成全体を動かす（editDraft.ts の shiftConsistByEdge）。編成自身の境界・ドアは一緒に動くので、
-          スナップの候補はホーム端だけにする */}
+          スナップの候補はホーム端だけにする。ハンドルは自分の外端を bounds に収めるだけなので、
+          反対側の外端も収める制限は onShiftConsist の先（shiftConsistByEdge の range）で掛ける */}
       {sortedCars.map((car, i) => {
         const isFirst = i === 0;
         const isLast = i === sortedCars.length - 1;
@@ -117,7 +120,7 @@ export function DiagramEditLayer({
                 y={carY}
                 label={`${car.carNumber}号車の先頭（${leadEdgeX}m）`}
                 selected={false}
-                candidates={edgeCandidates}
+                candidates={reversed ? rightEdgeCandidates : leftEdgeCandidates}
                 onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
               />
             )}
@@ -145,7 +148,7 @@ export function DiagramEditLayer({
                 y={carY}
                 label={`${car.carNumber}号車の末尾（${trailEdgeX}m）`}
                 selected={false}
-                candidates={edgeCandidates}
+                candidates={reversed ? leftEdgeCandidates : rightEdgeCandidates}
                 onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
               />
             )}
