@@ -1,30 +1,26 @@
-# タスク: フリースペース・優先席のドア番号を、その号車のドア数の範囲内に限る (Issue #194)
+# タスク: ホーム図の編集で、編成の先頭・末尾を動かすと編成全体を平行移動する (Issue #201)
 
 どのサイクルも TDD（テストを1つ書く → 期待した理由で失敗することを確かめる → 最小の実装 → 通る → Refactor）。
 
-ブランチ: `fix/issue194-near-door-range`（`main` から）
+ブランチ: `fix/issue201-consist-shift`（`main` から）
 
-- [x] **TASK-1** ブランチを切る
-- [x] **TASK-2** `docs/spec/` の3点を #194 用に書き換える
-- [x] **TASK-3** サイクルA: `equipmentDoorIssues`（`features/train/domain/equipmentDoors.ts`）
-  - 6 件。モジュールが無い Red から
-- [x] **TASK-4** サイクルB: `trainSchema` の `superRefine`
-  - 4 件のうち、範囲外の 3 件が通ってしまう Red から
-  - zod 4 は中の項目に issue があっても外側の `superRefine` を走らせることを確かめた（design.md に書いた前提を直した）
-- [x] **TASK-5** サイクルC: `TrainForm` の行ごとのエラー・送信の阻止・ドア番号の上限
-  - 4 件の Red から。フリースペースと優先席の行を `EquipmentRows` にまとめた
-  - **dev サーバーで、範囲外の値が「更新」を押したときに上限に丸まり、そのまま保存されることを見つけた**（Mantine の `clampBehavior` の既定は `blur`）。
-    丸めずにエラーで止める期待にテストを書き換え（Red を確かめた）、`clampBehavior="none"` にした（REQ-7）
-- [x] **TASK-6** 検証: admin の test・型チェック・lint・build、dev サーバーで確かめる
-  - ユニット 687 件・型チェック・lint・`next build` が通った
-  - Chrome DevTools に接続できなかったので、e2e のログイン状態で Playwright を使い、丸ノ内線の編集画面を開いた。
-    1号車のフリースペースのドア番号に 9 を入れて「更新」を押すと、9 のまま、その行に「1号車のドアは1〜3番です」、通知「入力に誤りがあります。」が出て、PUT は 0 回
-  - 確認の 1 回目は送信を止めておらず、丸められた 3 が development に保存された（`trains.updated_at` だけが変わり、設備の値は本番と同じ。上の不具合はこのとき見つけた）。2 回目以降は PUT を遮断して確かめた
-- [x] **TASK-7** 振り返り: `docs/domain/train-stop-patterns.md` に「列車の設備（フリースペース・優先席）」を足した
-  - ADR の追加・ステータス変更は無い
-- [x] **TASK-8** PR を作る（#194 を閉じる）: #200
-- [x] **TASK-9** PR #200 のレビュー指摘への対応
-  - 号車の入力にも `clampBehavior="none"` を付けた（範囲外の号車が両数に丸められて保存されていた）。Red を確かめてから直した
-  - `trainSchema` で車両構成を確かめる: 号車が `1..carCount`・重複なし、`doorCount` が 1 以上。4 件の Red から
-  - 本番（main）に、この条件に反する車両構成が無いことを Neon で確かめた（編集しても保存できなくなる列車は無い）
-  - admin のユニット 692 件・型チェック・lint が通った
+- [x] **TASK-1** Issue #201 を起票し、ブランチを切る
+- [x] **TASK-2** `docs/spec/` の3点を #201 用に書き換える
+- [x] **TASK-3** サイクルA: `shiftConsistByEdge`（`editDraft.ts`）と呼び出し元の差し替え
+  - `moveCarEdge` の 7 件を平行移動の期待に書き換え、関数が無い Red から実装した。`StationLayoutEditor` の `handleMoveCarEdge` が呼ぶ関数を差し替えた
+  - コンポーネントの `onMoveCarEdge(edge, x)` は「外端を x に動かす」意味のままなので、名前を残した
+- [x] **TASK-4** サイクルB: 外端のハンドルのスナップの候補（`DiagramEditLayer.tsx`）
+  - 「自分のドア（6.25m）ではなくグリッド（6.5m）に合わせる」の Red を確かめてから、候補をホーム端だけにした。「ホーム端にはスナップする」は今の候補でも通る（候補を減らしすぎないためのもの）
+- [x] **TASK-5** サイクルC: インスペクタの数値入力からの結合の確認（`StationLayoutEditor.test.tsx`）
+  - 修正前の実装に戻すと落ち、修正後に通ることを確かめた
+- [x] **TASK-6** 検証: admin の test・型チェック・lint・build、dev サーバーで先頭・末尾をドラッグして確かめる（保存しない）
+  - ユニット 695 件・型チェック・lint・`next build` が通った
+  - Playwright（e2e のログイン状態、GET 以外の API は遮断。届いた数は 0）で大手町・丸ノ内線を開いた
+    - 1番線（非反転）: 1号車の先頭を右へ → 6両とも +5m、各 18m のまま
+    - 2番線（反転）: 1号車の先頭（end）を左へ → 6両とも -5m、続けて 6号車の末尾（start）を左へ → さらに -5m。各 18m のまま
+  - 未保存の変更があるまま別の番線のタブを押すと、切り替わらずに同じ番線に留まった。この PR の前からの振る舞い（変えていない）
+- [x] **TASK-7** 振り返り: `docs/domain/` の `moveCarEdge` の記述を上書きする
+  - `platform-coordinate-system.md`: 関数名を直し、「号車のハンドルは2種類ある」を足した
+  - `train-stop-patterns.md`: 関数名と、平行移動でも境界の共有が保たれる理由を直した
+  - ADR の追加・ステータス変更は無い（ADR-0010 は編集レイヤーの置き場所の決定）
+- [ ] **TASK-8** PR を作る（#201 を閉じる）
