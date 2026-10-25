@@ -346,11 +346,17 @@ export function freeEdgeSides(reversed: boolean): { first: 'start' | 'end'; last
  * 全号車を同じ差分だけ動かす（#201）。号車の長さと境界の共有は変わらない。
  * 動かしたいのは停車位置で、号車の長さは境界（moveCarBoundary）で変える。
  * edge が内側の号車・逆側のフィールドを指す場合は無変更で返す。
+ *
+ * opts.range は編成全体（つかんだ外端だけでなく反対側の外端も）を収める範囲で、差分をこれで
+ * 抑える。ドラッグは凍結した bounds（画面の外に出さない）、数値入力は decimal(6,2) の上限
+ * （保存時に溢れさせない）を渡す。編成が range の外にはみ出しているとき（bounds に含まれない
+ * 新規作成中の停車パターン）は、range へ近づく向きにだけ動かせる。
  */
 export function shiftConsistByEdge(
   draft: PatternDraft,
   edge: { carNumber: number; side: 'start' | 'end' },
   x: number,
+  opts: { range: { minX: number; maxX: number } },
 ): PatternDraft {
   const cars = [...draft.cars].sort((a, b) => a.carNumber - b.carNumber);
   const index = cars.findIndex((c) => c.carNumber === edge.carNumber);
@@ -364,7 +370,13 @@ export function shiftConsistByEdge(
   if (!isLeadEdge && !isTrailEdge) return draft;
 
   const car = cars[index]!;
-  const delta = x - (edge.side === 'start' ? car.startMeters : car.endMeters);
+  const consistMin = Math.min(...cars.map((c) => c.startMeters));
+  const consistMax = Math.max(...cars.map((c) => c.endMeters));
+  // 差分の範囲に 0 を必ず含め、range の外にいる編成が勝手に range へ引き戻されないようにする
+  const minDelta = Math.min(0, opts.range.minX - consistMin);
+  const maxDelta = Math.max(0, opts.range.maxX - consistMax);
+  const rawDelta = x - (edge.side === 'start' ? car.startMeters : car.endMeters);
+  const delta = Math.min(Math.max(rawDelta, minDelta), maxDelta);
   if (delta === 0) return draft;
   // 丸めないと浮動小数の誤差で隣接号車の共有フィールドがずれ、境界の共有が崩れる
   return {

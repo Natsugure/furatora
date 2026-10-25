@@ -50,6 +50,38 @@ describe('trainStopPatternSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('decimal(6,2) の範囲（±9999.99）ちょうどなら正常にパースされる', () => {
+    const result = trainStopPatternSchema.safeParse({
+      platformId: VALID_UUID,
+      trainId: OTHER_UUID,
+      cars: [
+        { carNumber: 1, startMeters: -9999.99, endMeters: -9979.99 },
+        { carNumber: 2, startMeters: 9979.99, endMeters: 9999.99 },
+      ],
+    });
+    // 境界の共有違反は出るが、範囲の違反は出ない
+    const rangeIssues = result.error?.issues.filter((i) => i.path.at(-1) === 'startMeters' || i.path.at(-1) === 'endMeters') ?? [];
+    expect(rangeIssues).toEqual([]);
+  });
+
+  it('endMeters が decimal(6,2) の上限 9999.99 を超える場合は失敗する', () => {
+    const result = trainStopPatternSchema.safeParse({
+      platformId: VALID_UUID,
+      trainId: OTHER_UUID,
+      cars: [{ carNumber: 1, startMeters: 9990, endMeters: 10010 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('startMeters が decimal(6,2) の下限 -9999.99 を下回る場合は失敗する', () => {
+    const result = trainStopPatternSchema.safeParse({
+      platformId: VALID_UUID,
+      trainId: OTHER_UUID,
+      cars: [{ carNumber: 1, startMeters: -10010, endMeters: -9990 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('隣接号車が境界を共有していれば正常にパースされる（非反転編成）', () => {
     const result = trainStopPatternSchema.safeParse({
       platformId: VALID_UUID,

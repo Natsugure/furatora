@@ -92,9 +92,10 @@ test('旧ルート（/facilities、/platforms/new）は削除済みで404にな�
 // 反転編成（carNumber昇順でxが減少する編成。docs/domain/train-stop-patterns.md
 // 「隣接号車は境界を共有する」参照）でのドラッグ編集。表参道 東京メトロ半蔵門線3番線が
 // development に存在する唯一の反転編成データ（2026-09-14確認）。PR3で発覚した
-// バグ（editDraft.ts の moveCarBoundary/shiftConsistByEdge と DiagramEditLayer.tsx の
+// バグ（editDraft.ts の moveCarBoundary/moveCarEdge と DiagramEditLayer.tsx の
 // ハンドル配置が非反転前提で書かれており、反転編成で図上編集すると無関係な号車の
 // 座標を書き換えて編成を破壊する）の再発を防ぐための回帰テスト。
+// moveCarEdge は #201 で外端が編成全体を動かす shiftConsistByEdge に置き換わった。
 // 保存はせず（ページ遷移で破棄）、development のデータへは書き込まない
 test('反転編成のホームでドラッグしても無関係な号車の境界は変化しない（表参道 東京メトロ半蔵門線3番線）', async ({ page }) => {
   const stationId = await findStationIdByLine(page, '表参道', '半蔵門線');

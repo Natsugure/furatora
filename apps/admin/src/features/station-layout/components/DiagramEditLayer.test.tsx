@@ -175,6 +175,21 @@ describe('号車境界・外端のドラッグ', () => {
     expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 100);
   });
 
+  it('外端は、反対側のホーム端にはスナップしない', () => {
+    // 1号車の先頭（左端）が右のホーム端に吸着すると、編成全体がホームの外へ引き寄せられる
+    const { onShiftConsist } = renderLayer();
+    const handle = screen.getByRole('slider', { name: '1号車の先頭（0m）' });
+    drag(handle, 0, 498.5); // 498.5px→99.7m。ホーム端100mから0.3m
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, 99.5);
+  });
+
+  it('最終号車の末尾（右端）は、左のホーム端にはスナップしない', () => {
+    const { onShiftConsist } = renderLayer();
+    const handle = screen.getByRole('slider', { name: '2号車の末尾（100m）' });
+    drag(handle, 500, 1.5); // 1.5px→0.3m。ホーム端0mから0.3m
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 0.5);
+  });
+
   describe('反転編成（carNumber昇順でxが減少する編成）', () => {
     it('境界ハンドルは共有フィールド（1号車のstart=2号車のend）の座標に立ち、onMoveCarBoundaryが呼ばれる', () => {
       const { onMoveCarBoundary } = renderLayer({ cars: reversedCars });
@@ -196,6 +211,15 @@ describe('号車境界・外端のドラッグ', () => {
       const handle = screen.getByRole('slider', { name: '2号車の末尾（0m）' });
       drag(handle, 0, 50); // 50px→10m
       expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, 10);
+    });
+
+    it('1号車の先頭（右端）は右のホーム端にスナップし、左のホーム端にはスナップしない', () => {
+      const { onShiftConsist } = renderLayer({ cars: reversedCars });
+      const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
+      drag(handle, 500, 499); // 499px→99.8m
+      expect(onShiftConsist).toHaveBeenLastCalledWith({ carNumber: 1, side: 'end' }, 100);
+      drag(handle, 500, 1.5); // 1.5px→0.3m
+      expect(onShiftConsist).toHaveBeenLastCalledWith({ carNumber: 1, side: 'end' }, 0.5);
     });
   });
 });

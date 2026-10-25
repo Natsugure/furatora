@@ -19,6 +19,7 @@ import { stationLayoutHref } from '@/features/station/listState';
 import type { LineWithDirections } from '@/features/platform/ports';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
+import { STOP_METERS_LIMIT } from '@/features/stop-pattern/schema';
 import type { CarSegment } from '@/features/stop-pattern/domain/carSegments';
 import type {
   LayoutPlatformDetailDTO, LayoutConcourseDTO, LayoutStopPatternDTO,
@@ -50,6 +51,9 @@ type Props = {
 
 /** 複製時に座標をずらす量（m）。0だと元と完全に重なって見分けがつかない */
 const DUPLICATE_OFFSET_METERS = 2;
+
+/** 数値入力で編成を動かせる範囲。画面には収まらなくてよいが、保存時に DB の列から溢れさせない */
+const STOP_METERS_RANGE = { minX: -STOP_METERS_LIMIT, maxX: STOP_METERS_LIMIT };
 
 function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | undefined): LayoutStopPatternDTO {
   if (!draft) return baseline;
@@ -250,17 +254,22 @@ export function StationLayoutEditor({
     );
   }
 
-  function handleShiftConsist(edge: { carNumber: number; side: 'start' | 'end' }, x: number) {
+  // range はドラッグなら凍結した bounds、数値入力なら decimal(6,2) の上限（shiftConsistByEdge 参照）
+  function handleShiftConsist(
+    edge: { carNumber: number; side: 'start' | 'end' },
+    x: number,
+    range: { minX: number; maxX: number },
+  ) {
     if (newPattern) {
       setNewPattern((prev) => (prev
-        ? { ...prev, draft: shiftConsistByEdge(prev.draft, edge, x) }
+        ? { ...prev, draft: shiftConsistByEdge(prev.draft, edge, x, { range }) }
         : prev));
       return;
     }
     if (!selectedPatternBaseline) return;
     updatePatternDraft(
       selectedPatternBaseline.patternId,
-      (draft) => shiftConsistByEdge(draft, edge, x),
+      (draft) => shiftConsistByEdge(draft, edge, x, { range }),
     );
   }
 
@@ -745,7 +754,7 @@ export function StationLayoutEditor({
                   onSelectCell={selectCell}
                   onMoveCell={handleMoveCell}
                   onMoveCarBoundary={handleMoveCarBoundary}
-                  onShiftConsist={handleShiftConsist}
+                  onShiftConsist={(edge, x) => handleShiftConsist(edge, x, bounds)}
                 />
               )}
             />
@@ -759,7 +768,7 @@ export function StationLayoutEditor({
           trainLabel={displayPattern.trainLabel}
           cars={displayPattern.cars}
           onMoveCarBoundary={handleMoveCarBoundary}
-          onShiftConsist={handleShiftConsist}
+          onShiftConsist={(edge, x) => handleShiftConsist(edge, x, STOP_METERS_RANGE)}
           {...patternActions()}
           saving={newPattern ? savingPatternIds.has('__new_pattern__') : savingPatternIds.has(selectedPatternBaseline?.patternId ?? '')}
           deleting={selectedPatternBaseline ? deletingPatternIds.has(selectedPatternBaseline.patternId) : false}

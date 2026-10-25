@@ -2,11 +2,20 @@ import { z } from 'zod';
 import { uuidSchema } from '@/shared/schema/uuid';
 import { isDoorOrderReversed } from '@furatora/platform-diagram/domain';
 
+// docs/domain/platform-coordinate-system.md「単位と精度」の decimal(6,2) に入る絶対値の上限。
+// 超えた値は保存時に DB の numeric field overflow になるため、ここで弾く
+export const STOP_METERS_LIMIT = 9999.99;
+
+const stopMetersSchema = z
+  .number()
+  .min(-STOP_METERS_LIMIT, { message: `位置は${-STOP_METERS_LIMIT}m以上にしてください` })
+  .max(STOP_METERS_LIMIT, { message: `位置は${STOP_METERS_LIMIT}m以下にしてください` });
+
 const trainStopPatternCarSchema = z
   .object({
     carNumber: z.number().int().min(1),
-    startMeters: z.number(),
-    endMeters: z.number(),
+    startMeters: stopMetersSchema,
+    endMeters: stopMetersSchema,
   })
   .refine((v) => v.startMeters < v.endMeters, {
     message: '開始位置は終了位置より小さい値にしてください',
