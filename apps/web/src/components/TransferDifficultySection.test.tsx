@@ -240,6 +240,28 @@ describe('TransferDifficultySection', () => {
     expect(within(stroller).queryByText('所要時間')).not.toBeInTheDocument();
   });
 
+  it('大きく出す1本にタグ・備考・迂回度のどれも無ければ、区切り線を出さない', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[partner({ combos: allCombos([route({ routeId: 'ev', label: 'エレベーター経由', minutes: 4 })]) })]}
+      />,
+    );
+    expect(within(card('ベビーカー')).queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('大きく出す1本に補足があれば、区切り線の下に出す', () => {
+    render(
+      <TransferDifficultySection
+        stationName="淡路町"
+        partners={[partner({ combos: allCombos([route({ routeId: 'ev', minutes: 4, notes: '改札内の北側' })]) })]}
+      />,
+    );
+    const stroller = card('ベビーカー');
+    expect(within(stroller).getByRole('separator')).toBeInTheDocument();
+    expect(within(stroller).getByText('改札内の北側')).toBeInTheDocument();
+  });
+
   it('迂回度は基準ルートと BF ルートの所要時分が揃うときだけ出す', () => {
     render(
       <TransferDifficultySection

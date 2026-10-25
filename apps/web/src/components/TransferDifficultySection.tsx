@@ -78,17 +78,8 @@ function Chip({ children, highlighted }: { children: React.ReactNode; highlighte
 }
 
 // 設備が入力済みのルートだけが来るので、必要な行為は常にある（assessRoutes が導出済み）。
-// タグは通常ではない通行条件だけにする。as_is は通常の通り方なので出さない（ベビーカーのバリアフリールートは常に as_is で、出しても何も伝えない）。
-// 条件が1つも無ければ段ごと出さない
-function RouteChips({
-  assessed: { route, requirement },
-  highlights,
-  className = '',
-}: {
-  assessed: AssessedRoute<TransferRouteDTO>;
-  highlights: Set<RouteField>;
-  className?: string;
-}) {
+// タグは通常ではない通行条件だけにする。as_is は通常の通り方なので出さない（ベビーカーのバリアフリールートは常に as_is で、出しても何も伝えない）
+function chipsOf({ route, requirement }: AssessedRoute<TransferRouteDTO>): [RouteField, string][] {
   const flags: [RouteField, boolean, string][] = [
     ['isOutdoor', route.isOutdoor, ROUTE_FLAG_LABEL.isOutdoor],
     ['requiresExitGate', route.requiresExitGate, ROUTE_FLAG_LABEL.requiresExitGate],
@@ -97,6 +88,20 @@ function RouteChips({
   ];
   const chips: [RouteField, string][] = flags.filter(([, shown]) => shown).map(([field, , label]) => [field, label]);
   if (requirement !== 'as_is') chips.unshift(['requirement', REQUIREMENT_LABEL[requirement]]);
+  return chips;
+}
+
+// 条件が1つも無ければ段ごと出さない
+function RouteChips({
+  assessed,
+  highlights,
+  className = '',
+}: {
+  assessed: AssessedRoute<TransferRouteDTO>;
+  highlights: Set<RouteField>;
+  className?: string;
+}) {
+  const chips = chipsOf(assessed);
   if (chips.length === 0) return null;
   return (
     <div role="group" aria-label="通行条件" className={`flex flex-wrap gap-1 ${className}`}>
@@ -150,6 +155,8 @@ function PrimaryRoute({
   detourNote: React.ReactNode;
 }) {
   const { route } = assessed;
+  // タグ・備考・迂回度のどれも無ければ、区切り線ごと出さない（区切り線だけが残る）
+  const hasDetails = chipsOf(assessed).length > 0 || Boolean(route.notes) || Boolean(detourNote);
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
@@ -169,12 +176,16 @@ function PrimaryRoute({
           </div>
         )}
       </div>
-      <div className="h-px bg-ink/10" />
-      <div className="flex flex-col gap-2">
-        <RouteChips assessed={assessed} highlights={highlights} />
-        {route.notes && <p className="text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
-        {detourNote}
-      </div>
+      {hasDetails && (
+        <>
+          <div role="separator" className="h-px bg-ink/10" />
+          <div className="flex flex-col gap-2">
+            <RouteChips assessed={assessed} highlights={highlights} />
+            {route.notes && <p className="text-xs text-ink-soft whitespace-pre-wrap">{route.notes}</p>}
+            {detourNote}
+          </div>
+        </>
+      )}
     </div>
   );
 }
