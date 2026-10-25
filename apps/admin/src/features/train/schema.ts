@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { uuidSchema } from '@/shared/schema/uuid';
+import { equipmentDoorIssues } from '@/features/train/domain/equipmentDoors';
 
 const trainEquipmentSchema = z.object({
   carNumber: z.number().int().min(1),
@@ -22,6 +23,13 @@ export const trainSchema = z.object({
   carStructure: z.array(carStructureItemSchema).nullable().optional(),
   freeSpaces: z.array(trainEquipmentSchema).nullable().optional(),
   prioritySeats: z.array(trainEquipmentSchema).nullable().optional(),
+}).superRefine((v, ctx) => {
+  // 設備のドア番号はその号車のドア数の範囲内（#194）。範囲の判定は TrainForm と共有する
+  for (const key of ['freeSpaces', 'prioritySeats'] as const) {
+    for (const issue of equipmentDoorIssues(v.carStructure, v[key] ?? [])) {
+      ctx.addIssue({ code: 'custom', message: issue.message, path: [key, issue.index, issue.field] });
+    }
+  }
 });
 
 export type TrainInput = z.infer<typeof trainSchema>;

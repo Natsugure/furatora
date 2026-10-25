@@ -75,3 +75,56 @@ describe('trainSchema の UUID（#160）', () => {
     expect(result).toMatchObject({ operatorId: LOWER, lineIds: [LOWER] });
   });
 });
+
+describe('trainSchema の設備のドア番号（#194）', () => {
+  const base = {
+    name: 'E235系',
+    operatorId: VALID_UUID,
+    lineIds: [VALID_UUID],
+    carCount: 2,
+    carStructure: [{ carNumber: 1, doorCount: 4 }, { carNumber: 2, doorCount: 4 }],
+  };
+
+  it('ドア番号が号車のドア数の範囲内なら通る', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      freeSpaces: [{ carNumber: 1, nearDoor: 4, isStandard: true }],
+      prioritySeats: [{ carNumber: 2, nearDoor: 1, isStandard: true }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('フリースペースのドア番号が範囲外なら失敗し、その行の nearDoor を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      freeSpaces: [
+        { carNumber: 1, nearDoor: 1, isStandard: true },
+        { carNumber: 2, nearDoor: 5, isStandard: true },
+      ],
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path: ['freeSpaces', 1, 'nearDoor'], message: '2号車のドアは1〜4番です' }),
+    ]);
+  });
+
+  it('優先席のドア番号が 0 なら失敗し、その行の nearDoor を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      prioritySeats: [{ carNumber: 1, nearDoor: 0, isStandard: true }],
+    });
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path: ['prioritySeats', 0, 'nearDoor'], message: '1号車のドアは1〜4番です' }),
+    ]);
+  });
+
+  it('車両構成に無い号車なら失敗し、その行の carNumber を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      freeSpaces: [{ carNumber: 3, nearDoor: 1, isStandard: true }],
+    });
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path: ['freeSpaces', 0, 'carNumber'] }),
+    ]);
+  });
+});
