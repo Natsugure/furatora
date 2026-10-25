@@ -7,8 +7,8 @@
 - [x] **TASK-1** Issue #201 を起票し、ブランチを切る
 - [x] **TASK-2** `docs/spec/` の3点を #201 用に書き換える
 - [x] **TASK-3** サイクルA: `shiftConsistByEdge`（`editDraft.ts`）と呼び出し元の差し替え
-  - `moveCarEdge` の 7 件を平行移動の期待に書き換え、関数が無い Red から実装した。`StationLayoutEditor` の `handleMoveCarEdge` が呼ぶ関数を差し替えた
-  - コンポーネントの `onMoveCarEdge(edge, x)` は「外端を x に動かす」意味のままなので、名前を残した
+  - `moveCarEdge` の 7 件を平行移動の期待に書き換え、関数が無い Red から実装した。`StationLayoutEditor` のハンドラが呼ぶ関数を差し替えた
+  - simplify のレビューを受け、props `onMoveCarEdge` / ハンドラ `handleMoveCarEdge` を `onShiftConsist` / `handleShiftConsist` に改名した（号車の長さを変えると読めるため）
 - [x] **TASK-4** サイクルB: 外端のハンドルのスナップの候補（`DiagramEditLayer.tsx`）
   - 「自分のドア（6.25m）ではなくグリッド（6.5m）に合わせる」の Red を確かめてから、候補をホーム端だけにした。「ホーム端にはスナップする」は今の候補でも通る（候補を減らしすぎないためのもの）
 - [x] **TASK-5** サイクルC: インスペクタの数値入力からの結合の確認（`StationLayoutEditor.test.tsx`）

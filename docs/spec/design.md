@@ -4,8 +4,8 @@
 
 ## 方針
 
-`editDraft.ts` の `moveCarEdge` を、平行移動の `shiftConsistByEdge` に置き換える。呼び出し元（`StationLayoutEditor` の `handleMoveCarEdge`）は関数を差し替えるだけ。
-コンポーネントの `onMoveCarEdge(edge, x)` は「外端を x に動かす」という意味のままで成り立つので、名前もシグネチャも変えない。
+`editDraft.ts` の `moveCarEdge` を、平行移動の `shiftConsistByEdge` に置き換える。呼び出し元（`StationLayoutEditor` のハンドラ）は関数を差し替える。
+コンポーネントの props `onMoveCarEdge` / ハンドラ `handleMoveCarEdge` は、号車の端を動かす（号車の長さを変える）と読めるため、ドメイン関数に揃えて `onShiftConsist` / `handleShiftConsist` に改名する。シグネチャ `(edge, x)` は変えない。
 
 ## インターフェース
 
@@ -33,7 +33,7 @@ export function shiftConsistByEdge(
 
 ## データフロー
 
-ハンドル・数値入力 → `onMoveCarEdge(edge, x)` → `handleMoveCarEdge` → `shiftConsistByEdge` → 未保存の draft → 図・インスペクタ。保存の経路は変わらない。
+ハンドル・数値入力 → `onShiftConsist(edge, x)` → `handleShiftConsist` → `shiftConsistByEdge` → 未保存の draft → 図・インスペクタ。保存の経路は変わらない。
 
 ## テスト戦略
 

@@ -33,7 +33,7 @@ type Props = {
   onSelectCell: (cellId: string) => void;
   onMoveCell: (cellId: string, x: number) => void;
   onMoveCarBoundary: (boundaryIndex: number, x: number) => void;
-  onMoveCarEdge: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
+  onShiftConsist: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
 };
 
 /** キャンバス（このレイヤーのルート要素）の実測サイズ。min-widthで伸縮するため必ず実測する */
@@ -60,7 +60,7 @@ function useCanvasRect(rootRef: RefObject<HTMLDivElement | null>) {
 
 export function DiagramEditLayer({
   rows, bounds, physicalLength, cars, cellHandles, selectedCellId,
-  onSelectCell, onMoveCell, onMoveCarBoundary, onMoveCarEdge,
+  onSelectCell, onMoveCell, onMoveCarBoundary, onShiftConsist,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const rect = useCanvasRect(rootRef);
@@ -118,7 +118,7 @@ export function DiagramEditLayer({
                 label={`${car.carNumber}号車の先頭（${leadEdgeX}m）`}
                 selected={false}
                 candidates={edgeCandidates}
-                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
+                onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
               />
             )}
             {!isLast && (
@@ -146,7 +146,7 @@ export function DiagramEditLayer({
                 label={`${car.carNumber}号車の末尾（${trailEdgeX}m）`}
                 selected={false}
                 candidates={edgeCandidates}
-                onCommit={(x) => onMoveCarEdge({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
+                onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: trailEdgeSide }, x)}
               />
             )}
           </div>

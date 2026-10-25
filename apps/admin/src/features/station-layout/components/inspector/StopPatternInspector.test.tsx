@@ -79,7 +79,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={onMoveCarBoundary}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -91,15 +91,15 @@ describe('StopPatternInspector', () => {
     expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 25);
   });
 
-  it('先頭・末尾の数値入力を変更するとonMoveCarEdgeが呼ばれる', async () => {
-    const onMoveCarEdge = vi.fn();
+  it('先頭・末尾の数値入力を変更するとonShiftConsistが呼ばれる', async () => {
+    const onShiftConsist = vi.fn();
     render(
       <MantineProvider>
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={onMoveCarEdge}
+          onShiftConsist={onShiftConsist}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -108,15 +108,15 @@ describe('StopPatternInspector', () => {
     );
     await userEvent.setup().click(screen.getByRole('button', { name: '展開する' }));
     fireEvent.change(screen.getByLabelText('1号車の先頭'), { target: { value: '-5' } });
-    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, -5);
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'start' }, -5);
 
     fireEvent.change(screen.getByLabelText('2号車の末尾'), { target: { value: '45' } });
-    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 45);
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 45);
   });
 
   it('反転編成では境界・外端のラベルと呼び出しフィールドが入れ替わる', async () => {
     const onMoveCarBoundary = vi.fn();
-    const onMoveCarEdge = vi.fn();
+    const onShiftConsist = vi.fn();
     const reversedCars = [
       { carNumber: 1, startMeters: 20, endMeters: 40 },
       { carNumber: 2, startMeters: 0, endMeters: 20 },
@@ -127,7 +127,7 @@ describe('StopPatternInspector', () => {
           trainLabel="丸ノ内線"
           cars={reversedCars}
           onMoveCarBoundary={onMoveCarBoundary}
-          onMoveCarEdge={onMoveCarEdge}
+          onShiftConsist={onShiftConsist}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -138,9 +138,9 @@ describe('StopPatternInspector', () => {
     // 反転編成: 境界の共有座標は1号車のstart（20）
     expect(screen.getByLabelText('1号車と2号車の境界')).toHaveValue('20 m');
     fireEvent.change(screen.getByLabelText('1号車の先頭'), { target: { value: '45' } });
-    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 45);
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 45);
     fireEvent.change(screen.getByLabelText('2号車の末尾'), { target: { value: '-5' } });
-    expect(onMoveCarEdge).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, -5);
+    expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, -5);
   });
 
   it('保存ボタンでonSaveが呼ばれる', async () => {
@@ -151,7 +151,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={onSave}
           saving={false}
           isNew={false}
@@ -171,7 +171,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={vi.fn()}
           onDiscard={vi.fn()}
           saving={false}
@@ -190,7 +190,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={vi.fn()}
           onDiscard={vi.fn()}
           saving={false}
@@ -209,7 +209,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -228,7 +228,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -248,7 +248,7 @@ describe('StopPatternInspector', () => {
           trainLabel="銀座線"
           cars={cars}
           onMoveCarBoundary={vi.fn()}
-          onMoveCarEdge={vi.fn()}
+          onShiftConsist={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}

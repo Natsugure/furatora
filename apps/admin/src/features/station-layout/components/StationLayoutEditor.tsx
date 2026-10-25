@@ -250,7 +250,7 @@ export function StationLayoutEditor({
     );
   }
 
-  function handleMoveCarEdge(edge: { carNumber: number; side: 'start' | 'end' }, x: number) {
+  function handleShiftConsist(edge: { carNumber: number; side: 'start' | 'end' }, x: number) {
     if (newPattern) {
       setNewPattern((prev) => (prev
         ? { ...prev, draft: shiftConsistByEdge(prev.draft, edge, x) }
@@ -745,7 +745,7 @@ export function StationLayoutEditor({
                   onSelectCell={selectCell}
                   onMoveCell={handleMoveCell}
                   onMoveCarBoundary={handleMoveCarBoundary}
-                  onMoveCarEdge={handleMoveCarEdge}
+                  onShiftConsist={handleShiftConsist}
                 />
               )}
             />
@@ -759,7 +759,7 @@ export function StationLayoutEditor({
           trainLabel={displayPattern.trainLabel}
           cars={displayPattern.cars}
           onMoveCarBoundary={handleMoveCarBoundary}
-          onMoveCarEdge={handleMoveCarEdge}
+          onShiftConsist={handleShiftConsist}
           {...patternActions()}
           saving={newPattern ? savingPatternIds.has('__new_pattern__') : savingPatternIds.has(selectedPatternBaseline?.patternId ?? '')}
           deleting={selectedPatternBaseline ? deletingPatternIds.has(selectedPatternBaseline.patternId) : false}
