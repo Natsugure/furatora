@@ -1,6 +1,7 @@
 // 方面ラベル（「池袋方面」など）の解決規則（ADR-0014 / docs/domain/line-directions.md）。
 
 import type { DirectionType } from '@furatora/database/enums';
+import { comparePlatformNumber } from './platformNumber';
 
 // 走行方向の語彙は @furatora/database/enums に1つだけ置く（ADR-0015）。利用側の import を変えないため再 export する
 export type { DirectionType };
@@ -75,8 +76,7 @@ export function resolveStationDirectionLabels(input: {
   const stationId = input.stationId.toLowerCase();
   const platformsOfLine = input.platformRows
     .filter((p) => p.stationId.toLowerCase() === stationId && p.lineId === lineId)
-    // ホーム番号は varchar なので、SQL の並びでは '10' が '2' より前になる。数値として並べる
-    .sort((a, b) => a.platformNumber.localeCompare(b.platformNumber, 'ja', { numeric: true }));
+    .sort((a, b) => comparePlatformNumber(a.platformNumber, b.platformNumber));
   const resolve = (directionType: DirectionType, names: (string | null)[]) =>
     resolveDirectionLabel({
       directionType,

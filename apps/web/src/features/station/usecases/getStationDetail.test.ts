@@ -75,6 +75,31 @@ describe('makeGetStationDetail', () => {
     ]);
   });
 
+  it('ホームをホーム番号の数値順に並べて返す (1, 2, 10の順)', async () => {
+    const p2 = platform({ id: 'p2', platformNumber: '2' });
+    const p10 = platform({ id: 'p10', platformNumber: '10' });
+    const p1 = platform({ id: 'p1', platformNumber: '1' });
+    const fixture = stationDetail({ platforms: [p2, p10, p1] });
+    const fake: StationDetailQuery = { getBySlug: async () => fixture };
+    const getStationDetail = makeGetStationDetail({ query: fake });
+
+    const result = await getStationDetail('shibuya');
+
+    expect(result!.platforms).toEqual([p1, p2, p10]);
+  });
+
+  it('方面タブ内のホームもホーム番号の数値順に並ぶ', async () => {
+    const p2 = platform({ id: 'p2', platformNumber: '2', inboundDirectionId: 'dir-in', inboundDirectionName: '荻窪方面' });
+    const p1 = platform({ id: 'p1', platformNumber: '1', inboundDirectionId: 'dir-in', inboundDirectionName: '荻窪方面' });
+    const fixture = stationDetail({ platforms: [p2, p1] });
+    const fake: StationDetailQuery = { getBySlug: async () => fixture };
+    const getStationDetail = makeGetStationDetail({ query: fake });
+
+    const result = await getStationDetail('ikebukuro');
+
+    expect(result!.tabs[0]!.platforms).toEqual([p1, p2]);
+  });
+
   it('停車位置パターンが0件のホームは列車0本のまま返る', async () => {
     const p = platform({ id: 'p1', stopPatterns: [] });
     const fixture = stationDetail({ platforms: [p] });
