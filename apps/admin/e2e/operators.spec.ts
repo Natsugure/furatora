@@ -11,7 +11,7 @@ test('新規事業者フォームが表示される', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '新規事業者' })).toBeVisible();
   await expect(page.getByLabel('事業者名')).toBeVisible();
   await expect(page.getByLabel(/ODPT事業者コード/)).toBeVisible();
-  await expect(page.getByLabel(/表示優先度/)).toBeVisible();
+  await expect(page.getByLabel(/表示順/)).toBeVisible();
 });
 
 test('事業者名が空の場合、フォーム送信が阻止される', async ({ page }) => {
