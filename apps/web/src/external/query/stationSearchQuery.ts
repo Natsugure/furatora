@@ -1,7 +1,8 @@
 import { db } from '@furatora/database/client';
 import { stations, stationLines, lines } from '@furatora/database/schema';
 import { toKatakana } from '@/features/station/domain/kana';
-import { ilike, eq, and, or } from 'drizzle-orm';
+import { stripRomajiSeparator } from '@/features/station/domain/romaji';
+import { ilike, eq, and, or, sql } from 'drizzle-orm';
 import type { StationGroup } from '@/types';
 import { publishedStation } from './visibility';
 
@@ -9,6 +10,10 @@ import { publishedStation } from './visibility';
 // stationLines・lines を LEFT JOIN し、駅名と路線情報を一括取得する。
 // 同一物理駅が複数の路線レコードを持つ場合、行数が増えるため limit は多めに設定する。
 export async function searchVisibleStations(query: string): Promise<StationGroup[]> {
+  // name_en（例: Naka-meguro）から区切り記号を除いた値。
+  // 入力側の stripRomajiSeparator と同じ規則で揃える（片方だけ変えるとヒットしなくなる）
+  const normalizedNameEn = sql`regexp_replace(${stations.nameEn}, '[-\\s]', '', 'g')`;
+
   const rows = await db
     .select({
       id: stations.id,
@@ -32,6 +37,7 @@ export async function searchVisibleStations(query: string): Promise<StationGroup
       or(
         ilike(stations.name, `%${query}%`),
         ilike(stations.nameKana, `%${toKatakana(query)}%`),
+        ilike(normalizedNameEn, `%${stripRomajiSeparator(query)}%`),
       ),
     ))
     .limit(60);
