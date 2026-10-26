@@ -5,6 +5,7 @@ import { dbStopPatternRepository } from '@/external/repository/stopPatternReposi
 import { dbStationPublishingRepository } from '@/external/repository/stationPublishingRepository';
 import { dbStationPublishingPageQuery } from '@/external/query/stationPublishingPageQuery';
 import { dbTrainEditPageQuery } from '@/external/query/trainEditPageQuery';
+import { dbTrainRepository } from '@/external/repository/trainRepository';
 import { dbLineEditPageQuery, dbLineDirectionEditPageQuery } from '@/external/query/lineEditPageQuery';
 import { dbLineRepository } from '@/external/repository/lineRepository';
 import { dbLineDirectionRepository } from '@/external/repository/lineDirectionRepository';
@@ -24,6 +25,8 @@ import { dbTransferPairEditPageQuery } from '@/external/query/transferPairEditPa
 export const platformRepository = dbPlatformRepository;
 export const platformLocationRepository = dbPlatformLocationRepository;
 export const stopPatternRepository = dbStopPatternRepository;
+// 列車の作成・更新・削除（#163）
+export const trainRepository = dbTrainRepository;
 export const stationPublishingRepository = dbStationPublishingRepository;
 export const stationPublishingPageQuery = dbStationPublishingPageQuery;
 
