@@ -2,6 +2,8 @@
 // 不変条件: 設備の nearDoor は、その号車（carStructure にある carNumber）の 1..doorCount に入る
 // （docs/domain/train-stop-patterns.md「列車の設備」）。範囲外だと、ホームの図はドアを号車の外に描き、
 // 図の下の一覧と食い違う。trainSchema（API）と TrainForm（行ごとのエラー）が同じこの関数で判定する。
+// 同じ種別の設備で号車・ドア番号が重なる行も拒む。DB の一意制約 unique_train_equipment に当たると、
+// 入力の誤りなのに API が 500 を返してしまうため。
 
 export type EquipmentDoorIssue = {
   /** equipments の添字 */
@@ -17,18 +19,28 @@ export function doorCountOf(carStructure: CarStructure, carNumber: number): numb
   return carStructure?.find((car) => car.carNumber === carNumber)?.doorCount;
 }
 
-/** 設備の号車とドア番号が、車両構成の範囲内にあるかを確かめる。1 行に出す issue は 1 つまで */
+/**
+ * 設備の号車とドア番号が、車両構成の範囲内にあり、重なっていないかを確かめる。1 行に出す issue は 1 つまで。
+ * equipments は 1 種別（フリースペースか優先席）の行で渡す
+ */
 export function equipmentDoorIssues(
   carStructure: CarStructure,
   equipments: readonly { carNumber: number; nearDoor: number }[],
 ): EquipmentDoorIssue[] {
   const issues: EquipmentDoorIssue[] = [];
+  const seen = new Set<string>();
   equipments.forEach((equipment, index) => {
     const doorCount = doorCountOf(carStructure, equipment.carNumber);
     if (doorCount === undefined) {
       issues.push({ index, field: 'carNumber', message: `${equipment.carNumber}号車は車両構成にありません` });
     } else if (equipment.nearDoor < 1 || equipment.nearDoor > doorCount) {
       issues.push({ index, field: 'nearDoor', message: `${equipment.carNumber}号車のドアは1〜${doorCount}番です` });
+    } else {
+      const key = `${equipment.carNumber}-${equipment.nearDoor}`;
+      if (seen.has(key)) {
+        issues.push({ index, field: 'nearDoor', message: `${equipment.carNumber}号車のドア${equipment.nearDoor}番が重複しています` });
+      }
+      seen.add(key);
     }
   });
   return issues;

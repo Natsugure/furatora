@@ -23,7 +23,8 @@ POST / PUT は `trains`・`train_car_structures`・`train_equipments` に分け�
 - **REQ-4** 更新・削除の対象の列車が無い場合、システムは 404 を返し、号車構成・設備に触れないこと
 - **REQ-5** 列車を作ったとき、システムは作った列車の `id` を 201 で返すこと
 - **REQ-6** システムは、列車の route から `@furatora/database` と `drizzle-orm` を import しないこと（ESLint の依存ルールを除外なしで通す）
-- **REQ-7** 入力の検証（`trainSchema`）、パスパラメータの検証、PUT・DELETE の応答（`{ success: true }`）は、いまと同じにすること
+- **REQ-7** 入力の検証（`trainSchema`）、パスパラメータの検証、PUT・DELETE の応答（`{ success: true }`）は、REQ-8 を除いていまと同じにすること
+- **REQ-8** 同じ種別の設備（フリースペース・優先席）に同じ号車・ドア番号の行が 2 つ以上ある場合、システムは API では 400 と2つ目以降の行を指すエラーを返し、フォームではその行にエラーを出して送信しないこと（PR #213 のレビューで追加。これまでは一意制約 `unique_train_equipment` に当たって 500 だった）
 
 ## 対象外
 

@@ -66,6 +66,9 @@ Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft
   （丸めると、入力していない別の号車・ドアが保存されてしまう）
 - この判定は車両構成を正として読むため、API は車両構成そのものも確かめる。号車は `1..carCount` に 1 回ずつ、`doorCount` は 1 以上
   （号車の重複は DB の一意制約 `unique_train_car_structure` でも止まる）
+- 同じ種別の設備で、号車・ドア番号が同じ行は 1 つまで（DB の一意制約 `unique_train_equipment`）。
+  一意制約に当たると入力の誤りが 500 になるため、`equipmentDoorIssues()` が範囲の判定と合わせて重複も拒み、2 つ目以降の行を指す。
+  フリースペースと優先席が同じ号車・ドア番号にあるのは構わない
 - 表示側（`packages/platform-diagram`）は範囲外の設備を落とさずに描く。データの誤りが図の上で見えるようにするため
 
 ## 号車位置の算出

@@ -91,6 +91,19 @@ describe('TrainForm', () => {
       expect(screen.getByText('2号車は車両構成にありません')).toBeInTheDocument();
     });
 
+    it('同じ号車・ドア番号の行が 2 回あれば、2 回目の行にエラーの文を出し、送信しない', async () => {
+      const user = userEvent.setup();
+      setup({ freeSpaces: [
+        { carNumber: 1, nearDoor: 2, isStandard: true },
+        { carNumber: 1, nearDoor: 2, isStandard: true },
+      ] });
+
+      await user.click(screen.getByRole('button', { name: '更新' }));
+
+      expect(screen.getByText('1号車のドア2番が重複しています')).toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('範囲外の行があるまま更新を押しても、送信しない', async () => {
       const user = userEvent.setup();
       setup({ freeSpaces: [{ carNumber: 1, nearDoor: 4, isStandard: true }] });

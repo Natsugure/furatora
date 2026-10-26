@@ -37,6 +37,25 @@ describe('equipmentDoorIssues', () => {
       .toEqual([{ index: 0, field: 'carNumber', message: '1号車は車両構成にありません' }]);
   });
 
+  it('同じ号車・ドア番号の行が 2 回あれば、2 回目の行の nearDoor を指す', () => {
+    // DB の一意制約 unique_train_equipment に当たる前に、行ごとのエラーで止める
+    expect(equipmentDoorIssues(CARS, [
+      { carNumber: 1, nearDoor: 2 },
+      { carNumber: 2, nearDoor: 2 },
+      { carNumber: 1, nearDoor: 2 },
+    ])).toEqual([{ index: 2, field: 'nearDoor', message: '1号車のドア2番が重複しています' }]);
+  });
+
+  it('範囲外の行は重複の判定に入れず、範囲外の issue だけを出す', () => {
+    expect(equipmentDoorIssues(CARS, [
+      { carNumber: 2, nearDoor: 9 },
+      { carNumber: 2, nearDoor: 9 },
+    ])).toEqual([
+      { index: 0, field: 'nearDoor', message: '2号車のドアは1〜3番です' },
+      { index: 1, field: 'nearDoor', message: '2号車のドアは1〜3番です' },
+    ]);
+  });
+
   it('設備が無ければ issue は無い', () => {
     expect(equipmentDoorIssues(undefined, [])).toEqual([]);
   });

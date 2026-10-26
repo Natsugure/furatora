@@ -118,6 +118,28 @@ describe('trainSchema の設備のドア番号（#194）', () => {
     ]);
   });
 
+  it('フリースペースに同じ号車・ドア番号が 2 回あれば失敗し、2 回目の行の nearDoor を指す', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      freeSpaces: [
+        { carNumber: 1, nearDoor: 2, isStandard: true },
+        { carNumber: 1, nearDoor: 2, isStandard: false },
+      ],
+    });
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path: ['freeSpaces', 1, 'nearDoor'], message: '1号車のドア2番が重複しています' }),
+    ]);
+  });
+
+  it('フリースペースと優先席が同じ号車・ドア番号なら通る（一意制約は設備の種別ごと）', () => {
+    const result = trainSchema.safeParse({
+      ...base,
+      freeSpaces: [{ carNumber: 1, nearDoor: 2, isStandard: true }],
+      prioritySeats: [{ carNumber: 1, nearDoor: 2, isStandard: true }],
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('車両構成に無い号車なら失敗し、その行の carNumber を指す', () => {
     const result = trainSchema.safeParse({
       ...base,
