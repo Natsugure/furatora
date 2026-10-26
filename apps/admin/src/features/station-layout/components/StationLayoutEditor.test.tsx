@@ -88,6 +88,27 @@ const platform: LayoutPlatformDetailDTO = {
   selectedPatternId: 'pattern-1',
 };
 
+// 反転編成（carNumber昇順でxが減少する。丸ノ内線相当）の 100m のホーム、25mずつの4両編成。
+// 1号車が右端（75-100m）、4号車が左端（0-25m）。コンコースは無く、bounds は platform と同じく
+// {minX:-5, maxX:105} になるので、RECT の scale 5 がそのまま使える
+const reversedPlatform: LayoutPlatformDetailDTO = {
+  ...platform,
+  concourses: [],
+  stopPatterns: [{
+    patternId: 'pattern-reversed',
+    trainId: 'train-reversed',
+    trainLabel: '反転列車',
+    carCount: 4,
+    cars: [
+      { carNumber: 1, startMeters: 75, endMeters: 100, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+      { carNumber: 2, startMeters: 50, endMeters: 75, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+      { carNumber: 3, startMeters: 25, endMeters: 50, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+      { carNumber: 4, startMeters: 0, endMeters: 25, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+    ],
+  }],
+  selectedPatternId: 'pattern-reversed',
+};
+
 const platforms = [{ id: 'platform-1', platformNumber: '1' }, { id: 'platform-2', platformNumber: '2' }];
 
 // scale = rect.width / (maxX - minX) = 550 / 110 = 5（PX_PER_METERと一致させ計算を単純にする）
@@ -95,13 +116,17 @@ const RECT = {
   width: 550, height: 200, left: 0, top: 0, right: 550, bottom: 200, x: 0, y: 0, toJSON: () => ({}),
 } as DOMRect;
 
-function renderEditor(overrides: { facilityTypes?: FacilityTypeOption[]; trains?: TrainOptionDTO[] } = {}) {
+function renderEditor(overrides: {
+  platform?: LayoutPlatformDetailDTO;
+  facilityTypes?: FacilityTypeOption[];
+  trains?: TrainOptionDTO[];
+} = {}) {
   return render(
     <MantineProvider>
       <StationLayoutEditor
         stationId="station-1"
         platforms={platforms}
-        platform={platform}
+        platform={overrides.platform ?? platform}
         lines={[]}
         facilityTypes={overrides.facilityTypes ?? []}
         connectedStations={[]}
@@ -309,6 +334,28 @@ describe('StationLayoutEditor', () => {
       await user.click(screen.getByRole('button', { name: '取り消す' }));
 
       expect(screen.queryByText('未保存の変更')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('反転編成の図上ドラッグ', () => {
+    it('内側の境界をドラッグしても、無関係な号車の境界は変化しない', () => {
+      renderEditor({ platform: reversedPlatform });
+      // 前提: 反転編成では 1号車の先頭が最終号車の末尾より右にある
+      expect(screen.getByRole('slider', { name: '1号車の先頭（100m）' })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '4号車の末尾（0m）' })).toBeInTheDocument();
+
+      const target = screen.getByRole('slider', { name: '2号車と3号車の境界（50m）' });
+      // px = (x - minX) * scale = (50-(-5))*5 = 275 → 245（44m 付近。スナップ先はドア位置になり得る）
+      fireEvent.pointerDown(target, { pointerId: 1, clientX: 275 });
+      fireEvent.pointerMove(target, { pointerId: 1, clientX: 245 });
+      fireEvent.pointerUp(target, { pointerId: 1, clientX: 245 });
+
+      expect(screen.queryByRole('slider', { name: '2号車と3号車の境界（50m）' })).not.toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: /^2号車と3号車の境界/ })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '1号車と2号車の境界（75m）' })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '3号車と4号車の境界（25m）' })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '1号車の先頭（100m）' })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '4号車の末尾（0m）' })).toBeInTheDocument();
     });
   });
 
