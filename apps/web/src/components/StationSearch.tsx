@@ -65,7 +65,7 @@ export function StationSearch() {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="駅名で検索（例：茅場町）"
+          placeholder="駅名で検索（例：中目黒, なかめぐろ, Naka-meguro）"
           aria-label="駅名"
           className="w-full h-14.5 pl-14 pr-5 rounded-[18px] bg-surface shadow-card text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-300"
         />
