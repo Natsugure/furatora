@@ -16,7 +16,7 @@ export async function getFacilityTypeOptions() {
 }
 
 export async function getConnectedStationOptions(stationId: string): Promise<ConnectedStationOption[]> {
-  // 現行 GET /api/stations?connectedFrom= と同じ JOIN。
+  // 接続先の駅を、その駅が属する路線ごとに1行ずつ引く（路線の無い駅も残す）。
   const stationRows = await db
     .select({
       id: stations.id,
@@ -54,7 +54,6 @@ export async function getConnectedStationOptions(stationId: string): Promise<Con
     .orderBy(asc(platforms.platformNumber));
 
   // 各駅のホームが参照する方面 ID を集め、方面の表示名を1本で解決する
-  // （現行 GET /api/stations/{id}/directions のロジックと同じ）
   const directionIdsByStation = new Map<string, Set<string>>();
   for (const p of platformRows) {
     const set = directionIdsByStation.get(p.stationId) ?? new Set<string>();
