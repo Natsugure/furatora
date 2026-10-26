@@ -1,6 +1,6 @@
 import { db } from '@furatora/database/client';
 import { stations, stationLines, lines } from '@furatora/database/schema';
-import { toKatakana } from '@/features/station/domain/kana';
+import { toKanaSearchKey } from '@/features/station/domain/kana';
 import { stripRomajiSeparator } from '@/features/station/domain/romaji';
 import { ilike, eq, and, or, sql } from 'drizzle-orm';
 import type { StationGroup } from '@/types';
@@ -17,6 +17,13 @@ export async function searchVisibleStations(query: string): Promise<StationGroup
   // name_en（例: Naka-meguro）から区切り記号を除いた値。
   // 入力側の stripRomajiSeparator と同じ規則で揃える（片方だけ変えるとヒットしなくなる）
   const normalizedNameEn = sql`regexp_replace(${stations.nameEn}, '[-\\s]', '', 'g')`;
+  // name_kana（例: メイジジングウマエ　ハラジュク）から半角・全角の空白を除いた値。
+  // 入力側の toKanaSearchKey と同じ規則で揃える
+  const normalizedNameKana = sql`translate(${stations.nameKana}, ' 　', '')`;
+
+  // 区切り記号や空白だけの入力は検索キーが空になり、'%%' が全駅に一致してしまうため条件から外す
+  const kanaKey = toKanaSearchKey(query);
+  const romajiKey = stripRomajiSeparator(query);
 
   const rows = await db
     .select({
@@ -40,8 +47,8 @@ export async function searchVisibleStations(query: string): Promise<StationGroup
       publishedStation(),
       or(
         ilike(stations.name, `%${query}%`),
-        ilike(stations.nameKana, `%${toKatakana(query)}%`),
-        ilike(normalizedNameEn, `%${stripRomajiSeparator(query)}%`),
+        kanaKey ? ilike(normalizedNameKana, `%${kanaKey}%`) : undefined,
+        romajiKey ? ilike(normalizedNameEn, `%${romajiKey}%`) : undefined,
       ),
     ))
     .limit(60); // 同一物理駅が複数の路線レコードを持つ場合、行数が増えるため limit は多めに設定する。
