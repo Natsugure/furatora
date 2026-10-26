@@ -1,6 +1,6 @@
 # ADR-0005: 書き込みの原子性を担保するため、読み取りと書き込みで Neon のドライバを使い分ける
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-08-15
 - **決定者**: @Natsugure
 - **関連**: [ADR-0003](./0003-read-write-separation.md), [ADR-0004](./0004-neon-branch-dev-environment.md)

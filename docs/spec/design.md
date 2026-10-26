@@ -1,29 +1,68 @@
-# 設計: 乗換の評価カードのタグと補足の文言を見直す (Issue #189)
+# 設計: 列車（trains）の書き込みを Repository にする (Issue #163)
 
 - **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
-## 文言
+## 構成
 
-| 対象 | 変更前 | 変更後 | 出る場所 |
-|---|---|---|---|
-| `call_staff` | 係員を呼ぶ | 係員が設備を操作 | Web タグ・Admin |
-| `lift` | 持ち上げる | 持ち上げて運ぶ | Web 補足・Admin |
-| `assisted_by_staff` | 駅員複数名の介助 | 係員複数名が車いすを担ぐ | Web 補足・Admin |
-| `requiresStaff`（Web） | 係員の対応が必要 | 係員への申し出が必要 | Web タグ |
-| `requiresStaff`（Admin の入力） | 係員対応が必要 | 係員への申し出が必要（設備の操作を除く） | Admin |
-| `notOfficiallyGuided` | 駅の構内図・公式案内に載っていないルート | 公式案内に無いルート | Web タグ |
-| 迂回度 | 最短のバリアフリールート: 一般的なルートより N分長い（行為） | 最短のバリアフリールート: 通常のルートより N分長い | Web 補足 |
-| 最も軽い方法 | 最も軽い方法: … | 最も負担の少ない方法: … | Web 補足 |
+ADR-0003・ADR-0005 の書き込みの形に合わせる。根拠は ADR を見る。
 
-`as_is`（そのまま通れる）・`fold_and_carry`・`impossible` と、`isOutdoor`・`requiresExitGate` は変えない。
+```
+route（app/api/trains/**）
+  └─ trainRepository（di.ts）
+       └─ dbTrainRepository（external/repository/trainRepository.ts）
+            ├─ create / update: withTransaction（@furatora/database/tx）
+            └─ delete: db（1 文。号車構成・設備・停車位置パターンは FK の CASCADE で消える）
+```
 
-## 実装
+## インターフェース（`features/train/ports.ts`）
 
-- `RouteChips`: `as_is` なら必要な行為のタグを出さない。タグが0個なら `null` を返す。外側の余白は `className` で受ける（空の段に余白を残さないため）。
-  段に `role="group"`・`aria-label="通行条件"` を付け、テストから意味で引けるようにする
-- `BarrierFreeDetail`: `shortestRequirements` をやめ、`detourText` だけを出す
-- 強調（`differingFields`）は変えない
+```ts
+// --- 書き込み（Repository。ADR-0003 / ADR-0005）---
+export interface TrainRepository {
+  // trains へ 1 行、号車構成・設備をその id で入れる（1 トランザクション）
+  create(input: TrainInput): Promise<{ id: string }>;
+  // 列車を更新し、号車構成・設備を消して入れ直す（1 トランザクション）。列車が無ければ false
+  update(id: string, input: TrainInput): Promise<boolean>;
+  // 列車が無ければ false
+  delete(id: string): Promise<boolean>;
+}
+```
+
+- 入力の型は `features/train/schema.ts` の `TrainInput` を使う（`platform`・`stop-pattern` の ports と同じ）
+- `create` の返り値は `{ id }` だけにする。呼び出し元（`TrainForm`・`DuplicateButton`）は `res.ok` しか見ていない。
+  いまは `trains` の行（列名が `operators` / `lines`）をそのまま返しているが、`TrainDTO` と形が違い、誤解のもとになる
+- `update` を `boolean` にするのは、PUT の応答が `{ success: true }` で、更新後の列車を読み直す必要が無いため
+
+## 実装の要点
+
+- 号車構成の行・設備の行を作る処理は、create と update で同じなので関数にまとめる
+  - `carLength` は decimal 列なので、`String()` に変換して書く（#165 まで）
+  - 設備は `freeSpaces` → `free_space`、`prioritySeats` → `priority_seat`
+  - 行が 0 件なら insert しない（Drizzle は空の `values([])` で例外を投げる）
+- `update` は、列車の update が 0 行なら、そこで `false` を返す。号車構成・設備には触れない
+- 例外はそのまま投げる。`withTransaction` が ROLLBACK し、route が 500 を返す
+
+## エラー
+
+| 状況 | Repository | route の応答 |
+|---|---|---|
+| 入力が `trainSchema` に合わない | 呼ばれない | 400 |
+| パスパラメータが UUID でない | 呼ばれない | 404 |
+| 更新・削除の対象が無い | `false` | 404 |
+| 書き込み中の例外（FK 違反など） | 投げる（ROLLBACK） | 500 |
 
 ## テスト
 
-`TransferDifficultySection.test.tsx` の文言の期待を書き換え、REQ-1・REQ-2 を足す。強調はクラスでしか確かめられないので、テストにしない（規約で、クラスでは検証しない）。
+- **Repository**（`external/repository/trainRepository.test.ts`）: CI に DB が無いため、`lineDirectionRepository.test.ts` と同じく、記録するだけの偽のクエリビルダを使う。次を確かめる
+  - create / update が `withTransaction` の中で書く
+  - 書く順番、渡す値（`carLength` の文字列化、設備の type）
+  - 空の配列なら insert しないこと
+  - 対象が無いときは、そこで止まること
+- **route**（`app/api/trains/route.test.ts`・`[trainId]/route.test.ts`）: `vi.mock('@/di')` で Repository を差し替え、次を確かめる
+  - 応答のステータスと本文
+  - 400 / 404 / 500 の分岐
+
+## 恒久知識の振り分け
+
+- 新しい ADR は作らない。既存の ADR-0003・ADR-0005 をそのまま当てはめるだけ
+- `docs/domain/` には、列車の書き込みについての記述が無い。層の構成もドメインのルールも変わらないので、更新しない

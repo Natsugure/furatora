@@ -17,8 +17,6 @@ const legacyExclusions = {
     'src/app/api/lines/\\[lineId\\]/directions/\\[directionId\\]/route.ts',
     'src/app/api/operators/route.ts',
     'src/app/api/operators/\\[operatorId\\]/route.ts',
-    'src/app/api/trains/route.ts',
-    'src/app/api/trains/\\[trainId\\]/route.ts',
   ],
   rules: {
     'no-restricted-imports': 'off',

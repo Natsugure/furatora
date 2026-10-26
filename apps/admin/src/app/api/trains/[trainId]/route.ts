@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@furatora/database/client';
-import { trains, trainEquipments, trainCarStructures } from '@furatora/database/schema';
-import { eq } from 'drizzle-orm';
 import { trainSchema } from '@/features/train/schema';
-import { trainEditPageQuery } from '@/di';
+import { trainEditPageQuery, trainRepository } from '@/di';
 import { parseUuidParams } from '@/shared/list/params';
 
 export async function GET(
@@ -37,57 +34,10 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { name, operatorId, lineIds, carCount, carStructure, freeSpaces, prioritySeats } = parsed.data;
-
-    const [updated] = await db
-      .update(trains)
-      .set({
-        name,
-        operators: operatorId,
-        lines: lineIds,
-        carCount,
-      })
-      .where(eq(trains.id, trainId))
-      .returning();
+    const updated = await trainRepository.update(trainId, parsed.data);
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-
-    await db.delete(trainCarStructures).where(eq(trainCarStructures.trainId, trainId));
-    if (carStructure && carStructure.length > 0) {
-      await db.insert(trainCarStructures).values(
-        carStructure.map((cs) => ({
-          trainId,
-          carNumber: cs.carNumber,
-          doorCount: cs.doorCount,
-          carLength: cs.carLength != null ? String(cs.carLength) : null,
-        }))
-      );
-    }
-
-    await db.delete(trainEquipments).where(eq(trainEquipments.trainId, trainId));
-
-    const equipmentRows = [
-      ...(freeSpaces ?? []).map((fs) => ({
-        trainId,
-        type: 'free_space' as const,
-        carNumber: fs.carNumber,
-        nearDoor: fs.nearDoor,
-        isStandard: fs.isStandard,
-      })),
-      ...(prioritySeats ?? []).map((ps) => ({
-        trainId,
-        type: 'priority_seat' as const,
-        carNumber: ps.carNumber,
-        nearDoor: ps.nearDoor,
-        isStandard: ps.isStandard,
-      })),
-    ];
-
-    if (equipmentRows.length > 0) {
-      await db.insert(trainEquipments).values(equipmentRows);
-    }
-
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -102,10 +52,7 @@ export async function DELETE(
     const ids = parseUuidParams(await params);
     if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { trainId } = ids;
-    const [deleted] = await db
-      .delete(trains)
-      .where(eq(trains.id, trainId))
-      .returning();
+    const deleted = await trainRepository.delete(trainId);
     if (!deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }

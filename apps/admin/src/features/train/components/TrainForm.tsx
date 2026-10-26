@@ -82,7 +82,7 @@ export function TrainForm({ initialData, isEdit = false, operators, lines }: Pro
     const hasBlank = [...freeSpaces, ...prioritySeats].some(
       (item) => typeof item.carNumber !== 'number' || typeof item.nearDoor !== 'number'
     );
-    // 範囲外のドア番号は API も拒む（trainSchema）。行のエラーを出したまま送らない
+    // 範囲外・重複したドア番号は API も拒む（trainSchema）。行のエラーを出したまま送らない
     const hasDoorIssue = freeSpaceIssues.length > 0 || prioritySeatIssues.length > 0;
 
     if (hasBlank || hasDoorIssue) {
