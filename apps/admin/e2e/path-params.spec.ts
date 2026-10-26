@@ -32,7 +32,7 @@ for (const path of [
 }
 
 test('UUID形式でないIDの API は404を返す', async ({ request }) => {
-  const response = await request.get('/api/stations/not-a-uuid');
+  const response = await request.put('/api/stations/not-a-uuid', { data: {} });
   expect(response.status()).toBe(404);
 });
 
