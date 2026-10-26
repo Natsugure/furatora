@@ -1,6 +1,6 @@
 import { db } from '@furatora/database/client';
 import { withTransaction, type Tx } from '@furatora/database/tx';
-import { trains, trainCarStructures, trainEquipments } from '@furatora/database/schema';
+import { trains, trainCarStructures, trainEquipments, type TrainEquipmentType } from '@furatora/database/schema';
 import { eq } from 'drizzle-orm';
 import type { TrainRepository } from '@/features/train/ports';
 import type { TrainInput } from '@/features/train/schema';
@@ -30,8 +30,8 @@ async function insertChildren(tx: Tx, trainId: string, input: TrainInput) {
     await tx.insert(trainCarStructures).values(carRows);
   }
 
-  const toEquipmentRow = (type: 'free_space' | 'priority_seat') =>
-    (e: { carNumber: number; nearDoor: number; isStandard: boolean }) => ({
+  const toEquipmentRow = (type: TrainEquipmentType) =>
+    (e: NonNullable<TrainInput['freeSpaces']>[number]) => ({
       trainId,
       type,
       carNumber: e.carNumber,
@@ -56,7 +56,7 @@ export const dbTrainRepository: TrainRepository = {
         await tx.insert(trains).values(trainValues(input)).returning({ id: trains.id })
       );
       await insertChildren(tx, row.id, input);
-      return { id: row.id };
+      return row;
     });
   },
 

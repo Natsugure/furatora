@@ -9,7 +9,6 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-
     const created = await trainRepository.create(parsed.data);
     return NextResponse.json(created, { status: 201 });
   } catch {

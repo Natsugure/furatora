@@ -87,15 +87,23 @@ const input = (overrides: Partial<TrainInput> = {}): TrainInput => ({
   ...overrides,
 });
 
-const expectedCarRows = (trainId: string) => [
+// trains テーブルの列名は operators（単一FK）/ lines（uuid配列）
+const expectedTrainValues = {
+  name: '10000系',
+  operators: OPERATOR_ID,
+  lines: ['line-1', 'line-2'],
+  carCount: 2,
+};
+
+const expectedCarRows = [
   // decimal 列のため文字列で書く（#165 まで）
-  { trainId, carNumber: 1, doorCount: 4, carLength: '20.5' },
-  { trainId, carNumber: 2, doorCount: 4, carLength: null },
+  { trainId: TRAIN_ID, carNumber: 1, doorCount: 4, carLength: '20.5' },
+  { trainId: TRAIN_ID, carNumber: 2, doorCount: 4, carLength: null },
 ];
 
-const expectedEquipmentRows = (trainId: string) => [
-  { trainId, type: 'free_space', carNumber: 1, nearDoor: 2, isStandard: true },
-  { trainId, type: 'priority_seat', carNumber: 2, nearDoor: 1, isStandard: false },
+const expectedEquipmentRows = [
+  { trainId: TRAIN_ID, type: 'free_space', carNumber: 1, nearDoor: 2, isStandard: true },
+  { trainId: TRAIN_ID, type: 'priority_seat', carNumber: 2, nearDoor: 1, isStandard: false },
 ];
 
 describe('dbTrainRepository', () => {
@@ -119,15 +127,9 @@ describe('dbTrainRepository', () => {
         ['insert', trainCarStructures, 'tx'],
         ['insert', trainEquipments, 'tx'],
       ]);
-      // trains テーブルの列名は operators（単一FK）/ lines（uuid配列）
-      expect(calls[0]?.values).toEqual({
-        name: '10000系',
-        operators: OPERATOR_ID,
-        lines: ['line-1', 'line-2'],
-        carCount: 2,
-      });
-      expect(calls[1]?.values).toEqual(expectedCarRows(TRAIN_ID));
-      expect(calls[2]?.values).toEqual(expectedEquipmentRows(TRAIN_ID));
+      expect(calls[0]?.values).toEqual(expectedTrainValues);
+      expect(calls[1]?.values).toEqual(expectedCarRows);
+      expect(calls[2]?.values).toEqual(expectedEquipmentRows);
     });
 
     it('号車構成・設備が無ければ、列車だけを入れる', async () => {
@@ -161,17 +163,12 @@ describe('dbTrainRepository', () => {
         ['insert', trainCarStructures, 'tx'],
         ['insert', trainEquipments, 'tx'],
       ]);
-      expect(calls[0]?.set).toEqual({
-        name: '10000系',
-        operators: OPERATOR_ID,
-        lines: ['line-1', 'line-2'],
-        carCount: 2,
-      });
+      expect(calls[0]?.set).toEqual(expectedTrainValues);
       expect(render(calls[0]).params).toEqual([TRAIN_ID]);
       expect(render(calls[1]).params).toEqual([TRAIN_ID]);
       expect(render(calls[2]).params).toEqual([TRAIN_ID]);
-      expect(calls[3]?.values).toEqual(expectedCarRows(TRAIN_ID));
-      expect(calls[4]?.values).toEqual(expectedEquipmentRows(TRAIN_ID));
+      expect(calls[3]?.values).toEqual(expectedCarRows);
+      expect(calls[4]?.values).toEqual(expectedEquipmentRows);
     });
 
     it('号車構成・設備が空になったら、消すだけで入れない', async () => {
