@@ -7,28 +7,6 @@ import { lineDirectionRepository } from '@/di';
 import { DirectionDefaultConflictError } from '@/features/line/ports';
 import { parseUuidParams } from '@/shared/list/params';
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ lineId: string; directionId: string }> }
-) {
-  try {
-    const ids = parseUuidParams(await params);
-    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const { lineId, directionId } = ids;
-    const [direction] = await db
-      .select()
-      .from(lineDirections)
-      .where(and(eq(lineDirections.id, directionId), eq(lineDirections.lineId, lineId)));
-
-    if (!direction) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    return NextResponse.json(direction);
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ lineId: string; directionId: string }> }

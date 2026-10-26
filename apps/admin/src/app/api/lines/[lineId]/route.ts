@@ -5,24 +5,6 @@ import { eq } from 'drizzle-orm';
 import { lineUpdateSchema } from '@/lib/validations';
 import { parseUuidParams } from '@/shared/list/params';
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ lineId: string }> }
-) {
-  const ids = parseUuidParams(await params);
-  if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const { lineId } = ids;
-  try {
-    const result = await db.select().from(lines).where(eq(lines.id, lineId)).limit(1);
-    if (result.length === 0) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    return NextResponse.json(result[0]);
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ lineId: string }> }

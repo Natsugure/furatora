@@ -8,7 +8,6 @@ import nextApp from '@furatora/eslint-config/next-app';
  */
 const legacyExclusions = {
   files: [
-    'src/app/page.tsx',
     'src/app/operators/page.tsx',
     'src/app/operators/\\[operatorId\\]/edit/page.tsx',
     'src/app/lines/\\[lineId\\]/directions/page.tsx',
@@ -17,12 +16,9 @@ const legacyExclusions = {
     'src/app/api/lines/\\[lineId\\]/route.ts',
     'src/app/api/lines/\\[lineId\\]/directions/\\[directionId\\]/route.ts',
     'src/app/api/operators/route.ts',
-    'src/app/api/operators/route.test.ts',
     'src/app/api/operators/\\[operatorId\\]/route.ts',
-    'src/app/api/operators/\\[operatorId\\]/route.test.ts',
     'src/app/api/trains/route.ts',
     'src/app/api/trains/\\[trainId\\]/route.ts',
-    'src/app/api/station-connections/\\[connectionId\\]/route.ts',
   ],
   rules: {
     'no-restricted-imports': 'off',

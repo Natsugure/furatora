@@ -5,24 +5,6 @@ import { eq } from 'drizzle-orm';
 import { stationUpdateSchema } from '@/lib/validations';
 import { parseUuidParams } from '@/shared/list/params';
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ stationId: string }> }
-) {
-  try {
-    const ids = parseUuidParams(await params);
-    if (!ids) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    const { stationId } = ids;
-    const [station] = await db.select().from(stations).where(eq(stations.id, stationId));
-    if (!station) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    return NextResponse.json(station);
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ stationId: string }> }

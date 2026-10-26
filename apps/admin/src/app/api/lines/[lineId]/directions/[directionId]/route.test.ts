@@ -11,7 +11,7 @@ vi.mock('@/di', () => ({
   },
 }));
 
-// GET・DELETE は db を直接使う（#130 の対象外）。PUT のテストでは読み込まれるだけなので空にする
+// DELETE は db を直接使う（#130 の対象外）。PUT のテストでは読み込まれるだけなので空にする
 vi.mock('@furatora/database/client', () => ({ db: {} }));
 
 const LINE_ID = '550e8400-e29b-41d4-a716-446655440000';
