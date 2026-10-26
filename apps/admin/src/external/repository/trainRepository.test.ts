@@ -164,9 +164,10 @@ describe('dbTrainRepository', () => {
         ['insert', trainEquipments, 'tx'],
       ]);
       expect(calls[0]?.set).toEqual(expectedTrainValues);
-      expect(render(calls[0]).params).toEqual([TRAIN_ID]);
-      expect(render(calls[1]).params).toEqual([TRAIN_ID]);
-      expect(render(calls[2]).params).toEqual([TRAIN_ID]);
+      // 列を取り違えても params は同じになるため、条件の列も確かめる
+      expect(render(calls[0])).toMatchObject({ sql: '"trains"."id" = $1', params: [TRAIN_ID] });
+      expect(render(calls[1])).toMatchObject({ sql: '"train_car_structures"."train_id" = $1', params: [TRAIN_ID] });
+      expect(render(calls[2])).toMatchObject({ sql: '"train_equipments"."train_id" = $1', params: [TRAIN_ID] });
       expect(calls[3]?.values).toEqual(expectedCarRows);
       expect(calls[4]?.values).toEqual(expectedEquipmentRows);
     });
@@ -202,7 +203,7 @@ describe('dbTrainRepository', () => {
       expect(deleted).toBe(true);
       expect(withTransaction).not.toHaveBeenCalled();
       expect(calls.map((c) => [c.op, c.table, c.runner])).toEqual([['delete', trains, 'db']]);
-      expect(render(calls[0]).params).toEqual([TRAIN_ID]);
+      expect(render(calls[0])).toMatchObject({ sql: '"trains"."id" = $1', params: [TRAIN_ID] });
     });
 
     it('列車が無ければ false を返す', async () => {
