@@ -6,9 +6,13 @@ import { ilike, eq, and, or, sql } from 'drizzle-orm';
 import type { StationGroup } from '@/types';
 import { publishedStation } from './visibility';
 
-// /api/v1/stations（駅名検索）。
-// stationLines・lines を LEFT JOIN し、駅名と路線情報を一括取得する。
-// 同一物理駅が複数の路線レコードを持つ場合、行数が増えるため limit は多めに設定する。
+/**
+ * @description /api/v1/stations（駅名検索）。
+ * stationLines・lines を LEFT JOIN し、駅名と路線情報を一括取得する。
+ * @param query 検索条件
+ * @returns `Promise<StationGroup[]>` 検索条件に合致した公開駅のグループ。
+ */
+
 export async function searchVisibleStations(query: string): Promise<StationGroup[]> {
   // name_en（例: Naka-meguro）から区切り記号を除いた値。
   // 入力側の stripRomajiSeparator と同じ規則で揃える（片方だけ変えるとヒットしなくなる）
@@ -40,7 +44,7 @@ export async function searchVisibleStations(query: string): Promise<StationGroup
         ilike(normalizedNameEn, `%${stripRomajiSeparator(query)}%`),
       ),
     ))
-    .limit(60);
+    .limit(60); // 同一物理駅が複数の路線レコードを持つ場合、行数が増えるため limit は多めに設定する。
 
   // 駅名でグループ化（Map は挿入順を保持するため表示順が安定する）
   const groupMap = new Map<string, StationGroup>();
