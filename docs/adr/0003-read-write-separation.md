@@ -1,6 +1,6 @@
 # ADR-0003: 読み取りと書き込みで異なる抽象を用いる（Query Service / Repository）
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-08-14
 - **決定者**: @Natsugure
 - **関連**: [ADR-0001](./0001-layer-structure.md), [ADR-0002](./0002-dependency-inversion-ports.md), [ADR-0005](./0005-write-atomicity-driver.md)
