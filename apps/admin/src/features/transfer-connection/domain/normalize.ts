@@ -41,6 +41,11 @@ export function comboKeyOf(stationDirection: DirectionType, connectedDirection: 
   return `${stationDirection}:${connectedDirection}`;
 }
 
+// comboKeyOf の逆
+export function directionsOfCombo(combo: ComboKey): [DirectionType, DirectionType] {
+  return combo.split(':') as [DirectionType, DirectionType];
+}
+
 // 方面の組み合わせ（S 基準）を、DB の正規化順（A < B）の端点対に変換する。
 // 書き込み側が INSERT 前に必ず通すこと（check transfer_connection_endpoints_ordered が逆順を拒否する）
 export function endpointsOfCombo(
@@ -48,7 +53,7 @@ export function endpointsOfCombo(
   connectedStationId: string,
   combo: ComboKey,
 ): { a: TransferEndpoint; b: TransferEndpoint } {
-  const [stationDirection, connectedDirection] = combo.split(':') as [DirectionType, DirectionType];
+  const [stationDirection, connectedDirection] = directionsOfCombo(combo);
   return normalizeTransferEndpoints(
     { stationId, directionType: stationDirection },
     { stationId: connectedStationId, directionType: connectedDirection },

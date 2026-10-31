@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import { Copy, Trash2 } from 'lucide-react';
 import type { FacilityTypeCode } from '@furatora/transfer-difficulty/domain';
-import { describeCombo } from '../domain/label';
+import { describeCombo, describeIssue } from '../domain/label';
 import { comboKeyOf } from '../domain/normalize';
 import { DIRECTIONS, type Direction, type RouteDraft } from '../domain/types';
 import type { ValidationIssue } from '../domain/validate';
@@ -204,10 +204,7 @@ export function RouteCard({
           <Alert color="red" title="保存できない項目があります">
             {errors.map((issue, i) => (
               <Text key={`${issue.code}-${i}`} size="sm">
-                {issue.combo
-                  ? `${describeCombo(issue.combo, stationAxis.stationName, connectedAxis.stationName)}: `
-                  : ''}
-                {issue.message}
+                {describeIssue(issue, stationAxis.stationName, connectedAxis.stationName)}
               </Text>
             ))}
           </Alert>

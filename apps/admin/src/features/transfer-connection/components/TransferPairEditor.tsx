@@ -14,7 +14,7 @@ import {
 import {
   applyDuplicateChoices, findDuplicates, matchKey, type DuplicateChoice, type DuplicateMatch,
 } from '../domain/duplicates';
-import { describeCombo, withLine } from '../domain/label';
+import { describeCombo, describeIssue, withLine } from '../domain/label';
 import { COMBO_KEYS, type ComboKey, type PairDraft } from '../domain/types';
 import { collectWarnings, validateSaveInput, type ValidationIssue } from '../domain/validate';
 import { DuplicateRouteModal } from './DuplicateRouteModal';
@@ -150,8 +150,6 @@ export function TransferPairEditor({ context }: Props) {
     hints: context.directionHints.connected,
   };
   const notesSingleValue = covered[0] ? draft.connectionNotes[covered[0]] : '';
-  const describePairCombo = (combo: ComboKey) =>
-    describeCombo(combo, stationAxis.stationName, connectedAxis.stationName);
 
   return (
     <Stack gap="lg" maw="56rem">
@@ -200,7 +198,7 @@ export function TransferPairEditor({ context }: Props) {
         <Alert color="yellow" title="確認してください">
           {pairLevelWarnings.map((w, i) => (
             <Text key={`${w.code}-${i}`} size="sm">
-              {w.combo ? `${describePairCombo(w.combo)}: ` : ''}{w.message}
+              {describeIssue(w, stationAxis.stationName, connectedAxis.stationName)}
             </Text>
           ))}
         </Alert>
@@ -226,7 +224,7 @@ export function TransferPairEditor({ context }: Props) {
               covered.map((combo) => (
                 <Textarea
                   key={combo}
-                  label={describePairCombo(combo)}
+                  label={describeCombo(combo, stationAxis.stationName, connectedAxis.stationName)}
                   autosize
                   minRows={2}
                   value={draft.connectionNotes[combo]}

@@ -53,7 +53,7 @@ export function validateSaveInput(input: PairSaveInput): ValidationIssue[] {
   // DB の unique_connection_route_label / unique_connection_baseline が接続単位のため
   for (const combo of COMBO_KEYS) {
     const labels = new Set<string>();
-    const baselineIndexes: number[] = [];
+    const baselines: { routeIndex: number; label: string }[] = [];
     input.routes.forEach((route, routeIndex) => {
       if (!route.combos.includes(combo)) return;
       const label = route.label.trim();
@@ -68,14 +68,14 @@ export function validateSaveInput(input: PairSaveInput): ValidationIssue[] {
         }
         labels.add(label);
       }
-      if (route.isBaseline) baselineIndexes.push(routeIndex);
+      if (route.isBaseline) baselines.push({ routeIndex, label });
     });
 
     // 重なった相手のカードにも出す。どれか1本の基準を外せば解消するため、どれを直すかは人が選ぶ
-    if (baselineIndexes.length >= 2) {
-      const names = baselineIndexes.map((i) => input.routes[i]?.label.trim()).join('・');
-      const message = `基準ルートが${baselineIndexes.length}本あります（${names}）。1つの方面の組み合わせにつき1本までです`;
-      for (const routeIndex of baselineIndexes) {
+    if (baselines.length >= 2) {
+      const names = baselines.map((b) => b.label).join('・');
+      const message = `基準ルートが${baselines.length}本あります（${names}）。1つの方面の組み合わせにつき1本までです`;
+      for (const { routeIndex } of baselines) {
         issues.push({ code: 'baseline_duplicate', message, routeIndex, combo });
       }
     }
