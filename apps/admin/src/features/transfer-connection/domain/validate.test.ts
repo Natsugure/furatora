@@ -77,6 +77,20 @@ describe('validateSaveInput（エラー。保存を拒否する）', () => {
     expect(issues).toContain('baseline_duplicate');
   });
 
+  it('基準ルートの重なりは、重なったすべてのルートに組み合わせとルート名を添えて返す', () => {
+    const a = route({ label: '乗換通路経由', combos: ['inbound:inbound', 'inbound:outbound', 'outbound:outbound'] });
+    const b = route({ label: 'エレベーター乗継', isBaseline: false });
+    const c = route({ label: '改札階経由', combos: ['inbound:outbound', 'outbound:inbound', 'outbound:outbound'] });
+    const dup = validateSaveInput(input(a, b, c)).filter((e) => e.code === 'baseline_duplicate');
+    expect(dup.map((e) => [e.routeIndex, e.combo])).toEqual([
+      [0, 'inbound:outbound'],
+      [2, 'inbound:outbound'],
+      [0, 'outbound:outbound'],
+      [2, 'outbound:outbound'],
+    ]);
+    expect(dup[0]?.message).toBe('基準ルートが2本あります（乗換通路経由・改札階経由）。1つの方面の組み合わせにつき1本までです');
+  });
+
   it('基準ルートが2本でも組み合わせが重ならなければエラーではない', () => {
     const a = route({ label: 'A', combos: ['inbound:inbound'] });
     const b = route({ label: 'B', combos: ['outbound:outbound'] });
