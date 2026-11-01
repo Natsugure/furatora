@@ -429,7 +429,7 @@ Admin の入力欄には、出発地・目的地に依存する比較を書か�
 
 ## 乗換接続の粒度（`facilityConnections`）
 
-現在 `facilityConnections` は0件。実データが出てから粒度を設計する
+`facilityConnections` の粒度は暫定である。入力した実データをもとに見直す
 （[Issue #84](https://github.com/Natsugure/furatora/issues/84)）。
 
 ## 利用規約に由来する制約
