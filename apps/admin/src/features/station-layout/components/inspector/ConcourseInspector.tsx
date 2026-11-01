@@ -120,18 +120,16 @@ export function ConcourseInspector({
                 <Text size="sm" fw={500} mb="xs">設備タイプ</Text>
                 <Stack gap="xs">
                   {facilityTypes.map((ft) => {
-                    const selected = cell.facilities.find((f) => f.typeCode === ft.code);
+                    const selected = cell.facilities.some((f) => f.typeCode === ft.code);
                     return (
-                      <Card key={ft.code} withBorder padding="sm">
-                        <Checkbox
-                          label={ft.name}
-                          checked={!!selected}
-                          onChange={() => onChange((d) => (
-                            selected ? removeCellFacility(d, cell.id, ft.code) : addCellFacility(d, cell.id, ft.code)
-                          ))}
-                          fw={500}
-                        />
-                      </Card>
+                      <Checkbox
+                        key={ft.code}
+                        label={ft.name}
+                        checked={selected}
+                        onChange={() => onChange((d) => (
+                          selected ? removeCellFacility(d, cell.id, ft.code) : addCellFacility(d, cell.id, ft.code)
+                        ))}
+                      />
                     );
                   })}
                 </Stack>
