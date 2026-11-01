@@ -128,4 +128,13 @@ describe('RouteCard', () => {
     expect(screen.getByText('ルートの名前（label）を入力してください')).toBeInTheDocument();
     expect(screen.getByText('階段と階段昇降機は代替手段です')).toBeInTheDocument();
   });
+
+  it('方面の組み合わせを持つ検証エラーには、どの組み合わせかを添える', () => {
+    setup(draft(), {
+      errors: [{ code: 'baseline_duplicate', message: '基準ルートが2本あります', combo: 'outbound:inbound' }],
+    });
+    expect(
+      screen.getByText('淡路町（丸ノ内線） outbound × 小川町（新宿線） inbound: 基準ルートが2本あります'),
+    ).toBeInTheDocument();
+  });
 });
