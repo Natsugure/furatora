@@ -1,6 +1,6 @@
 // 駅・路線マスタ（事業者・駅・路線・隣接・方面）。
 // docs/domain/station-master-model.md / line-directions.md / station-visibility.md 参照
-import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, uniqueIndex, date, check } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, decimal, integer, timestamp, text, uuid, boolean, primaryKey, unique, uniqueIndex, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { DirectionType } from '../enums';
 
@@ -31,7 +31,6 @@ export const stations = pgTable('stations', {
   ekidataStationCd: integer('ekidata_station_cd').unique(),
   stationGroupId: uuid('station_group_id').references(() => stationGroups.id),
   prefCode: integer('pref_code'),
-  abolishedAt: date('abolished_at'),
   // 【可視性はこの列が単独で担う】null = 非公開。ekidata 由来の新規駅は null で作られ、
   // 管理者が明示的に設定するまで一覧・検索・詳細ページ・公開APIに出ない。
   // operators.displayPriority は表示順専用であり可視性の意味を持たない
@@ -59,7 +58,6 @@ export const lines = pgTable('lines', {
   // ekidata line_cd。理由は stations.ekidataStationCd と同じ（ADR-0007 決定3）。
   // 由来の記録。手動追加された路線は持ち得ないため nullable のまま。notNull 化しないこと
   ekidataLineCd: integer('ekidata_line_cd').unique(),
-  abolishedAt: date('abolished_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });

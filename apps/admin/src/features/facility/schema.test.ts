@@ -57,16 +57,16 @@ describe('platformLocationSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('isWheelchairAccessible/isStrollerAccessibleがnullでも正常にパースされる', () => {
-    // コンコース全体を再送する全置換PUTのため、未設定(null)をそのまま送れる必要が
-    // ある（true に丸められるとアクセシビリティ属性が黙って変わる）
+  it('設備は種類だけを受け取り、車いす対応・ベビーカー対応・メモは捨てる', () => {
+    // 通れるかは種類から導くので、設備ごとの属性は保存しない
     const result = platformLocationSchema.safeParse({
       platformId: VALID_UUID,
       cells: [{
-        facilities: [{ typeCode: 'elevator', isWheelchairAccessible: null, isStrollerAccessible: null }],
+        facilities: [{ typeCode: 'elevator', isWheelchairAccessible: false, isStrollerAccessible: false, notes: 'メモ' }],
       }],
     });
     expect(result.success).toBe(true);
+    expect(result.data?.cells[0]?.facilities).toEqual([{ typeCode: 'elevator' }]);
   });
 
   it('対面乗り換え帯のxRangeStart/xRangeEndが正しい順序なら正常にパースされる', () => {

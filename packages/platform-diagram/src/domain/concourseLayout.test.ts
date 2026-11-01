@@ -221,8 +221,6 @@ describe('layoutConcoursePlates', () => {
         id: typeCode,
         typeCode,
         typeName,
-        isWheelchairAccessible: true,
-        isStrollerAccessible: true,
       });
       const { groups } = layoutConcoursePlates(
         [

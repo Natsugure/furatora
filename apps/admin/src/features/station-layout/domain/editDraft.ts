@@ -21,14 +21,8 @@ import type {
 /** 号車を潰さない最小幅（m）。moveCarBoundary の唯一のクランプ元 */
 export const MIN_CAR_METERS = 0.5;
 
-/** 新規アクセス点に設備を追加したときの既定値 */
-const DEFAULT_FACILITY_ACCESSIBILITY = { isWheelchairAccessible: true, isStrollerAccessible: true };
-
 export type FacilityDraft = {
   typeCode: FacilityTypeCode;
-  isWheelchairAccessible: boolean | null;
-  isStrollerAccessible: boolean | null;
-  notes: string | null;
 };
 
 export type CellDraft = {
@@ -72,12 +66,7 @@ export function createConcourseDraft(
     cells: concourse.cells.map((c) => ({
       id: c.id,
       xPositionMeters: c.xPositionMeters,
-      facilities: c.facilities.map((f) => ({
-        typeCode: f.typeCode,
-        isWheelchairAccessible: f.isWheelchairAccessible,
-        isStrollerAccessible: f.isStrollerAccessible,
-        notes: f.notes,
-      })),
+      facilities: c.facilities.map((f) => ({ typeCode: f.typeCode })),
     })),
     connections: concourse.connections.map((c) => ({
       stationId: c.connectedStationId,
@@ -203,7 +192,7 @@ export function addCellFacility(draft: ConcourseDraft, cellId: string, typeCode:
       if (cell.id !== cellId || cell.facilities.some((f) => f.typeCode === typeCode)) return cell;
       return {
         ...cell,
-        facilities: [...cell.facilities, { typeCode, ...DEFAULT_FACILITY_ACCESSIBILITY, notes: null }],
+        facilities: [...cell.facilities, { typeCode }],
       };
     }),
   };
@@ -218,25 +207,6 @@ export function removeCellFacility(draft: ConcourseDraft, cellId: string, typeCo
         ? { ...cell, facilities: cell.facilities.filter((f) => f.typeCode !== typeCode) }
         : cell
     )),
-  };
-}
-
-/** 設備タイプの属性（車いす対応・ベビーカー対応・メモ）を更新する */
-export function updateCellFacility(
-  draft: ConcourseDraft,
-  cellId: string,
-  typeCode: FacilityTypeCode,
-  patch: Partial<Omit<FacilityDraft, 'typeCode'>>,
-): ConcourseDraft {
-  return {
-    ...draft,
-    cells: draft.cells.map((cell) => {
-      if (cell.id !== cellId) return cell;
-      return {
-        ...cell,
-        facilities: cell.facilities.map((f) => (f.typeCode === typeCode ? { ...f, ...patch } : f)),
-      };
-    }),
   };
 }
 
@@ -409,14 +379,8 @@ export function isConcourseDirty(
     if (serverCell.xPositionMeters !== cell.xPositionMeters) return true;
     if (serverCell.facilities.length !== cell.facilities.length) return true;
 
-    const serverFacilityByType = new Map(serverCell.facilities.map((f) => [f.typeCode, f]));
-    for (const facility of cell.facilities) {
-      const serverFacility = serverFacilityByType.get(facility.typeCode);
-      if (!serverFacility) return true;
-      if (serverFacility.isWheelchairAccessible !== facility.isWheelchairAccessible) return true;
-      if (serverFacility.isStrollerAccessible !== facility.isStrollerAccessible) return true;
-      if (serverFacility.notes !== facility.notes) return true;
-    }
+    const serverTypeCodes = new Set(serverCell.facilities.map((f) => f.typeCode));
+    if (cell.facilities.some((f) => !serverTypeCodes.has(f.typeCode))) return true;
   }
 
   const serverConnectionByStation = new Map(server.connections.map((c) => [c.connectedStationId, c]));
@@ -474,12 +438,7 @@ export function toPlatformLocationPayload(
     notes: draft.notes,
     cells: draft.cells.map((cell) => ({
       xPositionMeters: cell.xPositionMeters,
-      facilities: cell.facilities.map((f) => ({
-        typeCode: f.typeCode,
-        isWheelchairAccessible: f.isWheelchairAccessible,
-        isStrollerAccessible: f.isStrollerAccessible,
-        notes: f.notes,
-      })),
+      facilities: cell.facilities.map((f) => ({ typeCode: f.typeCode })),
     })),
     connections: draft.connections.map((c) => ({
       stationId: c.stationId,
@@ -542,9 +501,6 @@ export function draftToDisplayConcourse(
         id: `${cell.id}:${f.typeCode}`,
         typeCode: f.typeCode,
         typeName: lookups.facilityTypeName(f.typeCode),
-        isWheelchairAccessible: f.isWheelchairAccessible,
-        isStrollerAccessible: f.isStrollerAccessible,
-        notes: f.notes,
       })),
     })),
     connections: draft.connections.map((c) => {

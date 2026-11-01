@@ -42,8 +42,6 @@ function concourse(
         id: `f${i}`,
         typeCode: 'elevator',
         typeName: 'エレベーター',
-        isWheelchairAccessible: null,
-        isStrollerAccessible: null,
       })),
     })),
     connections: connections.map((c) => ({

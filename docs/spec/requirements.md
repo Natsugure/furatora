@@ -1,32 +1,40 @@
-# 要件: 列車（trains）の書き込みを Repository にする (Issue #163)
+# 要件: 使われていない DB の列をコードから外す（二段階の削除の1段目）
 
 ## 概要
 
-- **対象**: Admin の列車 API（`POST /api/trains`・`PUT /api/trains/[trainId]`・`DELETE /api/trains/[trainId]`）
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #163](https://github.com/Natsugure/furatora/issues/163) /
-  [ADR-0003](../adr/0003-read-write-separation.md) / [ADR-0005](../adr/0005-write-atomicity-driver.md)
-- **進め方**: 1 つの PR（`refactor/admin-train-repository-163`）
-- **信頼度**: 90%（高）。`stopPatternRepository` と同じ形で書ける。画面の動きは変わらない
+- **対象**: `station_facilities.is_wheelchair_accessible` / `is_stroller_accessible` / `notes`、`stations.abolished_at`、`lines.abolished_at`
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #217](https://github.com/Natsugure/furatora/issues/217)（2段目: DROP COLUMN）
+- **進め方**: 1 つの PR（`refactor/remove-unused-columns`）。DB の列は残し、次の作業（#217）で落とす
+- **信頼度**: 90%（高）。消す列はどれも、表示にも判定にも使われていないことを読み書きの経路から確かめた
 
 ## 背景
 
-列車の書き込みは route が `db` を直接使っており、ADR-0003（書き込みは Repository）に沿っていない。
-POST / PUT は `trains`・`train_car_structures`・`train_equipments` に分けて書くが、トランザクションで囲んでいない。
-とくに PUT は号車構成・設備を消してから入れ直すので、入れ直しに失敗すると消えたままになる。
-2 つの route は `apps/admin/eslint.config.mjs` の `legacyExclusions` に入っている。
+admin の駅レイアウト編集で、設備ごとに「車いす対応」「ベビーカー対応」とメモを入力させている。
+しかしこの値はどこからも読まれていない。ベビーカー・車いすで通れるかは、設備の種類から導いている
+（`packages/transfer-difficulty` の `REQUIREMENT_BY_FACILITY`）。
+本番のデータでも、フラグはほぼ種類どおりで、食い違いは入力ミスらしいものだけだった
+（2026-11-01 時点の164件のうち、`false` のエレベーター4件、`true` のエスカレーター・階段各2件）。
+
+これを機に全テーブルの列を見直した。駅・路線の廃止日は、書き込む経路が無く、本番でも0件だった。
 
 ## 要件（EARS）
 
-- **REQ-1** 列車を作るとき、システムは列車・号車構成・設備を 1 つのトランザクションで書くこと
-- **REQ-2** 列車を更新するとき、システムは列車の更新と号車構成・設備の入れ直しを 1 つのトランザクションで行うこと
-- **REQ-3** 作成・更新の途中で書き込みが失敗した場合、システムはそれまでの書き込みを残さず、500 を返すこと
-- **REQ-4** 更新・削除の対象の列車が無い場合、システムは 404 を返し、号車構成・設備に触れないこと
-- **REQ-5** 列車を作ったとき、システムは作った列車の `id` を 201 で返すこと
-- **REQ-6** システムは、列車の route から `@furatora/database` と `drizzle-orm` を import しないこと（ESLint の依存ルールを除外なしで通す）
-- **REQ-7** 入力の検証（`trainSchema`）、パスパラメータの検証、PUT・DELETE の応答（`{ success: true }`）は、REQ-8 を除いていまと同じにすること
-- **REQ-8** 同じ種別の設備（フリースペース・優先席）に同じ号車・ドア番号の行が 2 つ以上ある場合、システムは API では 400 と2つ目以降の行を指すエラーを返し、フォームではその行にエラーを出して送信しないこと（PR #213 のレビューで追加。これまでは一意制約 `unique_train_equipment` に当たって 500 だった）
+- **REQ-1** システムは、駅レイアウト編集で設備ごとの「車いす対応」「ベビーカー対応」とメモの入力欄を出さないこと。設備は種類を選ぶだけにすること
+- **REQ-2** 設備の保存 API（platform-locations）が設備の種類以外の項目を受け取った場合、システムはそれを捨てて保存すること（400 にしない。古い画面からの送信を受け付けるため）
+- **REQ-3** システムは、対象の5列を読み書きしないこと（テーブル定義から外し、全列 SELECT と INSERT に含まれないようにする）
+- **REQ-4** システムは、Web の駅ページのホーム図を、これまでどおり描くこと
+- **REQ-5** システムは、場所メモ（`platform_locations.notes`）の入力と保存を、これまでどおり行えること
+
+## 残す列（見直した結果）
+
+- ekidata / ODPT の ID、`source`: ADR-0007 決定3 と `docs/domain/station-master-model.md` で、出どころの記録として残すと決めている
+- `stations.lat` / `lon`: 全駅にデータがあり、経路探索・地図で使える
+- `trains.lines`: 開発者の判断で残す
+- `createdAt` / `updatedAt`: 記録用の列
+- `platform_locations.notes`: 利用者に役立つ内容なので、Web に表示する（#218）
 
 ## 対象外
 
-- `carLength` の `String()` / `Number()` の変換をなくすこと（#165）
-- 列車一覧ページ（`app/trains/page.tsx`）の Query Service 化と、`legacyExclusions` に残るほかのファイル（後で Issue を立てる）
+- DROP COLUMN（#217）
+- 場所メモの Web 表示（#218）
+- 駅の新規作成でメモが保存されない不具合（#219。見直しの途中で見つかった）

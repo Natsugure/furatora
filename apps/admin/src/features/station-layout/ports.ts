@@ -25,10 +25,9 @@ export type LayoutStopPatternDTO = TrainStopPatternDTO & {
 // パッケージが編集用フィールドを抱え込むことになる。ADR-0010「レビュー」節参照）。
 
 /**
- * stationFacilities.notes を追加した設備DTO。
- * 知らないコードは読み取りで止める（assertKnownFacilityCodes）ので、typeCode は null を取らない
+ * 設備DTO。知らないコードは読み取りで止める（assertKnownFacilityCodes）ので、typeCode は null を取らない
  */
-export type LayoutFacilityDTO = Omit<FacilityDTO, 'typeCode'> & { typeCode: FacilityTypeCode; notes: string | null };
+export type LayoutFacilityDTO = Omit<FacilityDTO, 'typeCode'> & { typeCode: FacilityTypeCode };
 
 /** platformLocationCells.id を追加したアクセス点DTO（draftのキー・React keyに使う） */
 export type LayoutCellDTO = Omit<ConcourseCellDTO, 'facilities'> & {

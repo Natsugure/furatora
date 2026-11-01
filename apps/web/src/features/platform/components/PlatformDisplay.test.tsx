@@ -97,7 +97,7 @@ describe('PlatformDisplay', () => {
     const unplacedConcourse = {
       id: 'c9',
       exits: '南口',
-      cells: [{ xPositionMeters: null, facilities: [{ id: 'f1', typeCode: 'elevator' as const, typeName: 'エレベーター', isWheelchairAccessible: true, isStrollerAccessible: true }] }],
+      cells: [{ xPositionMeters: null, facilities: [{ id: 'f1', typeCode: 'elevator' as const, typeName: 'エレベーター' }] }],
       connections: [
         {
           lineNames: ['銀座線'],

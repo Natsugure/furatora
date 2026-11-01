@@ -29,7 +29,6 @@ const undrawableConcourse: LayoutConcourseDTO = {
       facilities: [
         {
           id: 'f-1', typeCode: 'elevator', typeName: 'エレベーター',
-          isWheelchairAccessible: true, isStrollerAccessible: true, notes: null,
         },
       ],
     },
