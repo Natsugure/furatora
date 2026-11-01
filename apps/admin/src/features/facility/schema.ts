@@ -5,13 +5,7 @@ import { FACILITY_TYPE_CODES } from '@furatora/database/enums';
 const facilitySchema = z.object({
   // 定数に無いコードは facility_types の外部キーで落ちる前に 400 で弾く（ADR-0016）
   typeCode: z.enum(FACILITY_TYPE_CODES),
-  // nullable: PUTはコンコース全体をdelete→insertする全置換のため、駅レイアウト
-  // 統合ページが座標のドラッグだけで再送するときもnull（未設定）をそのまま送れる
-  // 必要がある。omit/undefinedにするとrepository側でtrueに埋められてしまい、
-  // 未設定がアクセシブル扱いに黙って書き換わる
-  isWheelchairAccessible: z.boolean().nullable().optional(),
-  isStrollerAccessible: z.boolean().nullable().optional(),
-  notes: z.string().nullable().optional(),
+  // 設備は種類だけを持つ。ベビーカー・車いすで通れるかは種類から導く（transfer-difficulty の requirement.ts）
 });
 
 // ホーム端（x=0）からのメートル位置。null = コンコース全体

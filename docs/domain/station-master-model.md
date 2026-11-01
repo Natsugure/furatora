@@ -12,6 +12,11 @@
 > `POST /api/lines/[lineId]/adjacencies` ほか）。乗換単位グループ（`stationGroups`）の
 > 新規作成手段だけは未実装（`ekidataStationGroupCd` が NOT NULL + UNIQUE のため。別 Issue）。
 > 経緯と却下案は [ADR-0007](../adr/0007-station-master-data-source.md)。
+>
+> **ホーム図の設備（`station_facilities`）の対応フラグ・メモ、駅・路線の廃止日**は、コードから外したが
+> DB の列は残っている（`station_facilities.is_wheelchair_accessible` / `is_stroller_accessible` / `notes`、
+> `stations.abolished_at`、`lines.abolished_at`）。次のデプロイで DROP する予定
+> （二段階の削除。[Issue #217](https://github.com/Natsugure/furatora/issues/217)）。
 
 ## データ源
 
@@ -249,6 +254,11 @@ transfer_connections        接続（無向1行。端点は 駅×方面、方面
 - 設備は `facility_types` の7値: `sameFloor` / `elevator` / `ramp` / `wheelchairEscalator` /
   `escalator` / `stairLift` / `stairs`。**コードはキャメルケース**で、`wheelchairEscalator` は
   車いす対応・係員操作のエスカレーター。
+- **ホーム図の設備（`station_facilities`）も同じ種類を使い、種類だけを持つ。**
+  ベビーカー・車いすで通れるかは、乗換ルートと同じく種類から導く
+  （`packages/transfer-difficulty` の `REQUIREMENT_BY_FACILITY`）。設備ごとの「車いす対応」「ベビーカー対応」や
+  メモは持たない。同じ情報を種類と別に入力させると、種類と食い違う値（車いす非対応のエレベーター等）が入るため。
+  場所ごとの補足（利用できる時間など）は、場所（`platform_locations.notes`）に書く
 - **設備コードの一覧の正は、定数 `FACILITY_TYPE_CODES`（`@furatora/database/enums`）である。**
   `facility_types` は CHECK 制約で、seed は `Record<FacilityTypeCode, string>` の型で、これに従う
   （[ADR-0016](../adr/0016-facility-type-codes-constant-as-source.md)）。
@@ -419,7 +429,7 @@ Admin の入力欄には、出発地・目的地に依存する比較を書か�
 
 ## 乗換接続の粒度（`facilityConnections`）
 
-現在 `facilityConnections` は0件。実データが出てから粒度を設計する
+`facilityConnections` の粒度は暫定である。入力した実データをもとに見直す
 （[Issue #84](https://github.com/Natsugure/furatora/issues/84)）。
 
 ## 利用規約に由来する制約

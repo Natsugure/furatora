@@ -56,7 +56,6 @@ const concourse: LayoutConcourseDTO = {
     xPositionMeters: 25,
     facilities: [{
       id: 'facility-1', typeCode: 'elevator', typeName: 'エレベーター',
-      isWheelchairAccessible: true, isStrollerAccessible: true, notes: null,
     }],
   }],
   connections: [],

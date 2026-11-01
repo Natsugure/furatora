@@ -1,6 +1,6 @@
 // ホームと設備（ホーム・場所・アクセス点・設備・設備マスタ）。
 // docs/domain/platform-coordinate-system.md 参照
-import { pgTable, varchar, decimal, timestamp, text, uuid, boolean, unique, check } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, decimal, timestamp, text, uuid, unique, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { FACILITY_TYPE_CODES, type FacilityTypeCode } from '../enums';
 import { stations, lines, lineDirections } from './stationMaster';
@@ -42,9 +42,6 @@ export const stationFacilities = pgTable('station_facilities', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformLocationCellId: uuid('platform_location_cell_id').references(() => platformLocationCells.id, { onDelete: 'cascade' }).notNull(),
   typeCode: varchar('type_code').references(() => facilityTypes.code).notNull().$type<FacilityTypeCode>(),
-  isWheelchairAccessible: boolean('is_wheelchair_accessible').default(true),
-  isStrollerAccessible: boolean('is_stroller_accessible').default(true),
-  notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });

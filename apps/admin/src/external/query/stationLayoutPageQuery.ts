@@ -123,9 +123,6 @@ async function getConcourses(platformId: string): Promise<LayoutConcourseDTO[]> 
         id: f.id,
         typeCode: f.typeCode,
         typeName: facilityTypeMap[f.typeCode] ?? f.typeCode,
-        isWheelchairAccessible: f.isWheelchairAccessible,
-        isStrollerAccessible: f.isStrollerAccessible,
-        notes: f.notes,
       })),
     })),
     connections: (connectionsByLocation.get(loc.id) ?? []).map((c) => ({

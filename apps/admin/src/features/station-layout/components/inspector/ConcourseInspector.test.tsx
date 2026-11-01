@@ -16,7 +16,6 @@ const concourse: LayoutConcourseDTO = {
     xPositionMeters: 10,
     facilities: [{
       id: 'facility-1', typeCode: 'elevator', typeName: 'エレベーター',
-      isWheelchairAccessible: true, isStrollerAccessible: true, notes: null,
     }],
   }],
   connections: [],
@@ -54,7 +53,28 @@ describe('ConcourseInspector', () => {
     expect(screen.getByLabelText('出口')).toHaveValue('A3出口');
   });
 
-  it('新規設備タイプのチェックボックスをONにするとonChangeが呼ばれ、既定値で追加される', async () => {
+  it('選んだ設備に、車いす対応・ベビーカー対応・設備メモの入力欄を出さない', () => {
+    // ベビーカー・車いすで通れるかは設備の種類から導く（transfer-difficulty の requirement.ts）
+    render(
+      <MantineProvider>
+        <ConcourseInspector
+          draft={createConcourseDraft(concourse)}
+          facilityTypes={facilityTypes}
+          connectedStations={connectedStations}
+          onChange={vi.fn()}
+          onSave={vi.fn()}
+          saving={false}
+          isNew={false}
+        />
+      </MantineProvider>,
+    );
+    expect(screen.getByRole('checkbox', { name: 'エレベーター' })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: '車いす対応' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'ベビーカー対応' })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('設備メモ（任意）')).not.toBeInTheDocument();
+  });
+
+  it('新規設備タイプのチェックボックスをONにするとonChangeが呼ばれ、設備が追加される', async () => {
     const onChange = vi.fn();
     render(
       <MantineProvider>
@@ -76,9 +96,7 @@ describe('ConcourseInspector', () => {
     expect(onChange).toHaveBeenCalled();
     const mutate = onChange.mock.calls[0]![0] as (d: ConcourseDraft) => ConcourseDraft;
     const next = mutate(createConcourseDraft(concourse));
-    expect(next.cells[0]!.facilities).toContainEqual({
-      typeCode: 'stairs', isWheelchairAccessible: true, isStrollerAccessible: true, notes: null,
-    });
+    expect(next.cells[0]!.facilities).toContainEqual({ typeCode: 'stairs' });
   });
 
   it('乗換可能な駅のチェックボックスをONにするとonChangeが呼ばれ、接続が追加される', async () => {

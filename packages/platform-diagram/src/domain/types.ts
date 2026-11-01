@@ -8,8 +8,6 @@ export type FacilityDTO = {
   // null は稼働中のコードが知らない種類（ADR-0016「残るずれ」）。図では代替の記号で描く
   typeCode: FacilityTypeCode | null;
   typeName: string;
-  isWheelchairAccessible: boolean | null;
-  isStrollerAccessible: boolean | null;
 };
 
 // アクセス点。xPositionMeters が null の場合はコンコース全体を指す（SVGには描かない）

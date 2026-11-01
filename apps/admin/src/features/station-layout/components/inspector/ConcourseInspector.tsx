@@ -2,13 +2,13 @@
 
 import { useMemo } from 'react';
 import {
-  Button, Card, Checkbox, Collapse, Group, NativeSelect,
+  Button, Card, Checkbox, Group, NativeSelect,
   NumberInput, Stack, Text, TextInput, Textarea, Title,
 } from '@mantine/core';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import {
   setConcourseField, moveCell, addCell, removeCell,
-  addCellFacility, removeCellFacility, updateCellFacility,
+  addCellFacility, removeCellFacility,
   setConnection, removeConnection, concourseDraftValidationError,
   type ConcourseDraft,
 } from '@/features/station-layout/domain/editDraft';
@@ -120,50 +120,16 @@ export function ConcourseInspector({
                 <Text size="sm" fw={500} mb="xs">設備タイプ</Text>
                 <Stack gap="xs">
                   {facilityTypes.map((ft) => {
-                    const selected = cell.facilities.find((f) => f.typeCode === ft.code);
+                    const selected = cell.facilities.some((f) => f.typeCode === ft.code);
                     return (
-                      <Card key={ft.code} withBorder padding="sm">
-                        <Checkbox
-                          label={ft.name}
-                          checked={!!selected}
-                          onChange={() => onChange((d) => (
-                            selected ? removeCellFacility(d, cell.id, ft.code) : addCellFacility(d, cell.id, ft.code)
-                          ))}
-                          fw={500}
-                        />
-                        <Collapse in={!!selected}>
-                          <Stack gap="xs" mt="sm" ml="xl">
-                            <Group gap="lg">
-                              <Checkbox
-                                label="車いす対応"
-                                checked={selected?.isWheelchairAccessible ?? false}
-                                onChange={(e) => {
-                                  const checked = e.currentTarget.checked;
-                                  onChange((d) => updateCellFacility(d, cell.id, ft.code, { isWheelchairAccessible: checked }));
-                                }}
-                                size="sm"
-                              />
-                              <Checkbox
-                                label="ベビーカー対応"
-                                checked={selected?.isStrollerAccessible ?? false}
-                                onChange={(e) => {
-                                  const checked = e.currentTarget.checked;
-                                  onChange((d) => updateCellFacility(d, cell.id, ft.code, { isStrollerAccessible: checked }));
-                                }}
-                                size="sm"
-                              />
-                            </Group>
-                            <TextInput
-                              placeholder="設備メモ（任意）"
-                              value={selected?.notes ?? ''}
-                              onChange={(e) => onChange((d) => (
-                                updateCellFacility(d, cell.id, ft.code, { notes: e.target.value || null })
-                              ))}
-                              size="sm"
-                            />
-                          </Stack>
-                        </Collapse>
-                      </Card>
+                      <Checkbox
+                        key={ft.code}
+                        label={ft.name}
+                        checked={selected}
+                        onChange={() => onChange((d) => (
+                          selected ? removeCellFacility(d, cell.id, ft.code) : addCellFacility(d, cell.id, ft.code)
+                        ))}
+                      />
                     );
                   })}
                 </Stack>

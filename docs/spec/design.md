@@ -1,68 +1,58 @@
-# 設計: 列車（trains）の書き込みを Repository にする (Issue #163)
+# 設計: 使われていない DB の列をコードから外す（二段階の削除の1段目）
 
 - **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
-## 構成
+## 二段階の削除
 
-ADR-0003・ADR-0005 の書き込みの形に合わせる。根拠は ADR を見る。
+CLAUDE.md の禁止事項に従い、列を読むコードが稼働したまま DROP しない。
 
-```
-route（app/api/trains/**）
-  └─ trainRepository（di.ts）
-       └─ dbTrainRepository（external/repository/trainRepository.ts）
-            ├─ create / update: withTransaction（@furatora/database/tx）
-            └─ delete: db（1 文。号車構成・設備・停車位置パターンは FK の CASCADE で消える）
-```
+1. **この PR**: テーブル定義（`packages/database/src/schema/`）から列を外す。Drizzle は定義にある列を全列 SELECT と INSERT に含めるので、定義から外さないと「読まないコード」にならない
+2. **#217**: `pnpm run db:generate` で DROP COLUMN を作る
 
-## インターフェース（`features/train/ports.ts`）
+5列はどれも nullable（フラグは default true も付く）なので、INSERT から外しても DB 側の変更は要らない。手書きのマイグレーション（`--custom`）は作らない。
+
+## 変更する所
+
+| 層 | ファイル | 変更 |
+|---|---|---|
+| スキーマ | `packages/database/src/schema/platform.ts` | `stationFacilities` からフラグ2列と `notes` を外す |
+| スキーマ | `packages/database/src/schema/stationMaster.ts` | `stations` / `lines` から `abolishedAt` を外す（参照するコードは無い） |
+| DTO | `packages/platform-diagram/src/domain/types.ts` | `FacilityDTO` からフラグ2項目を外す |
+| Web | `apps/web/src/external/query/stationDetailQuery.ts` | 詰め替えから外す |
+| Admin 読み取り | `apps/admin/src/external/query/stationLayoutPageQuery.ts`、`features/station-layout/ports.ts` | 詰め替えと `LayoutFacilityDTO.notes` を外す |
+| Admin 書き込み | `features/facility/schema.ts`、`external/repository/platformLocationRepository.ts` | zod の3項目と、既定値 true の補完を外す |
+| Admin 画面 | `features/station-layout/domain/editDraft.ts`、`components/inspector/ConcourseInspector.tsx` | `FacilityDraft` を `{ typeCode }` にする。`updateCellFacility` を消す。差分判定は種類の集合だけを比べる |
+
+## インターフェース
 
 ```ts
-// --- 書き込み（Repository。ADR-0003 / ADR-0005）---
-export interface TrainRepository {
-  // trains へ 1 行、号車構成・設備をその id で入れる（1 トランザクション）
-  create(input: TrainInput): Promise<{ id: string }>;
-  // 列車を更新し、号車構成・設備を消して入れ直す（1 トランザクション）。列車が無ければ false
-  update(id: string, input: TrainInput): Promise<boolean>;
-  // 列車が無ければ false
-  delete(id: string): Promise<boolean>;
-}
+// features/station-layout/domain/editDraft.ts
+export type FacilityDraft = { typeCode: FacilityTypeCode };
+
+// features/facility/schema.ts（platform-locations の設備）
+const facilitySchema = z.object({ typeCode: z.enum(FACILITY_TYPE_CODES) });
+// z.object は知らないキーを捨てる。古い画面が isWheelchairAccessible などを送っても 400 にならない（REQ-2）
 ```
 
-- 入力の型は `features/train/schema.ts` の `TrainInput` を使う（`platform`・`stop-pattern` の ports と同じ）
-- `create` の返り値は `{ id }` だけにする。呼び出し元（`TrainForm`・`DuplicateButton`）は `res.ok` しか見ていない。
-  いまは `trains` の行（列名が `operators` / `lines`）をそのまま返しているが、`TrainDTO` と形が違い、誤解のもとになる
-- `update` を `boolean` にするのは、PUT の応答が `{ success: true }` で、更新後の列車を読み直す必要が無いため
+## 公開 API への影響
 
-## 実装の要点
-
-- 号車構成の行・設備の行を作る処理は、create と update で同じなので関数にまとめる
-  - `carLength` は decimal 列なので、`String()` に変換して書く（#165 まで）
-  - 設備は `freeSpaces` → `free_space`、`prioritySeats` → `priority_seat`
-  - 行が 0 件なら insert しない（Drizzle は空の `values([])` で例外を投げる）
-- `update` は、列車の update が 0 行なら、そこで `false` を返す。号車構成・設備には触れない
-- 例外はそのまま投げる。`withTransaction` が ROLLBACK し、route が 500 を返す
+`/api/v1/stations/[id]` と `/api/v1/operators`（の lines）は行を全列で返しているので、JSON から `abolishedAt` が消える。値は常に `null` で、リポジトリ内に使っている所は無い。
 
 ## エラー
 
-| 状況 | Repository | route の応答 |
-|---|---|---|
-| 入力が `trainSchema` に合わない | 呼ばれない | 400 |
-| パスパラメータが UUID でない | 呼ばれない | 404 |
-| 更新・削除の対象が無い | `false` | 404 |
-| 書き込み中の例外（FK 違反など） | 投げる（ROLLBACK） | 500 |
+| 状況 | 応答 |
+|---|---|
+| 古い画面が設備のフラグ・メモを送る | 捨てて保存する（200） |
+| 1段目のデプロイ中に古いコードが動く | 古いコードは列を読み書きするが、列は残っているので失敗しない |
 
 ## テスト
 
-- **Repository**（`external/repository/trainRepository.test.ts`）: CI に DB が無いため、`lineDirectionRepository.test.ts` と同じく、記録するだけの偽のクエリビルダを使う。次を確かめる
-  - create / update が `withTransaction` の中で書く
-  - 書く順番、渡す値（`carLength` の文字列化、設備の type）
-  - 空の配列なら insert しないこと
-  - 対象が無いときは、そこで止まること
-- **route**（`app/api/trains/route.test.ts`・`[trainId]/route.test.ts`）: `vi.mock('@/di')` で Repository を差し替え、次を確かめる
-  - 応答のステータスと本文
-  - 400 / 404 / 500 の分岐
+- `ConcourseInspector.test.tsx`: 設備を選んでも、車いす対応・ベビーカー対応・設備メモの入力欄が出ない
+- `facility/schema.test.ts`: 設備の種類以外の項目を捨てる
+- `editDraft.test.ts`: 追加・複製・ペイロード・表示用 DTO で、設備が `{ typeCode }` だけになる
+- 型検査: 消した項目を読む所が残っていればコンパイルエラーになる
 
 ## 恒久知識の振り分け
 
-- 新しい ADR は作らない。既存の ADR-0003・ADR-0005 をそのまま当てはめるだけ
-- `docs/domain/` には、列車の書き込みについての記述が無い。層の構成もドメインのルールも変わらないので、更新しない
+- `docs/domain/station-master-model.md`「ルートと設備」: ホーム図の設備も種類だけを持ち、通れるかは種類から導く。対応フラグ・メモは持たない
+- ADR は作らない。使っていない列を外すだけで、却下した選択肢と比べて選んだ設計ではない

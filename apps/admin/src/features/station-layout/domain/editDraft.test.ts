@@ -3,7 +3,7 @@ import {
   createConcourseDraft, createEmptyConcourseDraft, duplicateConcourseDraft,
   createPatternDraft, createPatternDraftFromPreview,
   setConcourseField, moveCell, addCell, removeCell,
-  addCellFacility, removeCellFacility, updateCellFacility,
+  addCellFacility, removeCellFacility,
   setConnection, removeConnection,
   moveCarBoundary, shiftConsistByEdge,
   isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
@@ -52,7 +52,6 @@ const concourse: LayoutConcourseDTO = {
       facilities: [
         {
           id: 'facility-1', typeCode: 'elevator', typeName: 'エレベーター',
-          isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可',
         },
       ],
     },
@@ -77,7 +76,7 @@ describe('createConcourseDraft', () => {
           id: 'cell-1',
           xPositionMeters: 10,
           facilities: [
-            { typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可' },
+            { typeCode: 'elevator' },
           ],
         },
         { id: 'cell-2', xPositionMeters: null, facilities: [] },
@@ -110,7 +109,7 @@ describe('duplicateConcourseDraft', () => {
         id: 'dup-0',
         xPositionMeters: 12, // 10 + 2
         facilities: [
-          { typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可' },
+          { typeCode: 'elevator' },
         ],
       },
       { id: 'dup-1', xPositionMeters: null, facilities: [] },
@@ -204,13 +203,13 @@ describe('addCell / removeCell', () => {
   });
 });
 
-describe('addCellFacility / removeCellFacility / updateCellFacility', () => {
-  it('addCellFacilityは既定値（車いす・ベビーカーとも対応、メモなし）で追加する', () => {
+describe('addCellFacility / removeCellFacility', () => {
+  it('addCellFacilityは設備の種類だけを追加する', () => {
     const draft = createConcourseDraft(concourse);
     const next = addCellFacility(draft, 'cell-2', 'stairs');
     const cell2 = next.cells.find((c) => c.id === 'cell-2')!;
     expect(cell2.facilities).toEqual([
-      { typeCode: 'stairs', isWheelchairAccessible: true, isStrollerAccessible: true, notes: null },
+      { typeCode: 'stairs' },
     ]);
   });
 
@@ -224,15 +223,6 @@ describe('addCellFacility / removeCellFacility / updateCellFacility', () => {
     const draft = createConcourseDraft(concourse);
     const next = removeCellFacility(draft, 'cell-1', 'elevator');
     expect(next.cells.find((c) => c.id === 'cell-1')?.facilities).toEqual([]);
-  });
-
-  it('updateCellFacilityは指定したフィールドだけをマージする', () => {
-    const draft = createConcourseDraft(concourse);
-    const next = updateCellFacility(draft, 'cell-1', 'elevator', { isStrollerAccessible: false });
-    const facility = next.cells.find((c) => c.id === 'cell-1')?.facilities[0];
-    expect(facility).toEqual({
-      typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: false, notes: '朝は使用不可',
-    });
   });
 });
 
@@ -469,11 +459,6 @@ describe('isConcourseDirty', () => {
     expect(isConcourseDirty(concourse, draft)).toBe(true);
   });
 
-  it('設備の属性を変更するとdirtyになる', () => {
-    const draft = updateCellFacility(createConcourseDraft(concourse), 'cell-1', 'elevator', { notes: '使用可能' });
-    expect(isConcourseDirty(concourse, draft)).toBe(true);
-  });
-
   it('設備を追加するとdirtyになる', () => {
     const draft = addCellFacility(createConcourseDraft(concourse), 'cell-2', 'stairs');
     expect(isConcourseDirty(concourse, draft)).toBe(true);
@@ -519,12 +504,7 @@ describe('toPlatformLocationPayload', () => {
         {
           xPositionMeters: 12.5,
           facilities: [
-            {
-              typeCode: 'elevator',
-              isWheelchairAccessible: true,
-              isStrollerAccessible: null, // null が true に化けない（D6）
-              notes: '朝は使用不可',
-            },
+            { typeCode: 'elevator' },
           ],
         },
         { xPositionMeters: null, facilities: [] },
@@ -557,7 +537,7 @@ describe('toPlatformLocationPayload', () => {
       cells: [
         {
           xPositionMeters: null,
-          facilities: [{ typeCode: 'elevator', isWheelchairAccessible: true, isStrollerAccessible: true, notes: null }],
+          facilities: [{ typeCode: 'elevator' }],
         },
       ],
       connections: [],
@@ -611,7 +591,6 @@ describe('draftToDisplayConcourse', () => {
           facilities: [
             {
               id: 'cell-1:elevator', typeCode: 'elevator', typeName: 'エレベーター',
-              isWheelchairAccessible: true, isStrollerAccessible: null, notes: '朝は使用不可',
             },
           ],
         },

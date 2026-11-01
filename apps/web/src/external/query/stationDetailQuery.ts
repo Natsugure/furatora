@@ -324,8 +324,6 @@ export const dbStationDetailQuery: StationDetailQuery = {
             // schema の $type<FacilityTypeCode>() は実行時に検査しないので、ここで見分ける（FacilityDTO.typeCode）
             typeCode: isFacilityTypeCode(f.typeCode) ? f.typeCode : null,
             typeName: facilityTypeMap[f.typeCode] ?? f.typeCode,
-            isWheelchairAccessible: f.isWheelchairAccessible,
-            isStrollerAccessible: f.isStrollerAccessible,
           })),
         })),
         connections: (connectionsByLocation.get(loc.id) ?? []).map((c) => ({
