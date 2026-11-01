@@ -12,11 +12,6 @@
 > `POST /api/lines/[lineId]/adjacencies` ほか）。乗換単位グループ（`stationGroups`）の
 > 新規作成手段だけは未実装（`ekidataStationGroupCd` が NOT NULL + UNIQUE のため。別 Issue）。
 > 経緯と却下案は [ADR-0007](../adr/0007-station-master-data-source.md)。
->
-> **ホーム図の設備（`station_facilities`）の対応フラグ・メモ、駅・路線の廃止日**は、コードから外したが
-> DB の列は残っている（`station_facilities.is_wheelchair_accessible` / `is_stroller_accessible` / `notes`、
-> `stations.abolished_at`、`lines.abolished_at`）。次のデプロイで DROP する予定
-> （二段階の削除。[Issue #217](https://github.com/Natsugure/furatora/issues/217)）。
 
 ## データ源
 
