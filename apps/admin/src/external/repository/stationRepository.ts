@@ -30,6 +30,7 @@ export const dbStationRepository: StationRepository = {
             odptStationId: input.odptStationId ?? null,
             prefCode: input.prefCode ?? null,
             stationGroupId: input.stationGroupId ?? null,
+            notes: input.notes ?? null,
             // slug / publishedAt / ekidataStationCd は設定しない（NULL）。
             // 公開は /stations/[stationId]/publish で行う（station-visibility.md）。
           })
