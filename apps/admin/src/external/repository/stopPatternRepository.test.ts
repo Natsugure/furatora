@@ -18,9 +18,13 @@ const pattern: TrainStopPatternInput = {
   cars: [{ carNumber: 1, startMeters: 0, endMeters: 20 }],
 };
 
-// 実 DB では drizzle-orm が pg のエラーを DrizzleQueryError で包み、code は cause に入る（Issue #73）
-const wrapped = (code: string) => Object.assign(new Error('Failed query'), { cause: { code } });
-const bare = (code: string) => Object.assign(new Error('duplicate key'), { code });
+// 実 DB では drizzle-orm が pg のエラーを DrizzleQueryError で包み、code と constraint は cause に入る（Issue #73）
+const PATTERN_CONSTRAINT = 'unique_train_stop_pattern';
+const CAR_CONSTRAINT = 'unique_train_stop_pattern_car';
+const wrapped = (code: string, constraint?: string) =>
+  Object.assign(new Error('Failed query'), { cause: { code, constraint } });
+const bare = (code: string, constraint?: string) =>
+  Object.assign(new Error('duplicate key'), { code, constraint });
 
 const operations = [
   ['save', () => dbStopPatternRepository.save(STATION_ID, pattern)],
@@ -34,15 +38,23 @@ describe('dbStopPatternRepository の一意制約違反', () => {
 
   describe.each(operations)('%s', (_name, run) => {
     it('ラップされた一意制約違反を DuplicateStopPatternError に変える', async () => {
-      withTransaction.mockRejectedValue(wrapped('23505'));
+      withTransaction.mockRejectedValue(wrapped('23505', PATTERN_CONSTRAINT));
 
       await expect(run()).rejects.toBeInstanceOf(DuplicateStopPatternError);
     });
 
     it('ラップされていない一意制約違反も DuplicateStopPatternError に変える', async () => {
-      withTransaction.mockRejectedValue(bare('23505'));
+      withTransaction.mockRejectedValue(bare('23505', PATTERN_CONSTRAINT));
 
       await expect(run()).rejects.toBeInstanceOf(DuplicateStopPatternError);
+    });
+
+    // 号車番号の重複はホーム・列車の組み合わせの重複ではないため、409 の説明を付けない
+    it('号車の一意制約違反は DuplicateStopPatternError にせず投げ直す', async () => {
+      const err = wrapped('23505', CAR_CONSTRAINT);
+      withTransaction.mockRejectedValue(err);
+
+      await expect(run()).rejects.toBe(err);
     });
 
     it('一意制約違反でないエラーはそのまま投げ直す', async () => {

@@ -5,10 +5,22 @@ import { and, eq } from 'drizzle-orm';
 import { DuplicateStopPatternError, type StopPatternRepository } from '@/features/stop-pattern/ports';
 import { requireInserted } from '@/external/requireInserted';
 import { isPlatformOfStation, belongsToStation } from '@/external/repository/stationScopeGuard';
-import { isPgErrorCode, PG_UNIQUE_VIOLATION } from '@/external/pgError';
+import { isPgErrorCode, pgConstraintName, PG_UNIQUE_VIOLATION } from '@/external/pgError';
 
-// (platformId, trainId) の一意制約違反（23505）は DuplicateStopPatternError に写像し、
-// route.ts が 409 を返す。ラップされた cause 展開の詳細は external/pgError.ts を見る。
+// (platformId, trainId) の一意制約違反（23505）だけを DuplicateStopPatternError に写像し、
+// route.ts が 409 を返す。号車の一意制約 unique_train_stop_pattern_car（同じパターン内の
+// 号車番号の重複）も 23505 になるが、組み合わせの重複ではないため写像せず投げ直す。
+// ラップされた cause 展開の詳細は external/pgError.ts を見る。
+const PATTERN_CONSTRAINT = 'unique_train_stop_pattern';
+
+function toDuplicateStopPatternError(err: unknown): unknown {
+  if (isPgErrorCode(err, PG_UNIQUE_VIOLATION) && pgConstraintName(err) === PATTERN_CONSTRAINT) {
+    return new DuplicateStopPatternError(
+      'このホーム・列車の組み合わせには既に停車位置パターンが登録されています'
+    );
+  }
+  return err;
+}
 
 // trainStopPatterns.id は DB側で採番されるため「親を insert → 返却された id で子を insert」
 // という順序が必須。この形は db.batch() では表現できないため withTransaction を使う（ADR-0005）。
@@ -35,12 +47,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
         return { id: row.id };
       });
     } catch (err) {
-      if (isPgErrorCode(err, PG_UNIQUE_VIOLATION)) {
-        throw new DuplicateStopPatternError(
-          'このホーム・列車の組み合わせには既に停車位置パターンが登録されています'
-        );
-      }
-      throw err;
+      throw toDuplicateStopPatternError(err);
     }
   },
 
@@ -71,12 +78,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
         return true;
       });
     } catch (err) {
-      if (isPgErrorCode(err, PG_UNIQUE_VIOLATION)) {
-        throw new DuplicateStopPatternError(
-          'このホーム・列車の組み合わせには既に停車位置パターンが登録されています'
-        );
-      }
-      throw err;
+      throw toDuplicateStopPatternError(err);
     }
   },
 
