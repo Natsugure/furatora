@@ -11,9 +11,6 @@ import { isPgErrorCode, PG_UNIQUE_VIOLATION } from '@/external/pgError';
 
 // slug の一意制約違反（23505）は SlugTakenError に写像し、route.ts が 409 を返す。
 // これを取りこぼすと 500 になる。ラップされた cause 展開の詳細は external/pgError.ts。
-//
-// 【注意】stopPatternRepository.ts の isUniqueViolation は err.code しか見ておらず、
-// withTransaction 経由でラップされたケースを取りこぼす。統一は別 Issue。
 
 // 駅が属する路線の slug を読む。stationLines が複数路線を持つ場合（実測0駅。#82 で生じうる）は
 // 「slug を持つ路線」を優先して1件返す（slug NULLS LAST、同順位は lines.id で確定）。

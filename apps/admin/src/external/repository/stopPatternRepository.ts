@@ -5,19 +5,10 @@ import { and, eq } from 'drizzle-orm';
 import { DuplicateStopPatternError, type StopPatternRepository } from '@/features/stop-pattern/ports';
 import { requireInserted } from '@/external/requireInserted';
 import { isPlatformOfStation, belongsToStation } from '@/external/repository/stationScopeGuard';
+import { isPgErrorCode, PG_UNIQUE_VIOLATION } from '@/external/pgError';
 
-// PostgreSQL の一意制約違反（unique_violation）のエラーコード。
-// https://www.postgresql.org/docs/current/errcodes-appendix.html
-const UNIQUE_VIOLATION_CODE = '23505';
-
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    (err as { code: unknown }).code === UNIQUE_VIOLATION_CODE
-  );
-}
+// (platformId, trainId) の一意制約違反（23505）は DuplicateStopPatternError に写像し、
+// route.ts が 409 を返す。ラップされた cause 展開の詳細は external/pgError.ts を見る。
 
 // trainStopPatterns.id は DB側で採番されるため「親を insert → 返却された id で子を insert」
 // という順序が必須。この形は db.batch() では表現できないため withTransaction を使う（ADR-0005）。
@@ -44,7 +35,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
         return { id: row.id };
       });
     } catch (err) {
-      if (isUniqueViolation(err)) {
+      if (isPgErrorCode(err, PG_UNIQUE_VIOLATION)) {
         throw new DuplicateStopPatternError(
           'このホーム・列車の組み合わせには既に停車位置パターンが登録されています'
         );
@@ -80,7 +71,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
         return true;
       });
     } catch (err) {
-      if (isUniqueViolation(err)) {
+      if (isPgErrorCode(err, PG_UNIQUE_VIOLATION)) {
         throw new DuplicateStopPatternError(
           'このホーム・列車の組み合わせには既に停車位置パターンが登録されています'
         );
