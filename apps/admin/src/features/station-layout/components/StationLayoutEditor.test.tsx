@@ -385,6 +385,34 @@ describe('StationLayoutEditor', () => {
       });
     });
 
+    it('1号車が無いパターンは保存せず「保存できません」を通知する', async () => {
+      const withoutCarOne: LayoutPlatformDetailDTO = {
+        ...platform,
+        stopPatterns: platform.stopPatterns.map((p) => ({
+          ...p,
+          cars: [
+            { carNumber: 2, startMeters: 0, endMeters: 50, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+            { carNumber: 3, startMeters: 50, endMeters: 100, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+          ],
+        })),
+      };
+      renderEditor({ platform: withoutCarOne });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '展開する' }));
+      const trailInput = screen.getByLabelText('3号車の末尾');
+      await user.clear(trailInput);
+      await user.type(trailInput, '98');
+      await user.tab();
+
+      await user.click(getUnsavedPanelSaveButton());
+      await waitFor(() => {
+        expect(notificationsShow).toHaveBeenCalledWith(
+          expect.objectContaining({ title: '保存できません', color: 'red' }),
+        );
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('先頭の数値入力を変えると、号車の長さを変えずに編成全体が動く（#201）', async () => {
       renderEditor();
       const user = userEvent.setup();

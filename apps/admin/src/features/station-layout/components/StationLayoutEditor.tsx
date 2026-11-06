@@ -385,14 +385,27 @@ export function StationLayoutEditor({
     });
   }
 
+  function notifyPatternWithoutCarOne() {
+    notifications.show({
+      title: '保存できません',
+      message: '1号車が無いため、停車位置の基準点を決められません。列車の号車構成を確認してください',
+      color: 'red',
+    });
+  }
+
   async function savePattern(pattern: LayoutStopPatternDTO) {
     const draft = patternDrafts.get(pattern.patternId);
     if (!draft) return;
+    const payload = toStopPatternPayload(platform.id, pattern.trainId, draft);
+    if (!payload) {
+      notifyPatternWithoutCarOne();
+      return;
+    }
     await saveAggregate({
       id: pattern.patternId,
       method: 'PUT',
       url: `/api/stations/${stationId}/train-stop-patterns/${pattern.patternId}`,
-      payload: toStopPatternPayload(platform.id, pattern.trainId, draft),
+      payload,
       setSavingIds: setSavingPatternIds,
       onSaved: () => {
         setPatternBaselines((prev) => prev.map((p) => (p.patternId === pattern.patternId ? mergePattern(p, draft) : p)));
@@ -410,11 +423,16 @@ export function StationLayoutEditor({
     if (!newPattern || !newPatternTrain) return;
     const { trainId, draft } = newPattern;
     const train = newPatternTrain;
+    const payload = toStopPatternPayload(platform.id, trainId, draft);
+    if (!payload) {
+      notifyPatternWithoutCarOne();
+      return;
+    }
     await saveAggregate({
       id: '__new_pattern__',
       method: 'POST',
       url: `/api/stations/${stationId}/train-stop-patterns`,
-      payload: toStopPatternPayload(platform.id, trainId, draft),
+      payload,
       setSavingIds: setSavingPatternIds,
       onSaved: (body) => {
         const created = body as { id?: string } | null;

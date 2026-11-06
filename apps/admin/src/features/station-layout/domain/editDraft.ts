@@ -423,15 +423,16 @@ export function toPlatformLocationPayload(
 /**
  * PUT/POST の train-stop-patterns ペイロードを組み立てる。
  * 号車の区間は送らず、draft の区間から基準点（1号車の外側の端）を戻して送る（ADR-0025）。
- * draft の cars は号車構成から算出したものなので、1号車は必ずある。
+ * 1号車が無く基準点を戻せないときは null を返す。読み取りは号車構成を 1..carCount で補うので
+ * 通常は起きないが、呼び出し側は保存せずに通知する（例外にすると async の外で捕まらない）。
  */
 export function toStopPatternPayload(
   platformId: string,
   trainId: string,
   draft: PatternDraft,
-): TrainStopPatternInput {
+): TrainStopPatternInput | null {
   const carOneOuterMeters = carOneAnchorOf(draft.cars, draft.ascendToward);
-  if (carOneOuterMeters === null) throw new Error('停車位置パターンに1号車がありません');
+  if (carOneOuterMeters === null) return null;
   return { platformId, trainId, carOneOuterMeters, carNumbersAscendToward: draft.ascendToward };
 }
 

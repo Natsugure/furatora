@@ -515,6 +515,14 @@ describe('toStopPatternPayload', () => {
       carNumbersAscendToward: 'minusX',
     });
   });
+
+  it('1号車が無い draft は基準点を戻せないので null を返す（例外を投げない）', () => {
+    const draft = createPatternDraft({
+      carNumbersAscendToward: 'plusX',
+      cars: pattern.cars.filter((c) => c.carNumber !== 1),
+    });
+    expect(toStopPatternPayload('platform-1', pattern.trainId, draft)).toBeNull();
+  });
 });
 
 describe('draftToDisplayConcourse', () => {
