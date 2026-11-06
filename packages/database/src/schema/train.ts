@@ -66,9 +66,8 @@ export const trainStopPatterns = pgTable('train_stop_patterns', {
   // 停車位置は「1号車の外側の端の座標」と「号車番号の向き」だけで持ち、号車の区間は
   // 列車の号車構成から読むたびに算出する（ADR-0025。算出は packages/platform-diagram の
   // carSegmentsFromCarOne）。号車ごとの区間を保存しないので、両数を変えてもずれない（#215）。
-  // 2列とも nullable なのは二段階の移行の1段目だから。2段目（#224）で NOT NULL にする
-  carOneOuterMeters: decimal('car_one_outer_meters', { precision: 6, scale: 2 }),
-  carNumbersAscendToward: varchar('car_numbers_ascend_toward', { length: 10 }).$type<CarNumbersAscendToward>(),
+  carOneOuterMeters: decimal('car_one_outer_meters', { precision: 6, scale: 2 }).notNull(),
+  carNumbersAscendToward: varchar('car_numbers_ascend_toward', { length: 10 }).$type<CarNumbersAscendToward>().notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
@@ -80,5 +79,3 @@ export const trainStopPatterns = pgTable('train_stop_patterns', {
   ),
 ]);
 
-// train_stop_pattern_cars（号車ごとの区間）は ADR-0025 で廃止した。DB の表は二段階の移行の2段目（#224）で DROP する。
-// それまでの間、他の作業で db:generate / db:push を流すと DROP TABLE が混ざる（CLAUDE.md「禁止事項」）
