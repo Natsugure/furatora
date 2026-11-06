@@ -104,23 +104,19 @@ export function groupCarStructureByTrain(
 }
 
 export type PatternAnchor = {
-  carOneOuterMeters: number | null;
-  carNumbersAscendToward: CarNumbersAscendToward | null;
+  carOneOuterMeters: number;
+  carNumbersAscendToward: CarNumbersAscendToward;
 };
 
 /**
  * 1つの停車位置パターンの号車（区間とドア数）を、列車の号車構成から解決する。
  * 号車構成に登録の無い号車は標準構成で補う（carStructureOrStandard）。
- *
- * 基準点か向きが null のパターンは null を返し、呼び出し側は表示しない。二段階の移行の
- * 1段目のあいだに旧コードが作った行で、2段目で旧表から埋め直す（ADR-0025）。
  */
 export function resolvePatternCars(
   carStructure: CarStructureSpec[],
   carCount: number,
   anchor: PatternAnchor,
-): (CarSegment & { doorCount: number })[] | null {
-  if (anchor.carOneOuterMeters === null || anchor.carNumbersAscendToward === null) return null;
+): (CarSegment & { doorCount: number })[] {
   const structure = carStructureOrStandard(carStructure, carCount);
   const doorCountByCar = new Map(structure.map((c) => [c.carNumber, c.doorCount]));
   return carSegmentsFromCarOne(structure, anchor.carOneOuterMeters, anchor.carNumbersAscendToward)

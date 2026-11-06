@@ -26,10 +26,11 @@ import type { PartnerLine } from '@/features/station/domain/transferPartners';
 import type {
   ConcourseDTO,
   PlatformDTO,
-  StopPatternCarDTO,
   TrainStopPatternDTO,
 } from '@furatora/platform-diagram/domain';
-import { groupCarStructureByTrain, resolvePatternCars } from '@furatora/platform-diagram/domain';
+import {
+  groupCarStructureByTrain, groupEquipmentsByTrainCar, stopPatternCarsOf,
+} from '@furatora/platform-diagram/domain';
 
 // apps/admin/src/external/query/stopPatternPageQuery.ts のスタイルを踏襲する。
 // decimal → number の変換はすべてここで完結させる（DTOより上に string を渡さない）。
@@ -211,18 +212,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
 
     const carStructureByTrain = groupCarStructureByTrain(carStructureRows);
 
-    const equipmentsByTrainCar = new Map<
-      string,
-      { free: { nearDoor: number; isStandard: boolean }[]; prio: { nearDoor: number; isStandard: boolean }[] }
-    >();
-    for (const row of equipmentRows) {
-      const key = `${row.trainId}:${row.carNumber}`;
-      if (!equipmentsByTrainCar.has(key)) equipmentsByTrainCar.set(key, { free: [], prio: [] });
-      const entry = equipmentsByTrainCar.get(key)!;
-      const item = { nearDoor: row.nearDoor, isStandard: row.isStandard };
-      if (row.type === 'free_space') entry.free.push(item);
-      else entry.prio.push(item);
-    }
+    const equipmentsByTrainCar = groupEquipmentsByTrainCar(equipmentRows);
 
     const stopPatternsByPlatformId = new Map<string, TrainStopPatternDTO[]>();
     for (const pattern of patternRows) {
@@ -230,27 +220,15 @@ export const dbStationDetailQuery: StationDetailQuery = {
       if (!train) continue; // 参照整合性が壊れている場合はスキップ
 
       // 号車の区間は保存せず、号車構成と基準点から算出する（ADR-0025）
-      const ascendToward = pattern.carNumbersAscendToward;
-      const resolved = resolvePatternCars(carStructureByTrain.get(train.id) ?? [], train.carCount, {
-        carOneOuterMeters: pattern.carOneOuterMeters !== null ? Number(pattern.carOneOuterMeters) : null,
-        carNumbersAscendToward: ascendToward,
-      });
-      if (!resolved || !ascendToward) continue; // 移行の途中で書かれた、基準点の無いパターン
-
-      const cars: StopPatternCarDTO[] = resolved.map((c) => {
-        const equipments = equipmentsByTrainCar.get(`${pattern.trainId}:${c.carNumber}`);
-        return {
-          ...c,
-          freeSpaceDoors: equipments?.free ?? [],
-          prioritySeatDoors: equipments?.prio ?? [],
-        };
-      });
+      const cars = stopPatternCarsOf(
+        pattern, train.carCount, carStructureByTrain.get(train.id) ?? [], equipmentsByTrainCar,
+      );
 
       const dto: TrainStopPatternDTO = {
         trainId: train.id,
         trainLabel: train.name,
         carCount: train.carCount,
-        carNumbersAscendToward: ascendToward,
+        carNumbersAscendToward: pattern.carNumbersAscendToward,
         cars,
       };
 

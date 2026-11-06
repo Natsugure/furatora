@@ -7,6 +7,7 @@ export * from './carShape';
 export * from './consist';
 export * from './doorList';
 export * from './carSegments';
+export * from './stopPatternCars';
 export * from './concourse';
 export * from './concourseLayout';
 export * from './snap';
