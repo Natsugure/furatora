@@ -9,7 +9,7 @@ import type { StopPatternCarDTO } from './types';
  * 号車をドア数で等分したスロットの中心を返す。ドアの実寸位置は持っていないので、
  * 等間隔と見なした近似である。
  *
- * @param reversed 号車が x 降順に並んでいるか（isDoorOrderReversed() の結果）。
+ * @param reversed 号車番号が x の減る向きに増えるか（パターンの carNumbersAscendToward が minusX）。
  *   ドア番号は進行方向を基準に振られるため、編成が反転していれば
  *   1番ドアは号車の右端側に来る。
  */

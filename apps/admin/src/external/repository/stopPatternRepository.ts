@@ -1,15 +1,15 @@
 import { db } from '@furatora/database/client';
 import { withTransaction } from '@furatora/database/tx';
-import { trainStopPatterns, trainStopPatternCars } from '@furatora/database/schema';
+import { trainStopPatterns } from '@furatora/database/schema';
 import { and, eq } from 'drizzle-orm';
 import { DuplicateStopPatternError, type StopPatternRepository } from '@/features/stop-pattern/ports';
 import { requireInserted } from '@/external/requireInserted';
 import { isPlatformOfStation, belongsToStation } from '@/external/repository/stationScopeGuard';
 import { isPgErrorCode, pgConstraintName, PG_UNIQUE_VIOLATION } from '@/external/pgError';
+import type { TrainStopPatternInput } from '@/features/stop-pattern/schema';
 
 // (platformId, trainId) の一意制約違反（23505）だけを DuplicateStopPatternError に写像し、
-// route.ts が 409 を返す。号車の一意制約 unique_train_stop_pattern_car（同じパターン内の
-// 号車番号の重複）も 23505 になるが、組み合わせの重複ではないため写像せず投げ直す。
+// route.ts が 409 を返す。ほかの制約の 23505 は組み合わせの重複ではないため写像せず投げ直す。
 // ラップされた cause 展開の詳細は external/pgError.ts を見る。
 const PATTERN_CONSTRAINT = 'unique_train_stop_pattern';
 
@@ -22,8 +22,20 @@ function toDuplicateStopPatternError(err: unknown): unknown {
   return err;
 }
 
-// trainStopPatterns.id は DB側で採番されるため「親を insert → 返却された id で子を insert」
-// という順序が必須。この形は db.batch() では表現できないため withTransaction を使う（ADR-0005）。
+// 停車位置は「1号車の外側の端」と「号車番号の向き」だけを書く。号車の区間は保存せず、
+// 読むたびに号車構成から算出する（ADR-0025）。
+// 1文で書けるが、ホームが当該駅のものかの確認と同じトランザクションに入れるため withTransaction を使う
+// （確認と書き込みの間にホームが付け替わらないようにする。ADR-0005）。
+function patternValues(pattern: TrainStopPatternInput) {
+  return {
+    platformId: pattern.platformId,
+    trainId: pattern.trainId,
+    // decimal 列は文字列で書く（#165 で mode: 'number' にするまで）
+    carOneOuterMeters: String(pattern.carOneOuterMeters),
+    carNumbersAscendToward: pattern.carNumbersAscendToward,
+  };
+}
+
 export const dbStopPatternRepository: StopPatternRepository = {
   async save(stationId, pattern) {
     try {
@@ -31,18 +43,7 @@ export const dbStopPatternRepository: StopPatternRepository = {
         if (!(await isPlatformOfStation(tx, pattern.platformId, stationId))) return null;
 
         const row = requireInserted(
-          await tx
-            .insert(trainStopPatterns)
-            .values({ platformId: pattern.platformId, trainId: pattern.trainId })
-            .returning()
-        );
-        await tx.insert(trainStopPatternCars).values(
-          pattern.cars.map((c) => ({
-            trainStopPatternId: row.id,
-            carNumber: c.carNumber,
-            startMeters: String(c.startMeters),
-            endMeters: String(c.endMeters),
-          }))
+          await tx.insert(trainStopPatterns).values(patternValues(pattern)).returning({ id: trainStopPatterns.id })
         );
         return { id: row.id };
       });
@@ -59,23 +60,10 @@ export const dbStopPatternRepository: StopPatternRepository = {
 
         const [updated] = await tx
           .update(trainStopPatterns)
-          .set({ platformId: pattern.platformId, trainId: pattern.trainId })
+          .set(patternValues(pattern))
           .where(and(eq(trainStopPatterns.id, id), belongsToStation(trainStopPatterns.platformId, stationId)))
-          .returning();
-        if (!updated) return false;
-
-        // cars は delete → insert で置き換える（親IDは変わらないため batch でも表現できるが、
-        // save() と実装を揃えるため withTransaction 内に統一する）
-        await tx.delete(trainStopPatternCars).where(eq(trainStopPatternCars.trainStopPatternId, id));
-        await tx.insert(trainStopPatternCars).values(
-          pattern.cars.map((c) => ({
-            trainStopPatternId: id,
-            carNumber: c.carNumber,
-            startMeters: String(c.startMeters),
-            endMeters: String(c.endMeters),
-          }))
-        );
-        return true;
+          .returning({ id: trainStopPatterns.id });
+        return !!updated;
       });
     } catch (err) {
       throw toDuplicateStopPatternError(err);
@@ -83,7 +71,6 @@ export const dbStopPatternRepository: StopPatternRepository = {
   },
 
   async delete(id, stationId) {
-    // trainStopPatternCars は CASCADE で削除される
     const [row] = await db
       .delete(trainStopPatterns)
       .where(and(eq(trainStopPatterns.id, id), belongsToStation(trainStopPatterns.platformId, stationId)))

@@ -1,5 +1,3 @@
-import type { CarPosition } from './doorOrder';
-
 // 号車の外形。見本（ADR-0017 の Platform.dc.html）に合わせ、号車は角を丸めた矩形にし、
 // 編成の外側の端だけを大きく丸める（先頭のノーズの多角形はやめた。Issue #174）。
 
@@ -10,6 +8,8 @@ export const CAR_CORNER_RADIUS = 2;
  * 帯の太さ（TRAIN_ROW_HEIGHT = 10m）の半分より少し小さくする
  */
 export const CAR_END_RADIUS = 4.5;
+
+export type CarPosition = { carNumber: number; startMeters: number };
 
 export type CornerRadii = { left: number; right: number };
 

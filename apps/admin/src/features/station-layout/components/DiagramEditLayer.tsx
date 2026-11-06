@@ -4,10 +4,10 @@ import {
   useCallback, useEffect, useMemo, useRef, useState, type RefObject,
 } from 'react';
 import {
-  pxToMeters, snapMeters, roundToDecimal2, snapCandidates, isDoorOrderReversed,
+  pxToMeters, snapMeters, roundToDecimal2, snapCandidates,
   SNAP_GRID_METERS, SNAP_TOLERANCE_METERS,
   FACILITY_ROW_HEIGHT, TRAIN_ROW_HEIGHT,
-  type Bounds, type VerticalLayout, type StopPatternCarDTO,
+  type Bounds, type VerticalLayout, type StopPatternCarDTO, type CarNumbersAscendToward,
 } from '@furatora/platform-diagram/domain';
 
 // PlatformDiagram の diagramOverlay に差し込む編集レイヤ。
@@ -27,12 +27,13 @@ type Props = {
   bounds: Bounds;
   physicalLength: number;
   cars: CarLike[];
+  /** パターンが持つ号車番号の向き。区間から推定すると1両編成で向きが決まらないため、保存値を受ける */
+  ascendToward: CarNumbersAscendToward;
   /** xPositionMeters === null のセルは図に描けないため、ここには渡さない（呼び出し側でフィルタ済み） */
   cellHandles: CellHandleData[];
   selectedCellId: string | null;
   onSelectCell: (cellId: string) => void;
   onMoveCell: (cellId: string, x: number) => void;
-  onMoveCarBoundary: (boundaryIndex: number, x: number) => void;
   onShiftConsist: (edge: { carNumber: number; side: 'start' | 'end' }, x: number) => void;
 };
 
@@ -59,15 +60,16 @@ function useCanvasRect(rootRef: RefObject<HTMLDivElement | null>) {
 }
 
 export function DiagramEditLayer({
-  rows, bounds, physicalLength, cars, cellHandles, selectedCellId,
-  onSelectCell, onMoveCell, onMoveCarBoundary, onShiftConsist,
+  rows, bounds, physicalLength, cars, ascendToward, cellHandles, selectedCellId,
+  onSelectCell, onMoveCell, onShiftConsist,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const rect = useCanvasRect(rootRef);
   const sortedCars = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
   // 号車番号昇順でxが減少する反転編成（docs/domain/platform-coordinate-system.md「号車の向き」）
-  // では、外端・境界のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
-  const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
+  // では、外端のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
+  // （StopPatternInspector・shiftConsistByEdge と同じく、パターンの向きの保存値から決める）
+  const reversed = ascendToward === 'minusX';
 
   // 外端は自分の側のホーム端にだけ吸着させる。反対側の端に吸着すると、編成全体がホームの外へ引き寄せられる
   const leftEdgeCandidates = useCallback(() => [0], []);
@@ -95,17 +97,16 @@ export function DiagramEditLayer({
         />
       ))}
 
-      {/* 外端は編成全体を動かす（editDraft.ts の shiftConsistByEdge）。編成自身の境界・ドアは一緒に動くので、
-          スナップの候補はホーム端だけにする。ハンドルは自分の外端を bounds に収めるだけなので、
-          反対側の外端も収める制限は onShiftConsist の先（shiftConsistByEdge の range）で掛ける */}
+      {/* ハンドルは編成の外端の2つだけで、どちらも編成全体を動かす（editDraft.ts の shiftConsistByEdge）。
+          号車の長さは列車の号車構成で決まるので、内側の境界のハンドルは無い（ADR-0025）。
+          編成自身の境界・ドアは一緒に動くので、スナップの候補はホーム端だけにする。ハンドルは自分の外端を
+          bounds に収めるだけなので、反対側の外端も収める制限は onShiftConsist の先（shiftConsistByEdge の range）で掛ける */}
       {sortedCars.map((car, i) => {
         const isFirst = i === 0;
         const isLast = i === sortedCars.length - 1;
-        // 非反転: 先頭車のstartが外端、境界はend。反転: これが入れ替わる
-        // （moveCarBoundary/shiftConsistByEdge の境界共有規則の裏返し。editDraft.ts参照）
+        // 非反転: 先頭車のstartが外端。反転: これが入れ替わる（editDraft.ts の freeEdgeSides）
         const leadEdgeX = reversed ? car.endMeters : car.startMeters;
         const leadEdgeSide: 'start' | 'end' = reversed ? 'end' : 'start';
-        const boundaryX = reversed ? car.startMeters : car.endMeters;
         const trailEdgeX = reversed ? car.startMeters : car.endMeters;
         const trailEdgeSide: 'start' | 'end' = reversed ? 'start' : 'end';
         return (
@@ -122,20 +123,6 @@ export function DiagramEditLayer({
                 selected={false}
                 candidates={reversed ? rightEdgeCandidates : leftEdgeCandidates}
                 onCommit={(x) => onShiftConsist({ carNumber: car.carNumber, side: leadEdgeSide }, x)}
-              />
-            )}
-            {!isLast && (
-              <DragHandle
-                rootRef={rootRef}
-                rect={rect}
-                bounds={bounds}
-                rows={rows}
-                x={boundaryX}
-                y={carY}
-                label={`${car.carNumber}号車と${car.carNumber + 1}号車の境界（${boundaryX}m）`}
-                selected={false}
-                candidates={() => snapCandidates(sortedCars, physicalLength, { exclude: [boundaryX] })}
-                onCommit={(x) => onMoveCarBoundary(i, x)}
               />
             )}
             {isLast && (

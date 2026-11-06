@@ -2,3 +2,4 @@
 // 配下は Drizzle にも実行時の外部パッケージにも依存させない（eslint.config.mjs で守っている）
 export * from './stationMaster';
 export * from './facility';
+export * from './train';

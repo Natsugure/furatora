@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { doorCenterX, doorCentersX, doorMarks, freeSpaceMarks } from './consist';
-import { isDoorOrderReversed } from './doorOrder';
 
 // 20m・4ドアの標準的な号車。スロット幅5m、中心は 2.5 / 7.5 / 12.5 / 17.5
 const car = { startMeters: 0, endMeters: 20, doorCount: 4 };
@@ -38,18 +37,6 @@ describe('doorCenterX', () => {
 
   it('号車の開始位置が0でなくても正しく写る', () => {
     expect(doorCenterX({ startMeters: 40, endMeters: 60, doorCount: 4 }, 1, false)).toBe(42.5);
-  });
-
-  it('isDoorOrderReversed の結果をそのまま渡せる', () => {
-    const cars = [
-      { carNumber: 1, startMeters: 80 },
-      { carNumber: 2, startMeters: 60 },
-      { carNumber: 3, startMeters: 40 },
-    ];
-    const reversed = isDoorOrderReversed(cars);
-
-    expect(reversed).toBe(true);
-    expect(doorCenterX({ startMeters: 80, endMeters: 100, doorCount: 4 }, 1, reversed)).toBe(97.5);
   });
 });
 

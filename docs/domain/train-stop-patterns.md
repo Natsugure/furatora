@@ -9,40 +9,35 @@
 trainStopPatterns
   ├── platformId, trainId
   ├── unique(platformId, trainId)
-  └── trainStopPatternCars (FK: trainStopPatternId, CASCADE)
-        ├── carNumber
-        ├── startMeters
-        └── endMeters
+  ├── carOneOuterMeters        … 1号車の外側の端（隣の号車と接していない側）のホーム座標
+  └── carNumbersAscendToward   … 'plusX'（号車番号が x の増える側へ増える）| 'minusX'
 ```
 
-号車ごとに区間 `[startMeters, endMeters]` を持つ。
-**`order` によらず、どの号車も `startMeters < endMeters` を保つ**
-（号車番号の向きが反転しても、区間そのものの向きは反転しない）。
+**パターンは号車ごとの区間を持たない。** 号車の数と長さは列車の号車構成（`trainCarStructures`）で決まり、
+パターンが持つのは「編成をどこに、どちら向きに置くか」だけである（[ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)）。
 
-### 隣接号車は境界を共有する
+> **適用状況（2026-11-06）**: 二段階の移行の1段目。2列は nullable で、旧表 `train_stop_pattern_cars` が DB に残っている
+> （テーブル定義からは外してあり、どのコードも読み書きしない）。2段目（#224）で2列を `NOT NULL` にし、旧表を DROP する。
+> それまでは、基準点が NULL のパターン（1段目のデプロイ中に旧コードが作った行）を表示しない。
 
-**`carNumber` が隣り合う号車どうしは、境界の座標を共有する。**
-編成に重なり・隙間ができることは物理的に起こり得ないため、この座標系上でも許容しない。
+- 向きの語彙は `@furatora/database/enums` の `CAR_NUMBERS_ASCEND_TOWARD`。DB の CHECK 制約 `train_stop_patterns_ascend_toward_known` がこの一覧に従う
+- 基準点を1号車に置くので、**列車の両数・号車構成を変えても1号車の位置は変わらず、最後尾の側が伸び縮みする**。
+  パターンを直す必要は無い（#215）
 
-どちらのフィールドが共有側かは、編成の向き（[「号車の向き」](#号車の向き)。
-`isDoorOrderReversed()` が判定する）に依存する:
+### 号車の区間は読むたびに算出する
 
-| 向き | 共有条件 |
-|---|---|
-| 非反転（`carNumber` 昇順で `startMeters` が増加） | `cars[i].endMeters === cars[i+1].startMeters` |
-| 反転（`carNumber` 昇順で `startMeters` が減少） | `cars[i].startMeters === cars[i+1].endMeters` |
+`packages/platform-diagram/src/domain/carSegments.ts`（Web と Admin が共有する）。
 
-これは `startMeters < endMeters` と違い、DB のカラム制約にはまだ現れていない
-（`trainStopPatternCars` の一意な保証は各行の `startMeters < endMeters` のみ）。
-Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft.ts`
-の `moveCarBoundary`/`shiftConsistByEdge`）が、`isDoorOrderReversed()` で向きを判定した上で
-境界を動かすときに隣接号車の共有フィールドを常に同値で書き換え、編成全体を動かすときは
-全号車に同じ差分を足して小数2桁に丸めることで、この不変条件をクライアント側で構造的に守っている。
+- `carSegmentsFromCarOne()`: 1号車の外側の端から、向きの側へ `carLength` を積む。どの号車も `startMeters < endMeters` を保ち、
+  各端を小数2桁に丸める
+- `resolvePatternCars()`: 読み取り（Web `stationDetailQuery.ts`、Admin `stationLayoutPageQuery.ts`）の入口。
+  号車構成が1件も無い列車は `carCount` 両の標準構成（20m、ドア数 `DEFAULT_DOOR_COUNT` = 4）として扱う
+- `carOneAnchorOf()`: 区間から基準点を戻す。Admin が平行移動した区間を保存するときに使う
 
-**サーバー側スキーマ（`trainStopPatternSchema`）にも `superRefine` で同じ条件を
-強制している**（既存データ（本番含む）に不連続な編成が無いことを確認してから
-追加した。確認には向き非依存の判定が必須で、向きを考慮しない単純な
-`end===start` 比較では、反転編成（例: 茗荷谷2番線・丸ノ内線）を不連続と誤検出する）。
+画面に渡す DTO（`StopPatternCarDTO`）は区間の形のままなので、図の描画は保存の形を知らない。
+
+**隣接号車が境界を共有すること**（重なり・隙間が無いこと）は、区間を積んで作るので構造的に成り立つ。
+保存の側で検証する必要は無い。
 
 ## 標準車両長
 
@@ -71,22 +66,26 @@ Admin の図上編集（`apps/admin/src/features/station-layout/domain/editDraft
   フリースペースと優先席が同じ号車・ドア番号にあるのは構わない
 - 表示側（`packages/platform-diagram`）は範囲外の設備を落とさずに描く。データの誤りが図の上で見えるようにするため
 
-## 号車位置の算出
+## 停車位置の入力（Admin）
 
-`features/stop-pattern/domain/carSegments.ts` の `buildCarSegments()`（純関数）が行う。
-管理者は次の2つを入力する。
+**新規作成**（`StopPatternCreateForm`）では、管理者は次の2つを入力する。
 
 1. **編成の `x=0` に近い側の端**が、ホーム端（`x=0`）から何メートルの位置に来るか
 2. **`x=0` に近い側が1号車か、最終号車か**（`carOneNearest` / `lastCarNearest`）
 
-`x=0` に近い側から `carLength` を積算して各号車の区間を決める。
-算出結果はプレビュー表示され、管理者が個別の号車境界を上書きできる。
-保存されるのは**確定した座標**であり、算出パラメータは保持しない。
+保存の形（1号車の外側の端＋向き）とは違うが、ホーム端からの距離で入れるほうが構内図から読み取りやすいため、
+入力欄はこの形にしている。`features/stop-pattern/domain/carSegments.ts` の `buildCarSegments()` が区間に換算し
+（`carOneNearest` → `plusX`、`lastCarNearest` → `minusX`、このとき1号車の外側の端は「近い側の端＋編成の全長」）、
+保存の前に `carOneAnchorOf()` で基準点に戻す。
 
-基準を「先頭車」ではなく「`x=0` に近い側の端」とするのは、
-「先頭車」基準だとその先頭が x のどちら側にあるかが別途必要になり、
-入力が2つの独立した二択に分かれて曖昧になるため。上記の形なら
-「位置1つ + 号車番号の向き1つ」で一意に定まる。
+**編集**でできるのは次の2つだけ（`apps/admin/src/features/station-layout/domain/editDraft.ts`）。
+
+- 編成全体の平行移動（図の外端のハンドルと、インスペクタの先頭・末尾の数値入力。`shiftConsistByEdge`）
+- 号車番号の向きの反転（インスペクタの「号車の向きを反転」。`reverseConsist`）。**編成が占める区間は保ち**、
+  号車の並びだけを逆にする。1号車は反対側の端に移り、保存では反転後の1号車の外側の端が基準点になる。
+  向きを間違えて登録したパターンを、位置を合わせ直さずに直すため
+
+**号車の長さはパターンでは変えない。** 変えるときは列車の号車構成の `carLength` を直す。
 
 ## 列車の表示判定
 
@@ -157,4 +156,4 @@ JR追加時点で必要なキーが本当に「方面」なのかが未確定な
 ## 関連
 
 - [platform-coordinate-system.md](./platform-coordinate-system.md) — 座標の原点・単位・描画範囲
-- [ADR-0005](../adr/0005-write-atomicity-driver.md) — 親子 insert の原子性（`withTransaction`）
+- [ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md) — 号車ごとの区間ではなく、1号車の外側の端＋向きで持つ理由

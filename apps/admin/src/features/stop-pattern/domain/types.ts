@@ -5,7 +5,7 @@
 export type TrainOptionCarDTO = {
   carNumber: number;
   carLength: number | null;
-  /** 未登録号車は既定値4で補う（stationLayoutPageQueryのgetStopPatternsと同じ既定値） */
+  /** 未登録号車は既定値 DEFAULT_DOOR_COUNT で補う（resolvePatternCars と同じ） */
   doorCount: number;
 };
 

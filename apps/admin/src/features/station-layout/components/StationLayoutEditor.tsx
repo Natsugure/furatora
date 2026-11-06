@@ -9,8 +9,9 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
   computeBounds, layoutConcoursePlates, layoutFacingBanners, exitsLabel, connectionLabels,
-  isDrawable, hasDisplayableInfo,
+  isDrawable, hasDisplayableInfo, DEFAULT_DOOR_COUNT,
 } from '@furatora/platform-diagram/domain';
+import type { CarNumbersAscendToward } from '@furatora/platform-diagram/domain';
 import { PlatformDiagram } from '@furatora/platform-diagram/components';
 import { describeError } from '@/features/station-publishing/describeError';
 import { LinkButton } from '@/components/LinkElements';
@@ -27,10 +28,10 @@ import type {
 import {
   createConcourseDraft, createEmptyConcourseDraft, duplicateConcourseDraft,
   createPatternDraft, createPatternDraftFromPreview,
-  moveCell, moveCarBoundary, shiftConsistByEdge,
+  moveCell, shiftConsistByEdge, reverseConsist,
   isConcourseDirty, isPatternDirty, dirtyIds, toPlatformLocationPayload, toStopPatternPayload,
   draftToDisplayConcourse, concourseDraftValidationError,
-  MIN_CAR_METERS, type ConcourseDraft, type PatternDraft, type ConcourseDisplayLookups,
+  type ConcourseDraft, type PatternDraft, type ConcourseDisplayLookups,
 } from '@/features/station-layout/domain/editDraft';
 import { DiagramEditLayer } from './DiagramEditLayer';
 import { ConcourseInspector } from './inspector/ConcourseInspector';
@@ -60,10 +61,32 @@ function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | unde
   const byNumber = new Map(draft.cars.map((c) => [c.carNumber, c]));
   return {
     ...baseline,
+    carNumbersAscendToward: draft.ascendToward,
     cars: baseline.cars.map((car) => {
       const d = byNumber.get(car.carNumber);
       return d ? { ...car, startMeters: d.startMeters, endMeters: d.endMeters } : car;
     }),
+  };
+}
+
+/**
+ * 新規作成のdraftを表示・baseline用のDTOにする。ドア数は列車の号車構成から添え、設備はまだ無い。
+ * プレビュー中の表示と、保存成功後のbaselineへの反映が同じ形を使う。
+ */
+function newPatternDTO(patternId: string, train: TrainOptionDTO, draft: PatternDraft): LayoutStopPatternDTO {
+  const doorCountByCar = new Map(train.cars.map((c) => [c.carNumber, c.doorCount]));
+  return {
+    patternId,
+    trainId: train.id,
+    trainLabel: train.name,
+    carCount: train.carCount,
+    carNumbersAscendToward: draft.ascendToward,
+    cars: draft.cars.map((c) => ({
+      ...c,
+      doorCount: doorCountByCar.get(c.carNumber) ?? DEFAULT_DOOR_COUNT,
+      freeSpaceDoors: [],
+      prioritySeatDoors: [],
+    })),
   };
 }
 
@@ -172,19 +195,7 @@ export function StationLayoutEditor({
 
   const displayPattern: LayoutStopPatternDTO | null = useMemo(() => {
     if (newPattern && newPatternTrain) {
-      const doorCountByCar = new Map(newPatternTrain.cars.map((c) => [c.carNumber, c.doorCount]));
-      return {
-        patternId: '__new__',
-        trainId: newPattern.trainId,
-        trainLabel: newPatternTrain.name,
-        carCount: newPatternTrain.carCount,
-        cars: newPattern.draft.cars.map((c) => ({
-          ...c,
-          doorCount: doorCountByCar.get(c.carNumber) ?? 4,
-          freeSpaceDoors: [],
-          prioritySeatDoors: [],
-        })),
-      };
+      return newPatternDTO('__new__', newPatternTrain, newPattern.draft);
     }
     if (!selectedPatternBaseline) return null;
     return mergePattern(selectedPatternBaseline, patternDrafts.get(selectedPatternBaseline.patternId));
@@ -240,20 +251,6 @@ export function StationLayoutEditor({
     updateConcourseDraft(concourseId, (draft) => moveCell(draft, cellId, x));
   }
 
-  function handleMoveCarBoundary(boundaryIndex: number, x: number) {
-    if (newPattern) {
-      setNewPattern((prev) => (prev
-        ? { ...prev, draft: moveCarBoundary(prev.draft, boundaryIndex, x, { minCarMeters: MIN_CAR_METERS }) }
-        : prev));
-      return;
-    }
-    if (!selectedPatternBaseline) return;
-    updatePatternDraft(
-      selectedPatternBaseline.patternId,
-      (draft) => moveCarBoundary(draft, boundaryIndex, x, { minCarMeters: MIN_CAR_METERS }),
-    );
-  }
-
   // range はドラッグなら凍結した bounds、数値入力なら decimal(6,2) の上限（shiftConsistByEdge 参照）
   function handleShiftConsist(
     edge: { carNumber: number; side: 'start' | 'end' },
@@ -271,6 +268,15 @@ export function StationLayoutEditor({
       selectedPatternBaseline.patternId,
       (draft) => shiftConsistByEdge(draft, edge, x, { range }),
     );
+  }
+
+  function handleReverseConsist() {
+    if (newPattern) {
+      setNewPattern((prev) => (prev ? { ...prev, draft: reverseConsist(prev.draft) } : prev));
+      return;
+    }
+    if (!selectedPatternBaseline) return;
+    updatePatternDraft(selectedPatternBaseline.patternId, reverseConsist);
   }
 
   function updatePatternDraft(patternId: string, mutate: (draft: PatternDraft) => PatternDraft) {
@@ -379,14 +385,27 @@ export function StationLayoutEditor({
     });
   }
 
+  function notifyPatternWithoutCarOne() {
+    notifications.show({
+      title: '保存できません',
+      message: '1号車が無いため、停車位置の基準点を決められません。列車の号車構成を確認してください',
+      color: 'red',
+    });
+  }
+
   async function savePattern(pattern: LayoutStopPatternDTO) {
     const draft = patternDrafts.get(pattern.patternId);
     if (!draft) return;
+    const payload = toStopPatternPayload(platform.id, pattern.trainId, draft);
+    if (!payload) {
+      notifyPatternWithoutCarOne();
+      return;
+    }
     await saveAggregate({
       id: pattern.patternId,
       method: 'PUT',
       url: `/api/stations/${stationId}/train-stop-patterns/${pattern.patternId}`,
-      payload: toStopPatternPayload(platform.id, pattern.trainId, draft),
+      payload,
       setSavingIds: setSavingPatternIds,
       onSaved: () => {
         setPatternBaselines((prev) => prev.map((p) => (p.patternId === pattern.patternId ? mergePattern(p, draft) : p)));
@@ -404,25 +423,21 @@ export function StationLayoutEditor({
     if (!newPattern || !newPatternTrain) return;
     const { trainId, draft } = newPattern;
     const train = newPatternTrain;
+    const payload = toStopPatternPayload(platform.id, trainId, draft);
+    if (!payload) {
+      notifyPatternWithoutCarOne();
+      return;
+    }
     await saveAggregate({
       id: '__new_pattern__',
       method: 'POST',
       url: `/api/stations/${stationId}/train-stop-patterns`,
-      payload: toStopPatternPayload(platform.id, trainId, draft),
+      payload,
       setSavingIds: setSavingPatternIds,
       onSaved: (body) => {
         const created = body as { id?: string } | null;
         if (!created?.id) return;
-        const doorCountByCar = new Map(train.cars.map((c) => [c.carNumber, c.doorCount]));
-        const newBaseline: LayoutStopPatternDTO = {
-          patternId: created.id,
-          trainId,
-          trainLabel: train.name,
-          carCount: train.carCount,
-          cars: draft.cars.map((c) => ({
-            ...c, doorCount: doorCountByCar.get(c.carNumber) ?? 4, freeSpaceDoors: [], prioritySeatDoors: [],
-          })),
-        };
+        const newBaseline = newPatternDTO(created.id, train, draft);
         setPatternBaselines((prev) => [...prev, newBaseline]);
         setNewPattern(null);
       },
@@ -531,8 +546,8 @@ export function StationLayoutEditor({
     setNewConcourse(null);
   }
 
-  function handlePreviewNewPattern(trainId: string, segments: CarSegment[]) {
-    setNewPattern({ trainId, draft: createPatternDraftFromPreview(segments) });
+  function handlePreviewNewPattern(trainId: string, segments: CarSegment[], ascendToward: CarNumbersAscendToward) {
+    setNewPattern({ trainId, draft: createPatternDraftFromPreview(segments, ascendToward) });
     setCreatingPattern(false);
   }
 
@@ -746,6 +761,7 @@ export function StationLayoutEditor({
                   bounds={bounds}
                   physicalLength={platform.physicalLength}
                   cars={displayPattern.cars}
+                  ascendToward={displayPattern.carNumbersAscendToward}
                   cellHandles={displayConcourses
                     .flatMap((c) => c.cells)
                     .filter((c) => c.xPositionMeters !== null)
@@ -753,7 +769,6 @@ export function StationLayoutEditor({
                   selectedCellId={selectedCellId}
                   onSelectCell={selectCell}
                   onMoveCell={handleMoveCell}
-                  onMoveCarBoundary={handleMoveCarBoundary}
                   onShiftConsist={(edge, x) => handleShiftConsist(edge, x, bounds)}
                 />
               )}
@@ -767,8 +782,9 @@ export function StationLayoutEditor({
           key={displayPattern.patternId}
           trainLabel={displayPattern.trainLabel}
           cars={displayPattern.cars}
-          onMoveCarBoundary={handleMoveCarBoundary}
+          ascendToward={displayPattern.carNumbersAscendToward}
           onShiftConsist={(edge, x) => handleShiftConsist(edge, x, STOP_METERS_RANGE)}
+          onReverse={handleReverseConsist}
           {...patternActions()}
           saving={newPattern ? savingPatternIds.has('__new_pattern__') : savingPatternIds.has(selectedPatternBaseline?.patternId ?? '')}
           deleting={selectedPatternBaseline ? deletingPatternIds.has(selectedPatternBaseline.patternId) : false}

@@ -131,6 +131,7 @@ describe('StationLayoutView', () => {
         trainId: 'train-a',
         trainLabel: '列車A',
         carCount: 1,
+        carNumbersAscendToward: 'plusX',
         cars: [{
           carNumber: 1, startMeters: 0, endMeters: 100, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [],
         }],

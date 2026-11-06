@@ -21,8 +21,7 @@ import {
 import type { ConcoursePlateGroup, FacingTransferBanner } from '../../domain/concourseLayout';
 import { carCornerRadii, roundedBarPath } from '../../domain/carShape';
 import { doorMarks } from '../../domain/consist';
-import { isDoorOrderReversed } from '../../domain/doorOrder';
-import type { ConcourseDTO, StopPatternCarDTO } from '../../domain/types';
+import type { ConcourseDTO, StopPatternCarDTO, TrainStopPatternDTO } from '../../domain/types';
 
 // 図の幾何だけを描く。文字はホーム両端の距離ラベルと号車番号しか持たない
 // （出口名・路線名・対面乗換の文はSVG外のHTMLオーバーレイにある）。
@@ -60,6 +59,8 @@ const FACILITY_TILE_RADIUS = 1.6;
 
 type Props = {
   cars: StopPatternCarDTO[];
+  /** ドア番号の振り方を決める号車番号の向き。区間からは推定しない（1両の編成では読めないため） */
+  carNumbersAscendToward: TrainStopPatternDTO['carNumbersAscendToward'];
   concourses: ConcourseDTO[];
   physicalLength: number;
   /** 描画範囲。縦の図の写像も、HTML の列（verticalY()）と同じこの値から作る */
@@ -95,6 +96,7 @@ function upright(vertical: boolean, cx: number, cy: number): string | undefined 
 
 export function DiagramSvg({
   cars,
+  carNumbersAscendToward,
   concourses,
   physicalLength,
   bounds,
@@ -106,7 +108,7 @@ export function DiagramSvg({
 }: Props) {
   const { minX, maxX } = bounds;
   const width = maxX - minX;
-  const reversed = isDoorOrderReversed(cars);
+  const reversed = carNumbersAscendToward === 'minusX';
   const cells = concourses.flatMap((c) => c.cells.map((cell) => ({ ...cell, concourseId: c.id })));
   const tileY = rows.facilityY + (FACILITY_ROW_HEIGHT - FACILITY_ICON_SIZE) / 2;
 

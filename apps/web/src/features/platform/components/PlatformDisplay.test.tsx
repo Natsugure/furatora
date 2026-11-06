@@ -10,6 +10,7 @@ function pattern(overrides: Partial<TrainStopPatternDTO> & { trainId: string }):
   return {
     trainLabel: `列車${overrides.trainId}`,
     carCount: 2,
+    carNumbersAscendToward: 'plusX',
     cars: [
       { carNumber: 1, startMeters: 0, endMeters: 20, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
       { carNumber: 2, startMeters: 20, endMeters: 40, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
@@ -185,6 +186,31 @@ describe('PlatformDisplay', () => {
       await userEvent.click(toggle());
 
       expect(within(canvas('horizontal')).getByText('1号車 1番ドア付近のフリースペース（一部編成）')).toBeInTheDocument();
+    });
+
+    it('ドア番号は保存された号車番号の向きで振る（区間から向きを読めない1両の編成でも）', async () => {
+      // 1両・4ドア・0-20m。plusX ならドア1は左端側、minusX なら右端側
+      const freeSpaceAtDoorOneX = async (carNumbersAscendToward: 'plusX' | 'minusX') => {
+        const oneCar = pattern({
+          trainId: 't1',
+          carCount: 1,
+          carNumbersAscendToward,
+          cars: [{
+            carNumber: 1, startMeters: 0, endMeters: 20, doorCount: 4,
+            freeSpaceDoors: [{ nearDoor: 1, isStandard: true }], prioritySeatDoors: [],
+          }],
+        });
+        const { unmount } = render(<PlatformDisplay platform={platform({ stopPatterns: [oneCar] })} />);
+        await userEvent.click(toggle());
+        const title = within(canvas('horizontal')).getByText('1号車 1番ドア付近のフリースペース（全編成）');
+        const x = Number(title.parentElement!.querySelector('circle')!.getAttribute('cx'));
+        unmount();
+        return x;
+      };
+
+      const plusX = await freeSpaceAtDoorOneX('plusX');
+      const minusX = await freeSpaceAtDoorOneX('minusX');
+      expect(minusX).toBeGreaterThan(plusX);
     });
 
     it('縦の図と横の図の両方を描く（どちらを見せるかは CSS で画面の幅により切り替える）', async () => {

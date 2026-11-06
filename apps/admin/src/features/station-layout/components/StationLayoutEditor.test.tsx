@@ -79,6 +79,7 @@ const platform: LayoutPlatformDetailDTO = {
     trainId: 'train-1',
     trainLabel: 'テスト列車',
     carCount: 2,
+    carNumbersAscendToward: 'plusX',
     cars: [
       { carNumber: 1, startMeters: 0, endMeters: 50, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
       { carNumber: 2, startMeters: 50, endMeters: 100, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
@@ -98,6 +99,7 @@ const reversedPlatform: LayoutPlatformDetailDTO = {
     trainId: 'train-reversed',
     trainLabel: '反転列車',
     carCount: 4,
+    carNumbersAscendToward: 'minusX',
     cars: [
       { carNumber: 1, startMeters: 75, endMeters: 100, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
       { carNumber: 2, startMeters: 50, endMeters: 75, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
@@ -337,38 +339,78 @@ describe('StationLayoutEditor', () => {
   });
 
   describe('反転編成の図上ドラッグ', () => {
-    it('内側の境界をドラッグしても、無関係な号車の境界は変化しない', () => {
+    it('内側の境界のハンドルは無く、外端をドラッグすると号車の長さを変えずに編成全体が動く', () => {
       renderEditor({ platform: reversedPlatform });
       // 前提: 反転編成では 1号車の先頭が最終号車の末尾より右にある
-      expect(screen.getByRole('slider', { name: '1号車の先頭（100m）' })).toBeInTheDocument();
-      expect(screen.getByRole('slider', { name: '4号車の末尾（0m）' })).toBeInTheDocument();
+      expect(screen.queryByRole('slider', { name: /境界/ })).not.toBeInTheDocument();
 
-      const target = screen.getByRole('slider', { name: '2号車と3号車の境界（50m）' });
-      // px = (x - minX) * scale = (50-(-5))*5 = 275 → 245（44m 付近。スナップ先はドア位置になり得る）
-      fireEvent.pointerDown(target, { pointerId: 1, clientX: 275 });
-      fireEvent.pointerMove(target, { pointerId: 1, clientX: 245 });
-      fireEvent.pointerUp(target, { pointerId: 1, clientX: 245 });
+      const lead = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
+      // px = (x - minX) * scale = (100-(-5))*5 = 525 → 512.5（97.5m）
+      fireEvent.pointerDown(lead, { pointerId: 1, clientX: 525 });
+      fireEvent.pointerMove(lead, { pointerId: 1, clientX: 512.5 });
+      fireEvent.pointerUp(lead, { pointerId: 1, clientX: 512.5 });
 
-      expect(screen.queryByRole('slider', { name: '2号車と3号車の境界（50m）' })).not.toBeInTheDocument();
-      expect(screen.getByRole('slider', { name: /^2号車と3号車の境界/ })).toBeInTheDocument();
-      expect(screen.getByRole('slider', { name: '1号車と2号車の境界（75m）' })).toBeInTheDocument();
-      expect(screen.getByRole('slider', { name: '3号車と4号車の境界（25m）' })).toBeInTheDocument();
-      expect(screen.getByRole('slider', { name: '1号車の先頭（100m）' })).toBeInTheDocument();
-      expect(screen.getByRole('slider', { name: '4号車の末尾（0m）' })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '1号車の先頭（97.5m）' })).toBeInTheDocument();
+      expect(screen.getByRole('slider', { name: '4号車の末尾（-2.5m）' })).toBeInTheDocument();
     });
   });
 
   describe('停車位置パターン（既存）のインスペクタ', () => {
-    it('選択中パターンの境界を数値入力で変更できる', async () => {
+    it('末尾を数値入力で変えると未保存になり、保存では1号車の外側の端と向きを送る（ADR-0025）', async () => {
+      vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
       renderEditor();
       const user = userEvent.setup();
       await user.click(screen.getByRole('button', { name: '展開する' }));
-      const boundaryInput = screen.getByLabelText('1号車と2号車の境界');
-      await user.clear(boundaryInput);
-      await user.type(boundaryInput, '60');
+      const trailInput = screen.getByLabelText('2号車の末尾');
+      await user.clear(trailInput);
+      await user.type(trailInput, '98');
       await user.tab();
 
       expect(within(screen.getByTestId('unsaved-panel')).getByText('テスト列車 の停車位置')).toBeInTheDocument();
+      // 末尾を +2m 動かすと、号車の長さを変えずに先頭も同じだけ動く
+      expect(screen.getByLabelText('1号車の先頭')).toHaveValue('-2 m');
+
+      await user.click(getUnsavedPanelSaveButton());
+      await waitFor(() => {
+        expect(fetch).toHaveBeenCalledWith('/api/stations/station-1/train-stop-patterns/pattern-1', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platformId: 'platform-1',
+            trainId: 'train-1',
+            carOneOuterMeters: -2,
+            carNumbersAscendToward: 'plusX',
+          }),
+        });
+      });
+    });
+
+    it('1号車が無いパターンは保存せず「保存できません」を通知する', async () => {
+      const withoutCarOne: LayoutPlatformDetailDTO = {
+        ...platform,
+        stopPatterns: platform.stopPatterns.map((p) => ({
+          ...p,
+          cars: [
+            { carNumber: 2, startMeters: 0, endMeters: 50, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+            { carNumber: 3, startMeters: 50, endMeters: 100, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
+          ],
+        })),
+      };
+      renderEditor({ platform: withoutCarOne });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '展開する' }));
+      const trailInput = screen.getByLabelText('3号車の末尾');
+      await user.clear(trailInput);
+      await user.type(trailInput, '98');
+      await user.tab();
+
+      await user.click(getUnsavedPanelSaveButton());
+      await waitFor(() => {
+        expect(notificationsShow).toHaveBeenCalledWith(
+          expect.objectContaining({ title: '保存できません', color: 'red' }),
+        );
+      });
+      expect(fetch).not.toHaveBeenCalled();
     });
 
     it('先頭の数値入力を変えると、号車の長さを変えずに編成全体が動く（#201）', async () => {
@@ -380,8 +422,34 @@ describe('StationLayoutEditor', () => {
       await user.type(leadInput, '-5');
       await user.tab();
 
-      expect(screen.getByText('1号車（-5m 〜 45m）')).toBeInTheDocument();
-      expect(screen.getByText('2号車（45m 〜 95m）')).toBeInTheDocument();
+      expect(screen.getByLabelText('2号車の末尾')).toHaveValue('95 m');
+    });
+
+    it('号車の向きを反転すると、占める区間を保ったまま1号車が反対の端へ移り、保存では反転後の基準点と向きを送る', async () => {
+      vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
+      renderEditor();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: '展開する' }));
+      await user.click(screen.getByRole('button', { name: '号車の向きを反転' }));
+
+      // 0〜100m を占める2両編成。反転後は1号車が右端（先頭 100m）、2号車が左端（末尾 0m）
+      expect(screen.getByLabelText('1号車の先頭')).toHaveValue('100 m');
+      expect(screen.getByLabelText('2号車の末尾')).toHaveValue('0 m');
+      expect(within(screen.getByTestId('unsaved-panel')).getByText('テスト列車 の停車位置')).toBeInTheDocument();
+
+      await user.click(getUnsavedPanelSaveButton());
+      await waitFor(() => {
+        expect(fetch).toHaveBeenCalledWith('/api/stations/station-1/train-stop-patterns/pattern-1', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platformId: 'platform-1',
+            trainId: 'train-1',
+            carOneOuterMeters: 100,
+            carNumbersAscendToward: 'minusX',
+          }),
+        });
+      });
     });
 
     it('「自動計算してプレビュー」で作成した新規パターンのインスペクタはデフォルトで展開されている', async () => {
@@ -401,7 +469,7 @@ describe('StationLayoutEditor', () => {
       await user.click(screen.getByRole('button', { name: '自動計算してプレビュー' }));
 
       expect(screen.getByRole('heading', { name: 'テスト2両編成 の停車位置（新規）' })).toBeInTheDocument();
-      expect(screen.getByLabelText('1号車と2号車の境界')).toBeInTheDocument();
+      expect(screen.getByLabelText('1号車の先頭')).toBeInTheDocument();
     });
   });
 });

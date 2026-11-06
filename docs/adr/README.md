@@ -74,6 +74,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0022](./0022-platform-origin-left-end-facing-track.md) | ホーム座標の原点を「線路に向かって立ったときの左の端」に定め、ホームの側（platformSide）を廃止する | Accepted   | 2026-10-21 |
 | [0023](./0023-diagram-orientation-by-viewport-in-platform-card.md) | ホーム図は画面の幅で横と縦を切り替え、番線のカードに収める（回してよいが、鏡写しにしない） | Accepted   | 2026-10-21 |
 | [0024](./0024-free-space-ring-and-transfer-plate-edge.md) | ホーム図の一部編成のフリースペースを同じローズの輪にし、乗換のプレートの枠を neutral-500 にする | Accepted   | 2026-10-23 |
+| [0025](./0025-stop-pattern-as-car-one-anchor.md) | 停車位置パターンを号車ごとの区間ではなく「1号車の外側の端＋号車番号の向き」で持つ | Accepted   | 2026-11-06 |
 
 ## 関連ドキュメント
 
