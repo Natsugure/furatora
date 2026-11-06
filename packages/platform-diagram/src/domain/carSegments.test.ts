@@ -81,10 +81,36 @@ describe('standardCarStructure', () => {
 });
 
 describe('carStructureOrStandard', () => {
-  it('号車構成があればそのまま、無ければ標準構成を返す', () => {
-    const structure = [{ carNumber: 1, carLength: 25, doorCount: 3 }];
-    expect(carStructureOrStandard(structure, 2)).toBe(structure);
+  it('号車構成が1..carCount そろっていれば、その値を carNumber 昇順で返す', () => {
+    const structure = [
+      { carNumber: 2, carLength: 18, doorCount: 4 },
+      { carNumber: 1, carLength: 25, doorCount: 3 },
+    ];
+    expect(carStructureOrStandard(structure, 2)).toEqual([
+      { carNumber: 1, carLength: 25, doorCount: 3 },
+      { carNumber: 2, carLength: 18, doorCount: 4 },
+    ]);
+  });
+
+  it('号車構成が無ければ標準構成を返す', () => {
     expect(carStructureOrStandard([], 2)).toEqual(standardCarStructure(2));
+  });
+
+  it('抜けた号車は標準の長さ・ドア数で補う（1号車が無い構成でも1号車を返す）', () => {
+    const structure = [{ carNumber: 3, carLength: 25, doorCount: 3 }];
+    expect(carStructureOrStandard(structure, 3)).toEqual([
+      { carNumber: 1, carLength: null, doorCount: DEFAULT_DOOR_COUNT },
+      { carNumber: 2, carLength: null, doorCount: DEFAULT_DOOR_COUNT },
+      { carNumber: 3, carLength: 25, doorCount: 3 },
+    ]);
+  });
+
+  it('carCount を超える号車は含めない', () => {
+    const structure = [
+      { carNumber: 1, carLength: 25, doorCount: 3 },
+      { carNumber: 2, carLength: 25, doorCount: 3 },
+    ];
+    expect(carStructureOrStandard(structure, 1)).toEqual([{ carNumber: 1, carLength: 25, doorCount: 3 }]);
   });
 });
 

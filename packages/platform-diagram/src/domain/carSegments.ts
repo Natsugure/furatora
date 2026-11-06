@@ -72,11 +72,15 @@ export function standardCarStructure(carCount: number): CarStructureSpec[] {
 }
 
 /**
- * 列車の号車構成を返す。1件も無ければ standardCarStructure で補う。
+ * 列車の 1..carCount 号車の構成を carNumber 昇順で返す。登録の無い号車は標準構成で補い、
+ * carCount を超える号車は含めない。
+ * trainSchema は号車構成が 1..carCount のすべてをそろえることを求めないため、ここで補う。
+ * 区間は号車構成を積んで算出するので、抜けがあると1号車の基準点から号車がずれる（ADR-0025）。
  * 読み取り（区間の算出）と Admin の新規作成のプレビューが同じ補い方をするため、ここに置く。
  */
 export function carStructureOrStandard(carStructure: CarStructureSpec[], carCount: number): CarStructureSpec[] {
-  return carStructure.length > 0 ? carStructure : standardCarStructure(carCount);
+  const byCarNumber = new Map(carStructure.map((c) => [c.carNumber, c]));
+  return standardCarStructure(carCount).map((standard) => byCarNumber.get(standard.carNumber) ?? standard);
 }
 
 /**
@@ -106,7 +110,7 @@ export type PatternAnchor = {
 
 /**
  * 1つの停車位置パターンの号車（区間とドア数）を、列車の号車構成から解決する。
- * 号車構成が1件も無い列車は carCount 両の標準構成として扱う。
+ * 号車構成に登録の無い号車は標準構成で補う（carStructureOrStandard）。
  *
  * 基準点か向きが null のパターンは null を返し、呼び出し側は表示しない。二段階の移行の
  * 1段目のあいだに旧コードが作った行で、2段目で旧表から埋め直す（ADR-0025）。
