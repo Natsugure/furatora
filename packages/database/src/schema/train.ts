@@ -1,8 +1,9 @@
 // 列車（編成・車両設備・停車位置）。docs/domain/train-stop-patterns.md 参照
-import { pgTable, varchar, decimal, integer, timestamp, uuid, boolean, unique } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, decimal, integer, timestamp, uuid, boolean, unique, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { operators, lines } from './stationMaster';
 import { platforms } from './platform';
+import { CAR_NUMBERS_ASCEND_TOWARD, type CarNumbersAscendToward } from '../enums';
 
 export const trains = pgTable('trains', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
@@ -62,20 +63,22 @@ export const trainStopPatterns = pgTable('train_stop_patterns', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
   platformId: uuid('platform_id').references(() => platforms.id, { onDelete: 'cascade' }).notNull(),
   trainId: uuid('train_id').references(() => trains.id, { onDelete: 'cascade' }).notNull(),
+  // 停車位置は「1号車の外側の端の座標」と「号車番号の向き」だけで持ち、号車の区間は
+  // 列車の号車構成から読むたびに算出する（ADR-0025。算出は packages/platform-diagram の
+  // carSegmentsFromCarOne）。号車ごとの区間を保存しないので、両数を変えてもずれない（#215）。
+  // 2列とも nullable なのは二段階の移行の1段目だから。2段目（#224）で NOT NULL にする
+  carOneOuterMeters: decimal('car_one_outer_meters', { precision: 6, scale: 2 }),
+  carNumbersAscendToward: varchar('car_numbers_ascend_toward', { length: 10 }).$type<CarNumbersAscendToward>(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
   unique('unique_train_stop_pattern').on(t.platformId, t.trainId),
+  // 値は sql.raw でリテラルとして展開する（理由は platform.ts の facility_types_code_known を見る）
+  check(
+    'train_stop_patterns_ascend_toward_known',
+    sql`${t.carNumbersAscendToward} IN (${sql.raw(CAR_NUMBERS_ASCEND_TOWARD.map((v) => `'${v}'`).join(', '))})`,
+  ),
 ]);
 
-export const trainStopPatternCars = pgTable('train_stop_pattern_cars', {
-  id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
-  trainStopPatternId: uuid('train_stop_pattern_id')
-    .references(() => trainStopPatterns.id, { onDelete: 'cascade' })
-    .notNull(),
-  carNumber: integer('car_number').notNull(),
-  startMeters: decimal('start_meters', { precision: 6, scale: 2 }).notNull(),
-  endMeters: decimal('end_meters', { precision: 6, scale: 2 }).notNull(),
-}, (t) => [
-  unique('unique_train_stop_pattern_car').on(t.trainStopPatternId, t.carNumber),
-]);
+// train_stop_pattern_cars（号車ごとの区間）は ADR-0025 で廃止した。DB の表は二段階の移行の2段目（#224）で DROP する。
+// それまでの間、他の作業で db:generate / db:push を流すと DROP TABLE が混ざる（CLAUDE.md「禁止事項」）

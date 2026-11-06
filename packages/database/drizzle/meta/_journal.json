@@ -155,6 +155,20 @@
       "when": 1793574360877,
       "tag": "0021_drop_unused_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793919006776,
+      "tag": "0022_stop_pattern_car_one_anchor",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793919022605,
+      "tag": "0023_backfill_stop_pattern_car_one_anchor",
+      "breakpoints": true
     }
   ]
 }

@@ -35,12 +35,15 @@ import type { DirectionType } from '@furatora/database/enums'  // Enum型
 ## `enums` の制約
 - `@furatora/database/enums` はアプリとドメインの packages（`platform-diagram` / `transfer-difficulty`）が共有する語彙の入口（ADR-0015 決定3）。
   ドメインの packages は `@furatora/database` のうち `enums` だけを import できる
+  - アプリの `features/*/components/` などは `@furatora/database/*` を lint で禁じられているので、型はドメインの packages が再 export したものを使う
+    （例: `CarNumbersAscendToward` は `@furatora/platform-diagram/domain` から）
 - 入口は1つに保つ。語彙が増えたら `src/enums/` にまとまりごとのファイルで置き、`index.ts` で再 export する。個別のファイルを exports に足さない
 - 配下はすべて Drizzle にも実行時の外部パッケージにも依存させない。型と `as const` の定数だけを置く
   - `src/enums/**` が import できるのは、同じディレクトリのファイル（`./` で始まり `..` を含まないパス）だけである。
     `eslint.config.mjs` の `no-restricted-imports` で、それ以外（外部パッケージ・`../schema` 等）をすべて禁止している
 - 構成: `stationMaster.ts`（`DirectionType` / `StationConnectionSource`）、
-  `facility.ts`（`FACILITY_TYPE_CODES` / `FacilityTypeCode`）、`index.ts`（再 export）
+  `facility.ts`（`FACILITY_TYPE_CODES` / `FacilityTypeCode`）、
+  `train.ts`（`CAR_NUMBERS_ASCEND_TOWARD` / `CarNumbersAscendToward`。停車位置パターンの向き、ADR-0025）、`index.ts`（再 export）
 - 設備コードの一覧の正は `FACILITY_TYPE_CODES` で、`facility_types` は CHECK 制約 `facility_types_code_known` で従う（ADR-0016）。
   種類を足す・消す・名前を変える手順（マイグレーションの順序）は `facility.ts` のコメントを見る
 
