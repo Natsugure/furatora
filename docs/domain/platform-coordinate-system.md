@@ -54,7 +54,7 @@
 | 対象 | 型 | 備考 |
 |---|---|---|
 | `platforms.physicalLength` | `decimal(6, 2)` | |
-| `trainStopPatternCars.startMeters` / `endMeters` | `decimal(6, 2)` | |
+| `trainStopPatterns.carOneOuterMeters` | `decimal(6, 2)` | 1号車の外側の端。号車の区間は保存せず算出する（[train-stop-patterns.md](./train-stop-patterns.md)） |
 | `trainCarStructures.carLength` | `decimal(5, 2)` | nullable |
 | `platformLocationCells.xPositionMeters` | `decimal(6, 2)` | nullable（null = コンコース全体） |
 | `facilityConnections.xRangeStart` / `xRangeEnd` | `decimal(6, 2)` | nullable（対面乗り換え帯） |
@@ -191,21 +191,18 @@ Admin 側は、保存が確定した値（baseline）が変わったとき（マ
 だけ bounds を再計算する（`StationLayoutEditor` の該当コメント参照）。
 ドラッグ中の未保存値（draft）は bounds の算出に含めない。
 
-**座標編集の入力経路は2つあるが、状態は1つ**: アクセス点・号車境界の座標は
+**座標編集の入力経路は2つあるが、状態は1つ**: アクセス点の座標と編成の位置は
 図上ドラッグ（本節）と、インスペクタの数値入力
 （`components/inspector/ConcourseInspector.tsx`/`StopPatternInspector.tsx`）の
 どちらからも編集できる。両方とも `apps/admin/src/features/station-layout/domain/
-editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`shiftConsistByEdge`）を呼ぶため、
-どちらの経路で編集しても未保存state・不変条件（号車境界の隙間・重なり防止、
-向き非依存の判定）は1箇所に閉じたまま保たれる。数値入力専用の別ロジックを
-作らないこと。
+editDraft.ts` の同じ純関数（`moveCell`/`shiftConsistByEdge`）を呼ぶため、
+どちらの経路で編集しても未保存state・動かせる範囲は1箇所に閉じたまま保たれる。
+数値入力専用の別ロジックを作らないこと。
 
-**号車のハンドルは2種類ある**:
-
-- **内側の境界**（隣り合う号車の境界）: 境界だけを動かし、両側の号車の長さが変わる（`moveCarBoundary`）
-- **外端**（1号車の先頭・最終号車の末尾）: 号車の長さを変えずに、**編成全体を平行移動する**（`shiftConsistByEdge`）。
-  停車位置を合わせる作業で動かしたいのは編成の位置だから。端の号車の長さだけを変える操作は無い
-  （長さは境界のハンドルで変える）。外端のスナップの候補は自分の側のホーム端だけ
+**号車のハンドルは外端の2つだけ**（1号車の先頭・最終号車の末尾）で、どちらも号車の長さを変えずに
+**編成全体を平行移動する**（`shiftConsistByEdge`）。号車の長さは列車の号車構成で決まり、
+停車位置の編集では変えない（[ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)）。内側の境界のハンドルは無い。
+外端のスナップの候補は自分の側のホーム端だけ
   （編成の左端は 0、右端は `physicalLength`）で、編成自身の境界・ドアは候補にしない（ドラッグ中に一緒に動くため）。
   反対側のホーム端に吸着すると、編成全体がホームの外へ引き寄せられる
 
@@ -281,11 +278,12 @@ editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`shiftConsistByE
 
 ## 号車の向き
 
-**向きを表すカラムは持たない。** 列車の向きは号車座標そのものが表現する
-（1号車が x の小さい側にあるか、大きい側にあるか）。
+**向きは停車位置パターンの `carNumbersAscendToward` が持つ**（`plusX` = 1号車が x の小さい側）。
+号車の区間はこの向きで積んで算出するので（[train-stop-patterns.md](./train-stop-patterns.md)）、区間にも向きが現れる。
 
-ドア番号の反転表示は、`cars` を `carNumber` 昇順に並べたときの
-`startMeters` が減少していれば反転、として導出する（`domain/doorOrder.ts`）。
+図の描画は区間だけを受け取り、ドア番号の反転表示は `cars` を `carNumber` 昇順に並べたときの
+`startMeters` が減少していれば反転、として区間から導出する（`domain/doorOrder.ts`）。
+1両の編成では区間から向きが読めないので、Admin の編集は保存された向きを持ち回る。
 
 個々のドアの座標は `domain/consist.ts` の `doorCenterX()` が返す。
 号車をドア数で等分した**スロットの中心**であり、左端ではない。
@@ -298,7 +296,7 @@ editDraft.ts` の同じ純関数（`moveCell`/`moveCarBoundary`/`shiftConsistByE
 ## この文書を変更するとき
 
 **原点の定義（`x = 0` の位置）を変更する場合、保存済みの全座標の再計算が必要になる。**
-`trainStopPatternCars` / `platformLocationCells` / `facilityConnections` の
+`trainStopPatterns`（基準点。向きも反転しうる） / `platformLocationCells` / `facilityConnections` の
 すべてのメートル値が対象で、機械的な一括変換で済むとは限らない。
 変更には明示的な意思決定を要する。
 
