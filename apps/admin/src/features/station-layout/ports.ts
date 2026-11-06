@@ -1,7 +1,7 @@
 import type {
   PlatformDTO, TrainStopPatternDTO, FacilityDTO, ConcourseCellDTO, FacilityConnectionDTO, ConcourseDTO,
 } from '@furatora/platform-diagram/domain';
-import type { FacilityTypeCode } from '@furatora/database/enums';
+import type { CarNumbersAscendToward, FacilityTypeCode } from '@furatora/database/enums';
 import type { LineWithDirections } from '@/features/platform/ports';
 import type { FacilityTypeOption, ConnectedStationOption } from '@/features/facility/ports';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
@@ -17,6 +17,11 @@ export type LayoutPlatformDTO = {
 export type LayoutStopPatternDTO = TrainStopPatternDTO & {
   /** trainStopPatterns.id。URL の ?patternId= に使う（パッケージのDTOは表示用のため持たない） */
   patternId: string;
+  /**
+   * 号車番号の向き。編集の保存で基準点（1号車の外側の端）へ戻すのに使う（ADR-0025）。
+   * 1両の編成は区間から向きを読み取れないので、保存された値を持ち回る
+   */
+  carNumbersAscendToward: CarNumbersAscendToward;
 };
 
 // 編集専用フィールド。PUT platform-locations がコンコース全体を

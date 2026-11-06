@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildCarSegments, DEFAULT_CAR_LENGTH } from './carSegments';
+import { DEFAULT_CAR_LENGTH } from '@furatora/platform-diagram/domain';
+import { buildCarSegments, ascendTowardOf } from './carSegments';
 
 describe('buildCarSegments', () => {
   it('carLength未指定の場合は標準値（20.0m）で積算される（carOneNearest）', () => {
@@ -104,5 +105,12 @@ describe('buildCarSegments', () => {
       'carOneNearest',
     );
     expect(result).toEqual([{ carNumber: 1, startMeters: -10, endMeters: 10 }]);
+  });
+});
+
+describe('ascendTowardOf', () => {
+  it('x=0 側が1号車なら plusX、最終号車なら minusX', () => {
+    expect(ascendTowardOf('carOneNearest')).toBe('plusX');
+    expect(ascendTowardOf('lastCarNearest')).toBe('minusX');
   });
 });

@@ -1,6 +1,7 @@
 import { db } from '@furatora/database/client';
 import { trains, trainCarStructures } from '@furatora/database/schema';
 import { inArray, asc } from 'drizzle-orm';
+import { standardCarStructure, DEFAULT_DOOR_COUNT } from '@furatora/platform-diagram/domain';
 import type { TrainOptionDTO } from '@/features/stop-pattern/domain/types';
 
 // stationLayoutPageQuery が停車パターン新規作成のプレビュー用の列車一覧
@@ -30,14 +31,12 @@ export async function getAllTrainOptions(): Promise<TrainOptionDTO[]> {
       .map((s) => ({
         carNumber: s.carNumber,
         carLength: s.carLength != null ? Number(s.carLength) : null,
-        // ドア位置解決（本ファイル getStopPatterns）と同じ既定値 4 に揃える
         doorCount: s.doorCount,
       }));
-    // 号車構成が未登録の場合、carCount 件を標準構成として補う
-    // （stop-pattern/domain/carSegments.ts の buildCarSegments は carLength: null を標準値扱いする）
+    // 号車構成が未登録の場合、carCount 両の標準構成として補う。読み取り（resolvePatternCars）と同じ補い方
     const resolvedCars = cars.length > 0
       ? cars
-      : Array.from({ length: t.carCount }, (_, i) => ({ carNumber: i + 1, carLength: null, doorCount: 4 }));
+      : standardCarStructure(t.carCount).map((c) => ({ ...c, doorCount: DEFAULT_DOOR_COUNT }));
     return { id: t.id, name: t.name, carCount: t.carCount, cars: resolvedCars };
   });
 }

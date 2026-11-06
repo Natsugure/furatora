@@ -34,7 +34,6 @@ beforeEach(() => {
 function renderLayer(overrides: Partial<React.ComponentProps<typeof DiagramEditLayer>> = {}) {
   const onSelectCell = vi.fn();
   const onMoveCell = vi.fn();
-  const onMoveCarBoundary = vi.fn();
   const onShiftConsist = vi.fn();
 
   render(
@@ -47,13 +46,12 @@ function renderLayer(overrides: Partial<React.ComponentProps<typeof DiagramEditL
       selectedCellId={null}
       onSelectCell={onSelectCell}
       onMoveCell={onMoveCell}
-      onMoveCarBoundary={onMoveCarBoundary}
       onShiftConsist={onShiftConsist}
       {...overrides}
     />,
   );
 
-  return { onSelectCell, onMoveCell, onMoveCarBoundary, onShiftConsist };
+  return { onSelectCell, onMoveCell, onShiftConsist };
 }
 
 function drag(handle: HTMLElement, fromClientX: number, toClientX: number, extra: Partial<PointerEvent> = {}) {
@@ -137,13 +135,12 @@ describe('アクセス点のドラッグ', () => {
   });
 });
 
-describe('号車境界・外端のドラッグ', () => {
-  it('内側の境界をドラッグするとboundaryIndexつきでonMoveCarBoundaryが呼ばれる', () => {
-    const { onMoveCarBoundary } = renderLayer();
-    const handle = screen.getByRole('slider', { name: '1号車と2号車の境界（50m）' });
-    // clientX=350px → 70m。候補から離れているためグリッド丸め(70のまま)
-    drag(handle, 250, 350);
-    expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 70);
+describe('編成の外端のドラッグ', () => {
+  // 号車の長さは列車の号車構成で決まり、停車位置の編集では変えない（ADR-0025）
+  it('内側の境界のハンドルは出さず、編成の外端の2つだけを出す', () => {
+    renderLayer();
+    expect(screen.queryByRole('slider', { name: /境界/ })).toBeNull();
+    expect(screen.getAllByRole('slider', { name: /号車の(先頭|末尾)/ })).toHaveLength(2);
   });
 
   it('1号車の先頭（編成の左端）をドラッグするとonShiftConsistが呼ばれる', () => {
@@ -191,14 +188,6 @@ describe('号車境界・外端のドラッグ', () => {
   });
 
   describe('反転編成（carNumber昇順でxが減少する編成）', () => {
-    it('境界ハンドルは共有フィールド（1号車のstart=2号車のend）の座標に立ち、onMoveCarBoundaryが呼ばれる', () => {
-      const { onMoveCarBoundary } = renderLayer({ cars: reversedCars });
-      // 境界の共有座標は50m（非反転と異なりstart側）
-      const handle = screen.getByRole('slider', { name: '1号車と2号車の境界（50m）' });
-      drag(handle, 250, 350); // 350px→70m
-      expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 70);
-    });
-
     it('1号車の先頭ハンドルは外側の自由端（endフィールド、100m）に立ち、onShiftConsistのsideもendになる', () => {
       const { onShiftConsist } = renderLayer({ cars: reversedCars });
       const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });

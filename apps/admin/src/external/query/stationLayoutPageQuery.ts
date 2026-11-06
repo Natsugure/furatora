@@ -8,7 +8,6 @@ import {
   trainEquipments,
   trainCarStructures,
   trainStopPatterns,
-  trainStopPatternCars,
   platformLocations,
   platformLocationCells,
   stationFacilities,
@@ -20,6 +19,7 @@ import {
 import { asc, eq, inArray } from 'drizzle-orm';
 import type { StationLayoutPageQuery, LayoutStopPatternDTO, LayoutConcourseDTO } from '@/features/station-layout/ports';
 import type { StopPatternCarDTO } from '@furatora/platform-diagram/domain';
+import { resolvePatternCars } from '@furatora/platform-diagram/domain';
 import { getLinesWithDirections } from '@/external/query/platformEditPageQuery';
 import { getFacilityTypeOptions, getConnectedStationOptions } from '@/external/query/facilityEditPageQuery';
 import { getAllTrainOptions } from '@/external/query/stopPatternPageQuery';
@@ -142,29 +142,28 @@ async function getConcourses(platformId: string): Promise<LayoutConcourseDTO[]> 
 /** 1ホーム分の停車位置パターン（列車・号車・ドア設備込み） */
 async function getStopPatterns(platformId: string): Promise<LayoutStopPatternDTO[]> {
   const patternRows = await db
-    .select({ id: trainStopPatterns.id, trainId: trainStopPatterns.trainId })
+    .select({
+      id: trainStopPatterns.id,
+      trainId: trainStopPatterns.trainId,
+      carOneOuterMeters: trainStopPatterns.carOneOuterMeters,
+      carNumbersAscendToward: trainStopPatterns.carNumbersAscendToward,
+    })
     .from(trainStopPatterns)
     .where(eq(trainStopPatterns.platformId, platformId));
 
   if (patternRows.length === 0) return [];
 
-  const patternIds = patternRows.map((p) => p.id);
   const trainIds = [...new Set(patternRows.map((p) => p.trainId))];
 
-  const [trainRows, carRows, carStructureRows, equipmentRows] = await Promise.all([
+  const [trainRows, carStructureRows, equipmentRows] = await Promise.all([
     db.select({ id: trains.id, name: trains.name, carCount: trains.carCount }).from(trains).where(inArray(trains.id, trainIds)),
     db
       .select({
-        trainStopPatternId: trainStopPatternCars.trainStopPatternId,
-        carNumber: trainStopPatternCars.carNumber,
-        startMeters: trainStopPatternCars.startMeters,
-        endMeters: trainStopPatternCars.endMeters,
+        trainId: trainCarStructures.trainId,
+        carNumber: trainCarStructures.carNumber,
+        doorCount: trainCarStructures.doorCount,
+        carLength: trainCarStructures.carLength,
       })
-      .from(trainStopPatternCars)
-      .where(inArray(trainStopPatternCars.trainStopPatternId, patternIds))
-      .orderBy(asc(trainStopPatternCars.carNumber)),
-    db
-      .select({ trainId: trainCarStructures.trainId, carNumber: trainCarStructures.carNumber, doorCount: trainCarStructures.doorCount })
       .from(trainCarStructures)
       .where(inArray(trainCarStructures.trainId, trainIds)),
     db.select().from(trainEquipments).where(inArray(trainEquipments.trainId, trainIds)),
@@ -172,9 +171,16 @@ async function getStopPatterns(platformId: string): Promise<LayoutStopPatternDTO
 
   const trainById = new Map(trainRows.map((t) => [t.id, t]));
 
-  const doorCountByTrainCar = new Map<string, number>();
+  // decimal の carLength はここで number にする（DTOより上に string を渡さない）
+  const carStructureByTrain = new Map<string, { carNumber: number; doorCount: number; carLength: number | null }[]>();
   for (const row of carStructureRows) {
-    doorCountByTrainCar.set(`${row.trainId}:${row.carNumber}`, row.doorCount);
+    const list = carStructureByTrain.get(row.trainId) ?? [];
+    list.push({
+      carNumber: row.carNumber,
+      doorCount: row.doorCount,
+      carLength: row.carLength !== null ? Number(row.carLength) : null,
+    });
+    carStructureByTrain.set(row.trainId, list);
   }
 
   const equipmentsByTrainCar = new Map<
@@ -195,26 +201,29 @@ async function getStopPatterns(platformId: string): Promise<LayoutStopPatternDTO
     const train = trainById.get(pattern.trainId);
     if (!train) continue; // 参照整合性が壊れている場合はスキップ
 
-    const cars: StopPatternCarDTO[] = carRows
-      .filter((c) => c.trainStopPatternId === pattern.id)
-      .map((c) => {
-        const key = `${pattern.trainId}:${c.carNumber}`;
-        const equipments = equipmentsByTrainCar.get(key);
-        return {
-          carNumber: c.carNumber,
-          startMeters: Number(c.startMeters),
-          endMeters: Number(c.endMeters),
-          doorCount: doorCountByTrainCar.get(key) ?? 4,
-          freeSpaceDoors: equipments?.free ?? [],
-          prioritySeatDoors: equipments?.prio ?? [],
-        };
-      });
+    // 号車の区間は保存せず、号車構成と基準点から算出する（ADR-0025）
+    const ascendToward = pattern.carNumbersAscendToward;
+    const resolved = resolvePatternCars(carStructureByTrain.get(train.id) ?? [], train.carCount, {
+      carOneOuterMeters: pattern.carOneOuterMeters !== null ? Number(pattern.carOneOuterMeters) : null,
+      carNumbersAscendToward: ascendToward,
+    });
+    if (!resolved || !ascendToward) continue; // 移行の途中で書かれた、基準点の無いパターン
+
+    const cars: StopPatternCarDTO[] = resolved.map((c) => {
+      const equipments = equipmentsByTrainCar.get(`${pattern.trainId}:${c.carNumber}`);
+      return {
+        ...c,
+        freeSpaceDoors: equipments?.free ?? [],
+        prioritySeatDoors: equipments?.prio ?? [],
+      };
+    });
 
     dtos.push({
       patternId: pattern.id,
       trainId: train.id,
       trainLabel: train.name,
       carCount: train.carCount,
+      carNumbersAscendToward: ascendToward,
       cars,
     });
   }

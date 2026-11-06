@@ -50,7 +50,7 @@ describe('StopPatternCreateForm', () => {
     expect(onPreview).toHaveBeenCalledWith('train-2', [
       { carNumber: 1, startMeters: 0, endMeters: 20 },
       { carNumber: 2, startMeters: 20, endMeters: 40 },
-    ]);
+    ], 'plusX');
   });
 
   it('列車未選択でプレビューを押すとエラーメッセージが出る', async () => {
@@ -71,15 +71,17 @@ describe('StopPatternInspector', () => {
     { carNumber: 2, startMeters: 20, endMeters: 40 },
   ];
 
-  it('境界の数値入力を変更するとonMoveCarBoundaryが呼ばれる', async () => {
-    const onMoveCarBoundary = vi.fn();
+  // 号車の長さは列車の号車構成で決まり、停車位置の編集では変えない（ADR-0025）。
+  // 入力欄は編成の先頭・末尾の2つだけで、号車ごとの区間も並べない
+  it('号車の境界の数値入力も、号車ごとの区間も出さない', async () => {
     render(
       <MantineProvider>
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={onMoveCarBoundary}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -87,8 +89,8 @@ describe('StopPatternInspector', () => {
       </MantineProvider>,
     );
     await userEvent.setup().click(screen.getByRole('button', { name: '展開する' }));
-    fireEvent.change(screen.getByLabelText('1号車と2号車の境界'), { target: { value: '25' } });
-    expect(onMoveCarBoundary).toHaveBeenCalledWith(0, 25);
+    expect(screen.queryByLabelText('1号車と2号車の境界')).toBeNull();
+    expect(screen.queryByText(/号車（/)).toBeNull();
   });
 
   it('先頭・末尾の数値入力を変更するとonShiftConsistが呼ばれる', async () => {
@@ -98,8 +100,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={onShiftConsist}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -114,8 +117,7 @@ describe('StopPatternInspector', () => {
     expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'end' }, 45);
   });
 
-  it('反転編成では境界・外端のラベルと呼び出しフィールドが入れ替わる', async () => {
-    const onMoveCarBoundary = vi.fn();
+  it('反転編成（minusX）では外端の値と呼び出しフィールドが入れ替わる', async () => {
     const onShiftConsist = vi.fn();
     const reversedCars = [
       { carNumber: 1, startMeters: 20, endMeters: 40 },
@@ -126,8 +128,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="丸ノ内線"
           cars={reversedCars}
-          onMoveCarBoundary={onMoveCarBoundary}
+          ascendToward="minusX"
           onShiftConsist={onShiftConsist}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -135,12 +138,34 @@ describe('StopPatternInspector', () => {
       </MantineProvider>,
     );
     await userEvent.setup().click(screen.getByRole('button', { name: '展開する' }));
-    // 反転編成: 境界の共有座標は1号車のstart（20）
-    expect(screen.getByLabelText('1号車と2号車の境界')).toHaveValue('20 m');
+    // 反転編成: 1号車の先頭は end（40）、最終号車の末尾は start（0）
+    expect(screen.getByLabelText('1号車の先頭')).toHaveValue('40 m');
     fireEvent.change(screen.getByLabelText('1号車の先頭'), { target: { value: '45' } });
     expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 45);
     fireEvent.change(screen.getByLabelText('2号車の末尾'), { target: { value: '-5' } });
     expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, -5);
+  });
+
+  it('「号車の向きを反転」ボタンでonReverseが呼ばれる', async () => {
+    const onReverse = vi.fn();
+    render(
+      <MantineProvider>
+        <StopPatternInspector
+          trainLabel="銀座線"
+          cars={cars}
+          ascendToward="plusX"
+          onShiftConsist={vi.fn()}
+          onReverse={onReverse}
+          onSave={vi.fn()}
+          saving={false}
+          isNew={false}
+        />
+      </MantineProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '展開する' }));
+    await user.click(screen.getByRole('button', { name: '号車の向きを反転' }));
+    expect(onReverse).toHaveBeenCalledTimes(1);
   });
 
   it('保存ボタンでonSaveが呼ばれる', async () => {
@@ -150,8 +175,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={onSave}
           saving={false}
           isNew={false}
@@ -170,8 +196,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           onDiscard={vi.fn()}
           saving={false}
@@ -189,8 +216,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           onDiscard={vi.fn()}
           saving={false}
@@ -198,7 +226,7 @@ describe('StopPatternInspector', () => {
         />
       </MantineProvider>,
     );
-    expect(screen.getByLabelText('1号車と2号車の境界')).toBeInTheDocument();
+    expect(screen.getByLabelText('1号車の先頭')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '折りたたむ' })).toBeInTheDocument();
   });
 
@@ -208,15 +236,16 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
         />
       </MantineProvider>,
     );
-    expect(screen.queryByLabelText('1号車と2号車の境界')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('1号車の先頭')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '展開する' })).toBeInTheDocument();
   });
 
@@ -227,8 +256,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -236,7 +266,7 @@ describe('StopPatternInspector', () => {
       </MantineProvider>,
     );
     await user.click(screen.getByRole('button', { name: '展開する' }));
-    expect(screen.getByLabelText('1号車と2号車の境界')).toBeInTheDocument();
+    expect(screen.getByLabelText('1号車の先頭')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '折りたたむ' })).toBeInTheDocument();
   });
 
@@ -247,8 +277,9 @@ describe('StopPatternInspector', () => {
         <StopPatternInspector
           trainLabel="銀座線"
           cars={cars}
-          onMoveCarBoundary={vi.fn()}
+          ascendToward="plusX"
           onShiftConsist={vi.fn()}
+          onReverse={vi.fn()}
           onSave={vi.fn()}
           saving={false}
           isNew={false}
@@ -257,6 +288,6 @@ describe('StopPatternInspector', () => {
     );
     await user.click(screen.getByRole('button', { name: '展開する' }));
     await user.click(screen.getByRole('button', { name: '折りたたむ' }));
-    expect(screen.queryByLabelText('1号車と2号車の境界')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('1号車の先頭')).not.toBeInTheDocument();
   });
 });

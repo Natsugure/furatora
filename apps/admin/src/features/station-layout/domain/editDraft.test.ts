@@ -5,10 +5,9 @@ import {
   setConcourseField, moveCell, addCell, removeCell,
   addCellFacility, removeCellFacility,
   setConnection, removeConnection,
-  moveCarBoundary, shiftConsistByEdge,
+  shiftConsistByEdge, reverseConsist,
   isConcourseDirty, isPatternDirty, toPlatformLocationPayload, toStopPatternPayload,
   draftToDisplayConcourse,
-  MIN_CAR_METERS,
 } from './editDraft';
 import type { LayoutConcourseDTO, LayoutStopPatternDTO } from '@/features/station-layout/ports';
 
@@ -18,6 +17,7 @@ const pattern: LayoutStopPatternDTO = {
   trainId: 'train-1',
   trainLabel: '東京メトロ銀座線',
   carCount: 3,
+  carNumbersAscendToward: 'plusX',
   cars: [
     { carNumber: 1, startMeters: 0, endMeters: 20, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
     { carNumber: 2, startMeters: 20, endMeters: 40, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
@@ -33,6 +33,7 @@ const reversedPattern: LayoutStopPatternDTO = {
   trainId: 'train-2',
   trainLabel: '東京メトロ丸ノ内線',
   carCount: 3,
+  carNumbersAscendToward: 'minusX',
   cars: [
     { carNumber: 1, startMeters: 40, endMeters: 60, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
     { carNumber: 2, startMeters: 20, endMeters: 40, doorCount: 4, freeSpaceDoors: [], prioritySeatDoors: [] },
@@ -137,6 +138,7 @@ describe('duplicateConcourseDraft', () => {
 describe('createPatternDraft', () => {
   it('server DTOのcarsをcarNumber昇順のdraftに変換する', () => {
     expect(createPatternDraft(pattern)).toEqual({
+      ascendToward: 'plusX',
       cars: [
         { carNumber: 1, startMeters: 0, endMeters: 20 },
         { carNumber: 2, startMeters: 20, endMeters: 40 },
@@ -152,7 +154,8 @@ describe('createPatternDraftFromPreview', () => {
       { carNumber: 2, startMeters: 20, endMeters: 40 },
       { carNumber: 1, startMeters: 0, endMeters: 20 },
     ];
-    expect(createPatternDraftFromPreview(segments)).toEqual({
+    expect(createPatternDraftFromPreview(segments, 'plusX')).toEqual({
+      ascendToward: 'plusX',
       cars: [
         { carNumber: 1, startMeters: 0, endMeters: 20 },
         { carNumber: 2, startMeters: 20, endMeters: 40 },
@@ -251,101 +254,6 @@ describe('setConnection / removeConnection', () => {
     const draft = createConcourseDraft(concourse);
     const next = removeConnection(draft, 'station-shibuya');
     expect(next.connections).toEqual([]);
-  });
-});
-
-describe('moveCarBoundary', () => {
-  it('境界を動かすと隣接号車のend/startが同値で連動する', () => {
-    const draft = createPatternDraft(pattern);
-    const next = moveCarBoundary(draft, 0, 22, { minCarMeters: MIN_CAR_METERS });
-
-    const car1 = next.cars.find((c) => c.carNumber === 1)!;
-    const car2 = next.cars.find((c) => c.carNumber === 2)!;
-    expect(car1.endMeters).toBe(22);
-    expect(car2.startMeters).toBe(22);
-    expect(car1.endMeters).toBe(car2.startMeters); // 不変条件そのもの
-  });
-
-  it('他の号車には影響しない', () => {
-    const draft = createPatternDraft(pattern);
-    const next = moveCarBoundary(draft, 0, 22, { minCarMeters: MIN_CAR_METERS });
-    const car3 = next.cars.find((c) => c.carNumber === 3)!;
-    expect(car3).toEqual({ carNumber: 3, startMeters: 40, endMeters: 60 });
-  });
-
-  it('右の号車をminCarMeters未満に潰す位置へはクランプされる', () => {
-    const draft = createPatternDraft(pattern);
-    // 2-3号車境界(40)を59.8へ動かそうとすると3号車が0.2mになってしまう
-    const next = moveCarBoundary(draft, 1, 59.8, { minCarMeters: MIN_CAR_METERS });
-    const car2 = next.cars.find((c) => c.carNumber === 2)!;
-    const car3 = next.cars.find((c) => c.carNumber === 3)!;
-    expect(car2.endMeters).toBe(60 - MIN_CAR_METERS);
-    expect(car3.startMeters).toBe(60 - MIN_CAR_METERS);
-  });
-
-  it('左の号車をminCarMeters未満に潰す位置へはクランプされる', () => {
-    const draft = createPatternDraft(pattern);
-    const next = moveCarBoundary(draft, 0, 0.2, { minCarMeters: MIN_CAR_METERS });
-    const car1 = next.cars.find((c) => c.carNumber === 1)!;
-    expect(car1.endMeters).toBe(MIN_CAR_METERS);
-  });
-
-  it('範囲外のboundaryIndexは無変更で返す（両端は shiftConsistByEdge を使う）', () => {
-    const draft = createPatternDraft(pattern);
-    expect(moveCarBoundary(draft, -1, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
-    expect(moveCarBoundary(draft, 2, 10, { minCarMeters: MIN_CAR_METERS })).toEqual(draft);
-  });
-
-  it('重なりを許容しない: どの入力でも隣接ペアのend===startが崩れない', () => {
-    const draft = createPatternDraft(pattern);
-    for (const x of [-100, 0, 19.9, 20, 20.1, 100]) {
-      const next = moveCarBoundary(draft, 0, x, { minCarMeters: MIN_CAR_METERS });
-      const car1 = next.cars.find((c) => c.carNumber === 1)!;
-      const car2 = next.cars.find((c) => c.carNumber === 2)!;
-      expect(car1.endMeters).toBe(car2.startMeters);
-    }
-  });
-
-  describe('反転編成（carNumber昇順でxが減少する編成）', () => {
-    it('境界を動かすと隣接号車のstart/endが同値で連動する（非反転と共有フィールドが逆）', () => {
-      const draft = createPatternDraft(reversedPattern);
-      const next = moveCarBoundary(draft, 0, 35, { minCarMeters: MIN_CAR_METERS });
-
-      const car1 = next.cars.find((c) => c.carNumber === 1)!;
-      const car2 = next.cars.find((c) => c.carNumber === 2)!;
-      expect(car1.startMeters).toBe(35);
-      expect(car2.endMeters).toBe(35);
-      expect(car1.startMeters).toBe(car2.endMeters); // 反転側の不変条件
-      expect(car1.endMeters).toBe(60); // 動かしていない側は不変
-      expect(car2.startMeters).toBe(20);
-    });
-
-    it('他の号車には影響しない', () => {
-      const draft = createPatternDraft(reversedPattern);
-      const next = moveCarBoundary(draft, 0, 35, { minCarMeters: MIN_CAR_METERS });
-      const car3 = next.cars.find((c) => c.carNumber === 3)!;
-      expect(car3).toEqual({ carNumber: 3, startMeters: 0, endMeters: 20 });
-    });
-
-    it('クランプされる（右の号車＝carNumberが大きい側を潰す方向）', () => {
-      const draft = createPatternDraft(reversedPattern);
-      // 境界(40)を19.8へ動かそうとするとcar2が0.2mになってしまう
-      const next = moveCarBoundary(draft, 0, 19.8, { minCarMeters: MIN_CAR_METERS });
-      const car1 = next.cars.find((c) => c.carNumber === 1)!;
-      const car2 = next.cars.find((c) => c.carNumber === 2)!;
-      expect(car2.endMeters).toBe(20 + MIN_CAR_METERS);
-      expect(car1.startMeters).toBe(20 + MIN_CAR_METERS);
-    });
-
-    it('重なりを許容しない: どの入力でも隣接ペアのstart===endが崩れない', () => {
-      const draft = createPatternDraft(reversedPattern);
-      for (const x of [-100, 0, 39.9, 40, 40.1, 100]) {
-        const next = moveCarBoundary(draft, 0, x, { minCarMeters: MIN_CAR_METERS });
-        const car1 = next.cars.find((c) => c.carNumber === 1)!;
-        const car2 = next.cars.find((c) => c.carNumber === 2)!;
-        expect(car1.startMeters).toBe(car2.endMeters);
-      }
-    });
   });
 });
 
@@ -480,13 +388,53 @@ describe('isConcourseDirty', () => {
   });
 });
 
+describe('reverseConsist', () => {
+  const spans = (draft: { cars: { carNumber: number; startMeters: number; endMeters: number }[] }) =>
+    [...draft.cars].sort((a, b) => a.carNumber - b.carNumber).map((c) => [c.startMeters, c.endMeters]);
+
+  it('編成が占める区間を保ったまま、号車番号の並びと向きを逆にする（plusX → minusX）', () => {
+    const next = reverseConsist(createPatternDraft(pattern));
+    expect(next.ascendToward).toBe('minusX');
+    expect(spans(next)).toEqual([[40, 60], [20, 40], [0, 20]]);
+  });
+
+  it('minusX → plusX', () => {
+    const next = reverseConsist(createPatternDraft(reversedPattern));
+    expect(next.ascendToward).toBe('plusX');
+    expect(spans(next)).toEqual([[0, 20], [20, 40], [40, 60]]);
+  });
+
+  it('号車の長さが違う編成でも、各号車の長さと占める区間を保つ', () => {
+    const draft = createPatternDraftFromPreview([
+      { carNumber: 1, startMeters: 10, endMeters: 35.5 },
+      { carNumber: 2, startMeters: 35.5, endMeters: 53.5 },
+    ], 'plusX');
+    expect(spans(reverseConsist(draft))).toEqual([[28, 53.5], [10, 28]]);
+  });
+
+  it('2回反転すると元に戻る', () => {
+    const draft = createPatternDraft(reversedPattern);
+    expect(reverseConsist(reverseConsist(draft))).toEqual(draft);
+  });
+
+  it('保存では、反転後の1号車の外側の端を基準点にする', () => {
+    const payload = toStopPatternPayload('platform-1', 'train-1', reverseConsist(createPatternDraft(pattern)));
+    expect(payload).toMatchObject({ carOneOuterMeters: 60, carNumbersAscendToward: 'minusX' });
+  });
+});
+
 describe('isPatternDirty', () => {
   it('未変更のdraftはdirtyでない', () => {
     expect(isPatternDirty(pattern, createPatternDraft(pattern))).toBe(false);
   });
 
-  it('境界を動かすとdirtyになる', () => {
-    const draft = moveCarBoundary(createPatternDraft(pattern), 0, 22, { minCarMeters: MIN_CAR_METERS });
+  it('向きだけを反転してもdirtyになる（1両の編成は区間が変わらない）', () => {
+    const oneCar: LayoutStopPatternDTO = { ...pattern, carCount: 1, cars: [pattern.cars[0]!] };
+    expect(isPatternDirty(oneCar, reverseConsist(createPatternDraft(oneCar)))).toBe(true);
+  });
+
+  it('編成を動かすとdirtyになる', () => {
+    const draft = shiftConsistByEdge(createPatternDraft(pattern), { carNumber: 1, side: 'start' }, 2, { range: { minX: -100, maxX: 100 } });
     expect(isPatternDirty(pattern, draft)).toBe(true);
   });
 });
@@ -546,18 +494,25 @@ describe('toPlatformLocationPayload', () => {
 });
 
 describe('toStopPatternPayload', () => {
-  it('platformId・trainId・全号車のcarNumber順ペイロードを組み立てる', () => {
-    const draft = moveCarBoundary(createPatternDraft(pattern), 0, 22, { minCarMeters: MIN_CAR_METERS });
-    const payload = toStopPatternPayload('platform-1', pattern.trainId, draft);
+  const wideRange = { range: { minX: -100, maxX: 100 } };
 
-    expect(payload).toEqual({
+  it('号車の区間ではなく、1号車の外側の端と向きを送る（plusX は1号車の start）', () => {
+    const draft = shiftConsistByEdge(createPatternDraft(pattern), { carNumber: 1, side: 'start' }, 2.5, wideRange);
+    expect(toStopPatternPayload('platform-1', pattern.trainId, draft)).toEqual({
       platformId: 'platform-1',
       trainId: 'train-1',
-      cars: [
-        { carNumber: 1, startMeters: 0, endMeters: 22 },
-        { carNumber: 2, startMeters: 22, endMeters: 40 },
-        { carNumber: 3, startMeters: 40, endMeters: 60 },
-      ],
+      carOneOuterMeters: 2.5,
+      carNumbersAscendToward: 'plusX',
+    });
+  });
+
+  it('minusX は1号車の end を基準点にする', () => {
+    const draft = shiftConsistByEdge(createPatternDraft(reversedPattern), { carNumber: 3, side: 'start' }, 5, wideRange);
+    expect(toStopPatternPayload('platform-1', reversedPattern.trainId, draft)).toEqual({
+      platformId: 'platform-1',
+      trainId: 'train-2',
+      carOneOuterMeters: 65,
+      carNumbersAscendToward: 'minusX',
     });
   });
 });

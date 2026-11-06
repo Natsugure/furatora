@@ -1,5 +1,5 @@
-import { isDoorOrderReversed, roundToDecimal2 } from '@furatora/platform-diagram/domain';
-import type { FacilityTypeCode } from '@furatora/database/enums';
+import { carOneAnchorOf, roundToDecimal2 } from '@furatora/platform-diagram/domain';
+import type { CarNumbersAscendToward, FacilityTypeCode } from '@furatora/database/enums';
 import type { PlatformLocationInput } from '@/features/facility/schema';
 import type { TrainStopPatternInput } from '@/features/stop-pattern/schema';
 import type {
@@ -8,18 +8,12 @@ import type {
 
 // 図上編集・インスペクタ（StationLayoutEditor）が保持する未保存stateの純関数。
 // Next.js非依存（'use client' に依存しない）なので node 環境でテストできる。
-// この計画で確定した唯一の恒久ドメインルール: 号車境界は隣接号車が共有する。
-// 向き（docs/domain/platform-coordinate-system.md「号車の向き」）によってどちらの
-// フィールドが共有側かが変わる:
-//   非反転（carNumber昇順でxが増加）: cars[i].endMeters === cars[i+1].startMeters
-//   反転（carNumber昇順でxが減少）  : cars[i].startMeters === cars[i+1].endMeters
-// 向きの判定は isDoorOrderReversed()（packages/platform-diagram）を唯一の判定源とする。
-// この不変条件を保つため、startMeters/endMeters は moveCarBoundary（境界を動かす）と
-// shiftConsistByEdge（全号車を同じ差分で動かす）以外の経路で書き換えてはならない
-// （docs/domain/train-stop-patterns.md）。
-
-/** 号車を潰さない最小幅（m）。moveCarBoundary の唯一のクランプ元 */
-export const MIN_CAR_METERS = 0.5;
+//
+// 停車位置パターンは「1号車の外側の端」と「号車番号の向き」だけで保存する（ADR-0025）。
+// 号車の長さは列車の号車構成で決まり、パターンでは変えない。したがって停車位置の編集は
+// 編成全体の平行移動（shiftConsistByEdge）と、占める区間を保った向きの反転（reverseConsist）だけで、
+// draft の cars はそれ以外の経路で書き換えない。どちらも号車ごとの長さを保つので、
+// 隣接号車が境界を共有することも保たれる。
 
 export type FacilityDraft = {
   typeCode: FacilityTypeCode;
@@ -53,7 +47,13 @@ export type ConcourseDraft = {
   connections: ConnectionDraft[];
 };
 
+/**
+ * 停車位置パターンの未保存state。cars は図に描く区間で、保存時に carOneAnchorOf() で
+ * 基準点（1号車の外側の端）へ戻す。向きは編集では変わらないが、1両の編成では区間から
+ * 読み取れないため draft に持ち回る
+ */
 export type PatternDraft = {
+  ascendToward: CarNumbersAscendToward;
   cars: { carNumber: number; startMeters: number; endMeters: number }[];
 };
 
@@ -127,23 +127,22 @@ export function concourseDraftValidationError(draft: ConcourseDraft): string | n
   return null;
 }
 
-export function createPatternDraft(pattern: Pick<LayoutStopPatternDTO, 'cars'>): PatternDraft {
-  return {
-    cars: [...pattern.cars]
-      .sort((a, b) => a.carNumber - b.carNumber)
-      .map((c) => ({ carNumber: c.carNumber, startMeters: c.startMeters, endMeters: c.endMeters })),
-  };
+export function createPatternDraft(
+  pattern: Pick<LayoutStopPatternDTO, 'cars' | 'carNumbersAscendToward'>,
+): PatternDraft {
+  return createPatternDraftFromPreview(pattern.cars, pattern.carNumbersAscendToward);
 }
 
 /**
- * 新規停車パターン作成（US-3）: buildCarSegments() のプレビュー結果からdraftを作る。
- * createPatternDraft と処理は同じだが、CarSegment（stop-pattern featureのdomain型）は
- * StopPatternCarDTO（doorCount等を含む表示用の広い型）のサブセットのため別関数にする。
+ * 新規停車パターン作成（US-3）: プレビューの区間（carSegmentsFromCarOne の結果）からdraftを作る。
+ * StopPatternCarDTO（doorCount 等を含む表示用の広い型）からは区間だけを取り出す。
  */
 export function createPatternDraftFromPreview(
   segments: { carNumber: number; startMeters: number; endMeters: number }[],
+  ascendToward: CarNumbersAscendToward,
 ): PatternDraft {
   return {
+    ascendToward,
     cars: [...segments]
       .sort((a, b) => a.carNumber - b.carNumber)
       .map((c) => ({ carNumber: c.carNumber, startMeters: c.startMeters, endMeters: c.endMeters })),
@@ -249,61 +248,8 @@ export function removeConnection(draft: ConcourseDraft, stationId: string): Conc
 }
 
 /**
- * 号車の内側の境界（cars[boundaryIndex] と cars[boundaryIndex+1] の間）を動かす。
- *
- * 重なり・隙間は物理的に起こり得ないため、隣接号車の共有フィールドを常に同値に保つ
- * （このファイル唯一の不変条件）。どちらのフィールドが共有側かは編成の向きに依存する
- * （非反転: left.endMeters=right.startMeters、反転: left.startMeters=right.endMeters。
- * ファイル冒頭コメント参照）。opts.minCarMeters は号車を潰さない最小幅で、
- * 両側の号車がこれより短くならないようクランプする。
- *
- * boundaryIndex が範囲外（両端の外側の境界）のときは無変更で返す。両端は
- * shiftConsistByEdge を使うこと。テキスト入力（境界ベースの数値入力）からも同じ関数を呼ぶ
- * ことで、ドラッグと数値入力の両経路で隙間・重なりを構造的に作れなくする。
- */
-export function moveCarBoundary(
-  draft: PatternDraft,
-  boundaryIndex: number,
-  x: number,
-  opts: { minCarMeters: number },
-): PatternDraft {
-  const cars = [...draft.cars].sort((a, b) => a.carNumber - b.carNumber);
-  if (boundaryIndex < 0 || boundaryIndex >= cars.length - 1) return draft;
-
-  const left = cars[boundaryIndex]!;
-  const right = cars[boundaryIndex + 1]!;
-  const reversed = isDoorOrderReversed(cars);
-
-  if (!reversed) {
-    const minX = left.startMeters + opts.minCarMeters;
-    const maxX = right.endMeters - opts.minCarMeters;
-    const clamped = Math.min(Math.max(x, minX), maxX);
-    return {
-      cars: cars.map((car, i) => {
-        if (i === boundaryIndex) return { ...car, endMeters: clamped };
-        if (i === boundaryIndex + 1) return { ...car, startMeters: clamped };
-        return car;
-      }),
-    };
-  }
-
-  // 反転編成: left（carNumberが小さい側）が右寄り、right（carNumberが大きい側）が
-  // 左寄り。共有境界は left.startMeters === right.endMeters
-  const minX = right.startMeters + opts.minCarMeters;
-  const maxX = left.endMeters - opts.minCarMeters;
-  const clamped = Math.min(Math.max(x, minX), maxX);
-  return {
-    cars: cars.map((car, i) => {
-      if (i === boundaryIndex) return { ...car, startMeters: clamped };
-      if (i === boundaryIndex + 1) return { ...car, endMeters: clamped };
-      return car;
-    }),
-  };
-}
-
-/**
  * 編成の向きに応じた自由端の側を返す。非反転編成では1号車の start・最終号車の end、
- * 反転編成ではこれが入れ替わる（moveCarBoundary の境界共有規則の裏返し）。
+ * 反転編成（minusX）ではこれが入れ替わる。
  * shiftConsistByEdge とインスペクタのラベル表示（StopPatternInspector）の両方が
  * この判定を共有することで、向きの判定を1箇所に閉じる。
  */
@@ -314,7 +260,7 @@ export function freeEdgeSides(reversed: boolean): { first: 'start' | 'end'; last
 /**
  * 編成の外端（他のどの号車とも境界を共有しない、編成全体としての自由端）が x に来るよう、
  * 全号車を同じ差分だけ動かす（#201）。号車の長さと境界の共有は変わらない。
- * 動かしたいのは停車位置で、号車の長さは境界（moveCarBoundary）で変える。
+ * 号車の長さは列車の号車構成で決まり、パターンの編集では変えない（ADR-0025）。
  * edge が内側の号車・逆側のフィールドを指す場合は無変更で返す。
  *
  * opts.range は編成全体（つかんだ外端だけでなく反対側の外端も）を収める範囲で、差分をこれで
@@ -332,8 +278,7 @@ export function shiftConsistByEdge(
   const index = cars.findIndex((c) => c.carNumber === edge.carNumber);
   if (index === -1) return draft;
 
-  const reversed = isDoorOrderReversed(cars);
-  const { first: freeSideOfFirst, last: freeSideOfLast } = freeEdgeSides(reversed);
+  const { first: freeSideOfFirst, last: freeSideOfLast } = freeEdgeSides(draft.ascendToward === 'minusX');
 
   const isLeadEdge = index === 0 && edge.side === freeSideOfFirst;
   const isTrailEdge = index === cars.length - 1 && edge.side === freeSideOfLast;
@@ -350,11 +295,30 @@ export function shiftConsistByEdge(
   if (delta === 0) return draft;
   // 丸めないと浮動小数の誤差で隣接号車の共有フィールドがずれ、境界の共有が崩れる
   return {
+    ascendToward: draft.ascendToward,
     cars: cars.map((c) => ({
       ...c,
       startMeters: roundToDecimal2(c.startMeters + delta),
       endMeters: roundToDecimal2(c.endMeters + delta),
     })),
+  };
+}
+
+/**
+ * 号車番号の向きを反転する。編成が占める区間 [min, max] は保ったまま、号車の並びだけを逆にする
+ * （各区間を区間の中心で折り返す）。向きを間違えて登録したパターンを、位置を合わせ直さずに直すため。
+ * 号車ごとの長さは保たれ、1号車は反対側の端に来る。保存では反転後の1号車の外側の端が基準点になる。
+ */
+export function reverseConsist(draft: PatternDraft): PatternDraft {
+  const consistMin = Math.min(...draft.cars.map((c) => c.startMeters));
+  const consistMax = Math.max(...draft.cars.map((c) => c.endMeters));
+  // 丸めないと浮動小数の誤差で隣接号車の境界がずれる（shiftConsistByEdge と同じ理由）
+  const mirror = (x: number) => roundToDecimal2(consistMin + consistMax - x);
+  return {
+    ascendToward: draft.ascendToward === 'plusX' ? 'minusX' : 'plusX',
+    cars: [...draft.cars]
+      .sort((a, b) => a.carNumber - b.carNumber)
+      .map((c) => ({ carNumber: c.carNumber, startMeters: mirror(c.endMeters), endMeters: mirror(c.startMeters) })),
   };
 }
 
@@ -397,7 +361,12 @@ export function isConcourseDirty(
   return false;
 }
 
-export function isPatternDirty(server: Pick<LayoutStopPatternDTO, 'cars'>, draft: PatternDraft): boolean {
+export function isPatternDirty(
+  server: Pick<LayoutStopPatternDTO, 'cars' | 'carNumbersAscendToward'>,
+  draft: PatternDraft,
+): boolean {
+  // 1両の編成は向きを反転しても区間が変わらないので、向きも比べる
+  if (server.carNumbersAscendToward !== draft.ascendToward) return true;
   if (server.cars.length !== draft.cars.length) return true;
   const byNumber = new Map(server.cars.map((c) => [c.carNumber, c]));
   return draft.cars.some((c) => {
@@ -453,21 +422,17 @@ export function toPlatformLocationPayload(
 
 /**
  * PUT/POST の train-stop-patterns ペイロードを組み立てる。
- * cars は全置換なので draft の全号車を送る（doorCount 等の列車由来の値は
- * この PUT では扱わないので失われない）。
+ * 号車の区間は送らず、draft の区間から基準点（1号車の外側の端）を戻して送る（ADR-0025）。
+ * draft の cars は号車構成から算出したものなので、1号車は必ずある。
  */
 export function toStopPatternPayload(
   platformId: string,
   trainId: string,
   draft: PatternDraft,
 ): TrainStopPatternInput {
-  return {
-    platformId,
-    trainId,
-    cars: [...draft.cars]
-      .sort((a, b) => a.carNumber - b.carNumber)
-      .map((c) => ({ carNumber: c.carNumber, startMeters: c.startMeters, endMeters: c.endMeters })),
-  };
+  const carOneOuterMeters = carOneAnchorOf(draft.cars, draft.ascendToward);
+  if (carOneOuterMeters === null) throw new Error('停車位置パターンに1号車がありません');
+  return { platformId, trainId, carOneOuterMeters, carNumbersAscendToward: draft.ascendToward };
 }
 
 export type ConcourseDisplayLookups = {
