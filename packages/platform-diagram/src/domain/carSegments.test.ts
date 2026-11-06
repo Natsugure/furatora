@@ -166,8 +166,14 @@ describe('resolvePatternCars', () => {
     ]);
   });
 
-  it('基準点か向きが無いパターン（移行の途中で書かれた行）は null を返す', () => {
-    expect(resolvePatternCars([], 2, { carOneOuterMeters: null, carNumbersAscendToward: 'plusX' })).toBeNull();
-    expect(resolvePatternCars([], 2, { carOneOuterMeters: 0, carNumbersAscendToward: null })).toBeNull();
+  it('基準点と向きは必須で、null を受けない（2列は NOT NULL。#224）', () => {
+    // 型だけを確かめる（呼び出さない）
+    const typeOnly = () => {
+      // @ts-expect-error 基準点は null にならない
+      resolvePatternCars([], 2, { carOneOuterMeters: null, carNumbersAscendToward: 'plusX' });
+      // @ts-expect-error 向きは null にならない
+      resolvePatternCars([], 2, { carOneOuterMeters: 0, carNumbersAscendToward: null });
+    };
+    expect(typeOnly).toBeTypeOf('function');
   });
 });

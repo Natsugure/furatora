@@ -4,3 +4,6 @@
 export const CAR_NUMBERS_ASCEND_TOWARD = ['plusX', 'minusX'] as const;
 
 export type CarNumbersAscendToward = (typeof CAR_NUMBERS_ASCEND_TOWARD)[number];
+
+// 列車設備の種別。train_equipments.type の語彙
+export type TrainEquipmentType = 'free_space' | 'priority_seat';

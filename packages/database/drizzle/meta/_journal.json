@@ -169,6 +169,20 @@
       "when": 1793919022605,
       "tag": "0023_backfill_stop_pattern_car_one_anchor",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794000139395,
+      "tag": "0024_rebackfill_stop_pattern_car_one_anchor",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794000152207,
+      "tag": "0025_stop_pattern_anchor_not_null",
+      "breakpoints": true
     }
   ]
 }

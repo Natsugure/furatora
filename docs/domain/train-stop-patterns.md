@@ -16,10 +16,7 @@ trainStopPatterns
 **パターンは号車ごとの区間を持たない。** 号車の数と長さは列車の号車構成（`trainCarStructures`）で決まり、
 パターンが持つのは「編成をどこに、どちら向きに置くか」だけである（[ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)）。
 
-> **適用状況（2026-11-06）**: 二段階の移行の1段目。2列は nullable で、旧表 `train_stop_pattern_cars` が DB に残っている
-> （テーブル定義からは外してあり、どのコードも読み書きしない）。2段目（#224）で2列を `NOT NULL` にし、旧表を DROP する。
-> それまでは、基準点が NULL のパターン（1段目のデプロイ中に旧コードが作った行）を表示しない。
-
+- 2列とも `NOT NULL`。パターンは必ず基準点と向きを持つ
 - 向きの語彙は `@furatora/database/enums` の `CAR_NUMBERS_ASCEND_TOWARD`。DB の CHECK 制約 `train_stop_patterns_ascend_toward_known` がこの一覧に従う
 - 基準点を1号車に置くので、**列車の両数・号車構成を変えても1号車の位置は変わらず、最後尾の側が伸び縮みする**。
   パターンを直す必要は無い（#215）
@@ -30,8 +27,10 @@ trainStopPatterns
 
 - `carSegmentsFromCarOne()`: 1号車の外側の端から、向きの側へ `carLength` を積む。どの号車も `startMeters < endMeters` を保ち、
   各端を小数2桁に丸める
-- `resolvePatternCars()`: 読み取り（Web `stationDetailQuery.ts`、Admin `stationLayoutPageQuery.ts`）の入口。
-  号車構成が1件も無い列車は `carCount` 両の標準構成（20m、ドア数 `DEFAULT_DOOR_COUNT` = 4）として扱う
+- `resolvePatternCars()`: 号車構成と基準点から、号車の区間とドア数を解決する。
+  号車構成に登録の無い号車は標準構成（20m、ドア数 `DEFAULT_DOOR_COUNT` = 4）で補う
+- `stopPatternCarsOf()`（`stopPatternCars.ts`）: 読み取り（Web `stationDetailQuery.ts`、Admin `stationLayoutPageQuery.ts`）の入口。
+  decimal の基準点を数値にして `resolvePatternCars()` を呼び、各号車に設備（`groupEquipmentsByTrainCar()` でまとめたもの）を添える
 - `carOneAnchorOf()`: 区間から基準点を戻す。Admin が平行移動した区間を保存するときに使う
 
 画面に渡す DTO（`StopPatternCarDTO`）は区間の形のままなので、図の描画は保存の形を知らない。

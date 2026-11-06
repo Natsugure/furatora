@@ -1,79 +1,45 @@
-# 設計: 停車位置パターンを「1号車の外側の端＋向き」で持つ (Issue #215)
+# 設計: 停車位置パターンの基準点を NOT NULL にし、train_stop_pattern_cars を DROP する (Issue #224)
 
-- **参照**: [requirements.md](./requirements.md) / [tasks.md](./tasks.md) / [ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)
-
-## データモデル
-
-`train_stop_patterns` に2列を足す（1段目は nullable）。
-
-| 列 | 型 | 意味 |
-|---|---|---|
-| `car_one_outer_meters` | `decimal(6,2)` | 1号車の外側の端（隣の号車と接していない側）のホーム座標 |
-| `car_numbers_ascend_toward` | `varchar(10)` `'plusX' \| 'minusX'` | 号車番号が x の増える側へ増えるか、減る側へ増えるか |
-
-`train_stop_pattern_cars` はテーブル定義から外す（DB の表は2段目で DROP）。
-
-## 区間の算出
-
-`packages/platform-diagram/src/domain/carSegments.ts`（web と admin の両方が使う。ADR-0015）。
-
-```ts
-export type CarNumbersAscendToward = 'plusX' | 'minusX';
-export function carSegmentsFromCarOne(
-  carStructure: { carNumber: number; carLength: number | null }[],
-  carOneOuterMeters: number,
-  ascendToward: CarNumbersAscendToward,
-): { carNumber: number; startMeters: number; endMeters: number }[];
-export function standardCarStructure(carCount: number): { carNumber: number; carLength: null }[];
-export function carOneAnchorOf(cars, ascendToward): number; // 区間から基準点を戻す（Admin の保存用）
-```
-
-- `plusX`: 1号車が `[X, X+len1]`、2号車がその右
-- `minusX`: 1号車が `[X−len1, X]`、2号車がその左
-- 各端は小数2桁に丸める（`decimal(6,2)` と、隣接号車の境界の一致を保つため）
-
-読み取り側（Web `stationDetailQuery.ts`、Admin `stationLayoutPageQuery.ts`）は `external/query/` で区間を算出し、
-DTO（`StopPatternCarDTO`）の形は変えない。描画（`packages/platform-diagram` のコンポーネント）は変わらない。
-
-## 書き込み
-
-- API の入力（`trainStopPatternSchema`）: `{ platformId, trainId, carOneOuterMeters, carNumbersAscendToward }`
-- Repository: `train_stop_patterns` の1行だけを書く
-- Admin の編集: 未保存 state（`PatternDraft`）は `{ ascendToward, cars }`。`cars` は表示用の区間で、
-  平行移動（`shiftConsistByEdge`）だけが書き換える。保存時に `carOneAnchorOf` で基準点へ戻す。
-  内側の境界のハンドル（`moveCarBoundary`）はなくす
-- 新規作成のプレビュー（インスペクタ）: 入力は従来どおり「x=0 に近い側の端＋向き」。`carOneNearest` → `plusX`、`lastCarNearest` → `minusX`
+参照: [requirements.md](./requirements.md) / [tasks.md](./tasks.md) / [ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)
 
 ## マイグレーション
 
-1段目（このPR）: `drizzle-kit generate --custom` の手書き。
+| ファイル | 作り方 | 内容 |
+|---|---|---|
+| `0024_rebackfill_stop_pattern_car_one_anchor.sql` | `drizzle-kit generate --custom` | 0023 と同じ UPDATE（`car_one_outer_meters IS NULL` の行だけ） |
+| `0025_stop_pattern_anchor_not_null.sql` | `db:generate` | `DROP TABLE "train_stop_pattern_cars" CASCADE`、2列の `SET NOT NULL` |
 
-```sql
-ALTER TABLE train_stop_patterns ADD COLUMN car_one_outer_meters numeric(6,2);
-ALTER TABLE train_stop_patterns ADD COLUMN car_numbers_ascend_toward varchar(10);
--- 1号車と最大号車の startMeters の大小で向きを決める（区間から推定していた旧 isDoorOrderReversed と同じ判定。この関数はレビュー対応で消した）
-UPDATE ...
+- 0024 → 0025 の順に、Vercel のビルドの `db:migrate` が流す。埋め戻しは DROP より先に走る
+- 旧表に1号車の行が無いパターンは 0024 で埋まらず、0025 の `SET NOT NULL` が失敗してビルドが止まる。
+  マージ直前に本番で `SELECT id FROM train_stop_patterns WHERE car_one_outer_meters IS NULL OR car_numbers_ascend_toward IS NULL;` が 0 件であることを確かめる
+- 書き込み（Admin の zod `stopPatternSchema`、`stopPatternRepository`）は1段目から2列を必ず埋めている
+
+## 読み取り
+
+`packages/platform-diagram/src/domain/stopPatternCars.ts`（新規、domain のバレルから export）
+
+```ts
+groupEquipmentsByTrainCar(rows: { trainId; carNumber; type: TrainEquipmentType; nearDoor; isStandard }[]): EquipmentsByTrainCar
+// EquipmentsByTrainCar = { get(trainId, carNumber): { free, prio } | undefined }。キーの組み立てを外に出さない
+
+stopPatternCarsOf(
+  pattern: { trainId; carOneOuterMeters: string; carNumbersAscendToward },
+  carCount, carStructure: CarStructureSpec[], equipments: EquipmentsByTrainCar,
+): StopPatternCarDTO[]
 ```
 
-| 状況 | 結果 |
-|---|---|
-| マイグレーション後、旧コードが動いている間 | 旧コードは新しい列を書かない。その間に作ったパターンは基準点が NULL になり、新コードでは表示されない（REQ-8）。2段目で旧表から埋め直す |
-| 新コードが動いたあと | 旧表は読み書きされない |
-
-2段目: NULL の行を旧表から埋め直す → 2列を `NOT NULL` → `DROP TABLE train_stop_pattern_cars`。
-1段目と2段目の間は、他の作業で `db:generate` / `db:push` を流さない。
-
-## エラー
-
-| 状況 | 応答 |
-|---|---|
-| 基準点が ±9999.99 の外、向きが不正 | 400 |
-| 組み合わせの重複 | 409（従来どおり） |
-| 他駅のホーム | 404（従来どおり） |
+- `resolvePatternCars()` の `PatternAnchor` を非 null にし、null を返す分岐を外す
+- Web `stationDetailQuery.ts`・Admin `stationLayoutPageQuery.ts` は上の2関数を呼ぶだけにし、`if (!resolved || !ascendToward) continue;` を消す
+- `type` は `TrainEquipmentType` で受ける。型を schema から `@furatora/database/enums` へ移し、domain の packages から import できるようにする（ADR-0015 決定3）。種別を増やすと振り分けの `switch` が型エラーになる
 
 ## テスト
 
-- `carSegments.test.ts`（platform-diagram）: plusX / minusX、carLength の混在、1両、丸め、`carOneAnchorOf` との往復
-- `schema.test.ts`、`stopPatternRepository.test.ts`: 新しい入力
-- `editDraft.test.ts`: 平行移動・ペイロード
-- 照合 SQL: development で、算出した区間が旧表と全行一致する
+- `carSegments.test.ts`: null を受けないことを `@ts-expect-error` で確かめる（呼び出さない）
+- `stopPatternCars.test.ts`: string の基準点からの算出、設備の振り分け、他の列車の設備を添えないこと
+- DB に触れるクエリは単体テストの仕組みが無いため、型チェックとブラウザ確認で代える
+
+## 恒久知識の振り分け
+
+- `docs/domain/train-stop-patterns.md`: 適用状況の注記を外し、2列が NOT NULL であることと `stopPatternCarsOf()` を書く
+- `packages/database/CLAUDE.md`: 既知の誤検出の外部キーから旧表の分を外す
+- ADR: 新しい決定は無い（ADR-0025 は Accepted のまま）

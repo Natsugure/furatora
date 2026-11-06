@@ -1,34 +1,26 @@
-# 要件: 停車位置パターンを「1号車の外側の端＋向き」で持ち、号車の区間は号車構成から導く (Issue #215)
+# 要件: 停車位置パターンの基準点を NOT NULL にし、train_stop_pattern_cars を DROP する (Issue #224)
 
 ## 概要
 
-- **対象**: `train_stop_patterns` / `train_stop_pattern_cars`、Admin の駅レイアウト編集、Web・Admin の停車位置の読み取り
-- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #215](https://github.com/Natsugure/furatora/issues/215) /
+- **対象**: `train_stop_patterns` / `train_stop_pattern_cars`、Web・Admin の停車位置の読み取り
+- **参照**: [design.md](./design.md) / [tasks.md](./tasks.md) / [Issue #224](https://github.com/Natsugure/furatora/issues/224) /
   [ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)
-- **進め方**: 二段階の1段目（`refactor/stop-pattern-anchor-215`）。`train_stop_pattern_cars` の DROP と `NOT NULL` 化は2段目の PR（#224）
-- **信頼度**: 85%（中〜高）。本番の全パターンが新しい形へ損失なく移せることを確かめた。Admin の編集 UI の変更範囲が広い
+- **進め方**: 二段階の移行（CLAUDE.md「禁止事項」）の2段目。1段目は #215（PR #225）
+- **信頼度**: 92%（高）。本番・development とも基準点が NULL の行は 0 件 / 全 42 件（2026-11-07）
 
 ## 背景
 
-列車の両数を減らしても、停車位置パターンの号車（`train_stop_pattern_cars`）は作り直されず、列車に無い号車が図に残る。
-原因は、パターンが号車ごとに独立した区間を持っていることにある。号車の長さは列車の属性（`trainCarStructures.carLength`）で、
-駅ごとに変わることはない。パターンが持つべきなのは「編成をどこに、どちら向きに置くか」だけである。
-
-本番（2026-11-06、Neon main）の 42 パターン・266 号車行は、どれも号車の長さが `COALESCE(carLength, 20.0)` と一致し、
-号車構成と号車の数が食い違うパターンも無かった。
+1段目で2列（`car_one_outer_meters` / `car_numbers_ascend_toward`）を nullable で足し、旧表 `train_stop_pattern_cars` を
+テーブル定義から外した。読み取りは、基準点が NULL のパターン（1段目のデプロイ中に旧コードが作った行）を表示しない分岐を持っている。
 
 ## 要件（EARS）
 
-- **REQ-1** システムは、停車位置パターンに「1号車の外側の端の座標」と「号車番号が増えていく向き（`plusX` / `minusX`）」だけを保存すること
-- **REQ-2** 停車位置パターンを読むとき、システムは号車の区間を列車の号車構成（`carLength`、未指定なら 20m）から算出すること
-- **REQ-3** 列車の両数・号車構成を変えたとき、システムは、そのあとに読むパターンの号車を新しい号車構成に合わせること。1号車の位置は変えないこと
-- **REQ-4** 列車に号車構成が1件も無い場合、システムは `carCount` 両の標準構成（20m）として区間を算出すること
-- **REQ-5** 既存のパターンを移したとき、システムは、算出した区間を移す前の `train_stop_pattern_cars` と一致させること
-- **REQ-6** Admin で停車位置を編集するとき、システムは編成全体の平行移動だけを許し、号車の長さを変える操作を出さないこと
-- **REQ-7** 基準点の座標が ±9999.99 を超える場合、システムは保存を 400 で拒むこと
-- **REQ-8** 基準点を持たないパターン（2段目の前に旧コードが書いた行）の場合、システムはそのパターンを表示しないこと
+- **REQ-1** マイグレーションが走るとき、システムは、基準点が NULL のパターンを旧表から埋めてから、2列を `NOT NULL` にすること
+- **REQ-2** マイグレーションが走るとき、システムは `train_stop_pattern_cars` を DROP すること
+- **REQ-3** 停車位置を読むとき、システムは、すべてのパターンの号車を基準点と号車構成から算出して表示すること（NULL の分岐を持たない）
+- **REQ-4** システムは、Web と Admin の読み取りで「基準点を数値にする → 区間を算出する → 設備を添える」を同じ関数で行うこと（PR #225 レビュー指摘9）
+- **REQ-5** 移行の前後で、システムは、Web・Admin の図の号車・ドア・設備の位置を変えないこと
 
 ## 対象外
 
-- `train_stop_pattern_cars` の DROP、新しい列の `NOT NULL` 化（2段目）
-- 方面別のパターン（`docs/domain/train-stop-patterns.md`「現在の制約」）
+- 停車位置パターンの形や編集 UI の変更

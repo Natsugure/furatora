@@ -1,6 +1,7 @@
 import { db } from '@furatora/database/client';
 import { withTransaction, type Tx } from '@furatora/database/tx';
-import { trains, trainCarStructures, trainEquipments, type TrainEquipmentType } from '@furatora/database/schema';
+import { trains, trainCarStructures, trainEquipments } from '@furatora/database/schema';
+import type { TrainEquipmentType } from '@furatora/database/enums';
 import { eq } from 'drizzle-orm';
 import type { TrainRepository } from '@/features/train/ports';
 import type { TrainInput } from '@/features/train/schema';
