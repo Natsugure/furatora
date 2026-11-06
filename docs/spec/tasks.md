@@ -25,6 +25,12 @@
 - [x] **TASK-12**（レビューで追加。改修前からの不足）編集中のパターンで号車番号の向きを反転できるようにする
   - 編成が占める区間を保って号車の並びだけを逆にする（`reverseConsist`）。1両の編成でも未保存になるよう、`isPatternDirty` は向きも比べる
   - 画面: 茗荷谷1番線で反転 → 1号車の先頭 10m・6号車の末尾 118m、ドアの印も反転。保存で DB が 10.00 / `plusX` になった。反転し直して保存し、118.00 / `minusX` に戻した
+- [x] **TASK-13**（PR #225 のレビュー指摘1・4）号車構成の抜けを補い、1号車が無いパターンの保存を通知にする
+  - `carStructureOrStandard` は 1..carCount を返し、未登録の号車は標準構成で補い、carCount を超える号車は除く
+  - `toStopPatternPayload` は1号車が無ければ null を返し、`StationLayoutEditor` が「保存できません」を通知する（例外は async の外で捕まらなかった）
+- [x] **TASK-14**（PR #225 のレビュー指摘3・8a）図のドア番号を、保存された向きで振る
+  - `TrainStopPatternDTO` に `carNumbersAscendToward` を足し、`DiagramSvg` はそれで反転を決める。区間から推定する `isDoorOrderReversed`（`doorOrder.ts`）は消した
+  - 1両の編成でも minusX ならドア1が右端側に来ることを `PlatformDisplay.test.tsx` で確かめた
 - [x] **TASK-10** `docs/domain/` の更新、ADR-0025 を Accepted、2段目の Issue を起票
   - `train-stop-patterns.md`・`platform-coordinate-system.md` を上書きした（適用状況の注記つき）。`packages/database/CLAUDE.md` の enums の構成に `train.ts` を足した
   - ADR-0025 を Accepted にした。2段目を #224 に起票した

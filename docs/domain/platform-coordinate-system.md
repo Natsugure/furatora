@@ -281,9 +281,9 @@ editDraft.ts` の同じ純関数（`moveCell`/`shiftConsistByEdge`）を呼ぶ�
 **向きは停車位置パターンの `carNumbersAscendToward` が持つ**（`plusX` = 1号車が x の小さい側）。
 号車の区間はこの向きで積んで算出するので（[train-stop-patterns.md](./train-stop-patterns.md)）、区間にも向きが現れる。
 
-図の描画は区間だけを受け取り、ドア番号の反転表示は `cars` を `carNumber` 昇順に並べたときの
-`startMeters` が減少していれば反転、として区間から導出する（`domain/doorOrder.ts`）。
-1両の編成では区間から向きが読めないので、Admin の編集は保存された向きを持ち回る。
+図の描画も、ドア番号の振り方をこの向きで決める（`TrainStopPatternDTO.carNumbersAscendToward`。
+`minusX` なら1番ドアが号車の右端側に来る）。区間から向きを推定しないのは、1両の編成では区間から向きが読めないため。
+Web・Admin とも、読み取りで保存された向きを DTO に載せて渡し、Admin の編集中は編集中の向きを渡す。
 
 個々のドアの座標は `domain/consist.ts` の `doorCenterX()` が返す。
 号車をドア数で等分した**スロットの中心**であり、左端ではない。

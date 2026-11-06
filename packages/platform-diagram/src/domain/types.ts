@@ -1,7 +1,7 @@
 // 駅詳細画面（ホーム・列車・設備）用のDTO定義。Drizzle非依存（ADR-0003）。
 // decimal → number の変換は external/query/ の中で行い、ここより上には string を渡さない
 // （docs/domain/platform-coordinate-system.md「単位と精度」）。
-import type { FacilityTypeCode } from '@furatora/database/enums';
+import type { CarNumbersAscendToward, FacilityTypeCode } from '@furatora/database/enums';
 
 export type FacilityDTO = {
   id: string;
@@ -46,6 +46,11 @@ export type TrainStopPatternDTO = {
   trainId: string;
   trainLabel: string;
   carCount: number;
+  /**
+   * 号車番号の向き（plusX = 1号車が x の小さい側。ADR-0025）。図はドア番号の振り方をこれで決める。
+   * 1両の編成は区間から向きを読めないので、区間から推定せず保存された値を渡す
+   */
+  carNumbersAscendToward: CarNumbersAscendToward;
   cars: StopPatternCarDTO[]; // carNumber 昇順
 };
 

@@ -230,11 +230,12 @@ export const dbStationDetailQuery: StationDetailQuery = {
       if (!train) continue; // 参照整合性が壊れている場合はスキップ
 
       // 号車の区間は保存せず、号車構成と基準点から算出する（ADR-0025）
+      const ascendToward = pattern.carNumbersAscendToward;
       const resolved = resolvePatternCars(carStructureByTrain.get(train.id) ?? [], train.carCount, {
         carOneOuterMeters: pattern.carOneOuterMeters !== null ? Number(pattern.carOneOuterMeters) : null,
-        carNumbersAscendToward: pattern.carNumbersAscendToward,
+        carNumbersAscendToward: ascendToward,
       });
-      if (!resolved) continue; // 移行の途中で書かれた、基準点の無いパターン
+      if (!resolved || !ascendToward) continue; // 移行の途中で書かれた、基準点の無いパターン
 
       const cars: StopPatternCarDTO[] = resolved.map((c) => {
         const equipments = equipmentsByTrainCar.get(`${pattern.trainId}:${c.carNumber}`);
@@ -249,6 +250,7 @@ export const dbStationDetailQuery: StationDetailQuery = {
         trainId: train.id,
         trainLabel: train.name,
         carCount: train.carCount,
+        carNumbersAscendToward: ascendToward,
         cars,
       };
 

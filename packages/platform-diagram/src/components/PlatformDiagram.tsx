@@ -63,6 +63,7 @@ export function PlatformDiagram({
   // 縦と横の図は向きのほかは同じものを描く
   const svgProps = {
     cars,
+    carNumbersAscendToward: pattern.carNumbersAscendToward,
     concourses,
     physicalLength,
     bounds,

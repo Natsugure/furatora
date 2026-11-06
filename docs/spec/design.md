@@ -51,7 +51,7 @@ DTO（`StopPatternCarDTO`）の形は変えない。描画（`packages/platform-
 ```sql
 ALTER TABLE train_stop_patterns ADD COLUMN car_one_outer_meters numeric(6,2);
 ALTER TABLE train_stop_patterns ADD COLUMN car_numbers_ascend_toward varchar(10);
--- 1号車と最大号車の startMeters の大小で向きを決める（isDoorOrderReversed と同じ判定）
+-- 1号車と最大号車の startMeters の大小で向きを決める（区間から推定していた旧 isDoorOrderReversed と同じ判定。この関数はレビュー対応で消した）
 UPDATE ...
 ```
 
