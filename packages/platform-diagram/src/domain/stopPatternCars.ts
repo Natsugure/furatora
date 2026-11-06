@@ -1,6 +1,6 @@
 // 停車位置パターンの行から、図に渡す号車（区間・ドア数・設備）を組み立てる純関数（DB非依存）。
 // Web（stationDetailQuery）と Admin（stationLayoutPageQuery）の読み取りが同じ組み立て方をするため、ここに置く。
-import type { CarNumbersAscendToward } from '@furatora/database/enums';
+import type { CarNumbersAscendToward, TrainEquipmentType } from '@furatora/database/enums';
 import { resolvePatternCars, type CarStructureSpec } from './carSegments';
 import type { StopPatternCarDTO } from './types';
 
@@ -14,11 +14,11 @@ export type EquipmentsByTrainCar = {
 
 /**
  * trainEquipments の行を列車・号車ごとにまとめ、フリースペースと優先席に振り分ける。
- * type の語彙は trainEquipments.type（'free_space' | 'priority_seat'）。domain の packages は
- * schema を import できないため文字列で受け、'free_space' 以外を優先席として扱う。
+ * type は TrainEquipmentType（@furatora/database/enums。ADR-0015 決定3）で受ける。
+ * 種別を増やしたときは、ここで型エラーになるので振り分けを足す。
  */
 export function groupEquipmentsByTrainCar(
-  rows: { trainId: string; carNumber: number; type: string; nearDoor: number; isStandard: boolean }[],
+  rows: { trainId: string; carNumber: number; type: TrainEquipmentType; nearDoor: number; isStandard: boolean }[],
 ): EquipmentsByTrainCar {
   const byKey = new Map<string, TrainCarEquipments>();
   const keyOf = (trainId: string, carNumber: number) => `${trainId}:${carNumber}`;
@@ -26,8 +26,11 @@ export function groupEquipmentsByTrainCar(
     const key = keyOf(row.trainId, row.carNumber);
     const entry = byKey.get(key) ?? { free: [], prio: [] };
     const item = { nearDoor: row.nearDoor, isStandard: row.isStandard };
-    if (row.type === 'free_space') entry.free.push(item);
-    else entry.prio.push(item);
+    switch (row.type) {
+      case 'free_space': entry.free.push(item); break;
+      case 'priority_seat': entry.prio.push(item); break;
+      default: { const unknownType: never = row.type; throw new Error(`未知の設備種別: ${String(unknownType)}`); }
+    }
     byKey.set(key, entry);
   }
   return { get: (trainId, carNumber) => byKey.get(keyOf(trainId, carNumber)) };

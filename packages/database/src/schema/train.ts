@@ -3,7 +3,7 @@ import { pgTable, varchar, decimal, integer, timestamp, uuid, boolean, unique, c
 import { sql } from 'drizzle-orm';
 import { operators, lines } from './stationMaster';
 import { platforms } from './platform';
-import { CAR_NUMBERS_ASCEND_TOWARD, type CarNumbersAscendToward } from '../enums';
+import { CAR_NUMBERS_ASCEND_TOWARD, type CarNumbersAscendToward, type TrainEquipmentType } from '../enums';
 
 export const trains = pgTable('trains', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),
@@ -41,8 +41,6 @@ export type PrioritySeat = {
   nearDoor: number;
   isStandard: boolean; // 全編成に装備されているか
 }
-
-export type TrainEquipmentType = 'free_space' | 'priority_seat';
 
 export const trainEquipments = pgTable('train_equipments', {
   id: uuid('id').primaryKey().default(sql`uuid_generate_v7()`),

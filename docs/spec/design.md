@@ -19,7 +19,7 @@
 `packages/platform-diagram/src/domain/stopPatternCars.ts`（新規、domain のバレルから export）
 
 ```ts
-groupEquipmentsByTrainCar(rows: { trainId; carNumber; type: string; nearDoor; isStandard }[]): EquipmentsByTrainCar
+groupEquipmentsByTrainCar(rows: { trainId; carNumber; type: TrainEquipmentType; nearDoor; isStandard }[]): EquipmentsByTrainCar
 // EquipmentsByTrainCar = { get(trainId, carNumber): { free, prio } | undefined }。キーの組み立てを外に出さない
 
 stopPatternCarsOf(
@@ -30,7 +30,7 @@ stopPatternCarsOf(
 
 - `resolvePatternCars()` の `PatternAnchor` を非 null にし、null を返す分岐を外す
 - Web `stationDetailQuery.ts`・Admin `stationLayoutPageQuery.ts` は上の2関数を呼ぶだけにし、`if (!resolved || !ascendToward) continue;` を消す
-- `type` を文字列で受けるのは、domain の packages が `@furatora/database` の schema（`TrainEquipmentType`）を import できないため（ADR-0015 決定3）
+- `type` は `TrainEquipmentType` で受ける。型を schema から `@furatora/database/enums` へ移し、domain の packages から import できるようにする（ADR-0015 決定3）。種別を増やすと振り分けの `switch` が型エラーになる
 
 ## テスト
 
