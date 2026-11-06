@@ -45,14 +45,6 @@ export function carSegmentsFromCarOne(
 }
 
 /**
- * 号車構成が未登録の列車を、carCount 両の標準構成として扱うための構成を返す。
- * 読み取り（区間の算出）と Admin の新規作成のプレビューが同じ補い方をする。
- */
-export function standardCarStructure(carCount: number): CarLengthSpec[] {
-  return Array.from({ length: carCount }, (_, i) => ({ carNumber: i + 1, carLength: null }));
-}
-
-/**
  * 区間から基準点（1号車の外側の端）を戻す。carSegmentsFromCarOne の逆で、
  * Admin が平行移動した区間を保存するときに使う。1号車が無ければ null。
  */
@@ -68,6 +60,45 @@ export function carOneAnchorOf(
 /** trainCarStructures が未登録の号車のドア数。Web・Admin の表示で同じ値を使う */
 export const DEFAULT_DOOR_COUNT = 4;
 
+export type CarStructureSpec = CarLengthSpec & { doorCount: number };
+
+/**
+ * 号車構成が未登録の列車を、carCount 両の標準構成（既定の長さ・ドア数）として扱うための構成を返す。
+ */
+export function standardCarStructure(carCount: number): CarStructureSpec[] {
+  return Array.from({ length: carCount }, (_, i) => ({
+    carNumber: i + 1, carLength: null, doorCount: DEFAULT_DOOR_COUNT,
+  }));
+}
+
+/**
+ * 列車の号車構成を返す。1件も無ければ standardCarStructure で補う。
+ * 読み取り（区間の算出）と Admin の新規作成のプレビューが同じ補い方をするため、ここに置く。
+ */
+export function carStructureOrStandard(carStructure: CarStructureSpec[], carCount: number): CarStructureSpec[] {
+  return carStructure.length > 0 ? carStructure : standardCarStructure(carCount);
+}
+
+/**
+ * trainCarStructures の行を列車ごとにまとめる。decimal（string）の carLength はここで number にする。
+ * Web・Admin の読み取りが同じ変換をするため、ここに置く（DB非依存の行の形だけを受ける）。
+ */
+export function groupCarStructureByTrain(
+  rows: { trainId: string; carNumber: number; doorCount: number; carLength: string | null }[],
+): Map<string, CarStructureSpec[]> {
+  const byTrain = new Map<string, CarStructureSpec[]>();
+  for (const row of rows) {
+    const list = byTrain.get(row.trainId) ?? [];
+    list.push({
+      carNumber: row.carNumber,
+      doorCount: row.doorCount,
+      carLength: row.carLength !== null ? Number(row.carLength) : null,
+    });
+    byTrain.set(row.trainId, list);
+  }
+  return byTrain;
+}
+
 export type PatternAnchor = {
   carOneOuterMeters: number | null;
   carNumbersAscendToward: CarNumbersAscendToward | null;
@@ -81,14 +112,12 @@ export type PatternAnchor = {
  * 1段目のあいだに旧コードが作った行で、2段目で旧表から埋め直す（ADR-0025）。
  */
 export function resolvePatternCars(
-  carStructure: (CarLengthSpec & { doorCount: number })[],
+  carStructure: CarStructureSpec[],
   carCount: number,
   anchor: PatternAnchor,
 ): (CarSegment & { doorCount: number })[] | null {
   if (anchor.carOneOuterMeters === null || anchor.carNumbersAscendToward === null) return null;
-  const structure = carStructure.length > 0
-    ? carStructure
-    : standardCarStructure(carCount).map((c) => ({ ...c, doorCount: DEFAULT_DOOR_COUNT }));
+  const structure = carStructureOrStandard(carStructure, carCount);
   const doorCountByCar = new Map(structure.map((c) => [c.carNumber, c.doorCount]));
   return carSegmentsFromCarOne(structure, anchor.carOneOuterMeters, anchor.carNumbersAscendToward)
     .map((segment) => ({ ...segment, doorCount: doorCountByCar.get(segment.carNumber) ?? DEFAULT_DOOR_COUNT }));

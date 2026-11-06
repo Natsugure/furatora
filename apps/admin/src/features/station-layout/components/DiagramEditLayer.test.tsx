@@ -42,6 +42,7 @@ function renderLayer(overrides: Partial<React.ComponentProps<typeof DiagramEditL
       bounds={bounds}
       physicalLength={physicalLength}
       cars={cars}
+      ascendToward="plusX"
       cellHandles={[{ id: 'cell-1', xPositionMeters: 25 }]}
       selectedCellId={null}
       onSelectCell={onSelectCell}
@@ -189,26 +190,37 @@ describe('編成の外端のドラッグ', () => {
 
   describe('反転編成（carNumber昇順でxが減少する編成）', () => {
     it('1号車の先頭ハンドルは外側の自由端（endフィールド、100m）に立ち、onShiftConsistのsideもendになる', () => {
-      const { onShiftConsist } = renderLayer({ cars: reversedCars });
+      const { onShiftConsist } = renderLayer({ cars: reversedCars, ascendToward: 'minusX' });
       const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
       drag(handle, 500, 450); // 450px→90m
       expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 90);
     });
 
     it('最終号車の末尾ハンドルは外側の自由端（startフィールド、0m）に立ち、onShiftConsistのsideもstartになる', () => {
-      const { onShiftConsist } = renderLayer({ cars: reversedCars });
+      const { onShiftConsist } = renderLayer({ cars: reversedCars, ascendToward: 'minusX' });
       const handle = screen.getByRole('slider', { name: '2号車の末尾（0m）' });
       drag(handle, 0, 50); // 50px→10m
       expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 2, side: 'start' }, 10);
     });
 
     it('1号車の先頭（右端）は右のホーム端にスナップし、左のホーム端にはスナップしない', () => {
-      const { onShiftConsist } = renderLayer({ cars: reversedCars });
+      const { onShiftConsist } = renderLayer({ cars: reversedCars, ascendToward: 'minusX' });
       const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
       drag(handle, 500, 499); // 499px→99.8m
       expect(onShiftConsist).toHaveBeenLastCalledWith({ carNumber: 1, side: 'end' }, 100);
       drag(handle, 500, 1.5); // 1.5px→0.3m
       expect(onShiftConsist).toHaveBeenLastCalledWith({ carNumber: 1, side: 'end' }, 0.5);
+    });
+
+    it('1両編成でも、向きの保存値（minusX）から1号車の先頭を endフィールドとして扱う', () => {
+      // 区間が1つだけだと並びから向きを推定できないため、ascendToward で決める
+      const { onShiftConsist } = renderLayer({
+        cars: [{ carNumber: 1, startMeters: 50, endMeters: 100, doorCount: 4 }],
+        ascendToward: 'minusX',
+      });
+      const handle = screen.getByRole('slider', { name: '1号車の先頭（100m）' });
+      drag(handle, 500, 450); // 450px→90m
+      expect(onShiftConsist).toHaveBeenCalledWith({ carNumber: 1, side: 'end' }, 90);
     });
   });
 });

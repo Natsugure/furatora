@@ -82,9 +82,8 @@ export function snapMeters(
 /**
  * スナップ候補（号車境界・全ドア中心・0・physicalLength）を算出する（純関数）。
  *
- * exclude は自己吸着防止のために渡す。号車境界をドラッグするとき、その境界自身
- * （と連動して動く隣接号車側の座標）を候補から除かないと、必ず元の位置に
- * 吸い付いて動かせなくなる。
+ * exclude は自己吸着防止のために渡す。アクセス点をドラッグするとき、その点自身の
+ * 座標を候補から除かないと、必ず元の位置に吸い付いて動かせなくなる。
  */
 export function snapCandidates(
   cars: Pick<StopPatternCarDTO, 'startMeters' | 'endMeters' | 'doorCount'>[],

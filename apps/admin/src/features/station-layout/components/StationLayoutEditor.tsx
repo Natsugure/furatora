@@ -70,6 +70,27 @@ function mergePattern(baseline: LayoutStopPatternDTO, draft: PatternDraft | unde
 }
 
 /**
+ * 新規作成のdraftを表示・baseline用のDTOにする。ドア数は列車の号車構成から添え、設備はまだ無い。
+ * プレビュー中の表示と、保存成功後のbaselineへの反映が同じ形を使う。
+ */
+function newPatternDTO(patternId: string, train: TrainOptionDTO, draft: PatternDraft): LayoutStopPatternDTO {
+  const doorCountByCar = new Map(train.cars.map((c) => [c.carNumber, c.doorCount]));
+  return {
+    patternId,
+    trainId: train.id,
+    trainLabel: train.name,
+    carCount: train.carCount,
+    carNumbersAscendToward: draft.ascendToward,
+    cars: draft.cars.map((c) => ({
+      ...c,
+      doorCount: doorCountByCar.get(c.carNumber) ?? DEFAULT_DOOR_COUNT,
+      freeSpaceDoors: [],
+      prioritySeatDoors: [],
+    })),
+  };
+}
+
+/**
  * 駅レイアウトページの編集ビュー本体（Client Component）。図・編集レイヤ・
  * インスペクタ・未保存パネルを1つのツリーにまとめる（ADR-0010 決定2）。DTOはpropsで
  * 受け取り、関数propsは渡さない。
@@ -174,20 +195,7 @@ export function StationLayoutEditor({
 
   const displayPattern: LayoutStopPatternDTO | null = useMemo(() => {
     if (newPattern && newPatternTrain) {
-      const doorCountByCar = new Map(newPatternTrain.cars.map((c) => [c.carNumber, c.doorCount]));
-      return {
-        patternId: '__new__',
-        trainId: newPattern.trainId,
-        trainLabel: newPatternTrain.name,
-        carCount: newPatternTrain.carCount,
-        carNumbersAscendToward: newPattern.draft.ascendToward,
-        cars: newPattern.draft.cars.map((c) => ({
-          ...c,
-          doorCount: doorCountByCar.get(c.carNumber) ?? DEFAULT_DOOR_COUNT,
-          freeSpaceDoors: [],
-          prioritySeatDoors: [],
-        })),
-      };
+      return newPatternDTO('__new__', newPatternTrain, newPattern.draft);
     }
     if (!selectedPatternBaseline) return null;
     return mergePattern(selectedPatternBaseline, patternDrafts.get(selectedPatternBaseline.patternId));
@@ -411,17 +419,7 @@ export function StationLayoutEditor({
       onSaved: (body) => {
         const created = body as { id?: string } | null;
         if (!created?.id) return;
-        const doorCountByCar = new Map(train.cars.map((c) => [c.carNumber, c.doorCount]));
-        const newBaseline: LayoutStopPatternDTO = {
-          patternId: created.id,
-          trainId,
-          trainLabel: train.name,
-          carCount: train.carCount,
-          carNumbersAscendToward: draft.ascendToward,
-          cars: draft.cars.map((c) => ({
-            ...c, doorCount: doorCountByCar.get(c.carNumber) ?? DEFAULT_DOOR_COUNT, freeSpaceDoors: [], prioritySeatDoors: [],
-          })),
-        };
+        const newBaseline = newPatternDTO(created.id, train, draft);
         setPatternBaselines((prev) => [...prev, newBaseline]);
         setNewPattern(null);
       },
@@ -745,6 +743,7 @@ export function StationLayoutEditor({
                   bounds={bounds}
                   physicalLength={platform.physicalLength}
                   cars={displayPattern.cars}
+                  ascendToward={displayPattern.carNumbersAscendToward}
                   cellHandles={displayConcourses
                     .flatMap((c) => c.cells)
                     .filter((c) => c.xPositionMeters !== null)

@@ -29,27 +29,10 @@ import type {
   StopPatternCarDTO,
   TrainStopPatternDTO,
 } from '@furatora/platform-diagram/domain';
-import { resolvePatternCars } from '@furatora/platform-diagram/domain';
+import { groupCarStructureByTrain, resolvePatternCars } from '@furatora/platform-diagram/domain';
 
 // apps/admin/src/external/query/stopPatternPageQuery.ts のスタイルを踏襲する。
 // decimal → number の変換はすべてここで完結させる（DTOより上に string を渡さない）。
-
-type CarStructureRow = { trainId: string; carNumber: number; doorCount: number; carLength: string | null };
-
-/** 列車ごとの号車構成。decimal の carLength はここで number にする */
-function groupCarStructureByTrain(rows: CarStructureRow[]) {
-  const byTrain = new Map<string, { carNumber: number; doorCount: number; carLength: number | null }[]>();
-  for (const row of rows) {
-    const list = byTrain.get(row.trainId) ?? [];
-    list.push({
-      carNumber: row.carNumber,
-      doorCount: row.doorCount,
-      carLength: row.carLength !== null ? Number(row.carLength) : null,
-    });
-    byTrain.set(row.trainId, list);
-  }
-  return byTrain;
-}
 
 // connectedRailwayId 列は廃止済み（ODPT 同期専用の列であり、以後 ODPT 同期は行わない。
 // ADR-0007 決定3 / Issue #56）。路線名は connectedStationId → stationLines → lines の

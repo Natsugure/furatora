@@ -19,7 +19,7 @@ import {
 import { asc, eq, inArray } from 'drizzle-orm';
 import type { StationLayoutPageQuery, LayoutStopPatternDTO, LayoutConcourseDTO } from '@/features/station-layout/ports';
 import type { StopPatternCarDTO } from '@furatora/platform-diagram/domain';
-import { resolvePatternCars } from '@furatora/platform-diagram/domain';
+import { groupCarStructureByTrain, resolvePatternCars } from '@furatora/platform-diagram/domain';
 import { getLinesWithDirections } from '@/external/query/platformEditPageQuery';
 import { getFacilityTypeOptions, getConnectedStationOptions } from '@/external/query/facilityEditPageQuery';
 import { getAllTrainOptions } from '@/external/query/stopPatternPageQuery';
@@ -172,16 +172,7 @@ async function getStopPatterns(platformId: string): Promise<LayoutStopPatternDTO
   const trainById = new Map(trainRows.map((t) => [t.id, t]));
 
   // decimal の carLength はここで number にする（DTOより上に string を渡さない）
-  const carStructureByTrain = new Map<string, { carNumber: number; doorCount: number; carLength: number | null }[]>();
-  for (const row of carStructureRows) {
-    const list = carStructureByTrain.get(row.trainId) ?? [];
-    list.push({
-      carNumber: row.carNumber,
-      doorCount: row.doorCount,
-      carLength: row.carLength !== null ? Number(row.carLength) : null,
-    });
-    carStructureByTrain.set(row.trainId, list);
-  }
+  const carStructureByTrain = groupCarStructureByTrain(carStructureRows);
 
   const equipmentsByTrainCar = new Map<
     string,

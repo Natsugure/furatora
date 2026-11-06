@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   carSegmentsFromCarOne, carOneAnchorOf, standardCarStructure, resolvePatternCars, DEFAULT_CAR_LENGTH,
-  DEFAULT_DOOR_COUNT,
+  DEFAULT_DOOR_COUNT, carStructureOrStandard, groupCarStructureByTrain,
 } from './carSegments';
 
 const threeStandardCars = [
@@ -72,11 +72,34 @@ describe('carSegmentsFromCarOne', () => {
 });
 
 describe('standardCarStructure', () => {
-  it('carCount 両の標準構成（carLength: null）を返す', () => {
+  it('carCount 両の標準構成（carLength: null・既定のドア数）を返す', () => {
     expect(standardCarStructure(2)).toEqual([
-      { carNumber: 1, carLength: null },
-      { carNumber: 2, carLength: null },
+      { carNumber: 1, carLength: null, doorCount: DEFAULT_DOOR_COUNT },
+      { carNumber: 2, carLength: null, doorCount: DEFAULT_DOOR_COUNT },
     ]);
+  });
+});
+
+describe('carStructureOrStandard', () => {
+  it('号車構成があればそのまま、無ければ標準構成を返す', () => {
+    const structure = [{ carNumber: 1, carLength: 25, doorCount: 3 }];
+    expect(carStructureOrStandard(structure, 2)).toBe(structure);
+    expect(carStructureOrStandard([], 2)).toEqual(standardCarStructure(2));
+  });
+});
+
+describe('groupCarStructureByTrain', () => {
+  it('列車ごとにまとめ、decimal の carLength を number にする', () => {
+    const byTrain = groupCarStructureByTrain([
+      { trainId: 't1', carNumber: 1, doorCount: 4, carLength: '20.50' },
+      { trainId: 't2', carNumber: 1, doorCount: 3, carLength: null },
+      { trainId: 't1', carNumber: 2, doorCount: 4, carLength: null },
+    ]);
+    expect(byTrain.get('t1')).toEqual([
+      { carNumber: 1, doorCount: 4, carLength: 20.5 },
+      { carNumber: 2, doorCount: 4, carLength: null },
+    ]);
+    expect(byTrain.get('t2')).toEqual([{ carNumber: 1, doorCount: 3, carLength: null }]);
   });
 });
 

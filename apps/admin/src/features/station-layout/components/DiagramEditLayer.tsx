@@ -4,10 +4,10 @@ import {
   useCallback, useEffect, useMemo, useRef, useState, type RefObject,
 } from 'react';
 import {
-  pxToMeters, snapMeters, roundToDecimal2, snapCandidates, isDoorOrderReversed,
+  pxToMeters, snapMeters, roundToDecimal2, snapCandidates,
   SNAP_GRID_METERS, SNAP_TOLERANCE_METERS,
   FACILITY_ROW_HEIGHT, TRAIN_ROW_HEIGHT,
-  type Bounds, type VerticalLayout, type StopPatternCarDTO,
+  type Bounds, type VerticalLayout, type StopPatternCarDTO, type CarNumbersAscendToward,
 } from '@furatora/platform-diagram/domain';
 
 // PlatformDiagram の diagramOverlay に差し込む編集レイヤ。
@@ -27,6 +27,8 @@ type Props = {
   bounds: Bounds;
   physicalLength: number;
   cars: CarLike[];
+  /** パターンが持つ号車番号の向き。区間から推定すると1両編成で向きが決まらないため、保存値を受ける */
+  ascendToward: CarNumbersAscendToward;
   /** xPositionMeters === null のセルは図に描けないため、ここには渡さない（呼び出し側でフィルタ済み） */
   cellHandles: CellHandleData[];
   selectedCellId: string | null;
@@ -58,7 +60,7 @@ function useCanvasRect(rootRef: RefObject<HTMLDivElement | null>) {
 }
 
 export function DiagramEditLayer({
-  rows, bounds, physicalLength, cars, cellHandles, selectedCellId,
+  rows, bounds, physicalLength, cars, ascendToward, cellHandles, selectedCellId,
   onSelectCell, onMoveCell, onShiftConsist,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,8 @@ export function DiagramEditLayer({
   const sortedCars = useMemo(() => [...cars].sort((a, b) => a.carNumber - b.carNumber), [cars]);
   // 号車番号昇順でxが減少する反転編成（docs/domain/platform-coordinate-system.md「号車の向き」）
   // では、外端のハンドルが指す start/end フィールドが入れ替わる（editDraft.ts参照）
-  const reversed = useMemo(() => isDoorOrderReversed(sortedCars), [sortedCars]);
+  // （StopPatternInspector・shiftConsistByEdge と同じく、パターンの向きの保存値から決める）
+  const reversed = ascendToward === 'minusX';
 
   // 外端は自分の側のホーム端にだけ吸着させる。反対側の端に吸着すると、編成全体がホームの外へ引き寄せられる
   const leftEdgeCandidates = useCallback(() => [0], []);
