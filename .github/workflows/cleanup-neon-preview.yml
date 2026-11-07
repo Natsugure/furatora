@@ -14,7 +14,7 @@ jobs:
     steps:
       # Vercel の統合が作るブランチ名は preview/<git-branch> で固定されている。
       # 対象が既に無い場合もこのアクションは正常終了する。
-      - uses: neondatabase/delete-branch-action@v3
+      - uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3.2.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: preview/${{ github.head_ref }}

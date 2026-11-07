@@ -1,0 +1,40 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # pnpm の minimumReleaseAge（3日）とそろえる。
+    cooldown:
+      default-days: 3
+    # Issue で移行を管理しているメジャー版は PR にしない。移行を終えたら外す
+    ignore:
+      # #229（ESLint 10）
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # #230（vitest 5・Vite 8・plugin-react 6 はまとめて上げる。別々に上げると版の制約にぶつかる）
+      - dependency-name: vitest
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+    # メジャー版の更新は、まとめずに1つずつ PR にする
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    # npm と同じく、メジャー版の更新はまとめずに1つずつ PR にする
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
