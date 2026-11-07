@@ -7,6 +7,7 @@ minimumReleaseAge: 4320
 minimumReleaseAgeExclude: []
 
 trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 43200
 # 30日の内側で trustPolicy に止まった版を入れるときだけ「名前@版」で載せ、理由をコメントで書く
 trustPolicyExclude: []
 
