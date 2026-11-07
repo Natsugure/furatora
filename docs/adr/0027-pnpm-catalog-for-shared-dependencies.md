@@ -1,6 +1,6 @@
 # ADR-0027: 2つ以上のパッケージで使う依存の版を、pnpm の catalog の1か所に置く
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-11-07
 - **決定者**: @Natsugure
 - **関連**: [ADR-0026](./0026-pnpm-dependency-version-gates.md)（版は `^` を付けずに固定する）,

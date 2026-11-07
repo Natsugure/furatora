@@ -76,7 +76,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0024](./0024-free-space-ring-and-transfer-plate-edge.md) | ホーム図の一部編成のフリースペースを同じローズの輪にし、乗換のプレートの枠を neutral-500 にする | Accepted   | 2026-10-23 |
 | [0025](./0025-stop-pattern-as-car-one-anchor.md) | 停車位置パターンを号車ごとの区間ではなく「1号車の外側の端＋号車番号の向き」で持つ | Accepted   | 2026-11-06 |
 | [0026](./0026-pnpm-dependency-version-gates.md) | 依存の版を選ぶときに pnpm の関所を設け、pnpm は当面 10 系にとどめる | Accepted   | 2026-11-07 |
-| [0027](./0027-pnpm-catalog-for-shared-dependencies.md) | 2つ以上のパッケージで使う依存の版を、pnpm の catalog の1か所に置く | Proposed   | 2026-11-07 |
+| [0027](./0027-pnpm-catalog-for-shared-dependencies.md) | 2つ以上のパッケージで使う依存の版を、pnpm の catalog の1か所に置く | Accepted   | 2026-11-07 |
 
 ## 関連ドキュメント
 
