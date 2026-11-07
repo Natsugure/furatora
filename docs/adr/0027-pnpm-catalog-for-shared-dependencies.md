@@ -65,10 +65,21 @@
 ### 3. catalog に置かないもの
 
 - 1つのパッケージでしか使わず、組にも属さない依存。その `package.json` に固定した版で書く
-- `peerDependencies`。範囲（`^19` など）のまま、各パッケージに書く。利用する側の版を縛らないため
+- `peerDependencies`。範囲（`^19` など）のまま、各パッケージに書く。利用する側の版を縛らないため（ただし決定4）
 - `workspace:*` の内部パッケージ
 
-### 4. パッケージごとに版を意図して変えるときは、名前付きの catalog を使う
+### 4. `peerDependencies` に書いた依存は、同じパッケージの `devDependencies` にも `"catalog:"` で置く
+
+- 例: `packages/platform-diagram` は `peerDependencies` に `react: ^19` を書き、`devDependencies` に `react: "catalog:"` を書く
+- `peerDependencies` だけだと、pnpm はその peer を自動で入れ（`autoInstallPeers`）、範囲の中の最新に解決する。
+  catalog の版と別の版になりうる
+- 実際に、`pnpm update -r` で platform-diagram の React だけが 19.3.1 に上がり、web・admin（catalog の 19.2.3）と
+  2つの React が混ざった。ホーム図の部品を描くテストが `Cannot read properties of null (reading 'useId')` で落ちた
+  （2026-11-07）
+- `devDependencies` に置くと、そのパッケージの開発とテストはワークスペースと同じ版の1つに解決される。
+  利用する側に求める範囲は `peerDependencies` のまま変わらない
+
+### 5. パッケージごとに版を意図して変えるときは、名前付きの catalog を使う
 
 段階的な移行（片方のアプリだけ先にメジャー版を上げる）などで、版を意図して分けるときは、
 `catalogs:` に名前付きの catalog（例: `next17`）を作り、そのパッケージだけ `"catalog:next17"` と書く。
