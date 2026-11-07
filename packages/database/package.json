@@ -17,13 +17,13 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.2",
+    "@neondatabase/serverless": "1.2.0",
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
-    "dotenv": "^17.2.3",
+    "dotenv": "17.4.2",
     "drizzle-kit": "catalog:",
     "eslint": "catalog:",
     "eslint-config-next": "catalog:",

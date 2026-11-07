@@ -15,7 +15,7 @@
   "devDependencies": {
     "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",

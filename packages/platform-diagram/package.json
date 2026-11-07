@@ -24,6 +24,7 @@
     "@types/react": "catalog:",
     "eslint": "catalog:",
     "eslint-config-next": "catalog:",
+    "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

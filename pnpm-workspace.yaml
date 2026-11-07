@@ -41,7 +41,12 @@ catalog:
   "@testing-library/react": 16.3.2
   "@testing-library/user-event": 14.6.1
   # スクリプトの実行
-  tsx: 4.21.0
+  tsx: 4.23.15
+
+overrides:
+  # vitest 4.1.12 の配下の vite 7.3.1 に脆弱性があり、pnpm update では配下まで上がらないため、7 系の修正版に引き上げる。
+  # vitest 5・Vite 8 へ移行するときに外す
+  "vite@7": 7.3.7
 
 minimumReleaseAge: 4320
 # 3日を待てない修正版だけを「名前@版」で載せ、理由・載せた日・外す日をコメントで書く
