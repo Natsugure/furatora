@@ -75,6 +75,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0023](./0023-diagram-orientation-by-viewport-in-platform-card.md) | ホーム図は画面の幅で横と縦を切り替え、番線のカードに収める（回してよいが、鏡写しにしない） | Accepted   | 2026-10-21 |
 | [0024](./0024-free-space-ring-and-transfer-plate-edge.md) | ホーム図の一部編成のフリースペースを同じローズの輪にし、乗換のプレートの枠を neutral-500 にする | Accepted   | 2026-10-23 |
 | [0025](./0025-stop-pattern-as-car-one-anchor.md) | 停車位置パターンを号車ごとの区間ではなく「1号車の外側の端＋号車番号の向き」で持つ | Accepted   | 2026-11-06 |
+| [0026](./0026-pnpm-dependency-version-gates.md) | 依存の版を選ぶときに pnpm の関所を設け、pnpm は当面 10 系にとどめる | Proposed   | 2026-11-07 |
 
 ## 関連ドキュメント
 
