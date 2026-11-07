@@ -1,0 +1,40 @@
+# 依存の脆弱性を pnpm audit で調べる（ADR-0028）。
+# high 以上で落とす。moderate 以下は Dependabot のセキュリティ更新で片付ける。
+# PR では依存を変えたときだけ回し、新しく公開された脆弱性は定期実行で拾う。
+name: Dependencies Audit
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - "**/package.json"
+      - .github/workflows/dependencies-audit.yml
+  schedule:
+    # UTC で毎日 19:00（JST 翌 4:00）
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: pnpm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # pnpm の版は package.json の packageManager から読む（ADR-0026）
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Audit
+        run: pnpm audit --audit-level=high
