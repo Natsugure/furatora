@@ -9,37 +9,37 @@ packages:
 # 1つのパッケージでしか使わない依存と peerDependencies は、ここに入れない。
 catalog:
   # フレームワーク
-  next: 16.4.4
+  next: 16.4.5
   # web だけで使うが、next と同じ版にそろえるため一緒に置く
-  "@next/third-parties": 16.4.4
-  react: 19.2.3
-  react-dom: 19.2.3
+  "@next/third-parties": 16.4.5
+  react: 19.3.1
+  react-dom: 19.3.1
   "@mantine/core": 8.3.15
   "@mantine/hooks": 8.3.15
   # admin だけで使うが、@mantine/core・@mantine/hooks と同じ版を peer に求めるため一緒に置く
   "@mantine/notifications": 8.3.15
   lucide-react: 0.564.0
-  tailwindcss: 4.1.18
-  "@tailwindcss/postcss": 4.1.18
+  tailwindcss: 4.3.4
+  "@tailwindcss/postcss": 4.3.4
   # DB
   drizzle-orm: 0.45.4
   drizzle-kit: 0.31.11
   # 型
   typescript: 5.9.3
   "@types/node": 24.19.2
-  "@types/react": 19.2.9
-  "@types/react-dom": 19.2.3
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
   # lint
   eslint: 9.39.5
   # next と同じ版にそろえる
-  eslint-config-next: 16.4.4
+  eslint-config-next: 16.4.5
   # テスト
   vitest: 4.1.12
   "@vitejs/plugin-react": 5.2.0
   jsdom: 28.1.0
   "@testing-library/jest-dom": 6.9.1
-  "@testing-library/react": 16.3.2
-  "@testing-library/user-event": 14.6.1
+  "@testing-library/react": 16.3.3
+  "@testing-library/user-event": 14.6.8
   # スクリプトの実行
   tsx: 4.23.15
 
