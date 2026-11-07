@@ -1,6 +1,19 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+minimumReleaseAge: 4320
+# 3日を待てない修正版だけを「名前@版」で載せ、理由・載せた日・外す日をコメントで書く
+minimumReleaseAgeExclude: []
+
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 43200
+# 30日の内側で trustPolicy に止まった版を入れるときだけ「名前@版」で載せ、理由をコメントで書く
+trustPolicyExclude: []
+
+savePrefix: ""
+blockExoticSubdeps: true
+strictDepBuilds: true
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

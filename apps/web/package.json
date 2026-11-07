@@ -13,7 +13,6 @@
   },
   "keywords": [],
   "author": "Natsugure",
-  "packageManager": "pnpm@10.7.0",
   "devDependencies": {
     "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
