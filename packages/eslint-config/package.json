@@ -8,9 +8,9 @@
     "./next-app": "./next-app.mjs"
   },
   "dependencies": {
-    "eslint-config-next": "16.1.3"
+    "eslint-config-next": "catalog:"
   },
   "devDependencies": {
-    "eslint": "^9"
+    "eslint": "catalog:"
   }
 }

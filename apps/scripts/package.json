@@ -8,11 +8,11 @@
   },
   "dependencies": {
     "@furatora/database": "workspace:*",
-    "drizzle-orm": "^0.45.1"
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@furatora/typescript-config": "workspace:*",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }
