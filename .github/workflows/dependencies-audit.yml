@@ -4,13 +4,11 @@
 name: Dependencies Audit
 
 on:
+  # paths で絞らない。`pnpm audit` は main の必須のチェックであり、
+  # ワークフローが走らないと報告が無いまま待ちになり、依存を変えない PR までマージできなくなる。
+  # 依存を変えたかは changes ジョブで判定し、変えていなければ audit をスキップする（スキップは必須のチェックを満たす）。
   pull_request:
     branches: [ main ]
-    paths:
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - "**/package.json"
-      - .github/workflows/dependencies-audit.yml
   schedule:
     # UTC で毎日 19:00（JST 翌 4:00）
     - cron: "0 19 * * *"
@@ -20,8 +18,35 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deps: ${{ steps.diff.outputs.deps }}
+    steps:
+      # PR では refs/pull/N/merge がチェックアウトされる。1つ目の親が main の先端なので、
+      # HEAD^1..HEAD がこの PR の変更になる
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Diff dependency files
+        id: diff
+        run: |
+          if git diff --name-only HEAD^1 HEAD \
+            | grep -qE '(^|/)package\.json$|^pnpm-(lock|workspace)\.yaml$|^\.github/workflows/dependencies-audit\.yml$'; then
+            echo "deps=true" >> "$GITHUB_OUTPUT"
+          fi
+
   audit:
+    # main の必須のチェックの名前。変えると必須のチェックが待ちのまま残る
     name: pnpm audit
+    needs: changes
+    # 定期実行・手動実行では changes がスキップされるため、!cancelled() で audit まで連鎖してスキップされるのを防ぐ
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.deps == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
