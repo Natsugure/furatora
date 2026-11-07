@@ -2,6 +2,52 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# ----------------------------------------------------------------------------
+# 2つ以上のパッケージで使う依存の版 (ADR-0027)
+# ----------------------------------------------------------------------------
+# 各 package.json では "catalog:" と書く。版は ^ を付けずに固定する (ADR-0026)。
+# 1つのパッケージでしか使わない依存と peerDependencies は、ここに入れない。
+catalog:
+  # フレームワーク
+  next: 16.4.4
+  # web だけで使うが、next と同じ版にそろえるため一緒に置く
+  "@next/third-parties": 16.4.4
+  react: 19.2.3
+  react-dom: 19.2.3
+  "@mantine/core": 8.3.15
+  "@mantine/hooks": 8.3.15
+  # admin だけで使うが、@mantine/core・@mantine/hooks と同じ版を peer に求めるため一緒に置く
+  "@mantine/notifications": 8.3.15
+  lucide-react: 0.564.0
+  tailwindcss: 4.1.18
+  "@tailwindcss/postcss": 4.1.18
+  # DB
+  drizzle-orm: 0.45.4
+  drizzle-kit: 0.31.11
+  # 型
+  typescript: 5.9.3
+  "@types/node": 24.19.2
+  "@types/react": 19.2.9
+  "@types/react-dom": 19.2.3
+  # lint
+  eslint: 9.39.5
+  # next と同じ版にそろえる
+  eslint-config-next: 16.4.4
+  # テスト
+  vitest: 4.1.12
+  "@vitejs/plugin-react": 5.2.0
+  jsdom: 28.1.0
+  "@testing-library/jest-dom": 6.9.1
+  "@testing-library/react": 16.3.2
+  "@testing-library/user-event": 14.6.1
+  # スクリプトの実行
+  tsx: 4.23.15
+
+overrides:
+  # vitest 4.1.12 の配下の vite 7.3.1 に脆弱性があり、pnpm update では配下まで上がらないため、7 系の修正版に引き上げる。
+  # vitest 5・Vite 8 へ移行するときに外す
+  "vite@7": 7.3.7
+
 minimumReleaseAge: 4320
 # 3日を待てない修正版だけを「名前@版」で載せ、理由・載せた日・外す日をコメントで書く
 minimumReleaseAgeExclude: []
@@ -12,6 +58,7 @@ trustPolicyIgnoreAfter: 43200
 trustPolicyExclude: []
 
 savePrefix: ""
+catalogMode: strict
 blockExoticSubdeps: true
 strictDepBuilds: true
 ignoredBuiltDependencies:
