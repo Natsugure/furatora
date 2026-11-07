@@ -9,9 +9,9 @@ packages:
 # 1つのパッケージでしか使わない依存と peerDependencies は、ここに入れない。
 catalog:
   # フレームワーク
-  next: 16.1.6
+  next: 16.4.4
   # web だけで使うが、next と同じ版にそろえるため一緒に置く
-  "@next/third-parties": 16.1.6
+  "@next/third-parties": 16.4.4
   react: 19.2.3
   react-dom: 19.2.3
   "@mantine/core": 8.3.15
@@ -32,7 +32,7 @@ catalog:
   # lint
   eslint: 9.39.5
   # next と同じ版にそろえる
-  eslint-config-next: 16.1.3
+  eslint-config-next: 16.4.4
   # テスト
   vitest: 4.1.12
   "@vitejs/plugin-react": 5.2.0

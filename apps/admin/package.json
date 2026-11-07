@@ -30,7 +30,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@auth/core": "^0.41.0",
+    "@auth/core": "0.41.3",
     "@furatora/database": "workspace:*",
     "@furatora/platform-diagram": "workspace:*",
     "@furatora/transfer-difficulty": "workspace:*",
@@ -40,7 +40,7 @@
     "drizzle-orm": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
-    "next-auth": "5.0.0-beta.30",
+    "next-auth": "5.0.0-beta.32",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
