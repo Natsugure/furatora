@@ -33,6 +33,8 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
+    # npm と同じく、メジャー版の更新はまとめずに1つずつ PR にする
     groups:
       github-actions:
         patterns: ["*"]
+        update-types: [minor, patch]
