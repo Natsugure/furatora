@@ -1,6 +1,6 @@
 # ADR-0026: 依存の版を選ぶときに pnpm の関所を設け、pnpm は当面 10 系にとどめる
 
-- **ステータス**: Proposed
+- **ステータス**: Accepted
 - **日付**: 2026-11-07
 - **決定者**: @Natsugure
 - **関連**: [ADR-0008](./0008-environment-database-branch-mapping.md)（Vercel のビルド時にマイグレーションが走る）,
