@@ -40,7 +40,11 @@ const bizUdpGothic = BIZ_UDPGothic({
 });
 
 export const metadata: Metadata = {
-  title: 'ふらっと乗換 | バリアフリー駅・列車案内',
+  // 各ページは %s の部分だけを返す（features/station/domain/pageTitle.ts）。トップは default のまま
+  title: {
+    default: 'ふらっと乗換 | バリアフリー駅・列車案内',
+    template: '%s | ふらっと乗換',
+  },
   description: '首都圏の鉄道のベビーカー・車いすに優しい乗り換えルートを検索できます。他社線同士の乗り換えや、実際に列車に乗ったあとのフリースペース情報までわかりやすくご案内します。',
 };
 
