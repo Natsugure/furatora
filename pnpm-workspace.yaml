@@ -57,6 +57,14 @@ trustPolicyIgnoreAfter: 43200
 # 30日の内側で trustPolicy に止まった版を入れるときだけ「名前@版」で載せ、理由をコメントで書く
 trustPolicyExclude: []
 
+# pnpm audit で high 以上でも直せないものだけを GHSA の ID で載せ、理由・解消の条件・見直しの期限をコメントで書く (ADR-0028)
+auditConfig:
+  ignoreGhsas:
+    # picomatch <=4.0.7 の ReDoS（細工した extglob で処理が極端に遅くなる）。修正版が無い（2026-11-18 時点で最新が 4.0.7）。
+    # eslint-config-next の配下（開発用の lint）にしかなく、glob パターンは自分で書いた設定からしか渡らないため悪用されない。
+    # 解消の条件: picomatch の修正版が出て、配下まで上がったら外す。見直しの期限: 2026-12-18
+    - GHSA-fc5q-39xc-vjpf
+
 savePrefix: ""
 catalogMode: strict
 blockExoticSubdeps: true
