@@ -7,13 +7,35 @@ describe('stationPageTitle', () => {
   });
 
   it('中にカッコを持つ路線名はそのまま出す', () => {
-    expect(stationPageTitle('王子駅前', ['東京さくらトラム（都電荒川線）'])).toBe(
-      '王子駅前駅 東京さくらトラム（都電荒川線）',
+    expect(stationPageTitle('A', ['東京さくらトラム（都電荒川線）'])).toBe(
+      'A駅 東京さくらトラム（都電荒川線）',
     );
   });
 
   it('駅名が「駅」で終わるときは「駅」を足さない', () => {
     expect(stationPageTitle('A駅', ['B線'])).toBe('A駅 B線');
+  });
+
+  it('駅名が「駅前」で終わるときは「駅」を足さない', () => {
+    expect(stationPageTitle('A駅前', ['B線'])).toBe('A駅前 B線');
+  });
+
+  it('駅名の途中に「駅」があるときは「駅」を足さない', () => {
+    expect(stationPageTitle('A駅東口', ['B線'])).toBe('A駅東口 B線');
+    expect(stationPageTitle('A駅前通', ['B線'])).toBe('A駅前通 B線');
+  });
+
+  it('駅名が「駅前」だけのときは「駅」を足さない', () => {
+    expect(stationPageTitle('駅前', ['B線'])).toBe('駅前 B線');
+  });
+
+  it('駅名が「ステーション」で終わるときは「駅」を足さない', () => {
+    expect(stationPageTitle('A・ステーション', ['B線'])).toBe('A・ステーション B線');
+  });
+
+  // 「駅家」（正式には駅家駅）のように「駅」で始まる地名にも足さない。ADR-0029 で受け入れたトレードオフ
+  it('駅名が「駅」で始まる地名のときも「駅」を足さない', () => {
+    expect(stationPageTitle('駅A', ['B線'])).toBe('駅A B線');
   });
 
   it('複数の路線は重複を除いて「、」でつなぐ', () => {

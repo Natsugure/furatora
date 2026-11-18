@@ -10,3 +10,7 @@
 - [x] **TASK-6** 路線の駅一覧ページに `cache` と `generateMetadata` を足す
 - [x] **TASK-7** `pnpm test`・`typecheck`・`lint`、ブラウザで4種類のページの `document.title` を確かめる
 - [x] **TASK-8** `docs/domain/` が変わらないことを確かめ、PR（`Closes #8`）
+- [x] **TASK-9** レビューを受けて、「駅前」「・ステーション」などに「駅」を足さないテストを書き、落ちることを確かめる
+- [x] **TASK-10** `stationPageTitle` の判定を直し、テストを通す。ADR-0029（Proposed）を足す
+- [x] **TASK-11** `pnpm test`・`typecheck`・`lint`、ブラウザで王子駅前のページの `document.title` を確かめる
+- [ ] **TASK-12** マージ後、ADR-0029 を開発者の承認を得て Accepted にする
