@@ -78,6 +78,7 @@ furatora のアーキテクチャ決定は代替案の比較が主成分であ�
 | [0026](./0026-pnpm-dependency-version-gates.md) | 依存の版を選ぶときに pnpm の関所を設け、pnpm は当面 10 系にとどめる | Accepted   | 2026-11-07 |
 | [0027](./0027-pnpm-catalog-for-shared-dependencies.md) | 2つ以上のパッケージで使う依存の版を、pnpm の catalog の1か所に置く | Accepted   | 2026-11-07 |
 | [0028](./0028-dependency-audit-threshold-high.md) | 依存の監査は high 以上で CI を落とし、moderate 以下は Dependabot のセキュリティ更新で片付ける | Proposed   | 2026-11-07 |
+| [0029](./0029-station-title-eki-suffix-by-name.md) | 駅ページのタイトルで「駅」を足すかを駅名の文字だけで決め、名前に「駅」を含むものと「ステーション」で終わるものには足さない | Proposed   | 2026-11-18 |
 
 ## 関連ドキュメント
 

@@ -1,5 +1,8 @@
+import { cache } from 'react';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getVisibleLineWithStations } from '@/external/query/lineStationsQuery';
+import { linePageTitle } from '@/features/station/domain/pageTitle';
 import { BackButton } from '@/components/BackButton';
 import { StationTimeline } from '@/components/StationTimeline';
 import { Container } from '@/components/ui/Container';
@@ -10,9 +13,20 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
+// 本体と generateMetadata が同じリクエストで DB を2回読まないように、結果を使い回す
+const getLineWithStations = cache(getVisibleLineWithStations);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const data = await getLineWithStations(slug);
+  // 公開駅を持たない路線は可視性の述語（visibleLine()）で null になるため、路線名はタイトルに出ない
+  if (!data) notFound();
+  return { title: linePageTitle(data.line.name) };
+}
+
 export default async function StationListPage({ params }: Props) {
   const { slug } = await params;
-  const data = await getVisibleLineWithStations(slug);
+  const data = await getLineWithStations(slug);
 
   if (!data) {
     notFound();

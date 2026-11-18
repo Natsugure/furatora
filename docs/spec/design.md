@@ -1,45 +1,62 @@
-# 設計: 停車位置パターンの基準点を NOT NULL にし、train_stop_pattern_cars を DROP する (Issue #224)
+# 設計: 駅ページ・路線の駅一覧ページのタイトルに駅名・路線名を出す (Issue #8)
 
-参照: [requirements.md](./requirements.md) / [tasks.md](./tasks.md) / [ADR-0025](../adr/0025-stop-pattern-as-car-one-anchor.md)
+参照: [requirements.md](./requirements.md) / [tasks.md](./tasks.md)
 
-## マイグレーション
+## サイト名は `title.template` にまとめる
 
-| ファイル | 作り方 | 内容 |
-|---|---|---|
-| `0024_rebackfill_stop_pattern_car_one_anchor.sql` | `drizzle-kit generate --custom` | 0023 と同じ UPDATE（`car_one_outer_meters IS NULL` の行だけ） |
-| `0025_stop_pattern_anchor_not_null.sql` | `db:generate` | `DROP TABLE "train_stop_pattern_cars" CASCADE`、2列の `SET NOT NULL` |
-
-- 0024 → 0025 の順に、Vercel のビルドの `db:migrate` が流す。埋め戻しは DROP より先に走る
-- 旧表に1号車の行が無いパターンは 0024 で埋まらず、0025 の `SET NOT NULL` が失敗してビルドが止まる。
-  マージ直前に本番で `SELECT id FROM train_stop_patterns WHERE car_one_outer_meters IS NULL OR car_numbers_ascend_toward IS NULL;` が 0 件であることを確かめる
-- 書き込み（Admin の zod `stopPatternSchema`、`stopPatternRepository`）は1段目から2列を必ず埋めている
-
-## 読み取り
-
-`packages/platform-diagram/src/domain/stopPatternCars.ts`（新規、domain のバレルから export）
+`apps/web/src/app/layout.tsx`
 
 ```ts
-groupEquipmentsByTrainCar(rows: { trainId; carNumber; type: TrainEquipmentType; nearDoor; isStandard }[]): EquipmentsByTrainCar
-// EquipmentsByTrainCar = { get(trainId, carNumber): { free, prio } | undefined }。キーの組み立てを外に出さない
-
-stopPatternCarsOf(
-  pattern: { trainId; carOneOuterMeters: string; carNumbersAscendToward },
-  carCount, carStructure: CarStructureSpec[], equipments: EquipmentsByTrainCar,
-): StopPatternCarDTO[]
+title: {
+  default: 'ふらっと乗換 | バリアフリー駅・列車案内', // トップ（REQ-4）
+  template: '%s | ふらっと乗換',
+},
 ```
 
-- `resolvePatternCars()` の `PatternAnchor` を非 null にし、null を返す分岐を外す
-- Web `stationDetailQuery.ts`・Admin `stationLayoutPageQuery.ts` は上の2関数を呼ぶだけにし、`if (!resolved || !ascendToward) continue;` を消す
-- `type` は `TrainEquipmentType` で受ける。型を schema から `@furatora/database/enums` へ移し、domain の packages から import できるようにする（ADR-0015 決定3）。種別を増やすと振り分けの `switch` が型エラーになる
+各ページは `%s` の部分だけを返す。
+
+## タイトルの組み立て（純関数）
+
+`apps/web/src/features/station/domain/pageTitle.ts`（新規）
+
+```ts
+stationPageTitle(stationName: string, lineNames: string[]): string // '渋谷駅 東京メトロ銀座線'
+linePageTitle(lineName: string): string                            // '東京メトロ銀座線の駅一覧'
+```
+
+- 「駅」を足すかは駅名の文字だけで決める。名前に「駅」を含むか、「ステーション」で終わるときは足さない（REQ-1.1）。
+  停留場かどうかは見分けず、「駅家」も「駅家」と出る。根拠は [ADR-0029](../adr/0029-station-title-eki-suffix-by-name.md)
+- 書式をカッコにしない。「東京さくらトラム（都電荒川線）」のように、中にカッコを持つ路線名があるため
+- 路線名は「、」でつなぐ。「日暮里・舎人ライナー」のように、路線名の中に「・」が出てくるため
+- 今は複数の路線を持つ駅は0件だが、#82 で粒度が変わっても受けられるようにしておく
+- features に line は無い。路線の駅一覧は station の画面の一部なので、同じファイルに置く
+
+## ページ
+
+| ページ | 読み取り | `generateMetadata` |
+|---|---|---|
+| `stations/[slug]/page.tsx` | `cache(getStationDetail)`（`@/di`） | `stationPageTitle(station.name, stationLines の lineName)` |
+| `lines/[slug]/stations/page.tsx` | `cache(getVisibleLineWithStations)` | `linePageTitle(line.name)` |
+
+- React の `cache` は1回のリクエストの中で結果を使い回す。本体と `generateMetadata` が同じ包んだ関数を呼ぶので、
+  DB を読むのは1回になる（REQ-5）。`cache` はページのファイルの中で包む。`di.ts` はページ以外からも使えるように、そのままにする
+- 結果が null のときは `generateMetadata` でも `notFound()` を呼び、タイトルは `app/not-found.tsx` の `metadata` に任せる（REQ-3）。未公開の駅・路線は、クエリの可視性の述語
+  （`publishedStation()` / `visibleLine()`）で null になるので、名前を受け取ること自体が無い
+
+## エラー
+
+| 状況 | タイトル | 本体 |
+|---|---|---|
+| slug が無い・未公開 | `ページが見つかりません | ふらっと乗換` | `notFound()`（今のまま） |
+| DB の読み取りが失敗する | — | `error.tsx`（今のまま。`generateMetadata` も同じ例外で失敗する） |
 
 ## テスト
 
-- `carSegments.test.ts`: null を受けないことを `@ts-expect-error` で確かめる（呼び出さない）
-- `stopPatternCars.test.ts`: string の基準点からの算出、設備の振り分け、他の列車の設備を添えないこと
-- DB に触れるクエリは単体テストの仕組みが無いため、型チェックとブラウザ確認で代える
+- `pageTitle.test.ts`: REQ-1〜1.3・REQ-2 を固定データで確かめる
+- ページと `cache` は単体テストの仕組みが無いため、型チェックとブラウザで `document.title` を見て確かめる
 
 ## 恒久知識の振り分け
 
-- `docs/domain/train-stop-patterns.md`: 適用状況の注記を外し、2列が NOT NULL であることと `stopPatternCarsOf()` を書く
-- `packages/database/CLAUDE.md`: 既知の誤検出の外部キーから旧表の分を外す
-- ADR: 新しい決定は無い（ADR-0025 は Accepted のまま）
+- `docs/domain/`: 書き換えない。タイトルの書式は画面の都合で、鉄道ドメインのルールではない
+- ADR: 「駅」を足すかの判定を [ADR-0029](../adr/0029-station-title-eki-suffix-by-name.md) にする。
+  例外の形と、受け入れたトレードオフ（「駅家」・停留場）を覆すには、明示的な判断が要るため。書式のそのほかの部分は ADR にしない

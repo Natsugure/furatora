@@ -1,12 +1,16 @@
-# タスク: 停車位置パターンの基準点を NOT NULL にし、train_stop_pattern_cars を DROP する (Issue #224)
+# タスク: 駅ページ・路線の駅一覧ページのタイトルに駅名・路線名を出す (Issue #8)
 
-ブランチ: `refactor/stop-pattern-not-null-224`（`main` から）
+ブランチ: `feature/issue-8-page-title`（`main` から）
 
-- [x] **TASK-1** 着手前の確認: 本番・development の履歴件数（24 で一致）と NULL の行（0 件）
-- [x] **TASK-2** `resolvePatternCars` の null 分岐を外す（テスト先行）
-- [x] **TASK-3** `stopPatternCarsOf` / `groupEquipmentsByTrainCar` を `platform-diagram` に足し（テスト先行）、Web・Admin の query を置き換える
-- [x] **TASK-4** マイグレーション 0024（`--custom`、埋め戻しの流し直し）・0025（`db:generate`、DROP と NOT NULL）。0025 に想定外の文が無いことを確認
-- [x] **TASK-5** development に `pnpm run db:migrate`（開発者が実行）→ MCP で旧表が無いこと・2列が NOT NULL・履歴 26 件を確認
-- [x] **TASK-6** dev を再起動し、Web の駅詳細・Admin の駅レイアウトで停車位置が変わらず表示されることを確認
-- [x] **TASK-7** ドキュメント: `docs/domain/train-stop-patterns.md` の適用状況を外す、`packages/database/CLAUDE.md` の誤検出一覧を更新
-- [ ] **TASK-8** PR。マージ直前に本番で NULL 0 件を再確認する
+- [x] **TASK-1** spec の3点セットを Issue #8 用に書き換える
+- [x] **TASK-2** `pageTitle.test.ts` を書き、落ちることを確かめる
+- [x] **TASK-3** `pageTitle.ts` を実装し、テストを通す
+- [x] **TASK-4** `layout.tsx` の `title` を `default` / `template` にする
+- [x] **TASK-5** 駅ページに `cache` と `generateMetadata` を足す
+- [x] **TASK-6** 路線の駅一覧ページに `cache` と `generateMetadata` を足す
+- [x] **TASK-7** `pnpm test`・`typecheck`・`lint`、ブラウザで4種類のページの `document.title` を確かめる
+- [x] **TASK-8** `docs/domain/` が変わらないことを確かめ、PR（`Closes #8`）
+- [x] **TASK-9** レビューを受けて、「駅前」「・ステーション」などに「駅」を足さないテストを書き、落ちることを確かめる
+- [x] **TASK-10** `stationPageTitle` の判定を直し、テストを通す。ADR-0029（Proposed）を足す
+- [x] **TASK-11** `pnpm test`・`typecheck`・`lint`、ブラウザで王子駅前のページの `document.title` を確かめる
+- [ ] **TASK-12** マージ後、ADR-0029 を開発者の承認を得て Accepted にする
