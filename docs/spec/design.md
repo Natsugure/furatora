@@ -22,7 +22,6 @@ title: {
 ```ts
 stationPageTitle(stationName: string, lineNames: string[]): string // '渋谷駅 東京メトロ銀座線'
 linePageTitle(lineName: string): string                            // '東京メトロ銀座線の駅一覧'
-NOT_FOUND_TITLE = 'ページが見つかりません'
 ```
 
 - 書式をカッコにしない。「東京さくらトラム（都電荒川線）」のように、中にカッコを持つ路線名があるため
@@ -39,7 +38,7 @@ NOT_FOUND_TITLE = 'ページが見つかりません'
 
 - React の `cache` は1回のリクエストの中で結果を使い回す。本体と `generateMetadata` が同じ包んだ関数を呼ぶので、
   DB を読むのは1回になる（REQ-5）。`cache` はページのファイルの中で包む。`di.ts` はページ以外からも使えるように、そのままにする
-- 結果が null のときは `NOT_FOUND_TITLE` を返す（REQ-3）。未公開の駅・路線は、クエリの可視性の述語
+- 結果が null のときは `generateMetadata` でも `notFound()` を呼び、タイトルは `app/not-found.tsx` の `metadata` に任せる（REQ-3）。未公開の駅・路線は、クエリの可視性の述語
   （`publishedStation()` / `visibleLine()`）で null になるので、名前を受け取ること自体が無い
 
 ## エラー

@@ -2,7 +2,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getVisibleLineWithStations } from '@/external/query/lineStationsQuery';
-import { NOT_FOUND_TITLE, linePageTitle } from '@/features/station/domain/pageTitle';
+import { linePageTitle } from '@/features/station/domain/pageTitle';
 import { BackButton } from '@/components/BackButton';
 import { StationTimeline } from '@/components/StationTimeline';
 import { Container } from '@/components/ui/Container';
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const data = await getLineWithStations(slug);
   // 公開駅を持たない路線は可視性の述語（visibleLine()）で null になるため、路線名はタイトルに出ない
-  if (!data) return { title: NOT_FOUND_TITLE };
+  if (!data) notFound();
   return { title: linePageTitle(data.line.name) };
 }
 

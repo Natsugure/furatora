@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Info } from 'lucide-react';
 import { getStationDetail } from '@/di';
-import { NOT_FOUND_TITLE, stationPageTitle } from '@/features/station/domain/pageTitle';
+import { stationPageTitle } from '@/features/station/domain/pageTitle';
 import { PlatformDisplay } from '@/features/platform/components/PlatformDisplay';
 import { PlatformTabs } from '@/features/platform/components/PlatformTabs';
 import { reachableLines } from '@/features/station/domain/reachableLines';
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const data = await getDetail(slug);
   // 未公開の駅は可視性の述語（publishedStation()）で null になるため、駅名はタイトルに出ない
-  if (!data) return { title: NOT_FOUND_TITLE };
+  if (!data) notFound();
   return { title: stationPageTitle(data.station.name, data.stationLines.map((l) => l.lineName)) };
 }
 
