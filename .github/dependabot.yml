@@ -21,6 +21,14 @@ updates:
       # #240（Mantine 9。core・hooks・notifications は互いに同じ版を peer に求めるので、まとめて上げる）
       - dependency-name: "@mantine/*"
         update-types: ["version-update:semver-major"]
+      # 以下は Issue で管理しない、外す条件が決まっている除外
+      # @types/node は実行環境の Node（engines: 24.x）に合わせる。Node を上げるときに外す
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7（Go 版）は JS API を持たず、typescript-eslint などが追いつくまで見送る。
+      # 7 への橋渡しになる 6.x は受け取る
+      - dependency-name: typescript
+        versions: [">=7"]
     # メジャー版の更新は、まとめずに1つずつ PR にする
     groups:
       production-dependencies:
