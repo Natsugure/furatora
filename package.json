@@ -26,10 +26,10 @@
     "eslint": "catalog:",
     "eslint-config-next": "catalog:",
     "husky": "9.1.7",
-    "lint-staged": "17.6.0",
+    "lint-staged": "17.6.1",
     "tailwindcss": "catalog:",
     "tsx": "catalog:",
-    "turbo": "2.11.11",
+    "turbo": "2.11.13",
     "typescript": "catalog:"
   },
   "packageManager": "pnpm@10.34.9",
