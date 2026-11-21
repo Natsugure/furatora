@@ -18,7 +18,7 @@ catalog:
   "@mantine/hooks": 8.3.18
   # admin だけで使うが、@mantine/core・@mantine/hooks と同じ版を peer に求めるため一緒に置く
   "@mantine/notifications": 8.3.18
-  lucide-react: 0.564.0
+  lucide-react: 1.75.0
   tailwindcss: 4.3.5
   "@tailwindcss/postcss": 4.3.5
   # DB
