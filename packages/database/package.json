@@ -23,7 +23,7 @@
   "devDependencies": {
     "@furatora/eslint-config": "workspace:*",
     "@furatora/typescript-config": "workspace:*",
-    "dotenv": "17.4.2",
+    "dotenv": "18.0.10",
     "drizzle-kit": "catalog:",
     "eslint": "catalog:",
     "eslint-config-next": "catalog:",
